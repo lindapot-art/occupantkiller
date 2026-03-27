@@ -167,6 +167,11 @@ const Weapons = (() => {
     HUD.setAmmo(clip, reserve);
   }
 
+  function addAmmo(amount) {
+    reserve = Math.min(GUN.maxReserve, reserve + amount);
+    HUD.setAmmo(clip, reserve);
+  }
+
   function forceReload() { startReload(); }
   function isReloading() { return reloading; }
   function getClip()     { return clip; }
@@ -179,6 +184,7 @@ const Weapons = (() => {
     tryFire,
     update,
     reset,
+    addAmmo,
     forceReload,
     isReloading,
     getClip,

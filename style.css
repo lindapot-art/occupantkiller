@@ -240,3 +240,56 @@ canvas {
   70%  { opacity: 1; }
   100% { opacity: 0; }
 }
+/* Headshot indicator */
+#headshot-notif {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 20px;
+  font-weight: bold;
+  color: #ff8800;
+  letter-spacing: 5px;
+  opacity: 0;
+  pointer-events: none;
+}
+#headshot-notif.visible {
+  animation: headshotFade 1.2s forwards;
+}
+@keyframes headshotFade {
+  0%   { opacity: 1; transform: translateX(-50%) scale(1.15); }
+  30%  { opacity: 1; transform: translateX(-50%) scale(1); }
+  100% { opacity: 0; }
+}
+
+/* Pickup notification */
+#pickup-notif {
+  position: absolute;
+  bottom: 110px;
+  right: 24px;
+  font-size: 18px;
+  font-weight: bold;
+  opacity: 0;
+  pointer-events: none;
+  text-shadow: 0 0 8px currentColor;
+}
+#pickup-notif.visible {
+  animation: pickupFade 1.6s forwards;
+}
+@keyframes pickupFade {
+  0%   { opacity: 1; transform: translateY(0); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-18px); }
+}
+
+/* Hit marker – headshot variant (orange) */
+#hit-marker.headshot::before,
+#hit-marker.headshot::after {
+  background: #ff8800;
+}
+
+/* Pause screen title override */
+#pause-screen .btn:hover {
+  background: #fff;
+  color: #000;
+}

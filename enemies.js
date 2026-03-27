@@ -1,141 +1,218 @@
 /**
- * enemies.js – Occupant spawning, AI, and hit detection
- * Depends on: Three.js global (THREE), HUD
+ * enemies.js – Occupant spawning, AI, floating HP bars, and hit detection
+ * Three enemy types: NORMAL, RUNNER (wave 3+), TANK (wave 5+)
+ * Depends on: Three.js global (THREE)
  */
 
 const Enemies = (() => {
-  // ── Enemy config ──────────────────────────────────────────
-  const BASE_HP      = 60;
-  const BASE_SPEED   = 2.2;
-  const ATTACK_RANGE = 1.6;   // distance at which enemy melee-attacks player
-  const ATTACK_DMG   = 8;
-  const ATTACK_RATE  = 1.2;   // seconds between attacks
-
-  const BODY_COLOR   = 0xcc2222;
-  const HEAD_COLOR   = 0xffccaa;
-  const LIMB_COLOR   = 0x992222;
+  // ── Enemy type definitions ────────────────────────────────
+  const TYPES = {
+    NORMAL: {
+      name:        'OCCUPANT',
+      hpBase:      60,
+      speedBase:   2.2,
+      scale:       1.0,
+      bodyColor:   0xcc2222,
+      headColor:   0xffccaa,
+      limbColor:   0x992222,
+      eyeColor:    0xff0000,
+      attackDmg:   8,
+      attackRate:  1.2,
+      scoreValue:  100,
+      dropChance:  0.35,
+    },
+    RUNNER: {
+      name:        'RUNNER',
+      hpBase:      28,
+      speedBase:   4.0,
+      scale:       0.75,
+      bodyColor:   0x116688,
+      headColor:   0xaaccdd,
+      limbColor:   0x0d4455,
+      eyeColor:    0x00ffff,
+      attackDmg:   5,
+      attackRate:  0.8,
+      scoreValue:  150,
+      dropChance:  0.2,
+    },
+    TANK: {
+      name:        'TANK',
+      hpBase:      200,
+      speedBase:   1.1,
+      scale:       1.35,
+      bodyColor:   0x551166,
+      headColor:   0xddaabb,
+      limbColor:   0x330044,
+      eyeColor:    0xcc00ff,
+      attackDmg:   20,
+      attackRate:  1.8,
+      scoreValue:  300,
+      dropChance:  0.8,
+    },
+  };
 
   // ── Internal state ────────────────────────────────────────
-  let scene       = null;
-  let enemies     = [];         // array of enemy objects
-  let wave        = 1;
-  let waveEnemies = 0;
-  let spawnQueue  = 0;
-  let spawnTimer  = 0;
-  let allDead     = false;
+  let scene      = null;
+  let enemies    = [];
+  let wave       = 1;
+  let spawnQueue = [];   // array of type-name strings
+  let spawnTimer = 0;
+  let allDead    = false;
 
-  // ── Arena bounds for spawning ─────────────────────────────
   const ARENA_SIZE = 24;
 
-  // ── Build a simple humanoid mesh ──────────────────────────
-  function buildMesh() {
+  // ── Choose a type appropriate for the current wave ────────
+  function pickTypeForWave(w) {
+    const r = Math.random();
+    if (w >= 5 && r < 0.22) return 'TANK';
+    if (w >= 3 && r < 0.55) return 'RUNNER';
+    return 'NORMAL';
+  }
+
+  // ── Build humanoid mesh scaled to typeCfg ─────────────────
+  function buildMesh(typeCfg) {
     const group = new THREE.Group();
+    const s     = typeCfg.scale;
 
     const torso = new THREE.Mesh(
-      new THREE.BoxGeometry(0.52, 0.7, 0.26),
-      new THREE.MeshLambertMaterial({ color: BODY_COLOR })
+      new THREE.BoxGeometry(0.52 * s, 0.7 * s, 0.26 * s),
+      new THREE.MeshLambertMaterial({ color: typeCfg.bodyColor })
     );
-    torso.position.y = 0.85;
+    torso.position.y = 0.85 * s;
 
     const head = new THREE.Mesh(
-      new THREE.BoxGeometry(0.34, 0.34, 0.34),
-      new THREE.MeshLambertMaterial({ color: HEAD_COLOR })
+      new THREE.BoxGeometry(0.34 * s, 0.34 * s, 0.34 * s),
+      new THREE.MeshLambertMaterial({ color: typeCfg.headColor })
     );
-    head.position.y = 1.4;
+    head.position.y = 1.4 * s;
 
     const legL = new THREE.Mesh(
-      new THREE.BoxGeometry(0.21, 0.55, 0.21),
-      new THREE.MeshLambertMaterial({ color: LIMB_COLOR })
+      new THREE.BoxGeometry(0.21 * s, 0.55 * s, 0.21 * s),
+      new THREE.MeshLambertMaterial({ color: typeCfg.limbColor })
     );
-    legL.position.set(-0.14, 0.28, 0);
-
+    legL.position.set(-0.14 * s, 0.28 * s, 0);
     const legR = legL.clone();
-    legR.position.set(0.14, 0.28, 0);
+    legR.position.set(0.14 * s, 0.28 * s, 0);
 
     const armL = new THREE.Mesh(
-      new THREE.BoxGeometry(0.18, 0.52, 0.18),
-      new THREE.MeshLambertMaterial({ color: LIMB_COLOR })
+      new THREE.BoxGeometry(0.18 * s, 0.52 * s, 0.18 * s),
+      new THREE.MeshLambertMaterial({ color: typeCfg.limbColor })
     );
-    armL.position.set(-0.35, 0.82, 0);
-
+    armL.position.set(-0.35 * s, 0.82 * s, 0);
     const armR = armL.clone();
-    armR.position.set(0.35, 0.82, 0);
+    armR.position.set(0.35 * s, 0.82 * s, 0);
 
     group.add(torso, head, legL, legR, armL, armR);
 
     // Eye glow
-    const eyeGeo = new THREE.SphereGeometry(0.04, 6, 6);
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const eyeGeo = new THREE.SphereGeometry(0.04 * s, 6, 6);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: typeCfg.eyeColor });
     const eyeL   = new THREE.Mesh(eyeGeo, eyeMat);
-    eyeL.position.set(-0.08, 1.42, 0.18);
+    eyeL.position.set(-0.08 * s, 1.42 * s, 0.18 * s);
     const eyeR = eyeL.clone();
-    eyeR.position.set(0.08, 1.42, 0.18);
+    eyeR.position.set(0.08 * s, 1.42 * s, 0.18 * s);
     group.add(eyeL, eyeR);
 
-    // Collision helper (invisible bounding box approximation)
+    // Invisible hitbox
     const hitbox = new THREE.Mesh(
-      new THREE.BoxGeometry(0.6, 1.65, 0.4),
+      new THREE.BoxGeometry(0.6 * s, 1.65 * s, 0.4 * s),
       new THREE.MeshBasicMaterial({ visible: false })
     );
-    hitbox.position.y = 0.82;
+    hitbox.position.y = 0.82 * s;
     group.add(hitbox);
 
-    group.userData.hitbox = hitbox;
-    group.userData.parts  = [torso, head, legL, legR, armL, armR, hitbox];
+    group.userData.headMesh = head;
+    group.userData.hitbox   = hitbox;
+    group.userData.parts    = [torso, head, legL, legR, armL, armR, hitbox];
 
     return group;
   }
 
-  // ── Spawn one enemy at a random arena perimeter position ──
-  function spawnOne(hpMultiplier, speedMultiplier) {
+  // ── Floating HP bar (lives in scene, follows enemy) ───────
+  function buildHpBar() {
+    const group = new THREE.Group();
+
+    const bgMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.7, 0.09),
+      new THREE.MeshBasicMaterial({
+        color:      0x330000,
+        side:       THREE.DoubleSide,
+        depthTest:  false,
+        depthWrite: false,
+      })
+    );
+
+    const fgMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.7, 0.09),
+      new THREE.MeshBasicMaterial({
+        color:      0x44ff44,
+        side:       THREE.DoubleSide,
+        depthTest:  false,
+        depthWrite: false,
+      })
+    );
+    fgMesh.position.z = 0.002;
+
+    group.add(bgMesh, fgMesh);
+    scene.add(group);
+    return { group, fg: fgMesh };
+  }
+
+  // ── Spawn one enemy ───────────────────────────────────────
+  function spawnOne(typeName) {
+    const typeCfg = TYPES[typeName] || TYPES.NORMAL;
+
     const angle = Math.random() * Math.PI * 2;
     const r     = ARENA_SIZE * 0.46 + Math.random() * 4;
-    const x     = Math.cos(angle) * r;
-    const z     = Math.sin(angle) * r;
-
-    const mesh  = buildMesh();
-    mesh.position.set(x, 0, z);
+    const mesh  = buildMesh(typeCfg);
+    mesh.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
     scene.add(mesh);
 
-    const enemy = {
+    const waveHpBonus    = 1 + (wave - 1) * 0.22;
+    const waveSpeedBonus = 1 + (wave - 1) * 0.06;
+    const hp             = typeCfg.hpBase * waveHpBonus;
+
+    enemies.push({
       mesh,
-      hp:           BASE_HP * hpMultiplier,
-      maxHp:        BASE_HP * hpMultiplier,
-      speed:        BASE_SPEED * speedMultiplier,
-      attackTimer:  Math.random() * ATTACK_RATE,
-      alive:        true,
-      legAngle:     0,
-      legDir:       1,
-      deathTimer:   0,
-    };
-    enemies.push(enemy);
-    return enemy;
+      hpBar:       buildHpBar(),
+      typeCfg,
+      typeName,
+      hp,
+      maxHp:       hp,
+      speed:       typeCfg.speedBase * waveSpeedBonus,
+      attackDmg:   typeCfg.attackDmg,
+      attackTimer: Math.random() * typeCfg.attackRate,
+      attackRate:  typeCfg.attackRate,
+      scoreValue:  typeCfg.scoreValue,
+      dropChance:  typeCfg.dropChance,
+      alive:       true,
+      flashTimer:  0,
+      legAngle:    0,
+      legDir:      1,
+      deathTimer:  0,
+    });
   }
 
   // ── Initialise a wave ─────────────────────────────────────
   function startWave(w, sc) {
-    wave        = w;
-    scene       = sc;
-    enemies     = [];
-    allDead     = false;
+    wave    = w;
+    scene   = sc;
+    enemies = [];
+    allDead = false;
 
-    // Scale up difficulty each wave
-    waveEnemies = 4 + (w - 1) * 2;   // 4, 6, 8, 10 …
-    spawnQueue  = waveEnemies;
+    const count = 4 + (w - 1) * 2;
+    spawnQueue  = Array.from({ length: count }, () => pickTypeForWave(w));
     spawnTimer  = 0;
   }
 
   // ── Per-frame update ──────────────────────────────────────
   function update(delta, playerPos, onPlayerHit, onEnemyDied) {
     // Spawn from queue
-    if (spawnQueue > 0) {
+    if (spawnQueue.length > 0) {
       spawnTimer -= delta;
       if (spawnTimer <= 0) {
-        const hpMult    = 1 + (wave - 1) * 0.25;
-        const speedMult = 1 + (wave - 1) * 0.08;
-        spawnOne(hpMult, speedMult);
-        spawnQueue--;
-        spawnTimer = 0.5 + Math.random() * 0.8;
+        spawnOne(spawnQueue.pop());
+        spawnTimer = 0.45 + Math.random() * 0.75;
       }
     }
 
@@ -143,18 +220,33 @@ const Enemies = (() => {
 
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
+
       if (!e.alive) {
-        // Sink corpse into ground then remove
+        // Hide HP bar, sink corpse, then remove
+        if (e.hpBar) e.hpBar.group.visible = false;
         e.deathTimer -= delta;
         e.mesh.position.y -= delta * 1.2;
         if (e.deathTimer <= 0) {
           scene.remove(e.mesh);
+          if (e.hpBar) { scene.remove(e.hpBar.group); e.hpBar = null; }
           enemies.splice(i, 1);
         }
         continue;
       }
 
       alive++;
+
+      // Reset hit-flash colour
+      if (e.flashTimer > 0) {
+        e.flashTimer -= delta;
+        if (e.flashTimer <= 0) {
+          e.mesh.userData.parts.forEach(p => {
+            if (p.material && p.userData.origColor !== undefined) {
+              p.material.color.setHex(p.userData.origColor);
+            }
+          });
+        }
+      }
 
       // Walk toward player
       const dir = new THREE.Vector3()
@@ -167,51 +259,70 @@ const Enemies = (() => {
         e.mesh.position.addScaledVector(dir, e.speed * delta);
         e.mesh.lookAt(playerPos.x, e.mesh.position.y, playerPos.z);
 
-        // Leg animation
-        e.legAngle += e.legDir * 4 * delta;
+        // Leg swing animation (speed-scaled)
+        e.legAngle += e.legDir * (e.speed / 2.2) * 4 * delta;
         if (Math.abs(e.legAngle) > 0.45) e.legDir *= -1;
         const parts = e.mesh.userData.parts;
         if (parts[2]) parts[2].rotation.x =  e.legAngle;
         if (parts[3]) parts[3].rotation.x = -e.legAngle;
       }
 
-      // Attack player
-      if (dist < ATTACK_RANGE) {
+      // Melee attack when close enough
+      const meleeRange = 1.6 * e.typeCfg.scale;
+      if (dist < meleeRange) {
         e.attackTimer -= delta;
         if (e.attackTimer <= 0) {
-          onPlayerHit(ATTACK_DMG);
-          e.attackTimer = ATTACK_RATE;
+          onPlayerHit(e.attackDmg);
+          e.attackTimer = e.attackRate;
         }
       }
+
+      // Update floating HP bar
+      if (e.hpBar) {
+        const pct    = e.hp / e.maxHp;
+        e.hpBar.fg.scale.x     = pct;
+        e.hpBar.fg.position.x  = -0.35 * (1 - pct);   // left-anchor the fill
+        const hpColor = pct > 0.6 ? 0x44ff44 : pct > 0.3 ? 0xffaa00 : 0xff2222;
+        e.hpBar.fg.material.color.setHex(hpColor);
+
+        const barY = 1.75 * e.typeCfg.scale + 0.35;
+        e.hpBar.group.position.set(e.mesh.position.x, barY, e.mesh.position.z);
+        e.hpBar.group.lookAt(playerPos.x, barY, playerPos.z);
+      }
     }
 
-    // Check if wave is done (all spawned and all dead)
-    if (spawnQueue === 0 && alive === 0 && enemies.length === 0 && !allDead) {
+    // Wave complete?
+    if (spawnQueue.length === 0 && alive === 0 && enemies.length === 0 && !allDead) {
       allDead = true;
-      onEnemyDied(true);  // "wave complete" signal
+      onEnemyDied(true);
     }
   }
 
-  // ── Take damage (returns remaining hp) ────────────────────
+  // ── Apply damage, return remaining HP ─────────────────────
   function damage(enemy, amount) {
     if (!enemy.alive) return 0;
-    enemy.hp -= amount;
-    // Flash red
+    enemy.hp = Math.max(0, enemy.hp - amount);
+
+      // White flash on hit — start timer; update() resets colors
     enemy.mesh.userData.parts.forEach(p => {
       if (p.material && p.material.visible !== false) {
-        const orig = p.material.color.getHex();
+        // Cache original color on first hit
+        if (p.userData.origColor === undefined) {
+          p.userData.origColor = p.material.color.getHex();
+        }
         p.material.color.setHex(0xffffff);
-        setTimeout(() => p.material.color.setHex(orig), 80);
       }
     });
+    enemy.flashTimer = 0.08;
+
     if (enemy.hp <= 0) {
-      enemy.alive     = false;
+      enemy.alive      = false;
       enemy.deathTimer = 0.6;
     }
-    return Math.max(0, enemy.hp);
+    return enemy.hp;
   }
 
-  // ── Find enemy by hit mesh (walk up the hierarchy) ────────
+  // ── Find enemy by intersected mesh (walk hierarchy) ───────
   function findByMesh(mesh) {
     let obj = mesh;
     while (obj) {
@@ -227,15 +338,21 @@ const Enemies = (() => {
   }
 
   function getAliveCount() {
-    return enemies.filter(e => e.alive).length + spawnQueue;
+    return enemies.filter(e => e.alive).length + spawnQueue.length;
   }
 
   function isWaveDone() { return allDead; }
 
   function clear() {
-    enemies.forEach(e => scene && scene.remove(e.mesh));
-    enemies     = [];
-    spawnQueue  = 0;
+    enemies.forEach(e => {
+      if (scene) {
+        scene.remove(e.mesh);
+        if (e.hpBar) scene.remove(e.hpBar.group);
+      }
+    });
+    enemies    = [];
+    spawnQueue = [];
+    allDead    = false;
   }
 
   return {

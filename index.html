@@ -21,6 +21,7 @@
       <span id="score-display">SCORE: 0</span>
       <span id="wave-display">WAVE: 1</span>
       <span id="kills-display">KILLS: 0</span>
+      <span id="enemies-display">ENEMIES: 0</span>
     </div>
 
     <div id="bottom-bar">
@@ -40,6 +41,8 @@
     </div>
 
     <div id="reload-indicator">RELOADING…</div>
+    <div id="headshot-notif">HEADSHOT!</div>
+    <div id="pickup-notif"></div>
     <div id="wave-announce"></div>
   </div>
 
@@ -50,7 +53,7 @@
     <p class="subtitle">Survive as many waves as you can.</p>
     <button class="btn" id="start-btn">▶ START GAME</button>
     <div id="controls-hint">
-      WASD · MOVE &nbsp;|&nbsp; MOUSE · LOOK &nbsp;|&nbsp; LMB · SHOOT &nbsp;|&nbsp; R · RELOAD &nbsp;|&nbsp; SHIFT · SPRINT
+      WASD · MOVE &nbsp;|&nbsp; MOUSE · LOOK &nbsp;|&nbsp; LMB · SHOOT &nbsp;|&nbsp; R · RELOAD &nbsp;|&nbsp; SHIFT · SPRINT &nbsp;|&nbsp; SPACE · JUMP &nbsp;|&nbsp; ESC · PAUSE
     </div>
   </div>
 
@@ -70,6 +73,13 @@
     <button class="btn" id="next-wave-btn">NEXT WAVE →</button>
   </div>
 
+  <!-- Pause screen -->
+  <div id="pause-screen" class="overlay" style="display:none">
+    <h1 style="color:#ffffff">PAUSED</h1>
+    <button class="btn" id="resume-btn" style="border-color:#fff;color:#fff">▶ RESUME</button>
+    <button class="btn" id="quit-btn" style="margin-top:12px;border-color:#888;color:#888">✕ QUIT TO MENU</button>
+  </div>
+
   <!-- Win screen (all 10 waves) -->
   <div id="win-screen" class="overlay" style="display:none">
     <h1>VICTORY!</h1>
@@ -82,7 +92,7 @@
 
 <!-- Three.js r137 (local copy, patched for CVE XSS < 0.137.0) -->
 <script src="three.min.js"></script>
-<!-- Game modules -->
+<script src="pickups.js"></script>
 <script src="hud.js"></script>
 <script src="weapons.js"></script>
 <script src="enemies.js"></script>

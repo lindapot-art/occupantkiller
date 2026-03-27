@@ -1,6 +1,6 @@
 /**
  * game.js – Core engine: scene, renderer, pointer-lock controls, game loop
- * Depends on: Three.js (THREE), HUD, Weapons, Enemies
+ * Depends on: Three.js (THREE), HUD, Weapons, Enemies, Pickups
  */
 
 (function () {
@@ -12,19 +12,19 @@
   const SPRINT_MULT     = 1.65;
   const PLAYER_MAX_HP   = 100;
   const TOTAL_WAVES     = 10;
-  const ARENA_SIZE      = 24;   // half-extent of the arena
-  const SCORE_PER_KILL  = 100;
-  const SCORE_WAVE_BONUS = 500;
-  const GRAVITY         = 18;
+  const ARENA_SIZE      = 24;
+  const SCORE_WAVE_BONUS     = 500;
+  const GRAVITY              = 18;
+  const JUMP_SPEED           = 7.0;
+  const HEALTH_DROP_PROBABILITY = 0.5;  // chance a drop is health vs ammo
 
   // ── State ─────────────────────────────────────────────────
   let playerHp    = PLAYER_MAX_HP;
   let score       = 0;
   let kills       = 0;
   let currentWave = 1;
-  let gameState   = 'start';    // 'start' | 'playing' | 'dead' | 'waveClear' | 'win'
+  let gameState   = 'start';    // 'start' | 'playing' | 'paused' | 'dead' | 'waveClear' | 'win'
 
-  // Player velocity (for gravity / jump – kept simple, no jump in MVP)
   const velocity   = new THREE.Vector3();
   const direction  = new THREE.Vector3();
   const keys       = {};
@@ -32,6 +32,11 @@
   let   yaw        = 0;
   let   pitch      = 0;
   const pitchLimit = Math.PI / 2 - 0.05;
+
+  // Jump & bob
+  let verticalVel = 0;
+  let isGrounded  = true;
+  let bobTime     = 0;
 
   // ── Three.js setup ────────────────────────────────────────
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -67,7 +72,6 @@
 
   // ── Arena geometry ────────────────────────────────────────
   function buildArena() {
-    // Floor
     const floorGeo = new THREE.PlaneGeometry(ARENA_SIZE * 2, ARENA_SIZE * 2, 30, 30);
     const floorMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
     const floor    = new THREE.Mesh(floorGeo, floorMat);
@@ -75,38 +79,33 @@
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // Grid lines overlay
     const grid = new THREE.GridHelper(ARENA_SIZE * 2, 24, 0x330000, 0x220000);
     scene.add(grid);
 
-    // Walls (4 sides)
+    // Walls
     const wallMat = new THREE.MeshLambertMaterial({ color: 0x1e0a0a });
     const wallH   = 4;
-    const wallT   = 0.5;
     const wallLen = ARENA_SIZE * 2;
-    const walls   = [
-      { pos: [0, wallH / 2, -ARENA_SIZE], rot: [0, 0, 0],          size: [wallLen, wallH, wallT] },
-      { pos: [0, wallH / 2,  ARENA_SIZE], rot: [0, Math.PI, 0],    size: [wallLen, wallH, wallT] },
-      { pos: [-ARENA_SIZE, wallH / 2, 0], rot: [0, -Math.PI / 2, 0], size: [wallLen, wallH, wallT] },
-      { pos: [ ARENA_SIZE, wallH / 2, 0], rot: [0,  Math.PI / 2, 0], size: [wallLen, wallH, wallT] },
-    ];
-    walls.forEach(({ pos, rot, size }) => {
-      const geo  = new THREE.BoxGeometry(...size);
-      const mesh = new THREE.Mesh(geo, wallMat);
+    [
+      { pos: [0, wallH / 2, -ARENA_SIZE], rot: [0, 0, 0],              size: [wallLen, wallH, 0.5] },
+      { pos: [0, wallH / 2,  ARENA_SIZE], rot: [0, Math.PI, 0],        size: [wallLen, wallH, 0.5] },
+      { pos: [-ARENA_SIZE, wallH / 2, 0], rot: [0, -Math.PI / 2, 0],   size: [wallLen, wallH, 0.5] },
+      { pos: [ ARENA_SIZE, wallH / 2, 0], rot: [0,  Math.PI / 2, 0],   size: [wallLen, wallH, 0.5] },
+    ].forEach(({ pos, rot, size }) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), wallMat);
       mesh.position.set(...pos);
       mesh.rotation.set(...rot);
       mesh.castShadow = mesh.receiveShadow = true;
       scene.add(mesh);
     });
 
-    // Scattered cover crates
+    // Cover crates
     const crateMat = new THREE.MeshLambertMaterial({ color: 0x3a2a1a });
-    const cratePositions = [
-      [-6, 2],  [6, 2],   [-6, -2],  [6, -2],
-      [0, 7],   [0, -7],  [-10, 5],  [10, 5],
-      [-10, -5],[10, -5], [-4, 12],  [4, 12],
-    ];
-    cratePositions.forEach(([x, z]) => {
+    [
+      [-6, 2], [6, 2], [-6, -2], [6, -2],
+      [0, 7],  [0, -7], [-10, 5], [10, 5],
+      [-10, -5], [10, -5], [-4, 12], [4, 12],
+    ].forEach(([x, z]) => {
       const h   = 0.9 + Math.random() * 0.6;
       const geo = new THREE.BoxGeometry(1.0 + Math.random() * 0.5, h, 1.0 + Math.random() * 0.5);
       const m   = new THREE.Mesh(geo, crateMat);
@@ -115,9 +114,8 @@
       scene.add(m);
     });
 
-    // Atmospheric red point lights
-    const spots = [[-10, -10], [10, -10], [-10, 10], [10, 10]];
-    spots.forEach(([x, z]) => {
+    // Atmospheric point lights
+    [[-10, -10], [10, -10], [-10, 10], [10, 10]].forEach(([x, z]) => {
       const pt = new THREE.PointLight(0xff1100, 1.2, 18);
       pt.position.set(x, 2.5, z);
       scene.add(pt);
@@ -125,6 +123,7 @@
   }
 
   buildArena();
+  Pickups.init(scene);
   Weapons.createGunMesh(camera);
   Weapons.createMuzzleFlash(scene, camera);
 
@@ -136,8 +135,10 @@
   });
 
   document.addEventListener('pointerlockchange', () => {
+    // Auto-pause when pointer lock is lost mid-game
     if (document.pointerLockElement !== canvas && gameState === 'playing') {
-      // Paused – player unlocked pointer intentionally
+      gameState = 'paused';
+      document.getElementById('pause-screen').style.display = 'flex';
     }
   });
 
@@ -148,23 +149,42 @@
     pitch  = Math.max(-pitchLimit, Math.min(pitchLimit, pitch));
   });
 
-  document.addEventListener('mousedown', (e) => {
-    if (e.button === 0) mouseDown = true;
-  });
-  document.addEventListener('mouseup', (e) => {
-    if (e.button === 0) mouseDown = false;
-  });
+  document.addEventListener('mousedown', (e) => { if (e.button === 0) mouseDown = true; });
+  document.addEventListener('mouseup',   (e) => { if (e.button === 0) mouseDown = false; });
 
   // ── Keyboard ──────────────────────────────────────────────
   document.addEventListener('keydown', (e) => {
     keys[e.code] = true;
-    if (e.code === 'KeyR' && gameState === 'playing') Weapons.forceReload();
+    if (e.code === 'KeyR' && gameState === 'playing') {
+      Weapons.forceReload();
+    }
+    if (e.code === 'Escape') {
+      if (gameState === 'playing') {
+        gameState = 'paused';
+        document.exitPointerLock();
+        document.getElementById('pause-screen').style.display = 'flex';
+      } else if (gameState === 'paused') {
+        resumeGame();
+      }
+    }
   });
   document.addEventListener('keyup', (e) => { keys[e.code] = false; });
 
   // ── UI Buttons ────────────────────────────────────────────
   document.getElementById('start-btn').addEventListener('click', startGame);
   document.getElementById('restart-btn').addEventListener('click', startGame);
+  document.getElementById('play-again-btn').addEventListener('click', startGame);
+
+  document.getElementById('resume-btn').addEventListener('click', resumeGame);
+  document.getElementById('quit-btn').addEventListener('click', () => {
+    Enemies.clear();
+    Pickups.clear();
+    hideAllScreens();
+    HUD.hide();
+    gameState = 'start';
+    document.getElementById('start-screen').style.display = 'flex';
+  });
+
   document.getElementById('next-wave-btn').addEventListener('click', () => {
     currentWave++;
     if (currentWave > TOTAL_WAVES) {
@@ -177,11 +197,10 @@
       canvas.requestPointerLock();
     }
   });
-  document.getElementById('play-again-btn').addEventListener('click', startGame);
 
   // ── Game flow ─────────────────────────────────────────────
   function hideAllScreens() {
-    ['start-screen', 'dead-screen', 'wave-screen', 'win-screen'].forEach(id => {
+    ['start-screen', 'dead-screen', 'wave-screen', 'win-screen', 'pause-screen'].forEach(id => {
       document.getElementById(id).style.display = 'none';
     });
   }
@@ -191,16 +210,20 @@
     score       = 0;
     kills       = 0;
     currentWave = 1;
+    verticalVel = 0;
+    isGrounded  = true;
+    bobTime     = 0;
 
     Weapons.reset();
     Enemies.clear();
+    Pickups.clear();
 
     HUD.setScore(0);
     HUD.setKills(0);
+    HUD.setEnemies(0);
     HUD.setHealth(playerHp, PLAYER_MAX_HP);
     HUD.setAmmo(Weapons.getClip(), Weapons.getReserve());
 
-    // Reset player position
     camera.position.set(0, PLAYER_HEIGHT, 0);
     yaw   = 0;
     pitch = 0;
@@ -208,6 +231,12 @@
     hideAllScreens();
     HUD.show();
     beginWave(1);
+    gameState = 'playing';
+    canvas.requestPointerLock();
+  }
+
+  function resumeGame() {
+    document.getElementById('pause-screen').style.display = 'none';
     gameState = 'playing';
     canvas.requestPointerLock();
   }
@@ -230,14 +259,45 @@
     const enemy = Enemies.findByMesh(intersection.object);
     if (!enemy || !enemy.alive) return;
 
-    const remaining = Enemies.damage(enemy, dmgAmount);
-    HUD.flashHit();
+    // 2× damage on headshot – check hit mesh and its parents against the head mesh
+    const headMesh   = enemy.mesh.userData.headMesh;
+    let   hitObj     = intersection.object;
+    let   isHeadshot = false;
+    while (hitObj) {
+      if (hitObj === headMesh) { isHeadshot = true; break; }
+      hitObj = hitObj.parent;
+      if (hitObj === enemy.mesh) break;   // don't go above the enemy group
+    }
+    const actualDmg  = isHeadshot ? dmgAmount * 2 : dmgAmount;
+
+    const remaining = Enemies.damage(enemy, actualDmg);
+    HUD.flashHit(isHeadshot);
 
     if (remaining === 0) {
       kills++;
-      score += SCORE_PER_KILL;
+      score += enemy.scoreValue * (isHeadshot ? 2 : 1);
       HUD.setKills(kills);
       HUD.setScore(score);
+      if (isHeadshot) HUD.showHeadshot();
+
+      // Random pickup drop
+      if (Math.random() < enemy.dropChance) {
+        Pickups.spawn(
+          enemy.mesh.position,
+          Math.random() < HEALTH_DROP_PROBABILITY ? 'HEALTH' : 'AMMO'
+        );
+      }
+    }
+  }
+
+  function onPickupCollect(type) {
+    if (type === 'HEALTH') {
+      playerHp = Math.min(PLAYER_MAX_HP, playerHp + 25);
+      HUD.setHealth(playerHp, PLAYER_MAX_HP);
+      HUD.notifyPickup('+25 HP', '#44ff55');
+    } else if (type === 'AMMO') {
+      Weapons.addAmmo(30);
+      HUD.notifyPickup('+30 AMMO', '#ffcc00');
     }
   }
 
@@ -254,7 +314,6 @@
     gameState = 'waveClear';
     document.exitPointerLock();
     HUD.hide();
-
     document.getElementById('wave-score').textContent = 'SCORE: ' + score;
     document.getElementById('wave-screen').style.display = 'flex';
   }
@@ -265,6 +324,7 @@
     document.exitPointerLock();
     HUD.hide();
     Enemies.clear();
+    Pickups.clear();
 
     document.getElementById('final-score').textContent  = 'SCORE: '          + score;
     document.getElementById('final-kills').textContent  = 'KILLS: '          + kills;
@@ -276,13 +336,12 @@
     gameState = 'win';
     document.exitPointerLock();
     HUD.hide();
-
     document.getElementById('win-score').textContent = 'SCORE: ' + score;
     document.getElementById('win-kills').textContent = 'KILLS: ' + kills;
     document.getElementById('win-screen').style.display = 'flex';
   }
 
-  // ── Movement & camera ─────────────────────────────────────
+  // ── Movement, jump & camera bob ───────────────────────────
   const euler = new THREE.Euler(0, 0, 0, 'YXZ');
 
   function updatePlayer(delta) {
@@ -292,6 +351,7 @@
     euler.set(pitch, yaw, 0);
     camera.quaternion.setFromEuler(euler);
 
+    // Horizontal movement
     const sprint = keys['ShiftLeft'] || keys['ShiftRight'];
     const speed  = MOVE_SPEED * (sprint ? SPRINT_MULT : 1.0);
 
@@ -300,24 +360,41 @@
     if (keys['KeyS'] || keys['ArrowDown'])  direction.z += 1;
     if (keys['KeyA'] || keys['ArrowLeft'])  direction.x -= 1;
     if (keys['KeyD'] || keys['ArrowRight']) direction.x += 1;
+    const isMoving = direction.lengthSq() > 0;
     direction.normalize();
 
-    // Move relative to camera yaw only
     const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     const right   = new THREE.Vector3( Math.cos(yaw), 0, -Math.sin(yaw));
-
     velocity.set(0, 0, 0);
     velocity.addScaledVector(forward, direction.z * speed);
     velocity.addScaledVector(right,   direction.x * speed);
-
     camera.position.addScaledVector(velocity, delta);
 
-    // Clamp to arena
+    // Arena clamp
     camera.position.x = Math.max(-(ARENA_SIZE - 0.5), Math.min(ARENA_SIZE - 0.5, camera.position.x));
     camera.position.z = Math.max(-(ARENA_SIZE - 0.5), Math.min(ARENA_SIZE - 0.5, camera.position.z));
-    camera.position.y = PLAYER_HEIGHT;
 
-    // Auto-fire when mouse held
+    // Jump & gravity
+    if (keys['Space'] && isGrounded) {
+      verticalVel = JUMP_SPEED;
+      isGrounded  = false;
+    }
+    verticalVel -= GRAVITY * delta;
+    camera.position.y += verticalVel * delta;
+
+    if (camera.position.y <= PLAYER_HEIGHT) {
+      camera.position.y = PLAYER_HEIGHT;
+      verticalVel       = 0;
+      isGrounded        = true;
+    }
+
+    // Camera bob (only when grounded and moving)
+    if (isMoving && isGrounded) {
+      bobTime           += delta * (sprint ? 14 : 10);
+      camera.position.y += Math.sin(bobTime) * 0.038;
+    }
+
+    // Auto-fire
     if (mouseDown && document.pointerLockElement === canvas) {
       Weapons.tryFire(camera, Enemies.getEnemyMeshes(), delta, onEnemyHit);
     }
@@ -337,7 +414,7 @@
     requestAnimationFrame(animate);
 
     const now   = performance.now();
-    const delta = Math.min((now - prevTime) / 1000, 0.1);   // cap at 100ms
+    const delta = Math.min((now - prevTime) / 1000, 0.1);
     prevTime    = now;
 
     if (gameState === 'playing') {
@@ -349,6 +426,8 @@
         onPlayerHit,
         (waveComplete) => { if (waveComplete) onWaveComplete(); }
       );
+      Pickups.update(delta, camera.position, onPickupCollect);
+      HUD.setEnemies(Enemies.getAliveCount());
     }
 
     renderer.render(scene, camera);

@@ -5,29 +5,35 @@
 
 const HUD = (() => {
   const el = {
-    hud:       document.getElementById('hud'),
-    score:     document.getElementById('score-display'),
-    wave:      document.getElementById('wave-display'),
-    kills:     document.getElementById('kills-display'),
-    healthBar: document.getElementById('health-bar'),
-    healthVal: document.getElementById('health-value'),
-    ammo:      document.getElementById('ammo-display'),
-    ammoRes:   document.getElementById('ammo-reserve'),
-    reload:    document.getElementById('reload-indicator'),
-    hitMarker: document.getElementById('hit-marker'),
-    vignette:  document.getElementById('damage-vignette'),
-    waveAnn:   document.getElementById('wave-announce'),
+    hud:          document.getElementById('hud'),
+    score:        document.getElementById('score-display'),
+    wave:         document.getElementById('wave-display'),
+    kills:        document.getElementById('kills-display'),
+    enemies:      document.getElementById('enemies-display'),
+    healthBar:    document.getElementById('health-bar'),
+    healthVal:    document.getElementById('health-value'),
+    ammo:         document.getElementById('ammo-display'),
+    ammoRes:      document.getElementById('ammo-reserve'),
+    reload:       document.getElementById('reload-indicator'),
+    hitMarker:    document.getElementById('hit-marker'),
+    vignette:     document.getElementById('damage-vignette'),
+    waveAnn:      document.getElementById('wave-announce'),
+    headshotNotif: document.getElementById('headshot-notif'),
+    pickupNotif:   document.getElementById('pickup-notif'),
   };
 
-  let hitMarkerTimer  = null;
-  let vignetteTimer   = null;
+  let hitMarkerTimer   = null;
+  let vignetteTimer    = null;
+  let headshotTimer    = null;
+  let pickupTimer      = null;
 
   function show() { el.hud.style.display = 'block'; }
   function hide() { el.hud.style.display = 'none'; }
 
-  function setScore(v) { el.score.textContent = 'SCORE: ' + v; }
-  function setWave(v)  { el.wave.textContent  = 'WAVE: '  + v; }
-  function setKills(v) { el.kills.textContent = 'KILLS: ' + v; }
+  function setScore(v)   { el.score.textContent   = 'SCORE: '   + v; }
+  function setWave(v)    { el.wave.textContent     = 'WAVE: '    + v; }
+  function setKills(v)   { el.kills.textContent    = 'KILLS: '   + v; }
+  function setEnemies(v) { el.enemies.textContent  = 'ENEMIES: ' + v; }
 
   function setHealth(current, max) {
     const pct = Math.max(0, current / max) * 100;
@@ -50,10 +56,14 @@ const HUD = (() => {
     else    el.reload.classList.remove('visible');
   }
 
-  function flashHit() {
+  function flashHit(isHeadshot) {
     el.hitMarker.classList.add('visible');
+    if (isHeadshot) el.hitMarker.classList.add('headshot');
+    else            el.hitMarker.classList.remove('headshot');
     clearTimeout(hitMarkerTimer);
-    hitMarkerTimer = setTimeout(() => el.hitMarker.classList.remove('visible'), 140);
+    hitMarkerTimer = setTimeout(() => {
+      el.hitMarker.classList.remove('visible', 'headshot');
+    }, 140);
   }
 
   function flashDamage() {
@@ -62,14 +72,38 @@ const HUD = (() => {
     vignetteTimer = setTimeout(() => el.vignette.classList.remove('hit'), 300);
   }
 
+  function showHeadshot() {
+    el.headshotNotif.classList.remove('visible');
+    void el.headshotNotif.offsetWidth;
+    el.headshotNotif.classList.add('visible');
+    clearTimeout(headshotTimer);
+    headshotTimer = setTimeout(() => el.headshotNotif.classList.remove('visible'), 1200);
+  }
+
+  function notifyPickup(text, color) {
+    el.pickupNotif.textContent  = text;
+    el.pickupNotif.style.color  = color;
+    el.pickupNotif.classList.remove('visible');
+    void el.pickupNotif.offsetWidth;
+    el.pickupNotif.classList.add('visible');
+    clearTimeout(pickupTimer);
+    pickupTimer = setTimeout(() => el.pickupNotif.classList.remove('visible'), 1600);
+  }
+
   function announceWave(number, enemyCount) {
-    el.waveAnn.innerHTML = `<h2>WAVE ${number}</h2><p>${enemyCount} OCCUPANTS INCOMING</p>`;
+    el.waveAnn.innerHTML = '<h2>WAVE ' + number + '</h2><p>' + enemyCount + ' OCCUPANTS INCOMING</p>';
     el.waveAnn.classList.remove('visible');
-    // Force reflow so animation restarts
     void el.waveAnn.offsetWidth;
     el.waveAnn.classList.add('visible');
     setTimeout(() => el.waveAnn.classList.remove('visible'), 2200);
   }
 
-  return { show, hide, setScore, setWave, setKills, setHealth, setAmmo, showReload, flashHit, flashDamage, announceWave };
+  return {
+    show, hide,
+    setScore, setWave, setKills, setEnemies,
+    setHealth, setAmmo, showReload,
+    flashHit, flashDamage,
+    showHeadshot, notifyPickup,
+    announceWave,
+  };
 })();

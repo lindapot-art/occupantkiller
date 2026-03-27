@@ -14,25 +14,30 @@ No build step required — Three.js r137 is included as a local file (`three.min
 |---|---|
 | `W A S D` / Arrow keys | Move |
 | Mouse | Look |
-| Left click | Shoot |
+| Left click | Shoot (hold for auto-fire) |
 | `R` | Reload |
 | `Shift` | Sprint |
+| `Space` | Jump |
+| `Esc` | Pause / Resume |
 
 ## Game Mechanics
 
 - **10 waves** of enemies, each wave harder than the last
-- Enemies are **occupants** — humanoid melee attackers that chase you
-- **Shoot** them before they reach you — each occupant has a visible health pool
-- Pick up ammo bonuses by surviving each wave
-- Score: **100 pts** per kill, **500 pts** wave clear bonus
+- **3 enemy types** — Occupant (normal), Runner (fast/weak, wave 3+), Tank (slow/tough, wave 5+)
+- **Headshots** deal 2× damage and display a special indicator
+- **Pickups** drop randomly when enemies die: green health packs (+25 HP) and yellow ammo crates (+30 rounds)
+- **Floating HP bars** above every enemy, colour-coded by remaining health
+- **Jump** (Space) and **camera bob** while moving for a natural feel
+- **Pause** with Escape at any time
 
 ## Project Structure
 
 ```
 index.html   – Entry point & HTML layout
-style.css    – All styles (HUD, overlays, layout)
-game.js      – Core engine (scene, renderer, camera, player movement, game loop)
+style.css    – All styles (HUD, overlays, notifications, layout)
+game.js      – Core engine (scene, renderer, camera, player movement, jump, pause, game loop)
 weapons.js   – Gun state, raycasted shooting, muzzle flash, reload logic
-enemies.js   – Occupant spawning, pathfinding AI, hit detection
-hud.js       – Heads-up display DOM helpers
+enemies.js   – 3 enemy types, floating HP bars, occupant AI, pickup drop logic
+hud.js       – HUD DOM helpers (health, ammo, score, wave, enemies, headshot/pickup notifications)
+pickups.js   – Animated health & ammo collectible spawning and collection
 ```
