@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Occupant Killer — 3D FPS</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="game-container">
+
+  <!-- Three.js canvas is appended here by JS -->
+
+  <!-- HUD (shown while playing) -->
+  <div id="hud" style="display:none">
+    <div id="crosshair"></div>
+    <div id="hit-marker"></div>
+    <div id="damage-vignette"></div>
+
+    <div id="top-bar">
+      <span id="score-display">SCORE: 0</span>
+      <span id="wave-display">WAVE: 1</span>
+      <span id="kills-display">KILLS: 0</span>
+    </div>
+
+    <div id="bottom-bar">
+      <div id="health-section">
+        <div id="health-label">HEALTH</div>
+        <div id="health-bar-container">
+          <div id="health-bar" style="width:100%"></div>
+        </div>
+        <div id="health-value">100 / 100</div>
+      </div>
+
+      <div id="ammo-section">
+        <div id="ammo-label">AMMO</div>
+        <div id="ammo-display">30</div>
+        <div id="ammo-reserve">/ 90</div>
+      </div>
+    </div>
+
+    <div id="reload-indicator">RELOADING…</div>
+    <div id="wave-announce"></div>
+  </div>
+
+  <!-- Start screen -->
+  <div id="start-screen" class="overlay">
+    <h1>Occupant Killer</h1>
+    <p>Eliminate all occupants before they reach you.</p>
+    <p class="subtitle">Survive as many waves as you can.</p>
+    <button class="btn" id="start-btn">▶ START GAME</button>
+    <div id="controls-hint">
+      WASD · MOVE &nbsp;|&nbsp; MOUSE · LOOK &nbsp;|&nbsp; LMB · SHOOT &nbsp;|&nbsp; R · RELOAD &nbsp;|&nbsp; SHIFT · SPRINT
+    </div>
+  </div>
+
+  <!-- Dead screen -->
+  <div id="dead-screen" class="overlay" style="display:none">
+    <h1>YOU DIED</h1>
+    <p class="stat" id="final-score">SCORE: 0</p>
+    <p class="stat" id="final-kills">KILLS: 0</p>
+    <p class="stat" id="final-wave">WAVES SURVIVED: 0</p>
+    <button class="btn" id="restart-btn">↺ TRY AGAIN</button>
+  </div>
+
+  <!-- Wave clear screen -->
+  <div id="wave-screen" class="overlay" style="display:none">
+    <h1>WAVE CLEAR!</h1>
+    <p class="stat" id="wave-score">SCORE: 0</p>
+    <button class="btn" id="next-wave-btn">NEXT WAVE →</button>
+  </div>
+
+  <!-- Win screen (all 10 waves) -->
+  <div id="win-screen" class="overlay" style="display:none">
+    <h1>VICTORY!</h1>
+    <p>All occupants eliminated.</p>
+    <p class="stat" id="win-score">SCORE: 0</p>
+    <p class="stat" id="win-kills">KILLS: 0</p>
+    <button class="btn" id="play-again-btn">PLAY AGAIN</button>
+  </div>
+</div>
+
+<!-- Three.js r128 (local copy) -->
+<script src="three.min.js"></script>
+<!-- Game modules -->
+<script src="hud.js"></script>
+<script src="weapons.js"></script>
+<script src="enemies.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
