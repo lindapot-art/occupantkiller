@@ -162,6 +162,30 @@ scene.add(sun);
 //  ASSET LOADING
 // ═══════════════════════════════════════════════════════════
 const loader = new GLTFLoader();
+// Global GLTFLoader fallback: try original URL, then a placeholder GLB, then a primitive.
+(function(){
+  const orig = GLTFLoader.prototype.load;
+  GLTFLoader.prototype.load = function(url, onLoad, onProgress, onError){
+    let triedPlaceholder = false;
+    const placeholder = 'model/placeholder/placeholder.glb';
+    const wrappedOnError = (err) => {
+      console.warn('GLTF load failed for', url, err);
+      if(!triedPlaceholder){
+        triedPlaceholder = true;
+        try { orig.call(this, placeholder, onLoad, onProgress, wrappedOnError); }
+        catch(e){ console.warn('Placeholder load also failed', e); if(onError) onError(e); }
+      } else {
+        // final fallback: create a simple box mesh and call onLoad with a fake gltf
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({color:0x888888}));
+        const fake = { scene: mesh };
+        try { if(onLoad) onLoad(fake); } catch(e){ console.error(e); }
+        if(onError) onError(err);
+      }
+    };
+    try { orig.call(this, url, onLoad, onProgress, wrappedOnError); }
+    catch(e){ wrappedOnError(e); }
+  };
+})();
 let loadDone = 0;
 const TOTAL_LOADS = 5; // map + 3 weapons + enemy
 function onLoad() {

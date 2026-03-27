@@ -1137,6 +1137,29 @@ if(isMobile){
 
 // ASSET LOADING
 const loader=new GLTFLoader();
+// Global GLTFLoader fallback: try original URL, then a placeholder GLB, then a primitive.
+(function(){
+  const orig = GLTFLoader.prototype.load;
+  GLTFLoader.prototype.load = function(url, onLoad, onProgress, onError){
+    let triedPlaceholder = false;
+    const placeholder = 'model/placeholder/placeholder.glb';
+    const wrappedOnError = (err) => {
+      console.warn('GLTF load failed for', url, err);
+      if(!triedPlaceholder){
+        triedPlaceholder = true;
+        try { orig.call(this, placeholder, onLoad, onProgress, wrappedOnError); }
+        catch(e){ console.warn('Placeholder load also failed', e); if(onError) onError(e); }
+      } else {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({color:0x888888}));
+        const fake = { scene: mesh };
+        try { if(onLoad) onLoad(fake); } catch(e){ console.error(e); }
+        if(onError) onError(err);
+      }
+    };
+    try { orig.call(this, url, onLoad, onProgress, wrappedOnError); }
+    catch(e){ wrappedOnError(e); }
+  };
+})();
 
 // ENEMY: biped_9 run_fast (model #9 as selected)
 loader.load('model/biped_9/Meshy_AI_biped/Meshy_AI_Animation_run_fast_5_withSkin.glb',
