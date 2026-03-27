@@ -6,7 +6,7 @@ Survive 10 waves of increasingly dangerous **occupants** before they overrun you
 ## Play
 
 Open `index.html` in any modern browser (Chrome, Firefox, Edge).  
-No build step required — Three.js r128 is included as a local file (`three.min.js`).
+No build step required — Three.js r137 is included as a local file (`three.min.js`).
 
 ## Controls
 

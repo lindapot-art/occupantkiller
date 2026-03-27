@@ -19,6 +19,6 @@
   },
   "homepage": "https://github.com/lindapot-art/occupantkiller#readme",
   "dependencies": {
-    "three": "^0.128.0"
+    "three": "^0.137.0"
   }
 }
