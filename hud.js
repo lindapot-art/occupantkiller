@@ -34,7 +34,9 @@ const HUD = (() => {
   function hide() { el.hud.style.display = 'none'; }
 
   function setScore(v)   { el.score.textContent   = 'SCORE: '   + v; }
-  function setWave(v)    { el.wave.textContent     = 'WAVE: '    + v; }
+  function setWave(v, total) {
+    el.wave.textContent = total ? 'WAVE: ' + v + '/' + total : 'WAVE: ' + v;
+  }
   function setKills(v)   { el.kills.textContent    = 'KILLS: '   + v; }
   function setEnemies(v) { el.enemies.textContent  = 'ENEMIES: ' + v; }
   function setStage(num, name) {
@@ -103,12 +105,24 @@ const HUD = (() => {
     pickupTimer = setTimeout(() => el.pickupNotif.classList.remove('visible'), 1600);
   }
 
-  function announceWave(number, enemyCount) {
-    el.waveAnn.innerHTML = '<h2>WAVE ' + number + '</h2><p>' + enemyCount + ' OCCUPANTS STORMING</p>';
+  function announceWave(number, enemyCount, totalWaves) {
+    var progress = totalWaves ? ' OF ' + totalWaves : '';
+    el.waveAnn.innerHTML = '<h2>WAVE ' + number + progress + '</h2><p>' + enemyCount + ' OCCUPANTS STORMING</p>';
     el.waveAnn.classList.remove('visible');
     void el.waveAnn.offsetWidth;
     el.waveAnn.classList.add('visible');
     setTimeout(() => el.waveAnn.classList.remove('visible'), 2200);
+  }
+
+  function announceStage(stageNum, stageName, description) {
+    el.waveAnn.innerHTML =
+      '<h2 style="color:#44ff88">STAGE ' + stageNum + '</h2>' +
+      '<p style="font-size:22px;color:#fff;margin-bottom:6px">' + stageName + '</p>' +
+      '<p style="font-size:13px;color:#aaa">' + (description || '') + '</p>';
+    el.waveAnn.classList.remove('visible');
+    void el.waveAnn.offsetWidth;
+    el.waveAnn.classList.add('visible');
+    setTimeout(() => el.waveAnn.classList.remove('visible'), 3000);
   }
 
   return {
@@ -117,6 +131,6 @@ const HUD = (() => {
     setHealth, setAmmo, setWeapon, showReload,
     flashHit, flashDamage,
     showHeadshot, notifyPickup,
-    announceWave,
+    announceWave, announceStage,
   };
 })();

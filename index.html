@@ -125,7 +125,8 @@
   <!-- Wave clear screen -->
   <div id="overlay-waveclear" class="overlay" style="display:none">
     <h1>WAVE CLEAR!</h1>
-    <p class="stat">WAVE <span id="waveclear-num">1</span> COMPLETED</p>
+    <p class="stat">WAVE <span id="waveclear-num">1</span> OF <span id="waveclear-total">5</span> COMPLETED</p>
+    <p class="subtitle" id="waveclear-stage-info"></p>
     <button class="btn" id="next-wave-btn">NEXT WAVE →</button>
   </div>
 
@@ -133,8 +134,9 @@
   <div id="overlay-stageclear" class="overlay" style="display:none">
     <h1 style="color:#44ff88">STAGE CLEAR!</h1>
     <p class="stat">STAGE <span id="stageclear-num">1</span> — <span id="stageclear-name">AVDIIVKA SECTOR</span></p>
-    <p class="stat">SCORE: <span id="stageclear-score">0</span></p>
+    <p class="stat">SCORE: <span id="stageclear-score">0</span> <span style="color:#44ff88;font-size:14px">(+1000 bonus)</span></p>
     <p class="stat">KILLS: <span id="stageclear-kills">0</span></p>
+    <p class="subtitle" id="stageclear-heal" style="color:#44ff88"></p>
     <p class="subtitle" id="stageclear-next-label">Next: <span id="stageclear-next-name">BAKHMUT RUINS</span></p>
     <button class="btn" id="next-stage-btn" style="border-color:#44ff88;color:#44ff88">NEXT STAGE →</button>
   </div>

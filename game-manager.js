@@ -474,7 +474,12 @@ const GameManager = (function () {
     HUD.setStage(STAGES[0].id, STAGES[0].name);
 
     requestPointerLock();
-    beginWave(1);
+
+    // Announce first stage then begin first wave after delay
+    HUD.announceStage(STAGES[0].id, STAGES[0].name, STAGES[0].description);
+    setTimeout(function () {
+      beginWave(1);
+    }, 3200);
 
     // Generate an initial mission
     MissionSystem.generateRandom();
@@ -522,6 +527,11 @@ const GameManager = (function () {
     // Reset wave count for new stage
     currentWave = 0;
 
+    // Heal player between stages (50% of missing HP restored)
+    var missingHp = player.maxHp - player.hp;
+    player.hp = Math.min(player.maxHp, player.hp + Math.ceil(missingHp * 0.5));
+    HUD.setHealth(player.hp, player.maxHp);
+
     // Reset player position on new terrain
     const spawnH = VoxelWorld.getTerrainHeight(0, 0);
     player.position.set(0, spawnH + player.height, 0);
@@ -555,9 +565,12 @@ const GameManager = (function () {
     hideOverlays();
     gameState = STATE.PLAYING;
     requestPointerLock();
-    beginWave(1);
 
-    HUD.notifyPickup('STAGE ' + stageDef.id + ': ' + stageDef.name, '#44ff88');
+    // Announce new stage then begin first wave after delay
+    HUD.announceStage(stageDef.id, stageDef.name, stageDef.description);
+    setTimeout(function () {
+      beginWave(1);
+    }, 3200);
   }
 
   /* ── Wave Management ─────────────────────────────────────────────── */
@@ -565,8 +578,8 @@ const GameManager = (function () {
     currentWave = w;
     const stageDef = STAGES[currentStage];
     Enemies.startWave(w, _scene, stageDef.difficulty);
-    HUD.setWave(w);
-    HUD.announceWave(w, Enemies.getAliveCount());
+    HUD.setWave(w, stageDef.wavesPerStage);
+    HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage);
   }
 
   function onWaveComplete() {
@@ -601,6 +614,16 @@ const GameManager = (function () {
       document.getElementById('stageclear-score').textContent = player.score;
       document.getElementById('stageclear-kills').textContent = player.kills;
 
+      // Show heal preview
+      var missingHp = player.maxHp - player.hp;
+      var healAmount = Math.ceil(missingHp * 0.5);
+      var healEl = document.getElementById('stageclear-heal');
+      if (healEl) {
+        healEl.textContent = healAmount > 0
+          ? '❤ +' + healAmount + ' HP will be restored'
+          : '❤ Full health!';
+      }
+
       const nextStageDef = STAGES[currentStage + 1];
       document.getElementById('stageclear-next-name').textContent = nextStageDef.name;
       document.getElementById('stageclear-next-label').style.display = '';
@@ -610,6 +633,9 @@ const GameManager = (function () {
     gameState = STATE.WAVE_CLEAR;
     showOverlay('waveclear');
     document.getElementById('waveclear-num').textContent = currentWave;
+    document.getElementById('waveclear-total').textContent = stageDef.wavesPerStage;
+    document.getElementById('waveclear-stage-info').textContent =
+      'Stage ' + stageDef.id + ': ' + stageDef.name;
   }
 
   /* ── Player Movement ─────────────────────────────────────────────── */
