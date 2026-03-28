@@ -14,6 +14,8 @@ const HUD = (() => {
     healthVal:    document.getElementById('health-value'),
     ammo:         document.getElementById('ammo-display'),
     ammoRes:      document.getElementById('ammo-reserve'),
+    weaponName:   document.getElementById('weapon-name-display'),
+    weaponSlots:  [0, 1, 2].map(i => document.getElementById('wslot-' + i)),
     reload:       document.getElementById('reload-indicator'),
     hitMarker:    document.getElementById('hit-marker'),
     vignette:     document.getElementById('damage-vignette'),
@@ -49,6 +51,13 @@ const HUD = (() => {
   function setAmmo(clip, reserve) {
     el.ammo.textContent    = clip;
     el.ammoRes.textContent = '/ ' + reserve;
+  }
+
+  function setWeapon(name, idx) {
+    if (el.weaponName) el.weaponName.textContent = name;
+    el.weaponSlots.forEach((s, i) => {
+      if (s) s.classList.toggle('active', i === idx);
+    });
   }
 
   function showReload(on) {
@@ -91,7 +100,7 @@ const HUD = (() => {
   }
 
   function announceWave(number, enemyCount) {
-    el.waveAnn.innerHTML = '<h2>WAVE ' + number + '</h2><p>' + enemyCount + ' OCCUPANTS INCOMING</p>';
+    el.waveAnn.innerHTML = '<h2>WAVE ' + number + '</h2><p>' + enemyCount + ' OCCUPANTS STORMING</p>';
     el.waveAnn.classList.remove('visible');
     void el.waveAnn.offsetWidth;
     el.waveAnn.classList.add('visible');
@@ -101,7 +110,7 @@ const HUD = (() => {
   return {
     show, hide,
     setScore, setWave, setKills, setEnemies,
-    setHealth, setAmmo, showReload,
+    setHealth, setAmmo, setWeapon, showReload,
     flashHit, flashDamage,
     showHeadshot, notifyPickup,
     announceWave,

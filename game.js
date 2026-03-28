@@ -44,20 +44,20 @@
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
-  renderer.setClearColor(0x111111);
+  renderer.setClearColor(0x3a3028);
   document.getElementById('game-container').prepend(renderer.domElement);
 
   const scene  = new THREE.Scene();
-  scene.fog    = new THREE.Fog(0x111111, 15, 45);
+  scene.fog    = new THREE.Fog(0x3a3028, 14, 48);   // smoky brownish haze
 
   const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
   camera.position.set(0, PLAYER_HEIGHT, 0);
 
-  // ── Lighting ──────────────────────────────────────────────
-  const ambient = new THREE.AmbientLight(0x404040, 1.2);
+  // ── Lighting – war-zone overcast / burning sky ────────────
+  const ambient = new THREE.AmbientLight(0x4a3c2a, 1.0);
   scene.add(ambient);
 
-  const sun = new THREE.DirectionalLight(0xff6644, 1.0);
+  const sun = new THREE.DirectionalLight(0xff8833, 0.85);   // fire-orange sky
   sun.position.set(8, 12, 6);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -67,57 +67,118 @@
   sun.shadow.camera.right = sun.shadow.camera.top   =  30;
   scene.add(sun);
 
-  const fill = new THREE.HemisphereLight(0x220022, 0x000011, 0.6);
+  const fill = new THREE.HemisphereLight(0x3a2a18, 0x101008, 0.5);
   scene.add(fill);
 
-  // ── Arena geometry ────────────────────────────────────────
+  // ── Arena geometry – ZOMBIELAND (Avdiivka-style warzone) ──
   function buildArena() {
+    // Grey-brown cratered ground
     const floorGeo = new THREE.PlaneGeometry(ARENA_SIZE * 2, ARENA_SIZE * 2, 30, 30);
-    const floorMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+    const floorMat = new THREE.MeshLambertMaterial({ color: 0x3a332a });
     const floor    = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    const grid = new THREE.GridHelper(ARENA_SIZE * 2, 24, 0x330000, 0x220000);
+    const grid = new THREE.GridHelper(ARENA_SIZE * 2, 24, 0x2a2218, 0x1e1a12);
     scene.add(grid);
 
-    // Walls
-    const wallMat = new THREE.MeshLambertMaterial({ color: 0x1e0a0a });
+    // Earthen berm perimeter walls
+    const bermMat = new THREE.MeshLambertMaterial({ color: 0x3a2e20 });
     const wallH   = 4;
     const wallLen = ARENA_SIZE * 2;
     [
-      { pos: [0, wallH / 2, -ARENA_SIZE], rot: [0, 0, 0],              size: [wallLen, wallH, 0.5] },
-      { pos: [0, wallH / 2,  ARENA_SIZE], rot: [0, Math.PI, 0],        size: [wallLen, wallH, 0.5] },
-      { pos: [-ARENA_SIZE, wallH / 2, 0], rot: [0, -Math.PI / 2, 0],   size: [wallLen, wallH, 0.5] },
-      { pos: [ ARENA_SIZE, wallH / 2, 0], rot: [0,  Math.PI / 2, 0],   size: [wallLen, wallH, 0.5] },
+      { pos: [0, wallH / 2, -ARENA_SIZE], rot: [0, 0, 0],              size: [wallLen, wallH, 1.2] },
+      { pos: [0, wallH / 2,  ARENA_SIZE], rot: [0, Math.PI, 0],        size: [wallLen, wallH, 1.2] },
+      { pos: [-ARENA_SIZE, wallH / 2, 0], rot: [0, -Math.PI / 2, 0],   size: [wallLen, wallH, 1.2] },
+      { pos: [ ARENA_SIZE, wallH / 2, 0], rot: [0,  Math.PI / 2, 0],   size: [wallLen, wallH, 1.2] },
     ].forEach(({ pos, rot, size }) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), wallMat);
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), bermMat);
       mesh.position.set(...pos);
       mesh.rotation.set(...rot);
       mesh.castShadow = mesh.receiveShadow = true;
       scene.add(mesh);
     });
 
-    // Cover crates
-    const crateMat = new THREE.MeshLambertMaterial({ color: 0x3a2a1a });
+    // Missile craters (dark depressions in the ground)
+    const craterMat = new THREE.MeshLambertMaterial({ color: 0x1a1510 });
     [
-      [-6, 2], [6, 2], [-6, -2], [6, -2],
-      [0, 7],  [0, -7], [-10, 5], [10, 5],
-      [-10, -5], [10, -5], [-4, 12], [4, 12],
-    ].forEach(([x, z]) => {
-      const h   = 0.9 + Math.random() * 0.6;
-      const geo = new THREE.BoxGeometry(1.0 + Math.random() * 0.5, h, 1.0 + Math.random() * 0.5);
-      const m   = new THREE.Mesh(geo, crateMat);
-      m.position.set(x, h / 2, z);
+      [5, 8, 2.0], [-8, 3, 1.8], [2, -6, 2.4], [-5, -9, 1.6],
+      [11, -4, 1.9], [-12, 7, 1.5], [3, 16, 2.2], [-14, -5, 1.7],
+    ].forEach(([x, z, r]) => {
+      const crater = new THREE.Mesh(
+        new THREE.CylinderGeometry(r, r * 0.65, 0.45, 14),
+        craterMat
+      );
+      crater.position.set(x, -0.18, z);
+      crater.receiveShadow = true;
+      scene.add(crater);
+
+      // Crater rim (slightly raised dirt ring)
+      const rim = new THREE.Mesh(
+        new THREE.TorusGeometry(r * 1.05, 0.18, 6, 14),
+        new THREE.MeshLambertMaterial({ color: 0x2a2218 })
+      );
+      rim.rotation.x = -Math.PI / 2;
+      rim.position.set(x, 0.06, z);
+      scene.add(rim);
+    });
+
+    // Ruined concrete cover sections (broken walls / rubble)
+    const concreteMat = new THREE.MeshLambertMaterial({ color: 0x6a6458 });
+    const rubbleMat   = new THREE.MeshLambertMaterial({ color: 0x4a4438 });
+    [
+      { pos: [-6, 0.5, 2],  size: [2.6, 1.0, 0.45] },
+      { pos: [6, 0.6, 2],   size: [0.45, 1.2, 2.2] },
+      { pos: [-6, 0.4, -3], size: [0.45, 0.8, 1.8] },
+      { pos: [6, 0.5, -3],  size: [2.4, 1.0, 0.45] },
+      { pos: [0, 0.45, 7],  size: [3.2, 0.9, 0.45] },
+      { pos: [0, 0.45, -7], size: [0.45, 0.9, 2.8] },
+    ].forEach(({ pos, size }) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(...size), concreteMat);
+      m.position.set(...pos);
       m.castShadow = m.receiveShadow = true;
       scene.add(m);
     });
 
-    // Atmospheric point lights
+    // Rubble piles
+    [
+      [-10, 5], [10, 5], [-10, -5], [10, -5],
+      [-4, 13], [4, 13], [0, -10],
+    ].forEach(([x, z]) => {
+      const h   = 0.5 + Math.random() * 0.5;
+      const geo = new THREE.BoxGeometry(1.4 + Math.random(), h, 1.0 + Math.random());
+      const m   = new THREE.Mesh(geo, rubbleMat);
+      m.position.set(x, h / 2, z);
+      m.rotation.y = Math.random() * Math.PI;
+      m.castShadow = m.receiveShadow = true;
+      scene.add(m);
+    });
+
+    // Destroyed vehicle hulks (low flat boxes)
+    const vehicleMat = new THREE.MeshLambertMaterial({ color: 0x2a3020 });
+    [[-8, -8], [9, -7]].forEach(([x, z]) => {
+      const hull = new THREE.Mesh(
+        new THREE.BoxGeometry(3.8, 0.7, 1.8),
+        vehicleMat
+      );
+      hull.position.set(x, 0.35, z);
+      hull.rotation.y = Math.random() * 0.5;
+      hull.castShadow = hull.receiveShadow = true;
+      scene.add(hull);
+      // Turret stub
+      const turret = new THREE.Mesh(
+        new THREE.BoxGeometry(1.0, 0.5, 0.9),
+        vehicleMat
+      );
+      turret.position.set(x, 0.95, z);
+      scene.add(turret);
+    });
+
+    // Orange fire-glow point lights (burning vehicles / craters)
     [[-10, -10], [10, -10], [-10, 10], [10, 10]].forEach(([x, z]) => {
-      const pt = new THREE.PointLight(0xff1100, 1.2, 18);
-      pt.position.set(x, 2.5, z);
+      const pt = new THREE.PointLight(0xff5500, 1.4, 16);
+      pt.position.set(x, 1.2, z);
       scene.add(pt);
     });
   }
@@ -157,6 +218,12 @@
     keys[e.code] = true;
     if (e.code === 'KeyR' && gameState === 'playing') {
       Weapons.forceReload();
+    }
+    // Weapon switch
+    if (gameState === 'playing') {
+      if (e.code === 'Digit1') Weapons.switchTo(0);
+      if (e.code === 'Digit2') Weapons.switchTo(1);
+      if (e.code === 'Digit3') Weapons.switchTo(2);
     }
     if (e.code === 'Escape') {
       if (gameState === 'playing') {
@@ -243,7 +310,7 @@
 
   function beginWave(w) {
     HUD.setWave(w);
-    const count = 4 + (w - 1) * 2;
+    const count = 8 + (w - 1) * 3;   // matches enemies.js formula
     HUD.announceWave(w, count);
     Enemies.startWave(w, scene);
   }

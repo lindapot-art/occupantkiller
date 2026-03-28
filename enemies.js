@@ -1,53 +1,57 @@
 /**
  * enemies.js – Occupant spawning, AI, floating HP bars, and hit detection
- * Three enemy types: NORMAL, RUNNER (wave 3+), TANK (wave 5+)
+ * Level 1 "ZOMBIELAND" – based on Avdiivka assault waves.
+ * Three enemy types: CONSCRIPT (cannon fodder), STORMER (rusher), ARMORED (heavy)
  * Depends on: Three.js global (THREE)
  */
 
 const Enemies = (() => {
   // ── Enemy type definitions ────────────────────────────────
   const TYPES = {
-    NORMAL: {
-      name:        'OCCUPANT',
-      hpBase:      60,
-      speedBase:   2.2,
+    CONSCRIPT: {
+      name:        'CONSCRIPT',
+      hpBase:      40,
+      speedBase:   2.0,
       scale:       1.0,
-      bodyColor:   0xcc2222,
-      headColor:   0xffccaa,
-      limbColor:   0x992222,
-      eyeColor:    0xff0000,
+      bodyColor:   0x4a5230,   // olive-drab uniform
+      headColor:   0xc8a882,   // skin tone
+      limbColor:   0x3a4224,   // dark olive
+      helmetColor: 0x3a4020,   // steel helmet
+      eyeColor:    0x880000,
       attackDmg:   8,
       attackRate:  1.2,
       scoreValue:  100,
-      dropChance:  0.35,
+      dropChance:  0.30,
     },
-    RUNNER: {
-      name:        'RUNNER',
-      hpBase:      28,
-      speedBase:   4.0,
-      scale:       0.75,
-      bodyColor:   0x116688,
-      headColor:   0xaaccdd,
-      limbColor:   0x0d4455,
-      eyeColor:    0x00ffff,
-      attackDmg:   5,
-      attackRate:  0.8,
+    STORMER: {
+      name:        'STORMER',
+      hpBase:      30,
+      speedBase:   4.2,
+      scale:       0.85,
+      bodyColor:   0x3a4a3a,   // dark field uniform
+      headColor:   0xb09070,
+      limbColor:   0x2a3a2a,
+      helmetColor: 0x2a3020,
+      eyeColor:    0xff4400,
+      attackDmg:   6,
+      attackRate:  0.7,
       scoreValue:  150,
-      dropChance:  0.2,
+      dropChance:  0.20,
     },
-    TANK: {
-      name:        'TANK',
-      hpBase:      200,
-      speedBase:   1.1,
-      scale:       1.35,
-      bodyColor:   0x551166,
-      headColor:   0xddaabb,
-      limbColor:   0x330044,
-      eyeColor:    0xcc00ff,
-      attackDmg:   20,
+    ARMORED: {
+      name:        'ARMORED',
+      hpBase:      220,
+      speedBase:   1.0,
+      scale:       1.4,
+      bodyColor:   0x3a4a3a,   // heavy armored vest
+      headColor:   0xd0b090,
+      limbColor:   0x2a3820,
+      helmetColor: 0x1a2010,
+      eyeColor:    0xff0000,
+      attackDmg:   22,
       attackRate:  1.8,
-      scoreValue:  300,
-      dropChance:  0.8,
+      scoreValue:  350,
+      dropChance:  0.85,
     },
   };
 
@@ -64,9 +68,9 @@ const Enemies = (() => {
   // ── Choose a type appropriate for the current wave ────────
   function pickTypeForWave(w) {
     const r = Math.random();
-    if (w >= 5 && r < 0.22) return 'TANK';
-    if (w >= 3 && r < 0.55) return 'RUNNER';
-    return 'NORMAL';
+    if (w >= 5 && r < 0.20) return 'ARMORED';
+    if (w >= 3 && r < 0.50) return 'STORMER';
+    return 'CONSCRIPT';
   }
 
   // ── Build humanoid mesh scaled to typeCfg ─────────────────
@@ -86,6 +90,13 @@ const Enemies = (() => {
     );
     head.position.y = 1.4 * s;
 
+    // Steel helmet (flat-top box slightly wider than head)
+    const helmet = new THREE.Mesh(
+      new THREE.BoxGeometry(0.40 * s, 0.18 * s, 0.40 * s),
+      new THREE.MeshLambertMaterial({ color: typeCfg.helmetColor })
+    );
+    helmet.position.y = 1.55 * s;
+
     const legL = new THREE.Mesh(
       new THREE.BoxGeometry(0.21 * s, 0.55 * s, 0.21 * s),
       new THREE.MeshLambertMaterial({ color: typeCfg.limbColor })
@@ -102,7 +113,7 @@ const Enemies = (() => {
     const armR = armL.clone();
     armR.position.set(0.35 * s, 0.82 * s, 0);
 
-    group.add(torso, head, legL, legR, armL, armR);
+    group.add(torso, head, helmet, legL, legR, armL, armR);
 
     // Eye glow
     const eyeGeo = new THREE.SphereGeometry(0.04 * s, 6, 6);
@@ -115,15 +126,15 @@ const Enemies = (() => {
 
     // Invisible hitbox
     const hitbox = new THREE.Mesh(
-      new THREE.BoxGeometry(0.6 * s, 1.65 * s, 0.4 * s),
+      new THREE.BoxGeometry(0.6 * s, 1.75 * s, 0.4 * s),
       new THREE.MeshBasicMaterial({ visible: false })
     );
-    hitbox.position.y = 0.82 * s;
+    hitbox.position.y = 0.87 * s;
     group.add(hitbox);
 
     group.userData.headMesh = head;
     group.userData.hitbox   = hitbox;
-    group.userData.parts    = [torso, head, legL, legR, armL, armR, hitbox];
+    group.userData.parts    = [torso, head, helmet, legL, legR, armL, armR, hitbox];
 
     return group;
   }
@@ -200,7 +211,8 @@ const Enemies = (() => {
     enemies = [];
     allDead = false;
 
-    const count = 4 + (w - 1) * 2;
+    // Avdiivka-style: 8 on wave 1, +3 per wave (up to ~35 on wave 10)
+    const count = 8 + (w - 1) * 3;
     spawnQueue  = Array.from({ length: count }, () => pickTypeForWave(w));
     spawnTimer  = 0;
   }

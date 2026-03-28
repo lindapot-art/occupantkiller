@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Occupant Killer — 3D FPS</title>
+  <title>ZOMBIELAND — Occupant Killer</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -35,8 +35,18 @@
 
       <div id="ammo-section">
         <div id="ammo-label">AMMO</div>
-        <div id="ammo-display">30</div>
-        <div id="ammo-reserve">/ 90</div>
+        <div id="ammo-display">100</div>
+        <div id="ammo-reserve">/ 250</div>
+      </div>
+
+      <div id="weapon-section">
+        <div id="weapon-label">WEAPON</div>
+        <div id="weapon-name-display">PKM Machine Gun</div>
+        <div id="weapon-slots">
+          <span class="wslot active" id="wslot-0">1·PKM</span>
+          <span class="wslot" id="wslot-1">2·AK</span>
+          <span class="wslot" id="wslot-2">3·SVD</span>
+        </div>
       </div>
     </div>
 
@@ -48,12 +58,13 @@
 
   <!-- Start screen -->
   <div id="start-screen" class="overlay">
-    <h1>Occupant Killer</h1>
-    <p>Eliminate all occupants before they reach you.</p>
-    <p class="subtitle">Survive as many waves as you can.</p>
-    <button class="btn" id="start-btn">▶ START GAME</button>
+    <div id="level-badge">LEVEL 1</div>
+    <h1>ZOMBIELAND</h1>
+    <p>Avdiivka sector. Occupants storming in endless waves.</p>
+    <p class="subtitle">Hold the position. Neutralise every last one.</p>
+    <button class="btn" id="start-btn">▶ START MISSION</button>
     <div id="controls-hint">
-      WASD · MOVE &nbsp;|&nbsp; MOUSE · LOOK &nbsp;|&nbsp; LMB · SHOOT &nbsp;|&nbsp; R · RELOAD &nbsp;|&nbsp; SHIFT · SPRINT &nbsp;|&nbsp; SPACE · JUMP &nbsp;|&nbsp; ESC · PAUSE
+      WASD · MOVE &nbsp;|&nbsp; MOUSE · AIM &nbsp;|&nbsp; LMB · FIRE &nbsp;|&nbsp; R · RELOAD &nbsp;|&nbsp; 1/2/3 · WEAPON &nbsp;|&nbsp; SHIFT · SPRINT &nbsp;|&nbsp; SPACE · JUMP &nbsp;|&nbsp; ESC · PAUSE
     </div>
   </div>
 
