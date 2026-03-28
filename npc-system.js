@@ -420,13 +420,11 @@ const NPCSystem = (function () {
         npc.fireFlash = 0.1;
         npc.mesh.children.forEach(child => {
           if (child.userData.isArm) {
-            if (child.userData._origColor === undefined) {
-              child.userData._origColor = child.material.color ? child.material.color.getHex() : null;
-              child.userData._origMap = child.material.map;
+            if (!child.userData._savedMaterial) {
+              child.userData._savedMaterial = child.material;
+              child.userData._flashMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
             }
-            child.material = child.material.clone();
-            child.material.map = null;
-            child.material.color.setHex(0xffffff);
+            child.material = child.userData._flashMaterial;
           }
         });
       }
@@ -566,14 +564,8 @@ const NPCSystem = (function () {
       npc.fireFlash -= delta;
       if (npc.fireFlash <= 0) {
         npc.mesh.children.forEach(child => {
-          if (child.userData.isArm && child.userData._origColor !== undefined) {
-            child.material = child.material.clone();
-            if (child.userData._origMap) {
-              child.material.map = child.userData._origMap;
-              child.material.needsUpdate = true;
-            } else {
-              child.material.color.setHex(child.userData._origColor);
-            }
+          if (child.userData.isArm && child.userData._savedMaterial) {
+            child.material = child.userData._savedMaterial;
           }
         });
       }
