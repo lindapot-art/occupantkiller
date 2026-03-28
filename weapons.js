@@ -217,12 +217,13 @@ const Weapons = (() => {
   const raycaster = new THREE.Raycaster();
   const spreadVec = new THREE.Vector2();
 
-  function tryFire(camera, targets, delta, onHit) {
+  function tryFire(camera, targets, delta, onHit, newPress) {
     const wep = cur();
     const st  = curState();
     st.fireCooldown -= delta;
     if (st.reloading) return;
     if (st.fireCooldown > 0) return;
+    if (!wep.auto && !newPress) return;   // semi-auto: only fire on a fresh click
     st.fireCooldown = wep.fireRate;
 
     if (st.clip <= 0) {

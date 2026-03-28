@@ -29,6 +29,7 @@
   const direction  = new THREE.Vector3();
   const keys       = {};
   let   mouseDown  = false;
+  let   mouseJustPressed = false;
   let   yaw        = 0;
   let   pitch      = 0;
   const pitchLimit = Math.PI / 2 - 0.05;
@@ -210,7 +211,7 @@
     pitch  = Math.max(-pitchLimit, Math.min(pitchLimit, pitch));
   });
 
-  document.addEventListener('mousedown', (e) => { if (e.button === 0) mouseDown = true; });
+  document.addEventListener('mousedown', (e) => { if (e.button === 0) { mouseDown = true; mouseJustPressed = true; } });
   document.addEventListener('mouseup',   (e) => { if (e.button === 0) mouseDown = false; });
 
   // ── Keyboard ──────────────────────────────────────────────
@@ -461,10 +462,11 @@
       camera.position.y += Math.sin(bobTime) * 0.038;
     }
 
-    // Auto-fire
+    // Auto-fire (or single-click for semi-auto weapons)
     if (mouseDown && document.pointerLockElement === canvas) {
-      Weapons.tryFire(camera, Enemies.getEnemyMeshes(), delta, onEnemyHit);
+      Weapons.tryFire(camera, Enemies.getEnemyMeshes(), delta, onEnemyHit, mouseJustPressed);
     }
+    mouseJustPressed = false;
   }
 
   // ── Resize ────────────────────────────────────────────────

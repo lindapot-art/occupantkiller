@@ -171,7 +171,7 @@ const Enemies = (() => {
 
   // ── Spawn one enemy ───────────────────────────────────────
   function spawnOne(typeName) {
-    const typeCfg = TYPES[typeName] || TYPES.NORMAL;
+    const typeCfg = TYPES[typeName] || TYPES.CONSCRIPT;
 
     const angle = Math.random() * Math.PI * 2;
     const r     = ARENA_SIZE * 0.46 + Math.random() * 4;
@@ -275,8 +275,8 @@ const Enemies = (() => {
         e.legAngle += e.legDir * (e.speed / 2.2) * 4 * delta;
         if (Math.abs(e.legAngle) > 0.45) e.legDir *= -1;
         const parts = e.mesh.userData.parts;
-        if (parts[2]) parts[2].rotation.x =  e.legAngle;
-        if (parts[3]) parts[3].rotation.x = -e.legAngle;
+        if (parts[3]) parts[3].rotation.x =  e.legAngle;
+        if (parts[4]) parts[4].rotation.x = -e.legAngle;
       }
 
       // Melee attack when close enough
