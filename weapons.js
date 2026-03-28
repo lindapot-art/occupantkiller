@@ -496,11 +496,11 @@ const Weapons = (() => {
 
       // Check terrain collision via VoxelWorld
       if (!hit && typeof VoxelWorld !== 'undefined') {
-        var fakeCamera = {
+        const fakeCamera = {
           position: p.mesh.position.clone(),
           getWorldDirection: function(v) { return v.copy(p.dir); },
         };
-        var ray = VoxelWorld.raycastBlock(fakeCamera, p.speed * delta + 0.5);
+        const ray = VoxelWorld.raycastBlock(fakeCamera, p.speed * delta + 0.5);
         if (ray) hit = true;
       }
 

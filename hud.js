@@ -64,7 +64,7 @@ const HUD = (() => {
     el.weaponSlots.forEach((s, i) => {
       if (!s) return;
       s.classList.toggle('active', i === idx);
-      var isLocked = typeof Weapons !== 'undefined' && !Weapons.isUnlocked(i);
+      const isLocked = typeof Weapons !== 'undefined' && !Weapons.isUnlocked(i);
       s.classList.toggle('locked', isLocked);
     });
   }

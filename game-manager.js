@@ -774,12 +774,12 @@ const GameManager = (function () {
 
       // Weapon unlock drop (pickup weapons 2-8)
       if (Math.random() < 0.12) {
-        var candidates = [];
-        for (var wi = 2; wi <= 8; wi++) {
+        const candidates = [];
+        for (let wi = 2; wi <= 8; wi++) {
           if (!Weapons.isUnlocked(wi)) candidates.push(wi);
         }
         if (candidates.length > 0) {
-          var idx = candidates[Math.floor(Math.random() * candidates.length)];
+          const idx = candidates[Math.floor(Math.random() * candidates.length)];
           Weapons.unlockWeapon(idx);
           HUD.notifyPickup('WEAPON UNLOCKED: ' + Weapons.getWeaponName(idx), '#ff8800');
         }
