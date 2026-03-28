@@ -109,6 +109,7 @@ const Enemies = (() => {
   let spawnQueue = [];   // array of type-name strings
   let spawnTimer = 0;
   let allDead    = false;
+  let stageMult  = 1;    // stage difficulty multiplier
 
   const ARENA_SIZE = 24;
 
@@ -318,8 +319,8 @@ const Enemies = (() => {
     mesh.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
     scene.add(mesh);
 
-    const waveHpBonus    = 1 + (wave - 1) * 0.22;
-    const waveSpeedBonus = 1 + (wave - 1) * 0.06;
+    const waveHpBonus    = (1 + (wave - 1) * 0.22) * stageMult;
+    const waveSpeedBonus = (1 + (wave - 1) * 0.06) * (1 + (stageMult - 1) * 0.3);
     const hp             = typeCfg.hpBase * waveHpBonus;
 
     enemies.push({
@@ -344,14 +345,16 @@ const Enemies = (() => {
   }
 
   // ── Initialise a wave ─────────────────────────────────────
-  function startWave(w, sc) {
-    wave    = w;
-    scene   = sc;
-    enemies = [];
-    allDead = false;
+  function startWave(w, sc, stageMultiplier) {
+    wave      = w;
+    scene     = sc;
+    stageMult = stageMultiplier || 1;
+    enemies   = [];
+    allDead   = false;
 
-    // Avdiivka-style: 8 on wave 1, +3 per wave (up to ~35 on wave 10)
-    const count = 8 + (w - 1) * 3;
+    // Avdiivka-style: 8 on wave 1, +3 per wave, scaled by stage
+    const baseCount = 8 + (w - 1) * 3;
+    const count = Math.floor(baseCount * (1 + (stageMult - 1) * 0.5));
     spawnQueue  = Array.from({ length: count }, () => pickTypeForWave(w));
     spawnTimer  = 0;
   }

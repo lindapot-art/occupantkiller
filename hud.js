@@ -10,6 +10,7 @@ const HUD = (() => {
     wave:         document.getElementById('wave-display'),
     kills:        document.getElementById('kills-display'),
     enemies:      document.getElementById('enemies-display'),
+    stage:        document.getElementById('stage-display'),
     healthBar:    document.getElementById('health-bar'),
     healthVal:    document.getElementById('health-value'),
     ammo:         document.getElementById('ammo-display'),
@@ -36,6 +37,9 @@ const HUD = (() => {
   function setWave(v)    { el.wave.textContent     = 'WAVE: '    + v; }
   function setKills(v)   { el.kills.textContent    = 'KILLS: '   + v; }
   function setEnemies(v) { el.enemies.textContent  = 'ENEMIES: ' + v; }
+  function setStage(num, name) {
+    if (el.stage) el.stage.textContent = 'STAGE ' + num + ': ' + name;
+  }
 
   function setHealth(current, max) {
     const pct = Math.max(0, current / max) * 100;
@@ -109,7 +113,7 @@ const HUD = (() => {
 
   return {
     show, hide,
-    setScore, setWave, setKills, setEnemies,
+    setScore, setWave, setKills, setEnemies, setStage,
     setHealth, setAmmo, setWeapon, showReload,
     flashHit, flashDamage,
     showHeadshot, notifyPickup,

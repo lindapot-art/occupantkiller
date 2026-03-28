@@ -75,6 +75,7 @@ canvas {
 #wave-display  { color: #ffaa00; }
 #kills-display { color: #ff4444; }
 #enemies-display { color: #88cc44; }
+#stage-display { color: #44ff88; font-weight: bold; letter-spacing: 2px; }
 
 #bottom-bar {
   position: absolute;
