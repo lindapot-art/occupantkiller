@@ -277,6 +277,40 @@ const Enemies = (() => {
 
     group.add(torso, head, helmet, legL, legR, armL, armR);
 
+    // ── Body Armor (6B45 vest over torso) ─────────────────
+    const vest = new THREE.Mesh(
+      new THREE.BoxGeometry(0.56 * s, 0.55 * s, 0.30 * s),
+      new THREE.MeshLambertMaterial({ color: 0x3A4A2A })
+    );
+    vest.position.y = 0.92 * s;
+    group.add(vest);
+
+    // ── Magazine pouches on chest ─────────────────────────
+    for (let i = -1; i <= 1; i++) {
+      const pouch = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06 * s, 0.08 * s, 0.04 * s),
+        new THREE.MeshLambertMaterial({ color: 0x2a3a1a })
+      );
+      pouch.position.set(i * 0.1 * s, 0.95 * s, 0.16 * s);
+      group.add(pouch);
+    }
+
+    // ── Canteen on hip ────────────────────────────────────
+    const canteen = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04 * s, 0.04 * s, 0.08 * s, 8),
+      new THREE.MeshLambertMaterial({ color: 0x2a3a1a })
+    );
+    canteen.position.set(-0.30 * s, 0.50 * s, 0);
+    group.add(canteen);
+
+    // ── Radio on chest ────────────────────────────────────
+    const radio = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04 * s, 0.06 * s, 0.02 * s),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    radio.position.set(0.20 * s, 1.05 * s, 0.14 * s);
+    group.add(radio);
+
     // ── Belt / equipment strip (dark webbing) ─────────────
     const belt = new THREE.Mesh(
       new THREE.BoxGeometry(0.54 * s, 0.06 * s, 0.28 * s),
@@ -285,15 +319,25 @@ const Enemies = (() => {
     belt.position.y = 0.53 * s;
     group.add(belt);
 
-    // ── Boot tops (black) ─────────────────────────────────
+    // ── Boots (dark brown — historically accurate) ────────
     for (const legMesh of [legL, legR]) {
       const boot = new THREE.Mesh(
         new THREE.BoxGeometry(0.22 * s, 0.18 * s, 0.22 * s),
-        new THREE.MeshLambertMaterial({ color: 0x111111 })
+        new THREE.MeshLambertMaterial({ color: 0x2A1A0A })
       );
       boot.position.copy(legMesh.position);
       boot.position.y = 0.04 * s;
       group.add(boot);
+
+      // Knee pad
+      const kneePad = new THREE.Mesh(
+        new THREE.BoxGeometry(0.10 * s, 0.06 * s, 0.04 * s),
+        new THREE.MeshLambertMaterial({ color: 0x1a1a0a })
+      );
+      kneePad.position.copy(legMesh.position);
+      kneePad.position.y = 0.18 * s;
+      kneePad.position.z = 0.12 * s;
+      group.add(kneePad);
     }
 
     // Eye glow
