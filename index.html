@@ -17,11 +17,23 @@
     <div id="hit-marker"></div>
     <div id="damage-vignette"></div>
 
+    <!-- ── Extended top info bar ───────────────────────────── -->
+    <div id="extended-top-bar">
+      <span id="hud-time">07:00 DAY | Day 1 | Spring</span>
+      <span id="hud-rank">⬜ Recruit (0%)</span>
+      <span id="hud-mode">FPS</span>
+    </div>
+
     <div id="top-bar">
       <span id="score-display">SCORE: 0</span>
       <span id="wave-display">WAVE: 1</span>
       <span id="kills-display">KILLS: 0</span>
       <span id="enemies-display">ENEMIES: 0</span>
+    </div>
+
+    <!-- ── Resource bar ────────────────────────────────────── -->
+    <div id="resource-bar">
+      <span id="hud-resources">🪵50 🔩30 ⚡10 ⛽20 🪨40 🍞60 | 💰500</span>
     </div>
 
     <div id="bottom-bar">
@@ -50,63 +62,151 @@
       </div>
     </div>
 
+    <!-- ── NPC & mission info (bottom-left) ────────────────── -->
+    <div id="info-panel-left">
+      <div id="hud-npcs">NPCs: 0 | Morale: 0%</div>
+      <div id="hud-missions">📋 No active missions</div>
+    </div>
+
     <div id="reload-indicator">RELOADING…</div>
     <div id="headshot-notif">HEADSHOT!</div>
     <div id="pickup-notif"></div>
     <div id="wave-announce"></div>
+
+    <!-- ── Build mode HUD ──────────────────────────────────── -->
+    <div id="build-hud" style="display:none">
+      <div class="build-title">🔨 BUILD MODE</div>
+      <div class="build-templates">
+        <span class="build-opt">[F1] Barracks</span>
+        <span class="build-opt">[F2] Factory</span>
+        <span class="build-opt">[F3] Turret</span>
+        <span class="build-opt">[F4] Drone Hangar</span>
+        <span class="build-opt">[F5] Command Center</span>
+        <span class="build-opt">[F6] Wall</span>
+      </div>
+      <div class="build-info">LMB · Place | RMB · Remove | B · Exit Build</div>
+    </div>
+
+    <!-- ── Controls legend (top-right) ─────────────────────── -->
+    <div id="controls-legend">
+      <div>V · Camera Mode</div>
+      <div>B · Build Mode</div>
+      <div>F · Possess Drone</div>
+      <div>G · Enter Vehicle</div>
+      <div>4-7 · Time Speed</div>
+      <div>P · Pause Time</div>
+    </div>
   </div>
 
   <!-- Start screen -->
-  <div id="start-screen" class="overlay">
-    <div id="level-badge">LEVEL 1</div>
+  <div id="overlay-start" class="overlay">
+    <div id="level-badge">HYBRID VOXEL WARFARE</div>
     <h1>ZOMBIELAND</h1>
-    <p>Avdiivka sector. Occupants storming in endless waves.</p>
-    <p class="subtitle">Hold the position. Neutralise every last one.</p>
+    <p>Avdiivka sector. Voxel world. Build. Command. Fight.</p>
+    <p class="subtitle">Defend your base. Eliminate occupants. Expand your territory.</p>
     <button class="btn" id="start-btn">▶ START MISSION</button>
     <div id="controls-hint">
-      WASD · MOVE &nbsp;|&nbsp; MOUSE · AIM &nbsp;|&nbsp; LMB · FIRE &nbsp;|&nbsp; R · RELOAD &nbsp;|&nbsp; 1/2/3 · WEAPON &nbsp;|&nbsp; SHIFT · SPRINT &nbsp;|&nbsp; SPACE · JUMP &nbsp;|&nbsp; ESC · PAUSE
+      WASD · MOVE &nbsp;|&nbsp; MOUSE · AIM &nbsp;|&nbsp; LMB · FIRE &nbsp;|&nbsp; R · RELOAD &nbsp;|&nbsp; 1/2/3 · WEAPON &nbsp;|&nbsp; SHIFT · SPRINT &nbsp;|&nbsp; SPACE · JUMP<br/>
+      V · CAMERA MODE &nbsp;|&nbsp; B · BUILD &nbsp;|&nbsp; F · DRONE &nbsp;|&nbsp; G · VEHICLE &nbsp;|&nbsp; ESC · PAUSE
     </div>
   </div>
 
   <!-- Dead screen -->
-  <div id="dead-screen" class="overlay" style="display:none">
+  <div id="overlay-dead" class="overlay" style="display:none">
     <h1>YOU DIED</h1>
-    <p class="stat" id="final-score">SCORE: 0</p>
-    <p class="stat" id="final-kills">KILLS: 0</p>
-    <p class="stat" id="final-wave">WAVES SURVIVED: 0</p>
+    <p class="stat">SCORE: <span id="dead-score">0</span></p>
+    <p class="stat">KILLS: <span id="dead-kills">0</span></p>
+    <p class="stat">WAVES: <span id="dead-wave">0</span></p>
     <button class="btn" id="restart-btn">↺ TRY AGAIN</button>
   </div>
 
   <!-- Wave clear screen -->
-  <div id="wave-screen" class="overlay" style="display:none">
+  <div id="overlay-waveclear" class="overlay" style="display:none">
     <h1>WAVE CLEAR!</h1>
-    <p class="stat" id="wave-score">SCORE: 0</p>
+    <p class="stat">WAVE <span id="waveclear-num">1</span> COMPLETED</p>
     <button class="btn" id="next-wave-btn">NEXT WAVE →</button>
   </div>
 
   <!-- Pause screen -->
-  <div id="pause-screen" class="overlay" style="display:none">
+  <div id="overlay-pause" class="overlay" style="display:none">
     <h1 style="color:#ffffff">PAUSED</h1>
     <button class="btn" id="resume-btn" style="border-color:#fff;color:#fff">▶ RESUME</button>
     <button class="btn" id="quit-btn" style="margin-top:12px;border-color:#888;color:#888">✕ QUIT TO MENU</button>
   </div>
 
-  <!-- Win screen (all 10 waves) -->
-  <div id="win-screen" class="overlay" style="display:none">
+  <!-- Win screen -->
+  <div id="overlay-win" class="overlay" style="display:none">
     <h1>VICTORY!</h1>
     <p>All occupants eliminated.</p>
-    <p class="stat" id="win-score">SCORE: 0</p>
-    <p class="stat" id="win-kills">KILLS: 0</p>
+    <p class="stat">SCORE: <span id="win-score">0</span></p>
+    <p class="stat">KILLS: <span id="win-kills">0</span></p>
     <button class="btn" id="play-again-btn">PLAY AGAIN</button>
   </div>
 </div>
 
 <!-- Three.js r137 (local copy, patched for CVE XSS < 0.137.0) -->
 <script src="three.min.js"></script>
+
+<!-- Core modules (order matters: dependencies first) -->
+<script src="voxel-world.js"></script>
+<script src="camera-system.js"></script>
+<script src="time-system.js"></script>
+<script src="economy.js"></script>
+<script src="skills.js"></script>
+<script src="ranks.js"></script>
+<script src="building.js"></script>
+<script src="npc-system.js"></script>
+<script src="drone-system.js"></script>
+<script src="vehicles.js"></script>
+<script src="automation.js"></script>
+<script src="missions.js"></script>
 <script src="pickups.js"></script>
 <script src="hud.js"></script>
 <script src="weapons.js"></script>
 <script src="enemies.js"></script>
-<script src="game.js"></script>
+<script src="game-manager.js"></script>
+
+<!-- Boot -->
+<script>
+(function () {
+  'use strict';
+  GameManager.init();
+
+  // ── Button wiring ──────────────────────────────────────
+  document.getElementById('start-btn').addEventListener('click', function () {
+    GameManager.startGame();
+  });
+
+  document.getElementById('restart-btn').addEventListener('click', function () {
+    GameManager.startGame();
+  });
+
+  document.getElementById('next-wave-btn').addEventListener('click', function () {
+    GameManager.hideOverlays();
+    GameManager.setState(GameManager.STATE.PLAYING);
+    GameManager.requestPointerLock();
+    GameManager.beginWave(GameManager.getCurrentWave() + 1);
+  });
+
+  document.getElementById('resume-btn').addEventListener('click', function () {
+    GameManager.hideOverlays();
+    GameManager.setState(GameManager.STATE.PLAYING);
+    GameManager.requestPointerLock();
+  });
+
+  document.getElementById('quit-btn').addEventListener('click', function () {
+    GameManager.hideOverlays();
+    GameManager.showOverlay('start');
+    GameManager.setState(GameManager.STATE.MENU);
+  });
+
+  document.getElementById('play-again-btn').addEventListener('click', function () {
+    GameManager.startGame();
+  });
+
+  // Start render loop
+  GameManager.update();
+})();
+</script>
 </body>
 </html>
