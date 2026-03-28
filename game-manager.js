@@ -528,7 +528,7 @@ const GameManager = (function () {
     currentWave = 0;
 
     // Heal player between stages (50% of missing HP restored)
-    var missingHp = player.maxHp - player.hp;
+    const missingHp = player.maxHp - player.hp;
     player.hp = Math.min(player.maxHp, player.hp + Math.ceil(missingHp * 0.5));
     HUD.setHealth(player.hp, player.maxHp);
 
@@ -615,9 +615,9 @@ const GameManager = (function () {
       document.getElementById('stageclear-kills').textContent = player.kills;
 
       // Show heal preview
-      var missingHp = player.maxHp - player.hp;
-      var healAmount = Math.ceil(missingHp * 0.5);
-      var healEl = document.getElementById('stageclear-heal');
+      const missingHp = player.maxHp - player.hp;
+      const healAmount = Math.ceil(missingHp * 0.5);
+      const healEl = document.getElementById('stageclear-heal');
       if (healEl) {
         healEl.textContent = healAmount > 0
           ? '❤ +' + healAmount + ' HP will be restored'

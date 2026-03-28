@@ -106,7 +106,7 @@ const HUD = (() => {
   }
 
   function announceWave(number, enemyCount, totalWaves) {
-    var progress = totalWaves ? ' OF ' + totalWaves : '';
+    const progress = totalWaves ? ' OF ' + totalWaves : '';
     el.waveAnn.innerHTML = '<h2>WAVE ' + number + progress + '</h2><p>' + enemyCount + ' OCCUPANTS STORMING</p>';
     el.waveAnn.classList.remove('visible');
     void el.waveAnn.offsetWidth;
