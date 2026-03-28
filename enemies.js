@@ -152,6 +152,7 @@ const Enemies = (() => {
   let spawnTimer = 0;
   let allDead    = false;
   let stageMult  = 1;    // stage difficulty multiplier
+  let _playerPos = null; // cached player position for spawning
 
   const ARENA_SIZE = 24;
 
@@ -401,10 +402,17 @@ const Enemies = (() => {
     const rank = pickRank(wave);
     const unit = pickUnit();
 
+    // Spawn around the player, not world origin, and place on terrain
     const angle = Math.random() * Math.PI * 2;
     const r     = ARENA_SIZE * 0.46 + Math.random() * 4;
+    const px = _playerPos ? _playerPos.x : 0;
+    const pz = _playerPos ? _playerPos.z : 0;
+    const sx = px + Math.cos(angle) * r;
+    const sz = pz + Math.sin(angle) * r;
+    const sy = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
+      ? VoxelWorld.getTerrainHeight(sx, sz) : 0;
     const mesh  = buildMesh(typeCfg);
-    mesh.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+    mesh.position.set(sx, sy, sz);
     scene.add(mesh);
 
     const waveHpBonus    = (1 + (wave - 1) * 0.22) * stageMult;
@@ -451,6 +459,9 @@ const Enemies = (() => {
 
   // ── Per-frame update ──────────────────────────────────────
   function update(delta, playerPos, onPlayerHit, onEnemyDied) {
+    // Cache player position for spawning
+    _playerPos = playerPos;
+
     // Spawn from queue
     if (spawnQueue.length > 0) {
       spawnTimer -= delta;
@@ -501,6 +512,10 @@ const Enemies = (() => {
       if (dist > 0.1) {
         dir.normalize();
         e.mesh.position.addScaledVector(dir, e.speed * delta);
+        // Follow terrain height
+        if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
+          e.mesh.position.y = VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z);
+        }
         e.mesh.lookAt(playerPos.x, e.mesh.position.y, playerPos.z);
 
         // Leg swing animation (speed-scaled)
@@ -529,7 +544,7 @@ const Enemies = (() => {
         const hpColor = pct > 0.6 ? 0x44ff44 : pct > 0.3 ? 0xffaa00 : 0xff2222;
         e.hpBar.fg.material.color.setHex(hpColor);
 
-        const barY = 1.75 * e.typeCfg.scale + 0.35;
+        const barY = e.mesh.position.y + 1.75 * e.typeCfg.scale + 0.35;
         e.hpBar.group.position.set(e.mesh.position.x, barY, e.mesh.position.z);
         e.hpBar.group.lookAt(playerPos.x, barY, playerPos.z);
       }
