@@ -163,6 +163,39 @@
     <p class="stat">STAGES COMPLETED: <span id="win-stages">3</span></p>
     <button class="btn" id="play-again-btn">PLAY AGAIN</button>
   </div>
+
+  <!-- Inventory / Pause overlay -->
+  <div id="inventory-overlay" class="overlay" style="display:none">
+    <div class="overlay-content">
+      <h1>⏸ PAUSED</h1>
+      <div id="inventory-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:15px 0;"></div>
+      <div id="player-stats" style="text-align:left;font-size:14px;margin:10px 0;"></div>
+      <p style="color:#888">Press ESC or tap ⏸ to resume</p>
+      <button class="btn" id="inv-resume-btn" style="border-color:#fff;color:#fff">▶ RESUME</button>
+    </div>
+  </div>
+
+  <!-- Mobile Controls -->
+  <div id="mobile-controls" style="display:none">
+    <!-- Left joystick area -->
+    <div id="joystick-zone" class="mobile-ctrl">
+      <div id="joystick-base"></div>
+      <div id="joystick-thumb"></div>
+    </div>
+
+    <!-- Action buttons (right side) -->
+    <div id="mobile-actions" class="mobile-ctrl">
+      <button id="btn-fire" class="mobile-btn fire-btn">🔫</button>
+      <button id="btn-reload" class="mobile-btn">🔄</button>
+      <button id="btn-jump" class="mobile-btn">⬆</button>
+      <button id="btn-sprint" class="mobile-btn">🏃</button>
+      <button id="btn-weapon-prev" class="mobile-btn sm">◀</button>
+      <button id="btn-weapon-next" class="mobile-btn sm">▶</button>
+    </div>
+
+    <!-- Inventory/Pause button -->
+    <button id="btn-pause" class="mobile-btn pause-btn">⏸</button>
+  </div>
 </div>
 
 <!-- Three.js r137 (local copy, patched for CVE XSS < 0.137.0) -->
@@ -227,6 +260,10 @@
 
   document.getElementById('play-again-btn').addEventListener('click', function () {
     GameManager.startGame();
+  });
+
+  document.getElementById('inv-resume-btn').addEventListener('click', function () {
+    GameManager.toggleInventory();
   });
 
   // Start render loop
