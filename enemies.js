@@ -102,6 +102,48 @@ const Enemies = (() => {
     },
   };
 
+  // ── Military Ranks ───────────────────────────────────────
+  const RANKS = [
+    { id: 'PRIVATE',    name: 'Рядовой',    hpMult: 0.8, spdMult: 1.0, score: 50,   dropTier: 0 },
+    { id: 'CORPORAL',   name: 'Єфрейтор',   hpMult: 1.0, spdMult: 1.0, score: 100,  dropTier: 0 },
+    { id: 'SERGEANT',   name: 'Сержант',     hpMult: 1.2, spdMult: 1.1, score: 200,  dropTier: 1 },
+    { id: 'WARRANT',    name: 'Старшина',    hpMult: 1.5, spdMult: 1.0, score: 300,  dropTier: 1 },
+    { id: 'LIEUTENANT', name: 'Лейтенант',   hpMult: 1.8, spdMult: 0.9, score: 500,  dropTier: 2 },
+    { id: 'CAPTAIN',    name: 'Капітан',     hpMult: 2.0, spdMult: 0.9, score: 750,  dropTier: 2 },
+    { id: 'MAJOR',      name: 'Майор',       hpMult: 2.5, spdMult: 0.8, score: 1000, dropTier: 3 },
+    { id: 'COLONEL',    name: 'Полковник',   hpMult: 3.0, spdMult: 0.7, score: 2000, dropTier: 3 },
+    { id: 'GENERAL',    name: 'Генерал',     hpMult: 5.0, spdMult: 0.5, score: 5000, dropTier: 4 },
+  ];
+
+  // ── Unit Types ───────────────────────────────────────────
+  const UNITS = [
+    { id: 'REGULAR',  name: 'Regular Army',   marking: 'Z',  armband: 0xffffff },
+    { id: 'VDV',      name: 'VDV Airborne',   marking: 'V',  armband: 0xffffff, beret: 0x3366aa },
+    { id: 'WAGNER',   name: 'Wagner PMC',     marking: 'W',  armband: 0x111111 },
+    { id: 'DNR',      name: 'DNR Militia',    marking: 'Z',  armband: 0xff8800 },
+    { id: 'SPETSNAZ', name: 'Spetsnaz',       marking: 'Z',  armband: 0xffffff },
+    { id: 'MARINES',  name: 'Naval Infantry', marking: 'Z',  armband: 0xffffff, beret: 0x111111 },
+  ];
+
+  // ── Pick rank based on wave number ───────────────────────
+  function pickRank(waveNum) {
+    const r = Math.random();
+    if (waveNum >= 5 && r < 0.03) return RANKS[8]; // GENERAL
+    if (waveNum >= 4 && r < 0.08) return RANKS[7]; // COLONEL
+    if (waveNum >= 4 && r < 0.15) return RANKS[6]; // MAJOR
+    if (waveNum >= 3 && r < 0.25) return RANKS[5]; // CAPTAIN
+    if (waveNum >= 3 && r < 0.35) return RANKS[4]; // LIEUTENANT
+    if (waveNum >= 2 && r < 0.50) return RANKS[3]; // WARRANT
+    if (waveNum >= 2 && r < 0.65) return RANKS[2]; // SERGEANT
+    if (r < 0.80) return RANKS[1]; // CORPORAL
+    return RANKS[0]; // PRIVATE
+  }
+
+  // ── Pick random unit ────────────────────────────────────
+  function pickUnit() {
+    return UNITS[Math.floor(Math.random() * UNITS.length)];
+  }
+
   // ── Internal state ────────────────────────────────────────
   let scene      = null;
   let enemies    = [];
@@ -312,6 +354,8 @@ const Enemies = (() => {
   // ── Spawn one enemy ───────────────────────────────────────
   function spawnOne(typeName) {
     const typeCfg = TYPES[typeName] || TYPES.CONSCRIPT;
+    const rank = pickRank(wave);
+    const unit = pickUnit();
 
     const angle = Math.random() * Math.PI * 2;
     const r     = ARENA_SIZE * 0.46 + Math.random() * 4;
@@ -321,20 +365,22 @@ const Enemies = (() => {
 
     const waveHpBonus    = (1 + (wave - 1) * 0.22) * stageMult;
     const waveSpeedBonus = (1 + (wave - 1) * 0.06) * (1 + (stageMult - 1) * 0.3);
-    const hp             = typeCfg.hpBase * waveHpBonus;
+    const hp             = typeCfg.hpBase * waveHpBonus * rank.hpMult;
 
     enemies.push({
       mesh,
       hpBar:       buildHpBar(),
       typeCfg,
       typeName,
+      rank,
+      unit,
       hp,
       maxHp:       hp,
-      speed:       typeCfg.speedBase * waveSpeedBonus,
+      speed:       typeCfg.speedBase * waveSpeedBonus * rank.spdMult,
       attackDmg:   typeCfg.attackDmg,
       attackTimer: Math.random() * typeCfg.attackRate,
       attackRate:  typeCfg.attackRate,
-      scoreValue:  typeCfg.scoreValue,
+      scoreValue:  rank.score,
       dropChance:  typeCfg.dropChance,
       alive:       true,
       flashTimer:  0,
@@ -510,21 +556,22 @@ const Enemies = (() => {
   }
 
   // ── Area damage (explosions) ────────────────────────────────
-  function damageInRadius(position, radius, dmg) {
-    const rSq = radius * radius;
-    for (let i = 0; i < enemies.length; i++) {
-      const e = enemies[i];
+  function damageInRadius(pos, radius, amount) {
+    const results = [];
+    for (const e of enemies) {
       if (!e.alive) continue;
-      const dx = e.mesh.position.x - position.x;
-      const dy = e.mesh.position.y + e.typeCfg.scale * 0.87 - position.y;
-      const dz = e.mesh.position.z - position.z;
-      const distSq = dx * dx + dy * dy + dz * dz;
-      if (distSq < rSq) {
-        const falloff = 1 - Math.sqrt(distSq) / radius;
-        damage(e, dmg * falloff);
+      const dist = e.mesh.position.distanceTo(pos);
+      if (dist <= radius) {
+        const falloff = 1 - (dist / radius) * 0.5;
+        const remaining = damage(e, amount * falloff);
+        results.push({ enemy: e, remaining });
       }
     }
+    return results;
   }
+
+  // ── Get all alive enemies ─────────────────────────────────
+  function getAll() { return enemies.filter(e => e.alive); }
 
   return {
     startWave,
@@ -536,5 +583,8 @@ const Enemies = (() => {
     getAliveCount,
     isWaveDone,
     clear,
+    getAll,
+    RANKS,
+    UNITS,
   };
 })();

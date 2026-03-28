@@ -77,6 +77,11 @@ const NPCSystem = (function () {
       // State
       alive:  true,
       asleep: false,
+
+      // Combat
+      combatTarget: null,
+      combatCooldown: 0,
+      fireFlash: 0,
     };
 
     npc.mesh = buildNPCMesh(npc);
@@ -363,8 +368,88 @@ const NPCSystem = (function () {
     }
   }
 
+  /* ── NPC Combat ───────────────────────────────────────────────────── */
+  function findNearestEnemy(npc) {
+    const allEnemies = (typeof Enemies !== 'undefined' && Enemies.getAll) ? Enemies.getAll() : [];
+    let nearest = null;
+    let nearDist = Infinity;
+    for (const e of allEnemies) {
+      const dist = npc.position.distanceTo(e.mesh.position);
+      if (dist < nearDist) {
+        nearDist = dist;
+        nearest = e;
+      }
+    }
+    if (nearest && nearDist < 20) return { enemy: nearest, dist: nearDist };
+    return null;
+  }
+
+  function updateCombat(npc, delta, target) {
+    const dist = target.dist;
+    const enemy = target.enemy;
+
+    if (dist > 12) {
+      // Move toward enemy, stop 8 units away
+      const dir = new THREE.Vector3().subVectors(enemy.mesh.position, npc.position).setY(0).normalize();
+      npc.target = npc.position.clone().add(dir.multiplyScalar(dist - 8));
+    } else if (dist >= 4) {
+      // Stop and shoot
+      npc.target = null;
+      // Face enemy
+      const lookDir = new THREE.Vector3().subVectors(enemy.mesh.position, npc.position).setY(0);
+      if (lookDir.length() > 0.1) {
+        npc.mesh.rotation.y = Math.atan2(lookDir.x, lookDir.z);
+      }
+
+      npc.combatCooldown -= delta;
+      if (npc.combatCooldown <= 0) {
+        const fireRate = 1.5 - npc.skills.combat * 0.007; // 0.8-1.5s
+        npc.combatCooldown = Math.max(0.8, fireRate);
+        const dmg = 5 + npc.skills.combat * 0.3;
+
+        if (typeof Enemies !== 'undefined' && Enemies.damage) {
+          const remaining = Enemies.damage(enemy, dmg);
+          if (remaining <= 0) {
+            npc.stress = Math.max(0, npc.stress - 5);
+            npc.morale = Math.min(100, npc.morale + 5);
+            npc.combatTarget = null;
+          }
+        }
+
+        // Flash arms white when firing
+        npc.fireFlash = 0.1;
+        npc.mesh.children.forEach(child => {
+          if (child.userData.isArm) {
+            if (child.userData._origColor === undefined) {
+              child.userData._origColor = child.material.color ? child.material.color.getHex() : null;
+              child.userData._origMap = child.material.map;
+            }
+            child.material = child.material.clone();
+            child.material.map = null;
+            child.material.color.setHex(0xffffff);
+          }
+        });
+      }
+    } else {
+      // Too close — back away
+      const away = new THREE.Vector3().subVectors(npc.position, enemy.mesh.position).setY(0).normalize();
+      npc.target = npc.position.clone().add(away.multiplyScalar(6));
+    }
+  }
+
   /* ── AI Behavior ─────────────────────────────────────────────────── */
   function updateBehavior(npc, delta, timeInfo) {
+    // Combat takes highest priority for guards, patrols, and infantry+ ranks
+    if (['guard', 'patrol'].includes(npc.job) ||
+        RANK_ORDER.indexOf(npc.rank) >= RANK_ORDER.indexOf(NPC_RANK.INFANTRY)) {
+      const nearestEnemy = findNearestEnemy(npc);
+      if (nearestEnemy && nearestEnemy.dist < 20) {
+        npc.combatTarget = nearestEnemy.enemy;
+        updateCombat(npc, delta, nearestEnemy);
+        return;
+      }
+    }
+
     // Critical needs override job
     if (npc.fatigue > 85 && npc.job !== JOB.REST) {
       npc.asleep = true;
@@ -475,6 +560,25 @@ const NPCSystem = (function () {
   let _animTime = 0;
   function updateAnimation(npc, delta) {
     _animTime += delta;
+
+    // Reset fire flash
+    if (npc.fireFlash > 0) {
+      npc.fireFlash -= delta;
+      if (npc.fireFlash <= 0) {
+        npc.mesh.children.forEach(child => {
+          if (child.userData.isArm && child.userData._origColor !== undefined) {
+            child.material = child.material.clone();
+            if (child.userData._origMap) {
+              child.material.map = child.userData._origMap;
+              child.material.needsUpdate = true;
+            } else {
+              child.material.color.setHex(child.userData._origColor);
+            }
+          }
+        });
+      }
+    }
+
     if (npc.target && !npc.asleep) {
       npc.mesh.children.forEach(child => {
         if (child.userData.isLeg) {
