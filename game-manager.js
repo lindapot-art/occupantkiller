@@ -6,13 +6,14 @@ const GameManager = (function () {
 
   /* ── Game States ─────────────────────────────────────────────────── */
   const STATE = Object.freeze({
-    MENU:       'menu',
-    PLAYING:    'playing',
-    PAUSED:     'paused',
-    BUILD_MODE: 'buildMode',
-    DEAD:       'dead',
-    WAVE_CLEAR: 'waveClear',
-    WIN:        'win',
+    MENU:        'menu',
+    PLAYING:     'playing',
+    PAUSED:      'paused',
+    BUILD_MODE:  'buildMode',
+    DEAD:        'dead',
+    WAVE_CLEAR:  'waveClear',
+    STAGE_CLEAR: 'stageClear',
+    WIN:         'win',
   });
 
   /* ── Core State ──────────────────────────────────────────────────── */
@@ -36,8 +37,49 @@ const GameManager = (function () {
 
   /* ── Wave State ──────────────────────────────────────────────────── */
   let currentWave = 0;
-  const TOTAL_WAVES = 10;
   const SCORE_WAVE_BONUS = 500;
+
+  /* ── Stage Definitions ──────────────────────────────────────────── */
+  const STAGES = [
+    {
+      id:           1,
+      name:         'AVDIIVKA SECTOR',
+      theme:        'grassland',
+      wavesPerStage: 5,
+      difficulty:   1.0,
+      fogColor:     0x3a3028,
+      bgColor:      0x3a3028,
+      sunColor:     0xff8833,
+      sunIntensity: 0.85,
+      description:  'Green fields of Avdiivka. Hold the line.',
+    },
+    {
+      id:           2,
+      name:         'BAKHMUT RUINS',
+      theme:        'urban',
+      wavesPerStage: 5,
+      difficulty:   1.4,
+      fogColor:     0x2a2a2a,
+      bgColor:      0x2a2a2a,
+      sunColor:     0xccccdd,
+      sunIntensity: 0.65,
+      description:  'Urban ruins of Bakhmut. Every corner hides danger.',
+    },
+    {
+      id:           3,
+      name:         'KHERSON CROSSING',
+      theme:        'desert',
+      wavesPerStage: 5,
+      difficulty:   1.8,
+      fogColor:     0x5a4a30,
+      bgColor:      0x5a4a30,
+      sunColor:     0xffaa44,
+      sunIntensity: 1.0,
+      description:  'Sandy banks of Kherson. Final push to victory.',
+    },
+  ];
+
+  let currentStage = 0;  // 0-based index into STAGES
 
   /* ── Physics Constants ───────────────────────────────────────────── */
   const MOVE_SPEED   = 6.0;
@@ -410,7 +452,11 @@ const GameManager = (function () {
     player.score = 0;
     player.kills = 0;
     currentWave = 0;
+    currentStage = 0;
     player.velocity.set(0, 0, 0);
+
+    // Apply first stage
+    applyStage(STAGES[0]);
 
     const spawnH = VoxelWorld.getTerrainHeight(0, 0);
     player.position.set(0, spawnH + player.height, 0);
@@ -425,20 +471,115 @@ const GameManager = (function () {
     HUD.setScore(0);
     HUD.setWave(0);
     HUD.setKills(0);
+    HUD.setStage(STAGES[0].id, STAGES[0].name);
 
     requestPointerLock();
-    beginWave(1);
+
+    // Announce first stage then begin first wave after delay
+    HUD.announceStage(STAGES[0].id, STAGES[0].name, STAGES[0].description);
+    setTimeout(function () {
+      beginWave(1);
+    }, 3200);
 
     // Generate an initial mission
     MissionSystem.generateRandom();
   }
 
+  /* ── Stage Management ───────────────────────────────────────────── */
+  function applyStage(stageDef) {
+    // Update terrain theme
+    VoxelWorld.setTheme(stageDef.theme);
+    VoxelWorld.regenerate();
+
+    // Scatter resources on new terrain
+    VoxelWorld.scatterResources(VoxelWorld.BLOCK.WOOD, 0.004);
+    VoxelWorld.scatterResources(VoxelWorld.BLOCK.METAL, 0.001);
+    VoxelWorld.scatterResources(VoxelWorld.BLOCK.ELECTRONICS, 0.0005);
+
+    // Update scene colors
+    _scene.background = new THREE.Color(stageDef.bgColor);
+    _scene.fog = new THREE.Fog(stageDef.fogColor, 14, 80);
+
+    // Update lighting
+    if (sunLight) {
+      sunLight.color.setHex(stageDef.sunColor);
+      sunLight.intensity = stageDef.sunIntensity;
+    }
+  }
+
+  function getCurrentStage() { return STAGES[currentStage]; }
+
+  function nextStage() {
+    currentStage++;
+    if (currentStage >= STAGES.length) {
+      // All stages done — win!
+      gameState = STATE.WIN;
+      showOverlay('win');
+      document.getElementById('win-score').textContent = player.score;
+      document.getElementById('win-kills').textContent = player.kills;
+      document.getElementById('win-stages').textContent = STAGES.length;
+      return;
+    }
+
+    const stageDef = STAGES[currentStage];
+    applyStage(stageDef);
+
+    // Reset wave count for new stage
+    currentWave = 0;
+
+    // Heal player between stages (50% of missing HP restored)
+    const missingHp = player.maxHp - player.hp;
+    player.hp = Math.min(player.maxHp, player.hp + Math.ceil(missingHp * 0.5));
+    HUD.setHealth(player.hp, player.maxHp);
+
+    // Reset player position on new terrain
+    const spawnH = VoxelWorld.getTerrainHeight(0, 0);
+    player.position.set(0, spawnH + player.height, 0);
+    player.velocity.set(0, 0, 0);
+
+    // Clear enemies and pickups from old stage
+    Enemies.clear();
+    Pickups.clear();
+    DroneSystem.clear();
+
+    // Respawn NPCs on new terrain
+    NPCSystem.clear();
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2;
+      const dist = 5 + Math.random() * 5;
+      const nx = Math.cos(angle) * dist;
+      const nz = Math.sin(angle) * dist;
+      const nh = VoxelWorld.getTerrainHeight(nx, nz);
+      NPCSystem.spawn(nx, nh, nz, i < 2 ? 'civilian' : 'trainee');
+    }
+
+    // Respawn vehicle
+    const vh = VoxelWorld.getTerrainHeight(8, 8);
+    VehicleSystem.clear();
+    VehicleSystem.spawn(8, vh, 8, 'transport');
+
+    // Update HUD
+    HUD.setStage(stageDef.id, stageDef.name);
+    HUD.setWave(0);
+
+    hideOverlays();
+    gameState = STATE.PLAYING;
+    requestPointerLock();
+
+    // Announce new stage then begin first wave after delay
+    HUD.announceStage(stageDef.id, stageDef.name, stageDef.description);
+    setTimeout(function () {
+      beginWave(1);
+    }, 3200);
+  }
+
   /* ── Wave Management ─────────────────────────────────────────────── */
   function beginWave(w) {
     currentWave = w;
-    Enemies.startWave(w, _scene);
-    HUD.setWave(w);
-    HUD.announceWave(w, Enemies.getAliveCount());
+    const stageDef = STAGES[currentStage];
+    Enemies.startWave(w, _scene, stageDef.difficulty);
+    HUD.setWave(w, stageDef.wavesPerStage);
+    HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage);
   }
 
   function onWaveComplete() {
@@ -447,17 +588,54 @@ const GameManager = (function () {
     RankSystem.onWaveComplete(currentWave);
     MissionSystem.onWaveCompleted();
 
-    if (currentWave >= TOTAL_WAVES) {
-      gameState = STATE.WIN;
-      showOverlay('win');
-      document.getElementById('win-score').textContent = player.score;
-      document.getElementById('win-kills').textContent = player.kills;
+    const stageDef = STAGES[currentStage];
+
+    // Check if all waves in this stage are done
+    if (currentWave >= stageDef.wavesPerStage) {
+      // Stage clear!
+      player.score += 1000; // Stage clear bonus
+      HUD.setScore(player.score);
+
+      if (currentStage >= STAGES.length - 1) {
+        // Final stage cleared — win!
+        gameState = STATE.WIN;
+        showOverlay('win');
+        document.getElementById('win-score').textContent = player.score;
+        document.getElementById('win-kills').textContent = player.kills;
+        document.getElementById('win-stages').textContent = STAGES.length;
+        return;
+      }
+
+      // Show stage clear overlay
+      gameState = STATE.STAGE_CLEAR;
+      showOverlay('stageclear');
+      document.getElementById('stageclear-num').textContent = stageDef.id;
+      document.getElementById('stageclear-name').textContent = stageDef.name;
+      document.getElementById('stageclear-score').textContent = player.score;
+      document.getElementById('stageclear-kills').textContent = player.kills;
+
+      // Show heal preview
+      const missingHp = player.maxHp - player.hp;
+      const healAmount = Math.ceil(missingHp * 0.5);
+      const healEl = document.getElementById('stageclear-heal');
+      if (healEl) {
+        healEl.textContent = healAmount > 0
+          ? '❤ +' + healAmount + ' HP will be restored'
+          : '❤ Full health!';
+      }
+
+      const nextStageDef = STAGES[currentStage + 1];
+      document.getElementById('stageclear-next-name').textContent = nextStageDef.name;
+      document.getElementById('stageclear-next-label').style.display = '';
       return;
     }
 
     gameState = STATE.WAVE_CLEAR;
     showOverlay('waveclear');
     document.getElementById('waveclear-num').textContent = currentWave;
+    document.getElementById('waveclear-total').textContent = stageDef.wavesPerStage;
+    document.getElementById('waveclear-stage-info').textContent =
+      'Stage ' + stageDef.id + ': ' + stageDef.name;
   }
 
   /* ── Player Movement ─────────────────────────────────────────────── */
@@ -587,6 +765,7 @@ const GameManager = (function () {
     if (player.hp <= 0) {
       gameState = STATE.DEAD;
       showOverlay('dead');
+      document.getElementById('dead-stage').textContent = STAGES[currentStage].id;
       document.getElementById('dead-score').textContent = player.score;
       document.getElementById('dead-kills').textContent = player.kills;
       document.getElementById('dead-wave').textContent = currentWave;
@@ -725,18 +904,22 @@ const GameManager = (function () {
   /* ── Public API ──────────────────────────────────────────────────── */
   return {
     STATE,
+    STAGES,
     init,
     startGame,
+    nextStage,
     update,
     beginWave,
     showOverlay,
     hideOverlays,
     requestPointerLock,
-    getState:  function () { return gameState; },
-    setState:  function (s) { gameState = s; },
-    getPlayer: function () { return player; },
-    getScene:  function () { return _scene; },
-    getCamera: function () { return _camera; },
-    getCurrentWave: function () { return currentWave; },
+    getState:        function () { return gameState; },
+    setState:        function (s) { gameState = s; },
+    getPlayer:       function () { return player; },
+    getScene:        function () { return _scene; },
+    getCamera:       function () { return _camera; },
+    getCurrentWave:  function () { return currentWave; },
+    getCurrentStage: function () { return currentStage; },
+    getStageInfo:    function () { return STAGES[currentStage]; },
   };
 })();

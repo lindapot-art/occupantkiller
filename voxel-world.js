@@ -136,10 +136,61 @@ const VoxelWorld = (function () {
     if (c) c.dirty = true;
   }
 
+  /* ── Terrain Themes ────────────────────────────────────────────── */
+  let _theme = {
+    name: 'grassland',
+    seed: 0,
+    surfaceBlock: BLOCK.GRASS,
+    subBlock:     BLOCK.DIRT,
+    baseBlock:    BLOCK.STONE,
+    fogColor:     0x3a3028,
+    bgColor:      0x3a3028,
+    heightScale:  1.0,
+  };
+
+  const THEMES = {
+    grassland: {
+      name: 'grassland',
+      seed: 0,
+      surfaceBlock: BLOCK.GRASS,
+      subBlock:     BLOCK.DIRT,
+      baseBlock:    BLOCK.STONE,
+      fogColor:     0x3a3028,
+      bgColor:      0x3a3028,
+      heightScale:  1.0,
+    },
+    urban: {
+      name: 'urban',
+      seed: 7777,
+      surfaceBlock: BLOCK.CONCRETE,
+      subBlock:     BLOCK.STONE,
+      baseBlock:    BLOCK.STONE,
+      fogColor:     0x2a2a2a,
+      bgColor:      0x2a2a2a,
+      heightScale:  0.6,
+    },
+    desert: {
+      name: 'desert',
+      seed: 15555,
+      surfaceBlock: BLOCK.SAND,
+      subBlock:     BLOCK.SAND,
+      baseBlock:    BLOCK.STONE,
+      fogColor:     0x5a4a30,
+      bgColor:      0x5a4a30,
+      heightScale:  1.3,
+    },
+  };
+
+  function setTheme(themeName) {
+    _theme = THEMES[themeName] || THEMES.grassland;
+  }
+
+  function getTheme() { return _theme; }
+
   /* ── Terrain Generation ──────────────────────────────────────────── */
   // Simple heightmap with value noise
   function seededRandom(x, z) {
-    let n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+    let n = Math.sin((x + _theme.seed) * 12.9898 + (z + _theme.seed) * 78.233) * 43758.5453;
     return n - Math.floor(n);
   }
 
@@ -157,9 +208,10 @@ const VoxelWorld = (function () {
   }
 
   function getHeight(wx, wz) {
-    const n1 = smoothNoise(wx, wz, 32) * 8;
-    const n2 = smoothNoise(wx + 100, wz + 100, 16) * 4;
-    const n3 = smoothNoise(wx + 200, wz + 200, 8) * 2;
+    const hs = _theme.heightScale;
+    const n1 = smoothNoise(wx, wz, 32) * 8 * hs;
+    const n2 = smoothNoise(wx + 100, wz + 100, 16) * 4 * hs;
+    const n3 = smoothNoise(wx + 200, wz + 200, 8) * 2 * hs;
     return Math.floor(2 + n1 + n2 + n3);
   }
 
@@ -176,9 +228,9 @@ const VoxelWorld = (function () {
         for (let ly = 0; ly <= h; ly++) {
           let type;
           if (ly === h) {
-            type = BLOCK.GRASS;
+            type = _theme.surfaceBlock;
           } else if (ly >= h - 3) {
-            type = BLOCK.DIRT;
+            type = _theme.subBlock;
           } else {
             type = BLOCK.STONE;
           }
@@ -296,6 +348,28 @@ const VoxelWorld = (function () {
     rebuildAll();
   }
 
+  function regenerate() {
+    // Remove all existing chunk meshes
+    for (const chunk of chunks.values()) {
+      if (chunk.mesh) {
+        _scene.remove(chunk.mesh);
+        chunk.mesh.geometry.dispose();
+        chunk.mesh.material.dispose();
+        chunk.mesh = null;
+      }
+    }
+    chunks.clear();
+
+    // Regenerate with current theme
+    for (let cx = -HALF; cx < HALF; cx++) {
+      for (let cz = -HALF; cz < HALF; cz++) {
+        const chunk = createChunk(cx, cz);
+        generateChunkTerrain(chunk);
+      }
+    }
+    rebuildAll();
+  }
+
   function rebuildAll() {
     for (const chunk of chunks.values()) {
       chunk.dirty = true;
@@ -405,8 +479,12 @@ const VoxelWorld = (function () {
     CHUNK_SIZE,
     CHUNK_HEIGHT,
     BLOCK_SIZE,
+    THEMES,
     init,
+    regenerate,
     dispose,
+    setTheme,
+    getTheme,
     getBlock,
     setBlock,
     isSolid,
