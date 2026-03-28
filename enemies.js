@@ -2,10 +2,54 @@
  * enemies.js – Occupant spawning, AI, floating HP bars, and hit detection
  * Level 1 "ZOMBIELAND" – based on Avdiivka assault waves.
  * Three enemy types: CONSCRIPT (cannon fodder), STORMER (rusher), ARMORED (heavy)
+ * Uniforms: Russian EMR Digital Flora camo — accurate palette.
+ * Insignia: White «Z» on helmet side + white armband on left arm.
  * Depends on: Three.js global (THREE)
  */
 
 const Enemies = (() => {
+
+  // ── Russian EMR Digital Flora camo palette ─────────────────
+  // 4 tones used across body/limb meshes via procedural canvas texture
+  const EMR_CAMO = {
+    light:  0x5a7a4a,  // light olive-green
+    medium: 0x4a6a3a,  // medium olive
+    dark:   0x2a3a1a,  // dark olive / near-black
+    tan:    0x8a7a6a,  // grey-tan (urban accent)
+  };
+
+  // Canvas-based digital-pixel camo texture generator
+  function makeEMRCamoTexture(variant) {
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width  = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Palette in CSS hex strings
+    const palette = variant === 'dark'
+      ? ['#2a3a1a', '#3a4a2a', '#4a5a3a', '#1a2a0a']
+      : ['#5a7a4a', '#4a6a3a', '#3a5a2a', '#8a7a6a'];
+
+    // Fill base
+    ctx.fillStyle = palette[0];
+    ctx.fillRect(0, 0, size, size);
+
+    // Digital pixel squares (4×4 blocks)
+    const block = 4;
+    for (let y = 0; y < size; y += block) {
+      for (let x = 0; x < size; x += block) {
+        ctx.fillStyle = palette[Math.floor(Math.random() * palette.length)];
+        ctx.fillRect(x, y, block, block);
+      }
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+
   // ── Enemy type definitions ────────────────────────────────
   const TYPES = {
     CONSCRIPT: {
@@ -13,10 +57,11 @@ const Enemies = (() => {
       hpBase:      40,
       speedBase:   2.0,
       scale:       1.0,
-      bodyColor:   0x4a5230,   // olive-drab uniform
-      headColor:   0xc8a882,   // skin tone
-      limbColor:   0x3a4224,   // dark olive
-      helmetColor: 0x3a4020,   // steel helmet
+      camoVariant: 'light',           // EMR standard green
+      bodyColor:   EMR_CAMO.medium,   // fallback flat color
+      headColor:   0xc8a882,          // skin tone
+      limbColor:   EMR_CAMO.dark,
+      helmetColor: 0x3a3a2a,          // steel-dark EMR helmet
       eyeColor:    0x880000,
       attackDmg:   8,
       attackRate:  1.2,
@@ -28,10 +73,11 @@ const Enemies = (() => {
       hpBase:      30,
       speedBase:   4.2,
       scale:       0.85,
-      bodyColor:   0x3a4a3a,   // dark field uniform
+      camoVariant: 'dark',            // darker field uniform
+      bodyColor:   EMR_CAMO.dark,
       headColor:   0xb09070,
-      limbColor:   0x2a3a2a,
-      helmetColor: 0x2a3020,
+      limbColor:   0x2a3a1a,
+      helmetColor: 0x2a2a1a,
       eyeColor:    0xff4400,
       attackDmg:   6,
       attackRate:  0.7,
@@ -43,10 +89,11 @@ const Enemies = (() => {
       hpBase:      220,
       speedBase:   1.0,
       scale:       1.4,
-      bodyColor:   0x3a4a3a,   // heavy armored vest
+      camoVariant: 'dark',            // heavy armour over dark EMR
+      bodyColor:   EMR_CAMO.dark,
       headColor:   0xd0b090,
-      limbColor:   0x2a3820,
-      helmetColor: 0x1a2010,
+      limbColor:   0x1a2a0a,
+      helmetColor: 0x1a1a10,
       eyeColor:    0xff0000,
       attackDmg:   22,
       attackRate:  1.8,
@@ -73,47 +120,138 @@ const Enemies = (() => {
     return 'CONSCRIPT';
   }
 
+  // ── White «Z» texture for helmet side ─────────────────────
+  // Draws a white Z letter on a dark olive canvas
+  function makeHelmetZTexture(helmetColorHex) {
+    const size = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width  = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Base helmet color
+    const r = (helmetColorHex >> 16) & 0xff;
+    const g = (helmetColorHex >> 8)  & 0xff;
+    const b =  helmetColorHex        & 0xff;
+    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+    ctx.fillRect(0, 0, size, size);
+
+    // White Z – drawn with 3 pixel-art lines
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(8, 8, 16, 3);        // top bar
+    // Diagonal (stair-stepped)
+    for (let i = 0; i < 5; i++) {
+      ctx.fillRect(20 - i * 3, 11 + i * 2, 4, 3);
+    }
+    ctx.fillRect(8, 21, 16, 3);       // bottom bar
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  // ── White armband texture ──────────────────────────────────
+  function makeWhiteArmbandTexture(limbColorHex) {
+    const size = 16;
+    const canvas = document.createElement('canvas');
+    canvas.width  = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Base arm color
+    const r = (limbColorHex >> 16) & 0xff;
+    const g = (limbColorHex >> 8)  & 0xff;
+    const b =  limbColorHex        & 0xff;
+    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+    ctx.fillRect(0, 0, size, size);
+
+    // White band in upper third (like an armband near shoulder)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 2, size, 4);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
   // ── Build humanoid mesh scaled to typeCfg ─────────────────
+  // Full EMR camo uniforms, white Z on helmet, white armband
   function buildMesh(typeCfg) {
     const group = new THREE.Group();
     const s     = typeCfg.scale;
 
+    // Generate EMR Digital Flora camo texture for this unit
+    const camoTex = makeEMRCamoTexture(typeCfg.camoVariant || 'light');
+
+    // ── Torso (camo textured) ─────────────────────────────
     const torso = new THREE.Mesh(
       new THREE.BoxGeometry(0.52 * s, 0.7 * s, 0.26 * s),
-      new THREE.MeshLambertMaterial({ color: typeCfg.bodyColor })
+      new THREE.MeshLambertMaterial({ map: camoTex })
     );
     torso.position.y = 0.85 * s;
 
+    // ── Head (skin) ───────────────────────────────────────
     const head = new THREE.Mesh(
       new THREE.BoxGeometry(0.34 * s, 0.34 * s, 0.34 * s),
       new THREE.MeshLambertMaterial({ color: typeCfg.headColor })
     );
     head.position.y = 1.4 * s;
 
-    // Steel helmet (flat-top box slightly wider than head)
+    // ── Helmet with white «Z» insignia ────────────────────
+    const helmetZTex = makeHelmetZTexture(typeCfg.helmetColor);
     const helmet = new THREE.Mesh(
       new THREE.BoxGeometry(0.40 * s, 0.18 * s, 0.40 * s),
-      new THREE.MeshLambertMaterial({ color: typeCfg.helmetColor })
+      new THREE.MeshLambertMaterial({ map: helmetZTex })
     );
     helmet.position.y = 1.55 * s;
 
+    // ── Legs (camo textured, darker variant) ──────────────
+    const legCamo = makeEMRCamoTexture('dark');
     const legL = new THREE.Mesh(
       new THREE.BoxGeometry(0.21 * s, 0.55 * s, 0.21 * s),
-      new THREE.MeshLambertMaterial({ color: typeCfg.limbColor })
+      new THREE.MeshLambertMaterial({ map: legCamo })
     );
     legL.position.set(-0.14 * s, 0.28 * s, 0);
     const legR = legL.clone();
     legR.position.set(0.14 * s, 0.28 * s, 0);
 
+    // ── Left arm with WHITE ARMBAND (Russian ID marking) ──
+    const armbandTex = makeWhiteArmbandTexture(typeCfg.limbColor);
     const armL = new THREE.Mesh(
       new THREE.BoxGeometry(0.18 * s, 0.52 * s, 0.18 * s),
-      new THREE.MeshLambertMaterial({ color: typeCfg.limbColor })
+      new THREE.MeshLambertMaterial({ map: armbandTex })
     );
     armL.position.set(-0.35 * s, 0.82 * s, 0);
-    const armR = armL.clone();
+
+    // ── Right arm (plain camo) ────────────────────────────
+    const armR = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18 * s, 0.52 * s, 0.18 * s),
+      new THREE.MeshLambertMaterial({ map: camoTex })
+    );
     armR.position.set(0.35 * s, 0.82 * s, 0);
 
     group.add(torso, head, helmet, legL, legR, armL, armR);
+
+    // ── Belt / equipment strip (dark webbing) ─────────────
+    const belt = new THREE.Mesh(
+      new THREE.BoxGeometry(0.54 * s, 0.06 * s, 0.28 * s),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    belt.position.y = 0.53 * s;
+    group.add(belt);
+
+    // ── Boot tops (black) ─────────────────────────────────
+    for (const legMesh of [legL, legR]) {
+      const boot = new THREE.Mesh(
+        new THREE.BoxGeometry(0.22 * s, 0.18 * s, 0.22 * s),
+        new THREE.MeshLambertMaterial({ color: 0x111111 })
+      );
+      boot.position.copy(legMesh.position);
+      boot.position.y = 0.04 * s;
+      group.add(boot);
+    }
 
     // Eye glow
     const eyeGeo = new THREE.SphereGeometry(0.04 * s, 6, 6);
@@ -135,6 +273,7 @@ const Enemies = (() => {
     group.userData.headMesh = head;
     group.userData.hitbox   = hitbox;
     group.userData.parts    = [torso, head, helmet, legL, legR, armL, armR, hitbox];
+    group.userData.faction  = 'occupant';
 
     return group;
   }

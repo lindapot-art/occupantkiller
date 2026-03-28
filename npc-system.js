@@ -84,28 +84,145 @@ const NPCSystem = (function () {
     return npc;
   }
 
-  /* ── NPC Visual Mesh (simple humanoid) ───────────────────────────── */
+  /* ── Ukrainian MM-14 Digital Camo Palette ──────────────────────────── */
+  const MM14_CAMO = {
+    light:  0x6b9050,  // sage green
+    medium: 0x5a7a3f,  // olive green
+    dark:   0x3a4a1f,  // dark olive
+    tan:    0x8a6a4a,  // khaki accent
+  };
+
+  /* ── Ukrainian flag / insignia colors ────────────────────────────── */
+  const UA_BLUE   = 0x0057B8;
+  const UA_YELLOW = 0xFFD700;
+
+  /* ── Canvas-based MM-14 digital pixel camo texture ───────────────── */
+  function makeMM14CamoTexture(variant) {
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width  = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    const palette = variant === 'dark'
+      ? ['#3a4a1f', '#4a5a2f', '#5a6a3f', '#2a3a0f']
+      : ['#6b9050', '#5a7a3f', '#3a4a1f', '#8a6a4a'];
+
+    ctx.fillStyle = palette[0];
+    ctx.fillRect(0, 0, size, size);
+
+    const block = 4;
+    for (let y = 0; y < size; y += block) {
+      for (let x = 0; x < size; x += block) {
+        ctx.fillStyle = palette[Math.floor(Math.random() * palette.length)];
+        ctx.fillRect(x, y, block, block);
+      }
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+
+  /* ── Blue-yellow flag sleeve patch texture ───────────────────────── */
+  function makeUkrainianPatchTexture(baseColorHex) {
+    const size = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width  = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Base arm color
+    const r = (baseColorHex >> 16) & 0xff;
+    const g = (baseColorHex >> 8)  & 0xff;
+    const b =  baseColorHex        & 0xff;
+    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+    ctx.fillRect(0, 0, size, size);
+
+    // Flag patch (8×10 rectangle near top)
+    const px = 4, py = 3, pw = 24, ph = 12;
+    // Blue upper half
+    ctx.fillStyle = '#0057B8';
+    ctx.fillRect(px, py, pw, ph / 2);
+    // Yellow lower half
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(px, py + ph / 2, pw, ph / 2);
+
+    // Thin dark border
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px, py, pw, ph);
+
+    // Small trident (tryzub) in center of patch — simplified pixel art
+    ctx.fillStyle = '#FFD700';
+    // Center prong
+    ctx.fillRect(15, py + 1, 2, 5);
+    // Left prong
+    ctx.fillRect(11, py + 2, 2, 4);
+    // Right prong
+    ctx.fillRect(19, py + 2, 2, 4);
+    // Base bar
+    ctx.fillRect(11, py + 6, 10, 1);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /* ── Ukrainian helmet texture: blue-yellow cross tape ────────────── */
+  function makeUkrainianHelmetTexture(helmetColorHex) {
+    const size = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width  = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Base helmet color
+    const r = (helmetColorHex >> 16) & 0xff;
+    const g = (helmetColorHex >> 8)  & 0xff;
+    const b =  helmetColorHex        & 0xff;
+    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+    ctx.fillRect(0, 0, size, size);
+
+    // Blue cross (horizontal + vertical blue tape)
+    ctx.fillStyle = '#0057B8';
+    ctx.fillRect(0, 13, size, 6);    // horizontal
+    ctx.fillRect(13, 0, 6, size);    // vertical
+
+    // Yellow outline on cross
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(0, 12, size, 1);
+    ctx.fillRect(0, 19, size, 1);
+    ctx.fillRect(12, 0, 1, size);
+    ctx.fillRect(19, 0, 1, size);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /* ── NPC Visual Mesh — Ukrainian forces with proper insignia ─────── */
   function buildNPCMesh(npc) {
     const group = new THREE.Group();
-    const rankColors = {
-      civilian:   0x88AA66,
-      trainee:    0x6688AA,
-      infantry:   0x446633,
-      specialist: 0x336688,
-      veteran:    0x554422,
-      elite:      0x882222,
-    };
-    const col = rankColors[npc.rank] || 0x888888;
 
-    // Body
+    // Rank determines camo variant: higher ranks get darker, more worn camo
+    const isDark = ['veteran', 'elite', 'specialist'].includes(npc.rank);
+    const camoVariant = isDark ? 'dark' : 'light';
+    const camoTex = makeMM14CamoTexture(camoVariant);
+    const helmetColor = isDark ? 0x4a5a2f : 0x5a6a3f;
+
+    // ── Body (MM-14 camo) ─────────────────────────────────
     const body = new THREE.Mesh(
       new THREE.BoxGeometry(0.4, 0.7, 0.3),
-      new THREE.MeshLambertMaterial({ color: col })
+      new THREE.MeshLambertMaterial({ map: camoTex })
     );
     body.position.y = 0.75;
     group.add(body);
 
-    // Head
+    // ── Head (skin) ───────────────────────────────────────
     const head = new THREE.Mesh(
       new THREE.SphereGeometry(0.18, 8, 8),
       new THREE.MeshLambertMaterial({ color: 0xDDAA88 })
@@ -113,29 +230,74 @@ const NPCSystem = (function () {
     head.position.y = 1.28;
     group.add(head);
 
-    // Legs
+    // ── Helmet with blue-yellow cross tape ────────────────
+    const helmetTex = makeUkrainianHelmetTexture(helmetColor);
+    const helmet = new THREE.Mesh(
+      new THREE.BoxGeometry(0.40, 0.16, 0.40),
+      new THREE.MeshLambertMaterial({ map: helmetTex })
+    );
+    helmet.position.y = 1.44;
+    group.add(helmet);
+
+    // ── Legs (dark camo) ──────────────────────────────────
+    const legCamo = makeMM14CamoTexture('dark');
     for (let side = -1; side <= 1; side += 2) {
       const leg = new THREE.Mesh(
         new THREE.BoxGeometry(0.14, 0.5, 0.14),
-        new THREE.MeshLambertMaterial({ color: 0x333333 })
+        new THREE.MeshLambertMaterial({ map: legCamo })
       );
       leg.position.set(side * 0.12, 0.25, 0);
       leg.userData.isLeg = true;
       group.add(leg);
-    }
 
-    // Arms
-    for (let side = -1; side <= 1; side += 2) {
-      const arm = new THREE.Mesh(
-        new THREE.BoxGeometry(0.12, 0.5, 0.12),
-        new THREE.MeshLambertMaterial({ color: col })
+      // Boot (black)
+      const boot = new THREE.Mesh(
+        new THREE.BoxGeometry(0.15, 0.12, 0.15),
+        new THREE.MeshLambertMaterial({ color: 0x111111 })
       );
-      arm.position.set(side * 0.32, 0.8, 0);
-      arm.userData.isArm = true;
-      group.add(arm);
+      boot.position.set(side * 0.12, 0.02, 0);
+      group.add(boot);
     }
 
-    group.userData.npcId = npc.id;
+    // ── Left arm with BLUE-YELLOW PATCH (Ukrainian insignia) ─
+    const patchBaseColor = isDark ? 0x3a4a1f : 0x5a7a3f;
+    const patchTex = makeUkrainianPatchTexture(patchBaseColor);
+    const armL = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.5, 0.12),
+      new THREE.MeshLambertMaterial({ map: patchTex })
+    );
+    armL.position.set(-0.32, 0.8, 0);
+    armL.userData.isArm = true;
+    group.add(armL);
+
+    // ── Right arm (plain camo) ────────────────────────────
+    const armR = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.5, 0.12),
+      new THREE.MeshLambertMaterial({ map: camoTex })
+    );
+    armR.position.set(0.32, 0.8, 0);
+    armR.userData.isArm = true;
+    group.add(armR);
+
+    // ── Belt (dark webbing) ───────────────────────────────
+    const belt = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.05, 0.32),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    belt.position.y = 0.42;
+    group.add(belt);
+
+    // ── Eyes (green glow for friendlies) ──────────────────
+    const eyeGeo = new THREE.SphereGeometry(0.035, 6, 6);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x00CC00 });
+    const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+    eyeL.position.set(-0.06, 1.30, 0.14);
+    const eyeR = eyeL.clone();
+    eyeR.position.set(0.06, 1.30, 0.14);
+    group.add(eyeL, eyeR);
+
+    group.userData.npcId   = npc.id;
+    group.userData.faction = 'ukrainian';
     group.castShadow = true;
     return group;
   }
