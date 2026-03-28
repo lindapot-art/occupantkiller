@@ -22,6 +22,8 @@ const VoxelWorld = (function () {
     CRATE:       13,
     REINFORCED:  14,
     FENCE:       15,
+    RUBBLE:      16,
+    SANDBAG:     17,
   });
 
   const BLOCK_COLORS = {
@@ -40,6 +42,8 @@ const VoxelWorld = (function () {
     [BLOCK.CRATE]:       0xC19A6B,
     [BLOCK.REINFORCED]:  0x505860,
     [BLOCK.FENCE]:       0x8B7355,
+    [BLOCK.RUBBLE]:      0x7a6a5a,
+    [BLOCK.SANDBAG]:     0xC2B280,
   };
 
   const BLOCK_HARDNESS = {
@@ -58,6 +62,8 @@ const VoxelWorld = (function () {
     [BLOCK.CRATE]:       1.5,
     [BLOCK.REINFORCED]:  6,
     [BLOCK.FENCE]:       1,
+    [BLOCK.RUBBLE]:      2,
+    [BLOCK.SANDBAG]:     1,
   };
 
   const BLOCK_TRANSPARENT = new Set([BLOCK.AIR, BLOCK.WATER, BLOCK.GLASS]);
@@ -471,6 +477,429 @@ const VoxelWorld = (function () {
     }
   }
 
+  /* ── Level Definitions ────────────────────────────────────────────── */
+  const LEVELS = [
+    { id: 'HOSTOMEL',  name: 'Hostomel Airport',    desc: 'Stop the airborne assault',  theme: 'grassland', wavesPerLevel: 5, difficulty: 1.0, fogColor: 0x4a5a3a },
+    { id: 'AVDIIVKA',  name: 'Avdiivka Zombieland',  desc: 'Hold the industrial zone',   theme: 'urban',     wavesPerLevel: 5, difficulty: 1.3, fogColor: 0x3a3028 },
+    { id: 'BAKHMUT',   name: 'Bakhmut Ruins',        desc: 'Defend the city',             theme: 'urban',     wavesPerLevel: 5, difficulty: 1.6, fogColor: 0x2a2a2a },
+    { id: 'KHERSON',   name: 'Kherson Bridgehead',   desc: 'Cross the Dnipro',            theme: 'desert',    wavesPerLevel: 5, difficulty: 1.9, fogColor: 0x5a4a30 },
+  ];
+
+  const PROC_CITIES = ['Mariupol','Severodonetsk','Lysychansk','Bucha','Irpin','Izium','Kupyansk','Robotyne','Vuhledar'];
+
+  function getLevelDef(index) {
+    if (index >= 0 && index < LEVELS.length) return LEVELS[index];
+    const cityIdx = (index - LEVELS.length) % PROC_CITIES.length;
+    const themeNames = Object.keys(THEMES);
+    const theme = themeNames[Math.floor(seededRandom(index * 7, index * 13) * themeNames.length)];
+    return {
+      id: 'PROC_' + index,
+      name: PROC_CITIES[cityIdx],
+      desc: 'Liberate ' + PROC_CITIES[cityIdx],
+      theme: theme,
+      wavesPerLevel: 5,
+      difficulty: 1.0 + index * 0.35,
+      fogColor: THEMES[theme].fogColor,
+    };
+  }
+
+  /* ── Terrain Feature Generators ─────────────────────────────────── */
+  const worldMin = -HALF * CHUNK_SIZE;
+  const worldMax =  HALF * CHUNK_SIZE;
+
+  function randInWorld() {
+    return Math.floor(worldMin + Math.random() * (worldMax - worldMin));
+  }
+
+  function generateTrenches() {
+    const segments = 5 + Math.floor(Math.random() * 4);
+    let cx = randInWorld() * 0.5;
+    let cz = randInWorld() * 0.5;
+    const trenchWidth = 1 + Math.floor(Math.random() * 2);
+    const trenchDepth = 2 + Math.floor(Math.random() * 2);
+
+    for (let seg = 0; seg < segments; seg++) {
+      const len = 8 + Math.floor(Math.random() * 12);
+      const horizontal = seg % 2 === 0;
+
+      for (let i = 0; i < len; i++) {
+        const wx = Math.floor(horizontal ? cx + i : cx);
+        const wz = Math.floor(horizontal ? cz : cz + i);
+
+        for (let tw = 0; tw < trenchWidth; tw++) {
+          const bx = horizontal ? wx : wx + tw;
+          const bz = horizontal ? wz + tw : wz;
+          const surfH = getTerrainHeight(bx, bz);
+
+          // Dig the trench
+          for (let d = 0; d < trenchDepth; d++) {
+            setBlock(bx, surfH - 1 - d, bz, BLOCK.AIR);
+          }
+
+          // Reinforced walls on sides
+          if (tw === 0 || tw === trenchWidth - 1) {
+            for (let d = 0; d < trenchDepth; d++) {
+              const wallOff = tw === 0 ? -1 : 1;
+              const wallX = horizontal ? bx : bx + wallOff;
+              const wallZ = horizontal ? bz + wallOff : bz;
+              if (getBlock(wallX, surfH - 1 - d, wallZ) !== BLOCK.AIR) {
+                setBlock(wallX, surfH - 1 - d, wallZ, BLOCK.SANDBAG);
+              }
+            }
+          }
+        }
+      }
+      // Zigzag: advance perpendicular
+      if (horizontal) { cz += (Math.random() > 0.5 ? 1 : -1) * (3 + Math.floor(Math.random() * 4)); cx += len; }
+      else            { cx += (Math.random() > 0.5 ? 1 : -1) * (3 + Math.floor(Math.random() * 4)); cz += len; }
+    }
+  }
+
+  function generateCraters(count) {
+    for (let c = 0; c < count; c++) {
+      const cx = randInWorld();
+      const cz = randInWorld();
+      const radius = 2 + Math.floor(Math.random() * 4);
+      const depth = 1 + Math.floor(Math.random() * 3);
+      const surfH = getTerrainHeight(cx, cz);
+
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dz = -radius; dz <= radius; dz++) {
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          if (dist <= radius) {
+            const localDepth = Math.floor(depth * (1 - dist / radius));
+            for (let d = 0; d <= localDepth; d++) {
+              setBlock(cx + dx, surfH - d, cz + dz, BLOCK.AIR);
+            }
+            // Rim: pile rubble at edge
+            if (dist > radius - 1.5 && dist <= radius) {
+              setBlock(cx + dx, surfH + 1, cz + dz, BLOCK.RUBBLE);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function generateRuins(count) {
+    for (let r = 0; r < count; r++) {
+      const ox = randInWorld();
+      const oz = randInWorld();
+      const w = 4 + Math.floor(Math.random() * 6);
+      const d = 4 + Math.floor(Math.random() * 6);
+      const h = 3 + Math.floor(Math.random() * 5);
+      const surfH = getTerrainHeight(ox, oz);
+      const wallBlock = Math.random() > 0.5 ? BLOCK.BRICK : BLOCK.CONCRETE;
+
+      // Four walls with random gaps
+      for (let y = 0; y < h; y++) {
+        for (let i = 0; i < w; i++) {
+          if (Math.random() > 0.25) setBlock(ox + i, surfH + y, oz, wallBlock);
+          if (Math.random() > 0.25) setBlock(ox + i, surfH + y, oz + d - 1, wallBlock);
+        }
+        for (let j = 0; j < d; j++) {
+          if (Math.random() > 0.25) setBlock(ox, surfH + y, oz + j, wallBlock);
+          if (Math.random() > 0.25) setBlock(ox + w - 1, surfH + y, oz + j, wallBlock);
+        }
+      }
+
+      // Rubble inside
+      const rubbleCount = Math.floor(w * d * 0.2);
+      for (let rb = 0; rb < rubbleCount; rb++) {
+        const rx = ox + 1 + Math.floor(Math.random() * (w - 2));
+        const rz = oz + 1 + Math.floor(Math.random() * (d - 2));
+        setBlock(rx, surfH, rz, BLOCK.RUBBLE);
+      }
+    }
+  }
+
+  function generateDugouts(count) {
+    for (let dg = 0; dg < count; dg++) {
+      const ox = randInWorld();
+      const oz = randInWorld();
+      const rw = 3 + Math.floor(Math.random() * 3);
+      const rd = 3 + Math.floor(Math.random() * 3);
+      const surfH = getTerrainHeight(ox, oz);
+      const roomY = Math.max(1, surfH - 3);
+
+      // Hollow out room underground
+      for (let dx = 0; dx < rw; dx++) {
+        for (let dz = 0; dz < rd; dz++) {
+          for (let dy = 0; dy < 3; dy++) {
+            setBlock(ox + dx, roomY + dy, oz + dz, BLOCK.AIR);
+          }
+        }
+      }
+
+      // Reinforce ceiling
+      for (let dx = 0; dx < rw; dx++) {
+        for (let dz = 0; dz < rd; dz++) {
+          setBlock(ox + dx, roomY + 3, oz + dz, BLOCK.REINFORCED);
+        }
+      }
+
+      // Entrance: stairs down from surface
+      for (let s = 0; s < 3; s++) {
+        setBlock(ox - 1, surfH - s, oz + Math.floor(rd / 2), BLOCK.AIR);
+        setBlock(ox - 1, surfH - s + 1, oz + Math.floor(rd / 2), BLOCK.AIR);
+      }
+    }
+  }
+
+  function generateBrokenTrees(count) {
+    for (let t = 0; t < count; t++) {
+      const tx = randInWorld();
+      const tz = randInWorld();
+      const surfH = getTerrainHeight(tx, tz);
+      if (surfH <= 1) continue;
+      const trunkH = 2 + Math.floor(Math.random() * 3);
+      for (let y = 0; y < trunkH; y++) {
+        setBlock(tx, surfH + y, tz, BLOCK.WOOD);
+      }
+    }
+  }
+
+  function generateRunway(ox, oz, length, width) {
+    for (let x = ox; x < ox + length; x++) {
+      for (let z = oz; z < oz + width; z++) {
+        const h = getTerrainHeight(x, z);
+        setBlock(x, h, z, BLOCK.CONCRETE);
+      }
+    }
+  }
+
+  function generateBuilding(ox, oz, w, d, h, blockType) {
+    const surfH = getTerrainHeight(ox, oz);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        for (let z = 0; z < d; z++) {
+          const isWall = x === 0 || x === w - 1 || z === 0 || z === d - 1;
+          const isRoof = y === h - 1;
+          if (isWall || isRoof) {
+            setBlock(ox + x, surfH + y, oz + z, blockType);
+          }
+        }
+      }
+    }
+    // Door
+    setBlock(ox + Math.floor(w / 2), surfH, oz, BLOCK.AIR);
+    setBlock(ox + Math.floor(w / 2), surfH + 1, oz, BLOCK.AIR);
+  }
+
+  function generateControlTower(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Base
+    generateBuilding(ox, oz, 5, 5, 4, BLOCK.CONCRETE);
+    // Tower column
+    for (let y = 4; y < 10; y++) {
+      for (let x = 1; x <= 3; x++) {
+        for (let z = 1; z <= 3; z++) {
+          setBlock(ox + x, surfH + y, oz + z, BLOCK.METAL);
+        }
+      }
+    }
+    // Glass observation deck
+    for (let x = 0; x < 5; x++) {
+      for (let z = 0; z < 5; z++) {
+        const isEdge = x === 0 || x === 4 || z === 0 || z === 4;
+        setBlock(ox + x, surfH + 10, oz + z, BLOCK.CONCRETE);
+        if (isEdge) {
+          setBlock(ox + x, surfH + 11, oz + z, BLOCK.GLASS);
+          setBlock(ox + x, surfH + 12, oz + z, BLOCK.GLASS);
+        }
+        setBlock(ox + x, surfH + 13, oz + z, BLOCK.CONCRETE);
+      }
+    }
+  }
+
+  function generateRiver(startX, width) {
+    for (let z = worldMin; z < worldMax; z++) {
+      const waver = Math.floor(Math.sin(z * 0.08) * 3);
+      for (let w = 0; w < width; w++) {
+        const rx = startX + waver + w;
+        const surfH = getTerrainHeight(rx, z);
+        // Carve and fill with water
+        for (let y = surfH; y >= Math.max(0, surfH - 2); y--) {
+          setBlock(rx, y, z, BLOCK.WATER);
+        }
+      }
+    }
+  }
+
+  function generateBridge(x, z, length, width) {
+    for (let i = 0; i < length; i++) {
+      const surfH = getTerrainHeight(x + i, z);
+      const bridgeY = surfH + 2;
+      for (let w = 0; w < width; w++) {
+        setBlock(x + i, bridgeY, z + w, BLOCK.CONCRETE);
+      }
+      // Railings
+      if (i % 2 === 0) {
+        setBlock(x + i, bridgeY + 1, z, BLOCK.FENCE);
+        setBlock(x + i, bridgeY + 1, z + width - 1, BLOCK.FENCE);
+      }
+    }
+    // Support pillars
+    for (let p = 0; p < length; p += 4) {
+      const pH = getTerrainHeight(x + p, z);
+      for (let y = pH; y <= pH + 2; y++) {
+        setBlock(x + p, y, z + Math.floor(width / 2), BLOCK.CONCRETE);
+      }
+    }
+  }
+
+  function generateDefensivePosition(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Sandbag ring
+    for (let angle = 0; angle < Math.PI * 2; angle += 0.4) {
+      const r = 3;
+      const bx = ox + Math.round(Math.cos(angle) * r);
+      const bz = oz + Math.round(Math.sin(angle) * r);
+      setBlock(bx, surfH, bz, BLOCK.SANDBAG);
+      setBlock(bx, surfH + 1, bz, BLOCK.SANDBAG);
+    }
+  }
+
+  function generateStreetGrid(ox, oz, gridW, gridD, blockSize) {
+    const streetWidth = 2;
+    for (let gx = 0; gx < gridW; gx++) {
+      for (let gz = 0; gz < gridD; gz++) {
+        const bx = ox + gx * (blockSize + streetWidth);
+        const bz = oz + gz * (blockSize + streetWidth);
+        const h = 3 + Math.floor(Math.random() * 5);
+        const wallType = Math.random() > 0.3 ? BLOCK.BRICK : BLOCK.CONCRETE;
+        generateBuilding(bx, bz, blockSize, blockSize, h, wallType);
+        // Some buildings get basements
+        if (Math.random() > 0.5) {
+          generateDugouts(1);
+        }
+      }
+    }
+    // Pave streets
+    for (let gx = 0; gx <= gridW; gx++) {
+      const sx = ox + gx * (blockSize + streetWidth) - streetWidth;
+      for (let z = oz; z < oz + gridD * (blockSize + streetWidth); z++) {
+        for (let sw = 0; sw < streetWidth; sw++) {
+          const h = getTerrainHeight(sx + sw, z);
+          setBlock(sx + sw, h, z, BLOCK.CONCRETE);
+        }
+      }
+    }
+    for (let gz = 0; gz <= gridD; gz++) {
+      const sz = oz + gz * (blockSize + streetWidth) - streetWidth;
+      for (let x = ox; x < ox + gridW * (blockSize + streetWidth); x++) {
+        for (let sw = 0; sw < streetWidth; sw++) {
+          const h = getTerrainHeight(x, sz + sw);
+          setBlock(x, h, sz + sw, BLOCK.CONCRETE);
+        }
+      }
+    }
+  }
+
+  function generateMarsh(count) {
+    for (let m = 0; m < count; m++) {
+      const mx = randInWorld();
+      const mz = randInWorld();
+      const radius = 3 + Math.floor(Math.random() * 5);
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dz = -radius; dz <= radius; dz++) {
+          if (dx * dx + dz * dz <= radius * radius) {
+            const h = getTerrainHeight(mx + dx, mz + dz);
+            setBlock(mx + dx, h, mz + dz, BLOCK.WATER);
+          }
+        }
+      }
+    }
+  }
+
+  /* ── Level Generation ──────────────────────────────────────────── */
+  function generateLevel(index) {
+    const level = getLevelDef(index);
+    setTheme(level.theme);
+    _theme.seed = index * 3137;
+
+    // Clear and regenerate base terrain
+    for (const chunk of chunks.values()) {
+      if (chunk.mesh && _scene) {
+        _scene.remove(chunk.mesh);
+        chunk.mesh.geometry.dispose();
+        chunk.mesh.material.dispose();
+        chunk.mesh = null;
+      }
+    }
+    chunks.clear();
+
+    for (let cx = -HALF; cx < HALF; cx++) {
+      for (let cz = -HALF; cz < HALF; cz++) {
+        const chunk = createChunk(cx, cz);
+        generateChunkTerrain(chunk);
+      }
+    }
+
+    // Level-specific features
+    switch (level.id) {
+      case 'HOSTOMEL':
+        generateRunway(-30, -3, 60, 6);
+        generateBuilding(-10, 10, 12, 8, 4, BLOCK.CONCRETE);  // terminal
+        generateControlTower(15, 10);
+        generateBuilding(-25, -10, 10, 8, 5, BLOCK.METAL);    // hangar 1
+        generateBuilding(20, -10, 10, 8, 5, BLOCK.METAL);     // hangar 2
+        scatterResources(BLOCK.WOOD, 0.003);
+        break;
+
+      case 'AVDIIVKA':
+        generateCraters(28);
+        generateTrenches();
+        generateTrenches();
+        generateBrokenTrees(40);
+        generateRuins(8);
+        // Industrial buildings
+        generateBuilding(-20, -15, 15, 10, 6, BLOCK.METAL);
+        generateBuilding(10, 15, 12, 8, 5, BLOCK.CONCRETE);
+        generateBuilding(-5, 20, 10, 10, 4, BLOCK.BRICK);
+        // Scatter rubble
+        for (let rb = 0; rb < 50; rb++) {
+          const rx = randInWorld(), rz = randInWorld();
+          const h = getTerrainHeight(rx, rz);
+          if (h > 1) setBlock(rx, h, rz, BLOCK.RUBBLE);
+        }
+        break;
+
+      case 'BAKHMUT':
+        generateStreetGrid(-30, -30, 5, 5, 6);
+        generateRuins(18);
+        generateCraters(15);
+        generateBrokenTrees(15);
+        break;
+
+      case 'KHERSON':
+        generateRiver(0, 8);
+        generateBridge(-6, -2, 20, 4);
+        generateMarsh(6);
+        generateDefensivePosition(-20, -15);
+        generateDefensivePosition(20, 15);
+        generateDefensivePosition(-15, 20);
+        generateBrokenTrees(20);
+        scatterResources(BLOCK.WOOD, 0.002);
+        break;
+
+      default:
+        // Procedural: random mix
+        generateCraters(10 + Math.floor(Math.random() * 15));
+        generateRuins(5 + Math.floor(Math.random() * 10));
+        generateTrenches();
+        generateBrokenTrees(15 + Math.floor(Math.random() * 20));
+        generateDugouts(2 + Math.floor(Math.random() * 4));
+        if (Math.random() > 0.5) generateRiver(randInWorld(), 5 + Math.floor(Math.random() * 4));
+        if (Math.random() > 0.5) generateMarsh(3);
+        generateDefensivePosition(randInWorld(), randInWorld());
+        break;
+    }
+
+    rebuildAll();
+    return level;
+  }
+
   /* ── Public API ──────────────────────────────────────────────────── */
   return {
     BLOCK,
@@ -494,5 +923,7 @@ const VoxelWorld = (function () {
     rebuildAll,
     scatterResources,
     worldToChunk,
+    getLevelDef,
+    generateLevel,
   };
 })();

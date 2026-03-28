@@ -102,6 +102,48 @@ const Enemies = (() => {
     },
   };
 
+  // ── Military Ranks ───────────────────────────────────────
+  const RANKS = [
+    { id: 'PRIVATE',    name: 'Рядовой',    hpMult: 0.8, spdMult: 1.0, score: 50,   dropTier: 0 },
+    { id: 'CORPORAL',   name: 'Єфрейтор',   hpMult: 1.0, spdMult: 1.0, score: 100,  dropTier: 0 },
+    { id: 'SERGEANT',   name: 'Сержант',     hpMult: 1.2, spdMult: 1.1, score: 200,  dropTier: 1 },
+    { id: 'WARRANT',    name: 'Старшина',    hpMult: 1.5, spdMult: 1.0, score: 300,  dropTier: 1 },
+    { id: 'LIEUTENANT', name: 'Лейтенант',   hpMult: 1.8, spdMult: 0.9, score: 500,  dropTier: 2 },
+    { id: 'CAPTAIN',    name: 'Капітан',     hpMult: 2.0, spdMult: 0.9, score: 750,  dropTier: 2 },
+    { id: 'MAJOR',      name: 'Майор',       hpMult: 2.5, spdMult: 0.8, score: 1000, dropTier: 3 },
+    { id: 'COLONEL',    name: 'Полковник',   hpMult: 3.0, spdMult: 0.7, score: 2000, dropTier: 3 },
+    { id: 'GENERAL',    name: 'Генерал',     hpMult: 5.0, spdMult: 0.5, score: 5000, dropTier: 4 },
+  ];
+
+  // ── Unit Types ───────────────────────────────────────────
+  const UNITS = [
+    { id: 'REGULAR',  name: 'Regular Army',   marking: 'Z',  armband: 0xffffff },
+    { id: 'VDV',      name: 'VDV Airborne',   marking: 'V',  armband: 0xffffff, beret: 0x3366aa },
+    { id: 'WAGNER',   name: 'Wagner PMC',     marking: 'W',  armband: 0x111111 },
+    { id: 'DNR',      name: 'DNR Militia',    marking: 'Z',  armband: 0xff8800 },
+    { id: 'SPETSNAZ', name: 'Spetsnaz',       marking: 'Z',  armband: 0xffffff },
+    { id: 'MARINES',  name: 'Naval Infantry', marking: 'Z',  armband: 0xffffff, beret: 0x111111 },
+  ];
+
+  // ── Pick rank based on wave number ───────────────────────
+  function pickRank(waveNum) {
+    const r = Math.random();
+    if (waveNum >= 5 && r < 0.03) return RANKS[8]; // GENERAL
+    if (waveNum >= 4 && r < 0.08) return RANKS[7]; // COLONEL
+    if (waveNum >= 4 && r < 0.15) return RANKS[6]; // MAJOR
+    if (waveNum >= 3 && r < 0.25) return RANKS[5]; // CAPTAIN
+    if (waveNum >= 3 && r < 0.35) return RANKS[4]; // LIEUTENANT
+    if (waveNum >= 2 && r < 0.50) return RANKS[3]; // WARRANT
+    if (waveNum >= 2 && r < 0.65) return RANKS[2]; // SERGEANT
+    if (r < 0.80) return RANKS[1]; // CORPORAL
+    return RANKS[0]; // PRIVATE
+  }
+
+  // ── Pick random unit ────────────────────────────────────
+  function pickUnit() {
+    return UNITS[Math.floor(Math.random() * UNITS.length)];
+  }
+
   // ── Internal state ────────────────────────────────────────
   let scene      = null;
   let enemies    = [];
@@ -235,6 +277,40 @@ const Enemies = (() => {
 
     group.add(torso, head, helmet, legL, legR, armL, armR);
 
+    // ── Body Armor (6B45 vest over torso) ─────────────────
+    const vest = new THREE.Mesh(
+      new THREE.BoxGeometry(0.56 * s, 0.55 * s, 0.30 * s),
+      new THREE.MeshLambertMaterial({ color: 0x3A4A2A })
+    );
+    vest.position.y = 0.92 * s;
+    group.add(vest);
+
+    // ── Magazine pouches on chest ─────────────────────────
+    for (let i = -1; i <= 1; i++) {
+      const pouch = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06 * s, 0.08 * s, 0.04 * s),
+        new THREE.MeshLambertMaterial({ color: 0x2a3a1a })
+      );
+      pouch.position.set(i * 0.1 * s, 0.95 * s, 0.16 * s);
+      group.add(pouch);
+    }
+
+    // ── Canteen on hip ────────────────────────────────────
+    const canteen = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04 * s, 0.04 * s, 0.08 * s, 8),
+      new THREE.MeshLambertMaterial({ color: 0x2a3a1a })
+    );
+    canteen.position.set(-0.30 * s, 0.50 * s, 0);
+    group.add(canteen);
+
+    // ── Radio on chest ────────────────────────────────────
+    const radio = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04 * s, 0.06 * s, 0.02 * s),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    radio.position.set(0.20 * s, 1.05 * s, 0.14 * s);
+    group.add(radio);
+
     // ── Belt / equipment strip (dark webbing) ─────────────
     const belt = new THREE.Mesh(
       new THREE.BoxGeometry(0.54 * s, 0.06 * s, 0.28 * s),
@@ -243,15 +319,25 @@ const Enemies = (() => {
     belt.position.y = 0.53 * s;
     group.add(belt);
 
-    // ── Boot tops (black) ─────────────────────────────────
+    // ── Boots (dark brown — historically accurate) ────────
     for (const legMesh of [legL, legR]) {
       const boot = new THREE.Mesh(
         new THREE.BoxGeometry(0.22 * s, 0.18 * s, 0.22 * s),
-        new THREE.MeshLambertMaterial({ color: 0x111111 })
+        new THREE.MeshLambertMaterial({ color: 0x2A1A0A })
       );
       boot.position.copy(legMesh.position);
       boot.position.y = 0.04 * s;
       group.add(boot);
+
+      // Knee pad
+      const kneePad = new THREE.Mesh(
+        new THREE.BoxGeometry(0.10 * s, 0.06 * s, 0.04 * s),
+        new THREE.MeshLambertMaterial({ color: 0x1a1a0a })
+      );
+      kneePad.position.copy(legMesh.position);
+      kneePad.position.y = 0.18 * s;
+      kneePad.position.z = 0.12 * s;
+      group.add(kneePad);
     }
 
     // Eye glow
@@ -263,10 +349,10 @@ const Enemies = (() => {
     eyeR.position.set(0.08 * s, 1.42 * s, 0.18 * s);
     group.add(eyeL, eyeR);
 
-    // Invisible hitbox
+    // Invisible hitbox — use transparent+opacity:0 so Raycaster still detects it
     const hitbox = new THREE.Mesh(
       new THREE.BoxGeometry(0.6 * s, 1.75 * s, 0.4 * s),
-      new THREE.MeshBasicMaterial({ visible: false })
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 })
     );
     hitbox.position.y = 0.87 * s;
     group.add(hitbox);
@@ -312,6 +398,8 @@ const Enemies = (() => {
   // ── Spawn one enemy ───────────────────────────────────────
   function spawnOne(typeName) {
     const typeCfg = TYPES[typeName] || TYPES.CONSCRIPT;
+    const rank = pickRank(wave);
+    const unit = pickUnit();
 
     const angle = Math.random() * Math.PI * 2;
     const r     = ARENA_SIZE * 0.46 + Math.random() * 4;
@@ -321,20 +409,22 @@ const Enemies = (() => {
 
     const waveHpBonus    = (1 + (wave - 1) * 0.22) * stageMult;
     const waveSpeedBonus = (1 + (wave - 1) * 0.06) * (1 + (stageMult - 1) * 0.3);
-    const hp             = typeCfg.hpBase * waveHpBonus;
+    const hp             = typeCfg.hpBase * waveHpBonus * rank.hpMult;
 
     enemies.push({
       mesh,
       hpBar:       buildHpBar(),
       typeCfg,
       typeName,
+      rank,
+      unit,
       hp,
       maxHp:       hp,
-      speed:       typeCfg.speedBase * waveSpeedBonus,
+      speed:       typeCfg.speedBase * waveSpeedBonus * rank.spdMult,
       attackDmg:   typeCfg.attackDmg,
       attackTimer: Math.random() * typeCfg.attackRate,
       attackRate:  typeCfg.attackRate,
-      scoreValue:  typeCfg.scoreValue,
+      scoreValue:  rank.score,
       dropChance:  typeCfg.dropChance,
       alive:       true,
       flashTimer:  0,
@@ -509,14 +599,36 @@ const Enemies = (() => {
     allDead    = false;
   }
 
+  // ── Area damage (explosions) ────────────────────────────────
+  function damageInRadius(pos, radius, amount) {
+    const results = [];
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const dist = e.mesh.position.distanceTo(pos);
+      if (dist <= radius) {
+        const falloff = 1 - (dist / radius) * 0.5;
+        const remaining = damage(e, amount * falloff);
+        results.push({ enemy: e, remaining });
+      }
+    }
+    return results;
+  }
+
+  // ── Get all alive enemies ─────────────────────────────────
+  function getAll() { return enemies.filter(e => e.alive); }
+
   return {
     startWave,
     update,
     damage,
+    damageInRadius,
     findByMesh,
     getEnemyMeshes,
     getAliveCount,
     isWaveDone,
     clear,
+    getAll,
+    RANKS,
+    UNITS,
   };
 })();

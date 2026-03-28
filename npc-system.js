@@ -77,6 +77,11 @@ const NPCSystem = (function () {
       // State
       alive:  true,
       asleep: false,
+
+      // Combat
+      combatTarget: null,
+      combatCooldown: 0,
+      fireFlash: 0,
     };
 
     npc.mesh = buildNPCMesh(npc);
@@ -250,10 +255,10 @@ const NPCSystem = (function () {
       leg.userData.isLeg = true;
       group.add(leg);
 
-      // Boot (black)
+      // Boot (tan/coyote — NATO style)
       const boot = new THREE.Mesh(
         new THREE.BoxGeometry(0.15, 0.12, 0.15),
-        new THREE.MeshLambertMaterial({ color: 0x111111 })
+        new THREE.MeshLambertMaterial({ color: 0x8B7355 })
       );
       boot.position.set(side * 0.12, 0.02, 0);
       group.add(boot);
@@ -279,10 +284,50 @@ const NPCSystem = (function () {
     armR.userData.isArm = true;
     group.add(armR);
 
-    // ── Belt (dark webbing) ───────────────────────────────
+    // ── Plate Carrier (coyote brown — NATO style) ─────────
+    const plateCarrier = new THREE.Mesh(
+      new THREE.BoxGeometry(0.44, 0.50, 0.34),
+      new THREE.MeshLambertMaterial({ color: 0x8B7355 })
+    );
+    plateCarrier.position.y = 0.82;
+    group.add(plateCarrier);
+
+    // ── Medical cross patch on plate carrier ──────────────
+    const medPatch = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.05, 0.001),
+      new THREE.MeshLambertMaterial({ color: 0xCC0000 })
+    );
+    medPatch.position.set(-0.15, 0.85, 0.18);
+    group.add(medPatch);
+
+    // ── Tourniquet (orange/red band on chest strap) ───────
+    const tourniquet = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, 0.12, 0.03),
+      new THREE.MeshLambertMaterial({ color: 0xFF4400 })
+    );
+    tourniquet.position.set(0.22, 0.90, 0.10);
+    group.add(tourniquet);
+
+    // ── Blue armband (Ukrainian ID marking on right arm) ──
+    const blueArmband = new THREE.Mesh(
+      new THREE.BoxGeometry(0.13, 0.04, 0.13),
+      new THREE.MeshLambertMaterial({ color: 0x0057B8 })
+    );
+    blueArmband.position.set(0.32, 0.95, 0);
+    group.add(blueArmband);
+
+    // ── NVG mount on helmet ───────────────────────────────
+    const nvgMount = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.04, 0.03),
+      new THREE.MeshLambertMaterial({ color: 0x111111 })
+    );
+    nvgMount.position.set(0, 1.48, 0.18);
+    group.add(nvgMount);
+
+    // ── Belt (coyote brown webbing) ───────────────────────
     const belt = new THREE.Mesh(
       new THREE.BoxGeometry(0.42, 0.05, 0.32),
-      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+      new THREE.MeshLambertMaterial({ color: 0x8B7355 })
     );
     belt.position.y = 0.42;
     group.add(belt);
@@ -363,8 +408,86 @@ const NPCSystem = (function () {
     }
   }
 
+  /* ── NPC Combat ───────────────────────────────────────────────────── */
+  function findNearestEnemy(npc) {
+    const allEnemies = (typeof Enemies !== 'undefined' && Enemies.getAll) ? Enemies.getAll() : [];
+    let nearest = null;
+    let nearDist = Infinity;
+    for (const e of allEnemies) {
+      const dist = npc.position.distanceTo(e.mesh.position);
+      if (dist < nearDist) {
+        nearDist = dist;
+        nearest = e;
+      }
+    }
+    if (nearest && nearDist < 20) return { enemy: nearest, dist: nearDist };
+    return null;
+  }
+
+  function updateCombat(npc, delta, target) {
+    const dist = target.dist;
+    const enemy = target.enemy;
+
+    if (dist > 12) {
+      // Move toward enemy, stop 8 units away
+      const dir = new THREE.Vector3().subVectors(enemy.mesh.position, npc.position).setY(0).normalize();
+      npc.target = npc.position.clone().add(dir.multiplyScalar(dist - 8));
+    } else if (dist >= 4) {
+      // Stop and shoot
+      npc.target = null;
+      // Face enemy
+      const lookDir = new THREE.Vector3().subVectors(enemy.mesh.position, npc.position).setY(0);
+      if (lookDir.length() > 0.1) {
+        npc.mesh.rotation.y = Math.atan2(lookDir.x, lookDir.z);
+      }
+
+      npc.combatCooldown -= delta;
+      if (npc.combatCooldown <= 0) {
+        const fireRate = 1.5 - npc.skills.combat * 0.007; // 0.8-1.5s
+        npc.combatCooldown = Math.max(0.8, fireRate);
+        const dmg = 5 + npc.skills.combat * 0.3;
+
+        if (typeof Enemies !== 'undefined' && Enemies.damage) {
+          const remaining = Enemies.damage(enemy, dmg);
+          if (remaining <= 0) {
+            npc.stress = Math.max(0, npc.stress - 5);
+            npc.morale = Math.min(100, npc.morale + 5);
+            npc.combatTarget = null;
+          }
+        }
+
+        // Flash arms white when firing
+        npc.fireFlash = 0.1;
+        npc.mesh.children.forEach(child => {
+          if (child.userData.isArm) {
+            if (!child.userData._savedMaterial) {
+              child.userData._savedMaterial = child.material;
+              child.userData._flashMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            }
+            child.material = child.userData._flashMaterial;
+          }
+        });
+      }
+    } else {
+      // Too close — back away
+      const away = new THREE.Vector3().subVectors(npc.position, enemy.mesh.position).setY(0).normalize();
+      npc.target = npc.position.clone().add(away.multiplyScalar(6));
+    }
+  }
+
   /* ── AI Behavior ─────────────────────────────────────────────────── */
   function updateBehavior(npc, delta, timeInfo) {
+    // Combat takes highest priority for guards, patrols, and infantry+ ranks
+    if (['guard', 'patrol'].includes(npc.job) ||
+        RANK_ORDER.indexOf(npc.rank) >= RANK_ORDER.indexOf(NPC_RANK.INFANTRY)) {
+      const nearestEnemy = findNearestEnemy(npc);
+      if (nearestEnemy && nearestEnemy.dist < 20) {
+        npc.combatTarget = nearestEnemy.enemy;
+        updateCombat(npc, delta, nearestEnemy);
+        return;
+      }
+    }
+
     // Critical needs override job
     if (npc.fatigue > 85 && npc.job !== JOB.REST) {
       npc.asleep = true;
@@ -475,6 +598,19 @@ const NPCSystem = (function () {
   let _animTime = 0;
   function updateAnimation(npc, delta) {
     _animTime += delta;
+
+    // Reset fire flash
+    if (npc.fireFlash > 0) {
+      npc.fireFlash -= delta;
+      if (npc.fireFlash <= 0) {
+        npc.mesh.children.forEach(child => {
+          if (child.userData.isArm && child.userData._savedMaterial) {
+            child.material = child.userData._savedMaterial;
+          }
+        });
+      }
+    }
+
     if (npc.target && !npc.asleep) {
       npc.mesh.children.forEach(child => {
         if (child.userData.isLeg) {

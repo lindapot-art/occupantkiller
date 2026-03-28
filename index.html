@@ -54,11 +54,17 @@
 
       <div id="weapon-section">
         <div id="weapon-label">WEAPON</div>
-        <div id="weapon-name-display">PKM Machine Gun</div>
+        <div id="weapon-name-display">Army Shovel (МПЛ-50)</div>
         <div id="weapon-slots">
-          <span class="wslot active" id="wslot-0">1·PKM</span>
-          <span class="wslot" id="wslot-1">2·AK</span>
-          <span class="wslot" id="wslot-2">3·SVD</span>
+          <span class="wslot active" id="wslot-0">1·Shovel</span>
+          <span class="wslot" id="wslot-1">2·PM</span>
+          <span class="wslot" id="wslot-2">3·AK</span>
+          <span class="wslot" id="wslot-3">4·RPK</span>
+          <span class="wslot" id="wslot-4">5·SVD</span>
+          <span class="wslot" id="wslot-5">6·PKM</span>
+          <span class="wslot" id="wslot-6">7·NLAW</span>
+          <span class="wslot" id="wslot-7">8·Stugna</span>
+          <span class="wslot" id="wslot-8">9·M4A1</span>
         </div>
       </div>
     </div>
@@ -157,6 +163,39 @@
     <p class="stat">STAGES COMPLETED: <span id="win-stages">3</span></p>
     <button class="btn" id="play-again-btn">PLAY AGAIN</button>
   </div>
+
+  <!-- Inventory / Pause overlay -->
+  <div id="inventory-overlay" class="overlay" style="display:none">
+    <div class="overlay-content">
+      <h1>⏸ PAUSED</h1>
+      <div id="inventory-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:15px 0;"></div>
+      <div id="player-stats" style="text-align:left;font-size:14px;margin:10px 0;"></div>
+      <p style="color:#888">Press ESC or tap ⏸ to resume</p>
+      <button class="btn" id="inv-resume-btn" style="border-color:#fff;color:#fff">▶ RESUME</button>
+    </div>
+  </div>
+
+  <!-- Mobile Controls -->
+  <div id="mobile-controls" style="display:none">
+    <!-- Left joystick area -->
+    <div id="joystick-zone" class="mobile-ctrl">
+      <div id="joystick-base"></div>
+      <div id="joystick-thumb"></div>
+    </div>
+
+    <!-- Action buttons (right side) -->
+    <div id="mobile-actions" class="mobile-ctrl">
+      <button id="btn-fire" class="mobile-btn fire-btn">🔫</button>
+      <button id="btn-reload" class="mobile-btn">🔄</button>
+      <button id="btn-jump" class="mobile-btn">⬆</button>
+      <button id="btn-sprint" class="mobile-btn">🏃</button>
+      <button id="btn-weapon-prev" class="mobile-btn sm">◀</button>
+      <button id="btn-weapon-next" class="mobile-btn sm">▶</button>
+    </div>
+
+    <!-- Inventory/Pause button -->
+    <button id="btn-pause" class="mobile-btn pause-btn">⏸</button>
+  </div>
 </div>
 
 <!-- Three.js r137 (local copy, patched for CVE XSS < 0.137.0) -->
@@ -179,6 +218,9 @@
 <script src="hud.js"></script>
 <script src="weapons.js"></script>
 <script src="enemies.js"></script>
+<script src="audio-system.js"></script>
+<script src="weather-system.js"></script>
+<script src="ml-system.js"></script>
 <script src="game-manager.js"></script>
 
 <!-- Boot -->
@@ -221,6 +263,10 @@
 
   document.getElementById('play-again-btn').addEventListener('click', function () {
     GameManager.startGame();
+  });
+
+  document.getElementById('inv-resume-btn').addEventListener('click', function () {
+    GameManager.toggleInventory();
   });
 
   // Start render loop
