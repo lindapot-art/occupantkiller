@@ -39,6 +39,70 @@ const GameManager = (function () {
   let currentWave = 0;
   const SCORE_WAVE_BONUS = 500;
 
+  /* ── Kill Streak / Combo Tracking ──────────────────────────────── */
+  let killStreak       = 0;
+  let killStreakTimer   = 0;
+  const STREAK_TIMEOUT  = 3.5;  // seconds between kills to maintain streak
+  let bestStreak        = 0;
+  let totalHeadshots    = 0;
+
+  /* ── Screen Shake ──────────────────────────────────────────────── */
+  let shakeIntensity = 0;
+  let shakeDuration  = 0;
+  let shakeTimer     = 0;
+
+  function triggerScreenShake(intensity, duration) {
+    shakeIntensity = Math.max(shakeIntensity, intensity);
+    shakeDuration  = Math.max(shakeDuration, duration);
+    shakeTimer     = 0;
+  }
+
+  function updateScreenShake(delta) {
+    if (shakeDuration <= 0) return;
+    shakeTimer += delta;
+    if (shakeTimer >= shakeDuration) {
+      shakeDuration = 0;
+      shakeIntensity = 0;
+      return;
+    }
+    const fade = 1 - shakeTimer / shakeDuration;
+    const ox = (Math.random() - 0.5) * shakeIntensity * fade;
+    const oy = (Math.random() - 0.5) * shakeIntensity * fade;
+    _camera.position.x += ox;
+    _camera.position.y += oy;
+  }
+
+  /* ── Kill Feed ─────────────────────────────────────────────────── */
+  const killFeedEntries = [];
+  const MAX_KILL_FEED   = 5;
+
+  function addKillFeedEntry(text, color) {
+    killFeedEntries.push({ text: text, color: color || '#ff4444', timer: 4.0 });
+    if (killFeedEntries.length > MAX_KILL_FEED) killFeedEntries.shift();
+    renderKillFeed();
+  }
+
+  function updateKillFeed(delta) {
+    let changed = false;
+    for (let i = killFeedEntries.length - 1; i >= 0; i--) {
+      killFeedEntries[i].timer -= delta;
+      if (killFeedEntries[i].timer <= 0) {
+        killFeedEntries.splice(i, 1);
+        changed = true;
+      }
+    }
+    if (changed) renderKillFeed();
+  }
+
+  function renderKillFeed() {
+    var el = document.getElementById('kill-feed');
+    if (!el) return;
+    el.innerHTML = killFeedEntries.map(function (entry) {
+      var opacity = Math.min(1, entry.timer / 0.5);
+      return '<div style="color:' + entry.color + ';opacity:' + opacity + ';margin:2px 0;text-shadow:0 0 6px ' + entry.color + '">' + entry.text + '</div>';
+    }).join('');
+  }
+
   /* ── Stage Definitions ──────────────────────────────────────────── */
   const STAGES = [
     {
@@ -565,6 +629,15 @@ const GameManager = (function () {
     currentStage = 0;
     player.velocity.set(0, 0, 0);
 
+    // Reset streak/stats
+    killStreak = 0;
+    killStreakTimer = 0;
+    bestStreak = 0;
+    totalHeadshots = 0;
+    killFeedEntries.length = 0;
+    shakeIntensity = 0;
+    shakeDuration = 0;
+
     // Apply first stage
     applyStage(STAGES[0]);
 
@@ -628,6 +701,7 @@ const GameManager = (function () {
       document.getElementById('win-score').textContent = player.score;
       document.getElementById('win-kills').textContent = player.kills;
       document.getElementById('win-stages').textContent = STAGES.length;
+      showWinStats();
       return;
     }
 
@@ -716,6 +790,7 @@ const GameManager = (function () {
         document.getElementById('win-score').textContent = player.score;
         document.getElementById('win-kills').textContent = player.kills;
         document.getElementById('win-stages').textContent = STAGES.length;
+        showWinStats();
         return;
       }
 
@@ -867,7 +942,15 @@ const GameManager = (function () {
 
     AudioSystem.playHit();
     MLSystem.onHit(Weapons.getCurrentId());
-    const isHeadshot = hit.object === enemy.mesh.userData.headMesh;
+    // Walk up the hit object's parents to check if we hit the head mesh
+    const headMesh = enemy.mesh.userData.headMesh;
+    let hitObj = hit.object;
+    let isHeadshot = false;
+    while (hitObj) {
+      if (hitObj === headMesh) { isHeadshot = true; break; }
+      if (hitObj === enemy.mesh) break;
+      hitObj = hitObj.parent;
+    }
     const baseDmg = Weapons.getDamage();
     const dmg = isHeadshot ? baseDmg * 2 : baseDmg;
 
@@ -879,6 +962,7 @@ const GameManager = (function () {
     if (isHeadshot) {
       HUD.showHeadshot();
       player.score += 50;
+      totalHeadshots++;
     }
 
     if (remaining <= 0) {
@@ -889,6 +973,36 @@ const GameManager = (function () {
       HUD.setScore(player.score);
       HUD.setKills(player.kills);
       RankSystem.onKill(isHeadshot);
+
+      // Kill streak tracking
+      killStreak++;
+      killStreakTimer = STREAK_TIMEOUT;
+      if (killStreak > bestStreak) bestStreak = killStreak;
+
+      // Streak bonuses
+      var streakBonus = 0;
+      var streakLabel = '';
+      if (killStreak === 3) { streakBonus = 50; streakLabel = 'TRIPLE KILL!'; }
+      else if (killStreak === 5) { streakBonus = 150; streakLabel = 'KILLING SPREE!'; }
+      else if (killStreak === 8) { streakBonus = 300; streakLabel = 'RAMPAGE!'; }
+      else if (killStreak === 10) { streakBonus = 500; streakLabel = 'UNSTOPPABLE!'; }
+      else if (killStreak >= 15) { streakBonus = 1000; streakLabel = 'GODLIKE! (' + killStreak + ')'; }
+
+      if (streakBonus > 0) {
+        player.score += streakBonus;
+        HUD.setScore(player.score);
+        HUD.notifyPickup(streakLabel + ' +' + streakBonus, '#ff00ff');
+        triggerScreenShake(0.12, 0.3);
+      }
+
+      // Kill feed entry
+      var rankInfo = enemy.rank ? enemy.rank.name : '';
+      var unitInfo = enemy.unit ? enemy.unit.name : '';
+      var feedText = '💀 ' + (isHeadshot ? 'HEADSHOT ' : '') +
+        enemy.typeName + (rankInfo ? ' (' + rankInfo + ')' : '') +
+        (unitInfo ? ' [' + unitInfo + ']' : '') +
+        ' +' + enemy.scoreValue;
+      addKillFeedEntry(feedText, isHeadshot ? '#ff8800' : '#ff4444');
 
       // Pickup spawn
       if (Math.random() < enemy.dropChance) {
@@ -916,6 +1030,13 @@ const GameManager = (function () {
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
+    triggerScreenShake(0.06 + dmg * 0.003, 0.15);
+
+    // Kill streak broken
+    if (killStreak >= 3) {
+      addKillFeedEntry('Streak broken at ' + killStreak + ' kills', '#888888');
+    }
+    killStreak = 0;
 
     if (player.hp <= 0) {
       gameState = STATE.DEAD;
@@ -925,6 +1046,7 @@ const GameManager = (function () {
       document.getElementById('dead-score').textContent = player.score;
       document.getElementById('dead-kills').textContent = player.kills;
       document.getElementById('dead-wave').textContent = currentWave;
+      showDeathStats();
     }
   }
 
@@ -979,11 +1101,37 @@ const GameManager = (function () {
         if (ray) Building.updateGhost(ray.place.x, ray.place.y, ray.place.z);
       }
 
+      // Screen shake
+      updateScreenShake(delta);
+
+      // Kill streak timer
+      if (killStreakTimer > 0) {
+        killStreakTimer -= delta;
+        if (killStreakTimer <= 0 && killStreak >= 3) {
+          addKillFeedEntry('Streak ended: ' + killStreak + ' kills', '#888888');
+          killStreak = 0;
+        } else if (killStreakTimer <= 0) {
+          killStreak = 0;
+        }
+      }
+
+      // Kill feed decay
+      updateKillFeed(delta);
+
       // HUD updates
       HUD.setAmmo(Weapons.getClip(), Weapons.getReserve());
       HUD.setWeapon(Weapons.getCurrentName(), Weapons.getCurrentIdx());
       HUD.showReload(Weapons.isReloading());
       HUD.setEnemies(Enemies.getAliveCount());
+
+      // Low health warning
+      updateLowHealthWarning(delta);
+
+      // Ammo warning
+      updateAmmoWarning();
+
+      // Minimap
+      updateMinimap();
 
       // Update extended HUD
       updateExtendedHUD();
@@ -1052,6 +1200,179 @@ const GameManager = (function () {
         missionEl.textContent = '📋 No active missions';
       }
     }
+  }
+
+  /* ── Low Health Warning ─────────────────────────────────────────── */
+  let lowHealthPulse = 0;
+  function updateLowHealthWarning(delta) {
+    var el = document.getElementById('low-health-overlay');
+    if (!el) return;
+    var hpPct = player.hp / player.maxHp;
+    if (hpPct <= 0.25 && player.hp > 0) {
+      lowHealthPulse += delta * 3;
+      var pulse = 0.15 + Math.sin(lowHealthPulse) * 0.1;
+      el.style.opacity = pulse;
+      el.style.display = 'block';
+    } else {
+      el.style.display = 'none';
+      lowHealthPulse = 0;
+    }
+  }
+
+  /* ── Ammo Warning ──────────────────────────────────────────────── */
+  function updateAmmoWarning() {
+    var el = document.getElementById('ammo-warning');
+    if (!el) return;
+    var wepType = Weapons.getCurrentType();
+    if (wepType === 'MELEE') { el.style.display = 'none'; return; }
+    var info = Weapons.getWeaponInfo(Weapons.getCurrentIdx());
+    if (!info) { el.style.display = 'none'; return; }
+    if (info.clip <= 0 && info.reserve <= 0) {
+      el.textContent = 'NO AMMO!';
+      el.style.display = 'block';
+      el.style.color = '#ff2222';
+    } else if (info.clip <= Math.ceil(info.reserve * 0.1 + 1) && info.clip > 0) {
+      el.textContent = 'LOW AMMO';
+      el.style.display = 'block';
+      el.style.color = '#ffcc00';
+    } else {
+      el.style.display = 'none';
+    }
+  }
+
+  /* ── Minimap ───────────────────────────────────────────────────── */
+  function updateMinimap() {
+    var canvas = document.getElementById('minimap-canvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var size = canvas.width;
+    var half = size / 2;
+    var scale = size / 60; // 60 units visible
+
+    ctx.clearRect(0, 0, size, size);
+
+    // Background
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.beginPath();
+    ctx.arc(half, half, half, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(half, half, half - 1, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Player (center, green triangle pointing forward)
+    ctx.fillStyle = '#44ff88';
+    var yaw = CameraSystem.getYaw();
+    ctx.save();
+    ctx.translate(half, half);
+    ctx.rotate(-yaw);
+    ctx.beginPath();
+    ctx.moveTo(0, -5);
+    ctx.lineTo(-3, 4);
+    ctx.lineTo(3, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // Enemies (red dots)
+    var allEnemies = Enemies.getAll();
+    ctx.fillStyle = '#ff2222';
+    for (var i = 0; i < allEnemies.length; i++) {
+      var e = allEnemies[i];
+      var dx = (e.mesh.position.x - player.position.x) * scale;
+      var dz = (e.mesh.position.z - player.position.z) * scale;
+      var ex = half + dx;
+      var ey = half + dz;
+      var dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < half - 3) {
+        ctx.beginPath();
+        ctx.arc(ex, ey, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // NPCs (blue dots)
+    if (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) {
+      var allNpcs = NPCSystem.getAll();
+      ctx.fillStyle = '#4488ff';
+      for (var j = 0; j < allNpcs.length; j++) {
+        var n = allNpcs[j];
+        if (!n.alive) continue;
+        var ndx = (n.position.x - player.position.x) * scale;
+        var ndz = (n.position.z - player.position.z) * scale;
+        var nx = half + ndx;
+        var ny = half + ndz;
+        var ndist = Math.sqrt(ndx * ndx + ndz * ndz);
+        if (ndist < half - 3) {
+          ctx.beginPath();
+          ctx.arc(nx, ny, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // Compass markers
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('N', half, 10);
+    ctx.fillText('S', half, size - 4);
+    ctx.fillText('W', 6, half + 3);
+    ctx.fillText('E', size - 6, half + 3);
+  }
+
+  /* ── Visibilitychange handler ──────────────────────────────────── */
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      if (gameState === STATE.PLAYING) {
+        gameState = STATE.PAUSED;
+        showOverlay('pause');
+      }
+    }
+  });
+
+  /* ── Enhanced Death Screen ─────────────────────────────────────── */
+  function showDeathStats() {
+    var el = document.getElementById('dead-stats-breakdown');
+    if (!el) return;
+    var stage = STAGES[currentStage];
+    el.innerHTML =
+      '<div style="margin-top:12px;font-size:13px;color:#aaa;text-align:left;max-width:300px;margin-left:auto;margin-right:auto">' +
+      '<div>📍 Stage: ' + stage.id + ' — ' + stage.name + '</div>' +
+      '<div>🌊 Wave: ' + currentWave + ' / ' + stage.wavesPerStage + '</div>' +
+      '<div>💀 Kills: ' + player.kills + '</div>' +
+      '<div>🎯 Headshots: ' + totalHeadshots + '</div>' +
+      '<div>🔥 Best Streak: ' + bestStreak + '</div>' +
+      '<div>🏆 Score: ' + player.score + '</div>' +
+      '<div>⚔ Weapons Unlocked: ' + countUnlockedWeapons() + ' / ' + Weapons.getWeaponCount() + '</div>' +
+      '</div>';
+  }
+
+  function countUnlockedWeapons() {
+    var count = 0;
+    for (var i = 0; i < Weapons.getWeaponCount(); i++) {
+      if (Weapons.isUnlocked(i)) count++;
+    }
+    return count;
+  }
+
+  /* ── Enhanced Win Screen ───────────────────────────────────────── */
+  function showWinStats() {
+    var el = document.getElementById('win-stats-breakdown');
+    if (!el) return;
+    el.innerHTML =
+      '<div style="margin-top:12px;font-size:13px;color:#aaa;text-align:left;max-width:300px;margin-left:auto;margin-right:auto">' +
+      '<div>💀 Total Kills: ' + player.kills + '</div>' +
+      '<div>🎯 Headshots: ' + totalHeadshots + '</div>' +
+      '<div>🔥 Best Streak: ' + bestStreak + '</div>' +
+      '<div>🏆 Final Score: ' + player.score + '</div>' +
+      '<div>⚔ Weapons Unlocked: ' + countUnlockedWeapons() + ' / ' + Weapons.getWeaponCount() + '</div>' +
+      '<div>📍 Stages Cleared: ' + STAGES.length + '</div>' +
+      '</div>';
   }
 
   /* ── Mobile Controls Setup ─────────────────────────────────────── */

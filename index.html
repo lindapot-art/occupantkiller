@@ -79,6 +79,21 @@
     <div id="headshot-notif">HEADSHOT!</div>
     <div id="pickup-notif"></div>
     <div id="wave-announce"></div>
+    <div id="ammo-warning"></div>
+
+    <!-- Kill Feed (top-right combat log) -->
+    <div id="kill-feed"></div>
+
+    <!-- Minimap (bottom-right radar) -->
+    <div id="minimap-container">
+      <canvas id="minimap-canvas" width="120" height="120"></canvas>
+    </div>
+
+    <!-- Low health warning overlay -->
+    <div id="low-health-overlay"></div>
+
+    <!-- Kill streak display -->
+    <div id="streak-display"></div>
 
     <!-- ── Build mode HUD ──────────────────────────────────── -->
     <div id="build-hud" style="display:none">
@@ -125,6 +140,7 @@
     <p class="stat">SCORE: <span id="dead-score">0</span></p>
     <p class="stat">KILLS: <span id="dead-kills">0</span></p>
     <p class="stat">WAVES: <span id="dead-wave">0</span></p>
+    <div id="dead-stats-breakdown"></div>
     <button class="btn" id="restart-btn">↺ TRY AGAIN</button>
   </div>
 
@@ -161,6 +177,7 @@
     <p class="stat">FINAL SCORE: <span id="win-score">0</span></p>
     <p class="stat">TOTAL KILLS: <span id="win-kills">0</span></p>
     <p class="stat">STAGES COMPLETED: <span id="win-stages">3</span></p>
+    <div id="win-stats-breakdown"></div>
     <button class="btn" id="play-again-btn">PLAY AGAIN</button>
   </div>
 
