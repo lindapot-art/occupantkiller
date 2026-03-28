@@ -263,10 +263,10 @@ const Enemies = (() => {
     eyeR.position.set(0.08 * s, 1.42 * s, 0.18 * s);
     group.add(eyeL, eyeR);
 
-    // Invisible hitbox
+    // Invisible hitbox — use transparent+opacity:0 so Raycaster still detects it
     const hitbox = new THREE.Mesh(
       new THREE.BoxGeometry(0.6 * s, 1.75 * s, 0.4 * s),
-      new THREE.MeshBasicMaterial({ visible: false })
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 })
     );
     hitbox.position.y = 0.87 * s;
     group.add(hitbox);
@@ -509,10 +509,28 @@ const Enemies = (() => {
     allDead    = false;
   }
 
+  // ── Area damage (explosions) ────────────────────────────────
+  function damageInRadius(position, radius, dmg) {
+    const rSq = radius * radius;
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
+      if (!e.alive) continue;
+      const dx = e.mesh.position.x - position.x;
+      const dy = e.mesh.position.y + e.typeCfg.scale * 0.87 - position.y;
+      const dz = e.mesh.position.z - position.z;
+      const distSq = dx * dx + dy * dy + dz * dz;
+      if (distSq < rSq) {
+        const falloff = 1 - Math.sqrt(distSq) / radius;
+        damage(e, dmg * falloff);
+      }
+    }
+  }
+
   return {
     startWave,
     update,
     damage,
+    damageInRadius,
     findByMesh,
     getEnemyMeshes,
     getAliveCount,

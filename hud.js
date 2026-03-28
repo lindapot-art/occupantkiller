@@ -16,7 +16,7 @@ const HUD = (() => {
     ammo:         document.getElementById('ammo-display'),
     ammoRes:      document.getElementById('ammo-reserve'),
     weaponName:   document.getElementById('weapon-name-display'),
-    weaponSlots:  [0, 1, 2].map(i => document.getElementById('wslot-' + i)),
+    weaponSlots:  [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => document.getElementById('wslot-' + i)),
     reload:       document.getElementById('reload-indicator'),
     hitMarker:    document.getElementById('hit-marker'),
     vignette:     document.getElementById('damage-vignette'),
@@ -62,7 +62,10 @@ const HUD = (() => {
   function setWeapon(name, idx) {
     if (el.weaponName) el.weaponName.textContent = name;
     el.weaponSlots.forEach((s, i) => {
-      if (s) s.classList.toggle('active', i === idx);
+      if (!s) return;
+      s.classList.toggle('active', i === idx);
+      var isLocked = typeof Weapons !== 'undefined' && !Weapons.isUnlocked(i);
+      s.classList.toggle('locked', isLocked);
     });
   }
 

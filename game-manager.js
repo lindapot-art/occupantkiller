@@ -205,11 +205,13 @@ const GameManager = (function () {
       keys[e.code] = true;
 
       if (gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE) {
-        // Speed controls
-        if (e.code === 'Digit4') TimeSystem.setSpeed(1);
-        if (e.code === 'Digit5') TimeSystem.setSpeed(2);
-        if (e.code === 'Digit6') TimeSystem.setSpeed(5);
-        if (e.code === 'Digit7') TimeSystem.setSpeed(10);
+        // Speed controls (only in build mode, since 4-7 are weapons in play mode)
+        if (gameState === STATE.BUILD_MODE) {
+          if (e.code === 'Digit4') TimeSystem.setSpeed(1);
+          if (e.code === 'Digit5') TimeSystem.setSpeed(2);
+          if (e.code === 'Digit6') TimeSystem.setSpeed(5);
+          if (e.code === 'Digit7') TimeSystem.setSpeed(10);
+        }
         if (e.code === 'KeyP')   TimeSystem.togglePause();
 
         // Camera mode toggle
@@ -251,10 +253,16 @@ const GameManager = (function () {
           }
         }
 
-        // Weapon switching (1-3)
+        // Weapon switching (1-9)
         if (e.code === 'Digit1') Weapons.switchTo(0);
         if (e.code === 'Digit2') Weapons.switchTo(1);
         if (e.code === 'Digit3') Weapons.switchTo(2);
+        if (e.code === 'Digit4' && gameState === STATE.PLAYING) Weapons.switchTo(3);
+        if (e.code === 'Digit5' && gameState === STATE.PLAYING) Weapons.switchTo(4);
+        if (e.code === 'Digit6' && gameState === STATE.PLAYING) Weapons.switchTo(5);
+        if (e.code === 'Digit7' && gameState === STATE.PLAYING) Weapons.switchTo(6);
+        if (e.code === 'Digit8') Weapons.switchTo(7);
+        if (e.code === 'Digit9') Weapons.switchTo(8);
         if (e.code === 'KeyR')   Weapons.forceReload();
 
         // Build mode: template selection
@@ -355,10 +363,14 @@ const GameManager = (function () {
         // Right-click removes block
         handleBuildRemove();
       }
+      if (e.button === 2 && gameState === STATE.PLAYING) {
+        Weapons.handleRightDown();
+      }
     });
 
     document.addEventListener('mouseup', function (e) {
       if (e.button === 0) { mouseDown = false; mouseNewPress = false; }
+      if (e.button === 2) { Weapons.handleRightUp(); }
     });
 
     document.addEventListener('mousemove', function (e) {
@@ -368,7 +380,12 @@ const GameManager = (function () {
     });
 
     document.addEventListener('wheel', function (e) {
-      CameraSystem.handleWheel(e.deltaY);
+      if (gameState === STATE.PLAYING) {
+        if (e.deltaY > 0) Weapons.switchNext();
+        else if (e.deltaY < 0) Weapons.switchPrev();
+      } else {
+        CameraSystem.handleWheel(e.deltaY);
+      }
     });
 
     document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
@@ -753,6 +770,19 @@ const GameManager = (function () {
       if (Math.random() < enemy.dropChance) {
         const type = Math.random() < 0.5 ? 'HEALTH' : 'AMMO';
         Pickups.spawn(enemy.mesh.position, type);
+      }
+
+      // Weapon unlock drop (pickup weapons 2-8)
+      if (Math.random() < 0.12) {
+        var candidates = [];
+        for (var wi = 2; wi <= 8; wi++) {
+          if (!Weapons.isUnlocked(wi)) candidates.push(wi);
+        }
+        if (candidates.length > 0) {
+          var idx = candidates[Math.floor(Math.random() * candidates.length)];
+          Weapons.unlockWeapon(idx);
+          HUD.notifyPickup('WEAPON UNLOCKED: ' + Weapons.getWeaponName(idx), '#ff8800');
+        }
       }
     }
   }
