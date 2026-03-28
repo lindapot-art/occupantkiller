@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZOMBIELAND — Admin Dashboard</title>
+  <style>
+    :root {
+      --bg:     #0d0d0d;
+      --panel:  #151515;
+      --border: #2a2a2a;
+      --accent: #ff4444;
+      --gold:   #ffcc00;
+      --green:  #88cc44;
+      --blue:   #44aaff;
+      --dim:    #666;
+      --text:   #ddd;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* ── Top nav ── */
+    header {
+      position: sticky; top:0; z-index: 100;
+      background: #0a0a0a;
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex; align-items: center; gap: 32px;
+      height: 52px;
+    }
+    header .brand {
+      font-size: 16px; font-weight: bold;
+      color: var(--accent); letter-spacing: 4px;
+      text-shadow: 0 0 10px var(--accent);
+    }
+    header nav { display:flex; gap:0; }
+    header nav a {
+      color: var(--dim); text-decoration: none;
+      padding: 0 16px; line-height: 52px;
+      letter-spacing: 1px; font-size: 12px;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    header nav a:hover, header nav a.active {
+      color: var(--accent); border-bottom-color: var(--accent);
+    }
+    header .actions { margin-left: auto; display:flex; gap:8px; }
+    .btn {
+      padding: 7px 18px; font-family: inherit; font-size: 12px;
+      letter-spacing: 2px; text-transform: uppercase;
+      border: 1px solid; cursor: pointer;
+      background: transparent; transition: background 0.15s, color 0.15s;
+    }
+    .btn-primary { color: var(--accent); border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent); color: #000; }
+    .btn-secondary { color: var(--dim); border-color: var(--border); }
+    .btn-secondary:hover { background: var(--border); color: var(--text); }
+    .btn-green { color: var(--green); border-color: var(--green); }
+    .btn-green:hover { background: var(--green); color: #000; }
+
+    /* ── Main layout ── */
+    main { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+    /* ── Section ── */
+    .section { margin-bottom: 40px; }
+    .section-title {
+      font-size: 11px; letter-spacing: 4px; text-transform: uppercase;
+      color: var(--dim); border-bottom: 1px solid var(--border);
+      padding-bottom: 8px; margin-bottom: 20px;
+    }
+
+    /* ── Cards grid ── */
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:12px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border);
+      padding: 16px; border-radius: 2px;
+    }
+    .card-label { font-size: 10px; letter-spacing: 2px; color: var(--dim); margin-bottom: 6px; }
+    .card-value { font-size: 24px; font-weight: bold; }
+    .card-value.red   { color: var(--accent); text-shadow: 0 0 8px var(--accent); }
+    .card-value.gold  { color: var(--gold);   text-shadow: 0 0 8px var(--gold); }
+    .card-value.green { color: var(--green);  text-shadow: 0 0 8px var(--green); }
+    .card-value.blue  { color: var(--blue);   text-shadow: 0 0 8px var(--blue); }
+
+    /* ── Tables ── */
+    .tbl-wrap { overflow-x: auto; }
+    table {
+      width: 100%; border-collapse: collapse;
+      background: var(--panel);
+    }
+    thead th {
+      text-align: left; padding: 10px 14px;
+      font-size: 10px; letter-spacing: 2px; color: var(--dim);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td {
+      padding: 9px 14px; vertical-align: middle;
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px; font-size: 10px; letter-spacing: 1px;
+      border: 1px solid; border-radius: 2px;
+    }
+    .tag-pkm  { color: #44aaff; border-color: #44aaff; }
+    .tag-ak   { color: var(--green); border-color: var(--green); }
+    .tag-svd  { color: var(--gold); border-color: var(--gold); }
+    .tag-conscript { color: #88aacc; border-color: #88aacc; }
+    .tag-stormer   { color: var(--gold); border-color: var(--gold); }
+    .tag-armored   { color: var(--accent); border-color: var(--accent); }
+
+    /* ── Editable fields ── */
+    .field-wrap { display: inline-flex; align-items: center; gap: 4px; }
+    input[type=number] {
+      width: 72px; background: #0d0d0d; border: 1px solid var(--border);
+      color: var(--text); font-family: inherit; font-size: 13px;
+      padding: 3px 6px; border-radius: 2px; text-align: right;
+      transition: border-color 0.15s;
+    }
+    input[type=number]:focus { outline:none; border-color: var(--accent); }
+    input[type=number].modified { border-color: var(--gold); color: var(--gold); }
+
+    /* ── Wave chart ── */
+    .wave-chart { display:flex; gap:8px; align-items: flex-end; flex-wrap: wrap; padding: 8px 0; }
+    .wave-bar-wrap { display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .wave-bar {
+      width: 36px;
+      background: linear-gradient(to top, var(--accent), #882222);
+      border-radius: 2px 2px 0 0;
+      min-height: 4px;
+      transition: height 0.3s;
+    }
+    .wave-bar-label { font-size: 10px; color: var(--dim); }
+    .wave-bar-count { font-size: 11px; color: var(--text); }
+
+    /* ── Export box ── */
+    .export-box {
+      background: #0a0a0a; border: 1px solid var(--border);
+      padding: 16px; font-size: 12px; color: #aaa;
+      white-space: pre; overflow-x: auto; border-radius: 2px;
+      max-height: 340px; overflow-y: auto;
+      line-height: 1.6;
+    }
+    .export-box .kw { color: #569cd6; }
+    .export-box .str { color: #ce9178; }
+    .export-box .num { color: var(--gold); }
+    .export-box .cmt { color: #6a9955; }
+
+    /* ── Links panel ── */
+    .links-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap:16px;
+    }
+    .link-card {
+      background: var(--panel); border: 1px solid var(--border);
+      padding: 20px; border-radius: 2px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .link-card .link-title { font-size: 14px; font-weight: bold; letter-spacing: 2px; }
+    .link-card .link-desc { font-size: 11px; color: var(--dim); }
+    .link-card a {
+      color: var(--blue); text-decoration: none; font-size: 11px;
+      word-break: break-all;
+    }
+    .link-card a:hover { text-decoration: underline; }
+    .link-card .link-status {
+      font-size: 10px; letter-spacing: 1px;
+      padding: 2px 8px; border-radius: 2px; display: inline-block; width: fit-content;
+    }
+    .status-live { background: rgba(68,255,68,0.15); color: #44ff88; border: 1px solid #44ff88; }
+    .status-codespaces { background: rgba(68,170,255,0.15); color: var(--blue); border: 1px solid var(--blue); }
+
+    /* ── Notification ── */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--panel); border: 1px solid var(--green); color: var(--green);
+      padding: 10px 20px; font-size: 12px; letter-spacing: 1px;
+      opacity: 0; transform: translateY(10px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none; z-index: 999;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ── Tab panels ── */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">⚔ ZOMBIELAND ADMIN</div>
+  <nav id="nav">
+    <a href="#" class="active" data-tab="overview">Overview</a>
+    <a href="#" data-tab="weapons">Weapons</a>
+    <a href="#" data-tab="enemies">Enemies</a>
+    <a href="#" data-tab="waves">Waves</a>
+    <a href="#" data-tab="player">Player</a>
+    <a href="#" data-tab="export">Export Config</a>
+    <a href="#" data-tab="links">Staging Links</a>
+  </nav>
+  <div class="actions">
+    <button class="btn btn-secondary" onclick="resetAll()">↺ Reset</button>
+    <button class="btn btn-green" onclick="exportConfig()">⬇ Export JS</button>
+    <a href="../" target="_blank"><button class="btn btn-primary">▶ Play Game</button></a>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── OVERVIEW ── -->
+  <div id="tab-overview" class="tab-panel active">
+    <div class="section">
+      <div class="section-title">Game Overview</div>
+      <div class="cards">
+        <div class="card"><div class="card-label">TOTAL WAVES</div><div class="card-value gold" id="ov-waves">10</div></div>
+        <div class="card"><div class="card-label">WEAPONS</div><div class="card-value blue" id="ov-weapons">3</div></div>
+        <div class="card"><div class="card-label">ENEMY TYPES</div><div class="card-value red" id="ov-etypes">3</div></div>
+        <div class="card"><div class="card-label">ENEMIES — WAVE 1</div><div class="card-value" id="ov-w1">8</div></div>
+        <div class="card"><div class="card-label">ENEMIES — WAVE 10</div><div class="card-value" id="ov-w10">35</div></div>
+        <div class="card"><div class="card-label">MAX TOTAL ENEMIES</div><div class="card-value red" id="ov-total">215</div></div>
+        <div class="card"><div class="card-label">PLAYER MAX HP</div><div class="card-value red" id="ov-hp">100</div></div>
+        <div class="card"><div class="card-label">SCORE WAVE BONUS</div><div class="card-value gold" id="ov-score-bonus">500</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Weapons Summary</div>
+      <div class="tbl-wrap">
+        <table id="weapons-overview-table"></table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Enemy Types Summary</div>
+      <div class="tbl-wrap">
+        <table id="enemies-overview-table"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── WEAPONS ── -->
+  <div id="tab-weapons" class="tab-panel">
+    <div class="section">
+      <div class="section-title">Weapon Configuration</div>
+      <div class="tbl-wrap">
+        <table id="weapons-edit-table"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ENEMIES ── -->
+  <div id="tab-enemies" class="tab-panel">
+    <div class="section">
+      <div class="section-title">Enemy Type Configuration</div>
+      <div class="tbl-wrap">
+        <table id="enemies-edit-table"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── WAVES ── -->
+  <div id="tab-waves" class="tab-panel">
+    <div class="section">
+      <div class="section-title">Wave Scaling</div>
+      <div class="cards" style="grid-template-columns: repeat(auto-fill,minmax(160px,1fr))">
+        <div class="card">
+          <div class="card-label">TOTAL WAVES</div>
+          <div class="field-wrap"><input type="number" id="w-total" value="10" min="1" max="50" onchange="onParamChange()" /><span style="color:var(--dim);font-size:11px">waves</span></div>
+        </div>
+        <div class="card">
+          <div class="card-label">ENEMIES WAVE 1</div>
+          <div class="field-wrap"><input type="number" id="w-base" value="8" min="1" max="50" onchange="onParamChange()" /><span style="color:var(--dim);font-size:11px">units</span></div>
+        </div>
+        <div class="card">
+          <div class="card-label">+PER WAVE</div>
+          <div class="field-wrap"><input type="number" id="w-step" value="3" min="0" max="20" onchange="onParamChange()" /><span style="color:var(--dim);font-size:11px">units</span></div>
+        </div>
+        <div class="card">
+          <div class="card-label">HP SCALE/WAVE</div>
+          <div class="field-wrap"><input type="number" id="w-hp-scale" value="0.22" min="0" max="2" step="0.01" onchange="onParamChange()" /><span style="color:var(--dim);font-size:11px">×</span></div>
+        </div>
+        <div class="card">
+          <div class="card-label">SPEED SCALE/WAVE</div>
+          <div class="field-wrap"><input type="number" id="w-spd-scale" value="0.06" min="0" max="1" step="0.01" onchange="onParamChange()" /><span style="color:var(--dim);font-size:11px">×</span></div>
+        </div>
+        <div class="card">
+          <div class="card-label">SPAWN INTERVAL</div>
+          <div class="field-wrap"><input type="number" id="w-spawn" value="0.45" min="0.1" max="5" step="0.05" onchange="onParamChange()" /><span style="color:var(--dim);font-size:11px">s min</span></div>
+        </div>
+        <div class="card">
+          <div class="card-label">WAVE SCORE BONUS</div>
+          <div class="field-wrap"><input type="number" id="w-score-bonus" value="500" min="0" step="50" onchange="onParamChange()" /></div>
+        </div>
+        <div class="card">
+          <div class="card-label">STORMER FROM WAVE</div>
+          <div class="field-wrap"><input type="number" id="w-stormer-wave" value="3" min="1" onchange="onParamChange()" /></div>
+        </div>
+        <div class="card">
+          <div class="card-label">ARMORED FROM WAVE</div>
+          <div class="field-wrap"><input type="number" id="w-armored-wave" value="5" min="1" onchange="onParamChange()" /></div>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Enemy Count Per Wave</div>
+      <div class="wave-chart" id="wave-chart"></div>
+    </div>
+  </div>
+
+  <!-- ── PLAYER ── -->
+  <div id="tab-player" class="tab-panel">
+    <div class="section">
+      <div class="section-title">Player Configuration</div>
+      <div class="cards" style="grid-template-columns: repeat(auto-fill,minmax(200px,1fr))">
+        <div class="card"><div class="card-label">MAX HP</div>
+          <div class="field-wrap"><input type="number" id="p-maxhp" value="100" min="1" onchange="onParamChange()" /></div>
+        </div>
+        <div class="card"><div class="card-label">MOVE SPEED (m/s)</div>
+          <div class="field-wrap"><input type="number" id="p-speed" value="6.0" min="1" step="0.5" onchange="onParamChange()" /></div>
+        </div>
+        <div class="card"><div class="card-label">SPRINT MULTIPLIER</div>
+          <div class="field-wrap"><input type="number" id="p-sprint" value="1.65" min="1" step="0.05" onchange="onParamChange()" /></div>
+        </div>
+        <div class="card"><div class="card-label">JUMP SPEED (m/s)</div>
+          <div class="field-wrap"><input type="number" id="p-jump" value="7.0" min="1" step="0.5" onchange="onParamChange()" /></div>
+        </div>
+        <div class="card"><div class="card-label">GRAVITY</div>
+          <div class="field-wrap"><input type="number" id="p-gravity" value="18" min="1" step="1" onchange="onParamChange()" /></div>
+        </div>
+        <div class="card"><div class="card-label">PLAYER HEIGHT (m)</div>
+          <div class="field-wrap"><input type="number" id="p-height" value="1.7" min="0.5" step="0.1" onchange="onParamChange()" /></div>
+        </div>
+        <div class="card"><div class="card-label">HEALTH DROP PICKUP</div>
+          <div class="field-wrap"><input type="number" id="p-hdrop" value="25" min="1" step="5" onchange="onParamChange()" /></div>
+        </div>
+        <div class="card"><div class="card-label">AMMO DROP PICKUP</div>
+          <div class="field-wrap"><input type="number" id="p-adrop" value="30" min="1" step="5" onchange="onParamChange()" /></div>
+        </div>
+        <div class="card"><div class="card-label">HEALTH DROP CHANCE</div>
+          <div class="field-wrap"><input type="number" id="p-hdrop-pct" value="0.5" min="0" max="1" step="0.05" onchange="onParamChange()" /></div>
+        </div>
+        <div class="card"><div class="card-label">ARENA SIZE (m)</div>
+          <div class="field-wrap"><input type="number" id="p-arena" value="24" min="10" step="2" onchange="onParamChange()" /></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── EXPORT ── -->
+  <div id="tab-export" class="tab-panel">
+    <div class="section">
+      <div class="section-title">Generated Config Override</div>
+      <p style="color:var(--dim);font-size:12px;margin-bottom:16px">
+        Copy this into a new <code style="color:var(--gold)">config.js</code> file and include it <em>before</em>
+        <code style="color:var(--gold)">game.js</code>, <code style="color:var(--gold)">weapons.js</code>, and
+        <code style="color:var(--gold)">enemies.js</code> in <code style="color:var(--gold)">index.html</code>.
+        Each JS file will need to be refactored to read from <code style="color:var(--gold)">window.GAME_CONFIG</code>.
+      </p>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-green" onclick="copyExport()">⎘ Copy to Clipboard</button>
+        <button class="btn btn-secondary" onclick="downloadExport()">⬇ Download config.js</button>
+      </div>
+      <div class="export-box" id="export-code"></div>
+    </div>
+  </div>
+
+  <!-- ── LINKS ── -->
+  <div id="tab-links" class="tab-panel">
+    <div class="section">
+      <div class="section-title">Staging Links</div>
+      <div class="links-grid">
+        <div class="link-card">
+          <div class="link-title" style="color:var(--accent)">🎮 Game</div>
+          <div class="link-desc">Main game — served from repo root via <code>npx serve</code></div>
+          <div class="link-status status-codespaces">CODESPACES</div>
+          <div id="link-game" style="color:var(--dim);font-size:11px">
+            Detecting Codespaces URL…
+          </div>
+        </div>
+        <div class="link-card">
+          <div class="link-title" style="color:var(--blue)">🛠 Admin</div>
+          <div class="link-desc">This dashboard — available at <code>/admin/</code></div>
+          <div class="link-status status-codespaces">CODESPACES</div>
+          <div id="link-admin" style="color:var(--dim);font-size:11px">
+            Detecting Codespaces URL…
+          </div>
+        </div>
+        <div class="link-card">
+          <div class="link-title" style="color:var(--green)">🌐 GitHub Pages</div>
+          <div class="link-desc">
+            Static deploy via GitHub Actions workflow
+            (<code>.github/workflows/deploy.yml</code>).
+            Requires GitHub Pages to be enabled for this repo in
+            <strong>Settings → Pages → Source → GitHub Actions</strong>.
+          </div>
+          <div class="link-status status-live">AUTO-DEPLOY ON PUSH</div>
+          <a href="https://lindapot-art.github.io/occupantkiller/" target="_blank">
+            https://lindapot-art.github.io/occupantkiller/
+          </a>
+        </div>
+        <div class="link-card">
+          <div class="link-title" style="color:var(--gold)">📖 How to Use Codespaces</div>
+          <div class="link-desc">
+            <ol style="padding-left:16px;color:var(--dim);font-size:11px;line-height:2">
+              <li>Open the repo on GitHub</li>
+              <li>Click <strong>Code → Codespaces → Create codespace on this branch</strong></li>
+              <li>Wait for container to start — the game opens automatically at port 8080</li>
+              <li>Find URLs in the <strong>Ports</strong> tab of the terminal panel</li>
+              <li>Right-click port 8080 → <strong>Port Visibility → Public</strong> to share</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast">✓ Copied!</div>
+
+<script>
+// ── Default game data (mirrors the JS source files) ──────────────────────────
+
+const DEFAULT_WEAPONS = [
+  { id:'PKM',  name:'PKM Machine Gun',  damage:18,  fireRate:0.07, clipSize:100, maxReserve:250, reloadTime:4.5, spread:0.048, auto:true  },
+  { id:'AK74', name:'AK-74M',           damage:28,  fireRate:0.10, clipSize:30,  maxReserve:120, reloadTime:2.2, spread:0.022, auto:true  },
+  { id:'SVD',  name:'SVD Dragunov',     damage:115, fireRate:0.85, clipSize:10,  maxReserve:40,  reloadTime:3.5, spread:0.004, auto:false },
+];
+
+const DEFAULT_ENEMIES = [
+  { id:'CONSCRIPT', name:'Conscript', hpBase:40,  speedBase:2.0, scale:1.0, attackDmg:8,  attackRate:1.2, scoreValue:100, dropChance:0.30 },
+  { id:'STORMER',   name:'Stormer',   hpBase:30,  speedBase:4.2, scale:0.85,attackDmg:6,  attackRate:0.7, scoreValue:150, dropChance:0.20 },
+  { id:'ARMORED',   name:'Armored',   hpBase:220, speedBase:1.0, scale:1.4, attackDmg:22, attackRate:1.8, scoreValue:350, dropChance:0.85 },
+];
+
+// Working copies (editable)
+let weapons = JSON.parse(JSON.stringify(DEFAULT_WEAPONS));
+let enemies = JSON.parse(JSON.stringify(DEFAULT_ENEMIES));
+
+// ── Weapon tag CSS class ──────────────────────────────────────────────────────
+function weaponTag(id) {
+  const cls = {PKM:'pkm', AK74:'ak', SVD:'svd'}[id] || 'pkm';
+  return `<span class="tag tag-${cls}">${id}</span>`;
+}
+function enemyTag(id) {
+  const cls = id.toLowerCase();
+  return `<span class="tag tag-${cls}">${id}</span>`;
+}
+
+// ── Tab navigation ────────────────────────────────────────────────────────────
+document.getElementById('nav').addEventListener('click', e => {
+  const a = e.target.closest('a[data-tab]');
+  if (!a) return;
+  e.preventDefault();
+  document.querySelectorAll('#nav a').forEach(l => l.classList.remove('active'));
+  a.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + a.dataset.tab).classList.add('active');
+  if (a.dataset.tab === 'export') renderExport();
+});
+
+// ── Weapons overview table ────────────────────────────────────────────────────
+function renderWeaponsOverview() {
+  const t = document.getElementById('weapons-overview-table');
+  t.innerHTML = `<thead><tr>
+    <th>Weapon</th><th>Damage</th><th>Fire Rate</th><th>Clip</th>
+    <th>Reserve</th><th>Reload (s)</th><th>Spread</th><th>Mode</th>
+  </tr></thead><tbody>${weapons.map(w => `<tr>
+    <td>${weaponTag(w.id)} ${w.name}</td>
+    <td style="color:var(--accent)">${w.damage}</td>
+    <td style="color:var(--dim)">${w.fireRate}s</td>
+    <td style="color:var(--gold)">${w.clipSize}</td>
+    <td style="color:var(--dim)">${w.maxReserve}</td>
+    <td style="color:var(--dim)">${w.reloadTime}</td>
+    <td style="color:var(--dim)">${w.spread}</td>
+    <td style="color:${w.auto?'var(--green)':'var(--gold)'}">${w.auto?'AUTO':'SEMI'}</td>
+  </tr>`).join('')}</tbody>`;
+}
+
+// ── Enemies overview table ────────────────────────────────────────────────────
+function renderEnemiesOverview() {
+  const t = document.getElementById('enemies-overview-table');
+  t.innerHTML = `<thead><tr>
+    <th>Type</th><th>Base HP</th><th>Speed</th><th>Scale</th>
+    <th>Atk Dmg</th><th>Atk Rate</th><th>Score</th><th>Drop %</th>
+  </tr></thead><tbody>${enemies.map(en => `<tr>
+    <td>${enemyTag(en.id)}</td>
+    <td style="color:var(--accent)">${en.hpBase}</td>
+    <td style="color:var(--green)">${en.speedBase}</td>
+    <td style="color:var(--dim)">${en.scale}×</td>
+    <td style="color:var(--accent)">${en.attackDmg}</td>
+    <td style="color:var(--dim)">${en.attackRate}s</td>
+    <td style="color:var(--gold)">${en.scoreValue}</td>
+    <td style="color:var(--dim)">${(en.dropChance*100).toFixed(0)}%</td>
+  </tr>`).join('')}</tbody>`;
+}
+
+// ── Weapons edit table ────────────────────────────────────────────────────────
+function renderWeaponsEdit() {
+  const t = document.getElementById('weapons-edit-table');
+  t.innerHTML = `<thead><tr>
+    <th>Weapon</th><th>Damage</th><th>Fire Rate (s)</th><th>Clip Size</th>
+    <th>Max Reserve</th><th>Reload Time (s)</th><th>Spread</th><th>Mode</th>
+  </tr></thead><tbody>${weapons.map((w, i) => `<tr>
+    <td>${weaponTag(w.id)} <span style="color:var(--text)">${w.name}</span></td>
+    <td><input type="number" value="${w.damage}"    min="1"   onchange="weapons[${i}].damage=+this.value;markModified(this);onParamChange()"></td>
+    <td><input type="number" value="${w.fireRate}"  min="0.01" step="0.01" onchange="weapons[${i}].fireRate=+this.value;markModified(this);onParamChange()"></td>
+    <td><input type="number" value="${w.clipSize}"  min="1"   onchange="weapons[${i}].clipSize=+this.value;markModified(this);onParamChange()"></td>
+    <td><input type="number" value="${w.maxReserve}" min="1"  onchange="weapons[${i}].maxReserve=+this.value;markModified(this);onParamChange()"></td>
+    <td><input type="number" value="${w.reloadTime}" min="0.1" step="0.1" onchange="weapons[${i}].reloadTime=+this.value;markModified(this);onParamChange()"></td>
+    <td><input type="number" value="${w.spread}" min="0" max="1" step="0.001" onchange="weapons[${i}].spread=+this.value;markModified(this);onParamChange()"></td>
+    <td style="color:${w.auto?'var(--green)':'var(--gold)'}">${w.auto?'AUTO':'SEMI'}</td>
+  </tr>`).join('')}</tbody>`;
+}
+
+// ── Enemies edit table ────────────────────────────────────────────────────────
+function renderEnemiesEdit() {
+  const t = document.getElementById('enemies-edit-table');
+  t.innerHTML = `<thead><tr>
+    <th>Type</th><th>Base HP</th><th>Speed</th><th>Scale</th>
+    <th>Atk Dmg</th><th>Atk Rate (s)</th><th>Score Value</th><th>Drop Chance</th>
+  </tr></thead><tbody>${enemies.map((en, i) => `<tr>
+    <td>${enemyTag(en.id)}</td>
+    <td><input type="number" value="${en.hpBase}"     min="1"  onchange="enemies[${i}].hpBase=+this.value;markModified(this);onParamChange()"></td>
+    <td><input type="number" value="${en.speedBase}"  min="0.1" step="0.1" onchange="enemies[${i}].speedBase=+this.value;markModified(this);onParamChange()"></td>
+    <td><input type="number" value="${en.scale}"      min="0.1" step="0.05" onchange="enemies[${i}].scale=+this.value;markModified(this);onParamChange()"></td>
+    <td><input type="number" value="${en.attackDmg}"  min="1"  onchange="enemies[${i}].attackDmg=+this.value;markModified(this);onParamChange()"></td>
+    <td><input type="number" value="${en.attackRate}"  min="0.1" step="0.1" onchange="enemies[${i}].attackRate=+this.value;markModified(this);onParamChange()"></td>
+    <td><input type="number" value="${en.scoreValue}"  min="0" step="10" onchange="enemies[${i}].scoreValue=+this.value;markModified(this);onParamChange()"></td>
+    <td><input type="number" value="${en.dropChance}"  min="0" max="1" step="0.05" onchange="enemies[${i}].dropChance=+this.value;markModified(this);onParamChange()"></td>
+  </tr>`).join('')}</tbody>`;
+}
+
+function markModified(el) { el.classList.add('modified'); }
+
+// ── Wave chart ────────────────────────────────────────────────────────────────
+function renderWaveChart() {
+  const total = parseInt(document.getElementById('w-total').value) || 10;
+  const base  = parseInt(document.getElementById('w-base').value)  || 8;
+  const step  = parseInt(document.getElementById('w-step').value)  || 3;
+  const counts = Array.from({length: total}, (_, i) => base + i * step);
+  const max   = Math.max(...counts);
+
+  const chart = document.getElementById('wave-chart');
+  chart.innerHTML = counts.map((c, i) => `
+    <div class="wave-bar-wrap">
+      <div class="wave-bar-count">${c}</div>
+      <div class="wave-bar" style="height:${Math.max(8, (c/max)*120)}px"></div>
+      <div class="wave-bar-label">W${i+1}</div>
+    </div>
+  `).join('');
+
+  // Update overview cards
+  document.getElementById('ov-waves').textContent = total;
+  document.getElementById('ov-w1').textContent = counts[0];
+  document.getElementById('ov-w10').textContent = counts[counts.length-1] || counts[0];
+  document.getElementById('ov-total').textContent = counts.reduce((a,b)=>a+b,0);
+  document.getElementById('ov-hp').textContent = document.getElementById('p-maxhp').value;
+  document.getElementById('ov-score-bonus').textContent = document.getElementById('w-score-bonus').value;
+}
+
+// ── On any param change ───────────────────────────────────────────────────────
+function onParamChange() {
+  renderWaveChart();
+  renderWeaponsOverview();
+  renderEnemiesOverview();
+}
+
+// ── Export config ─────────────────────────────────────────────────────────────
+function buildConfigObject() {
+  return {
+    PLAYER_MAX_HP:            parseFloat(document.getElementById('p-maxhp').value),
+    MOVE_SPEED:               parseFloat(document.getElementById('p-speed').value),
+    SPRINT_MULT:              parseFloat(document.getElementById('p-sprint').value),
+    JUMP_SPEED:               parseFloat(document.getElementById('p-jump').value),
+    GRAVITY:                  parseFloat(document.getElementById('p-gravity').value),
+    PLAYER_HEIGHT:            parseFloat(document.getElementById('p-height').value),
+    HEALTH_PICKUP_AMOUNT:     parseFloat(document.getElementById('p-hdrop').value),
+    AMMO_PICKUP_AMOUNT:       parseFloat(document.getElementById('p-adrop').value),
+    HEALTH_DROP_PROBABILITY:  parseFloat(document.getElementById('p-hdrop-pct').value),
+    ARENA_SIZE:               parseFloat(document.getElementById('p-arena').value),
+    TOTAL_WAVES:              parseInt(document.getElementById('w-total').value),
+    WAVE_BASE_ENEMIES:        parseInt(document.getElementById('w-base').value),
+    WAVE_ENEMY_STEP:          parseInt(document.getElementById('w-step').value),
+    WAVE_HP_SCALE:            parseFloat(document.getElementById('w-hp-scale').value),
+    WAVE_SPEED_SCALE:         parseFloat(document.getElementById('w-spd-scale').value),
+    SPAWN_INTERVAL_MIN:       parseFloat(document.getElementById('w-spawn').value),
+    SCORE_WAVE_BONUS:         parseInt(document.getElementById('w-score-bonus').value),
+    STORMER_FROM_WAVE:        parseInt(document.getElementById('w-stormer-wave').value),
+    ARMORED_FROM_WAVE:        parseInt(document.getElementById('w-armored-wave').value),
+    WEAPONS: weapons,
+    ENEMIES: enemies,
+  };
+}
+
+function renderExport() {
+  const cfg = buildConfigObject();
+  const json = JSON.stringify(cfg, null, 2)
+    .replace(/"(\w+)":/g, '$1:')
+    .replace(/: true/g, ': true')
+    .replace(/: false/g, ': false');
+  document.getElementById('export-code').textContent =
+    `// config.js — generated by ZOMBIELAND Admin ${new Date().toISOString()}\n` +
+    `// Include before game.js, weapons.js, enemies.js in index.html\n\n` +
+    `window.GAME_CONFIG = ${json};\n`;
+}
+
+function exportConfig() { renderExport(); showTab('export'); }
+
+function copyExport() {
+  renderExport();
+  const text = document.getElementById('export-code').textContent;
+  navigator.clipboard.writeText(text).then(() => showToast('✓ Copied to clipboard!'));
+}
+
+function downloadExport() {
+  renderExport();
+  const text = document.getElementById('export-code').textContent;
+  const a = document.createElement('a');
+  a.href = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(text);
+  a.download = 'config.js';
+  a.click();
+}
+
+function showTab(name) {
+  document.querySelectorAll('#nav a').forEach(l => l.classList.toggle('active', l.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function resetAll() {
+  weapons = JSON.parse(JSON.stringify(DEFAULT_WEAPONS));
+  enemies = JSON.parse(JSON.stringify(DEFAULT_ENEMIES));
+  // Reset all number inputs to default
+  [
+    ['w-total',10],['w-base',8],['w-step',3],['w-hp-scale',0.22],['w-spd-scale',0.06],
+    ['w-spawn',0.45],['w-score-bonus',500],['w-stormer-wave',3],['w-armored-wave',5],
+    ['p-maxhp',100],['p-speed',6.0],['p-sprint',1.65],['p-jump',7.0],['p-gravity',18],
+    ['p-height',1.7],['p-hdrop',25],['p-adrop',30],['p-hdrop-pct',0.5],['p-arena',24],
+  ].forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (el) { el.value = val; el.classList.remove('modified'); }
+  });
+  renderAll();
+  showToast('✓ Reset to defaults');
+}
+
+function renderAll() {
+  renderWeaponsOverview();
+  renderEnemiesOverview();
+  renderWeaponsEdit();
+  renderEnemiesEdit();
+  renderWaveChart();
+}
+
+// ── Codespaces URL detection ──────────────────────────────────────────────────
+function detectCodespacesUrl() {
+  const h = window.location.hostname;
+  let gameUrl, adminUrl;
+
+  // Pattern 1: <name>-<port>.app.github.dev  (standard Codespaces)
+  const csMatch = h.match(/^(.+?)-\d+\.app\.github\.dev$/);
+  // Pattern 2: <name>-<port>.preview.app.github.dev  (alternate Codespaces)
+  const csMatchAlt = h.match(/^(.+?)-\d+\.preview\.app\.github\.dev$/);
+
+  if (csMatch || csMatchAlt) {
+    const base   = (csMatch || csMatchAlt)[1];
+    const suffix = csMatch ? '.app.github.dev' : '.preview.app.github.dev';
+    gameUrl  = `https://${base}-8080${suffix}/`;
+    adminUrl = `https://${base}-8080${suffix}/admin/`;
+  } else if (h === 'localhost' || h === '127.0.0.1') {
+    const port = window.location.port || '8080';
+    gameUrl  = `http://localhost:${port}/`;
+    adminUrl = `http://localhost:${port}/admin/`;
+  } else if (h.endsWith('.github.dev') || h.endsWith('.githubpreview.dev')) {
+    // Unknown Codespaces-like pattern — derive from current origin
+    gameUrl  = window.location.origin.replace(/-\d+(\.(?:preview\.)?app\.github(?:preview)?\.dev)$/, '-8080$1') + '/';
+    adminUrl = gameUrl + 'admin/';
+  } else {
+    // Generic fallback: relative to current server
+    gameUrl  = window.location.origin + '/';
+    adminUrl = window.location.origin + '/admin/';
+  }
+
+  document.getElementById('link-game').innerHTML  = `<a href="${gameUrl}"  target="_blank">${gameUrl}</a>`;
+  document.getElementById('link-admin').innerHTML = `<a href="${adminUrl}" target="_blank">${adminUrl}</a>`;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderAll();
+detectCodespacesUrl();
+</script>
+</body>
+</html>
