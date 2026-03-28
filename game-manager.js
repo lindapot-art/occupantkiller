@@ -339,13 +339,17 @@ const GameManager = (function () {
       if (e.code === 'Escape') {
         if (gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE) {
           gameState = STATE.PAUSED;
-          var invOv = document.getElementById('inventory-overlay');
-          if (invOv) { showInventory(); invOv.style.display = 'flex'; }
-          else { showOverlay('pause'); }
+          const invOv = document.getElementById('inventory-overlay');
+          if (invOv) {
+            showInventory();
+            invOv.style.display = 'flex';
+          } else {
+            showOverlay('pause');
+          }
         } else if (gameState === STATE.PAUSED) {
           gameState = STATE.PLAYING;
-          var invOv2 = document.getElementById('inventory-overlay');
-          if (invOv2) invOv2.style.display = 'none';
+          const invOv = document.getElementById('inventory-overlay');
+          if (invOv) invOv.style.display = 'none';
           hideOverlays();
           requestPointerLock();
         }
@@ -430,10 +434,10 @@ const GameManager = (function () {
 
     /* ── Touch look controls (right half of canvas) ──────────── */
     if (isMobile) {
-      var canvas = _renderer.domElement;
+      const canvas = _renderer.domElement;
       canvas.addEventListener('touchstart', function (e) {
-        for (var i = 0; i < e.changedTouches.length; i++) {
-          var t = e.changedTouches[i];
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const t = e.changedTouches[i];
           if (t.clientX < window.innerWidth * 0.4) {
             // Left side — movement handled by joystick zone
           } else if (t.clientX > window.innerWidth * 0.5 && touch.lookTouchId === null) {
@@ -445,11 +449,11 @@ const GameManager = (function () {
         }
       }, { passive: true });
       canvas.addEventListener('touchmove', function (e) {
-        for (var i = 0; i < e.changedTouches.length; i++) {
-          var t = e.changedTouches[i];
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const t = e.changedTouches[i];
           if (t.identifier === touch.lookTouchId) {
-            var dx = t.clientX - touch._lookPrevX;
-            var dy = t.clientY - touch._lookPrevY;
+            const dx = t.clientX - touch._lookPrevX;
+            const dy = t.clientY - touch._lookPrevY;
             touch.lookX = dx;
             touch.lookY = dy;
             touch._lookPrevX = t.clientX;
@@ -458,7 +462,7 @@ const GameManager = (function () {
         }
       }, { passive: true });
       canvas.addEventListener('touchend', function (e) {
-        for (var i = 0; i < e.changedTouches.length; i++) {
+        for (let i = 0; i < e.changedTouches.length; i++) {
           if (e.changedTouches[i].identifier === touch.lookTouchId) {
             touch.lookTouchId = null;
             touch.lookActive = false;
@@ -468,7 +472,7 @@ const GameManager = (function () {
         }
       }, { passive: true });
       canvas.addEventListener('touchcancel', function (e) {
-        for (var i = 0; i < e.changedTouches.length; i++) {
+        for (let i = 0; i < e.changedTouches.length; i++) {
           if (e.changedTouches[i].identifier === touch.lookTouchId) {
             touch.lookTouchId = null;
             touch.lookActive = false;
@@ -1025,31 +1029,31 @@ const GameManager = (function () {
 
   /* ── Mobile Controls Setup ─────────────────────────────────────── */
   function setupMobileControls() {
-    var joystickZone  = document.getElementById('joystick-zone');
-    var joystickThumb = document.getElementById('joystick-thumb');
-    var baseSize      = joystickZone.offsetWidth || 140;
-    var thumbSize     = joystickThumb.offsetWidth || 60;
-    var maxDist       = (baseSize - thumbSize) / 2;
+    const joystickZone  = document.getElementById('joystick-zone');
+    const joystickThumb = document.getElementById('joystick-thumb');
+    const baseSize      = joystickZone.offsetWidth || 140;
+    const thumbSize     = joystickThumb.offsetWidth || 60;
+    const maxDist       = (baseSize - thumbSize) / 2;
 
     // Joystick touch handling
     joystickZone.addEventListener('touchstart', function (e) {
       e.preventDefault();
-      var t = e.changedTouches[0];
+      const t = e.changedTouches[0];
       touch.moveTouchId = t.identifier;
       touch.moveActive = true;
-      var rect = joystickZone.getBoundingClientRect();
+      const rect = joystickZone.getBoundingClientRect();
       touch.moveStartX = rect.left + baseSize / 2;
       touch.moveStartY = rect.top + baseSize / 2;
     }, { passive: false });
 
     joystickZone.addEventListener('touchmove', function (e) {
       e.preventDefault();
-      for (var i = 0; i < e.changedTouches.length; i++) {
-        var t = e.changedTouches[i];
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
         if (t.identifier === touch.moveTouchId) {
-          var dx = t.clientX - touch.moveStartX;
-          var dy = t.clientY - touch.moveStartY;
-          var dist = Math.sqrt(dx * dx + dy * dy);
+          let dx = t.clientX - touch.moveStartX;
+          let dy = t.clientY - touch.moveStartY;
+          let dist = Math.sqrt(dx * dx + dy * dy);
           if (dist > maxDist) {
             dx = dx / dist * maxDist;
             dy = dy / dist * maxDist;
@@ -1072,44 +1076,58 @@ const GameManager = (function () {
       joystickThumb.style.top  = (baseSize / 2 - thumbSize / 2) + 'px';
     }
     joystickZone.addEventListener('touchend', function (e) {
-      for (var i = 0; i < e.changedTouches.length; i++) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
         if (e.changedTouches[i].identifier === touch.moveTouchId) resetJoystick();
       }
     }, { passive: true });
     joystickZone.addEventListener('touchcancel', function (e) {
-      for (var i = 0; i < e.changedTouches.length; i++) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
         if (e.changedTouches[i].identifier === touch.moveTouchId) resetJoystick();
       }
     }, { passive: true });
 
     // Fire button
-    var btnFire = document.getElementById('btn-fire');
+    const btnFire = document.getElementById('btn-fire');
     btnFire.addEventListener('touchstart', function (e) {
-      e.preventDefault(); touch.firing = true; mouseNewPress = true; btnFire.classList.add('active');
+      e.preventDefault();
+      touch.firing = true;
+      mouseNewPress = true;
+      btnFire.classList.add('active');
     }, { passive: false });
     btnFire.addEventListener('touchend', function () {
-      touch.firing = false; mouseNewPress = false; btnFire.classList.remove('active');
+      touch.firing = false;
+      mouseNewPress = false;
+      btnFire.classList.remove('active');
     });
     btnFire.addEventListener('touchcancel', function () {
-      touch.firing = false; mouseNewPress = false; btnFire.classList.remove('active');
+      touch.firing = false;
+      mouseNewPress = false;
+      btnFire.classList.remove('active');
     });
 
     // Reload button
-    var btnReload = document.getElementById('btn-reload');
+    const btnReload = document.getElementById('btn-reload');
     btnReload.addEventListener('touchstart', function (e) {
-      e.preventDefault(); Weapons.forceReload(); btnReload.classList.add('active');
+      e.preventDefault();
+      Weapons.forceReload();
+      btnReload.classList.add('active');
     }, { passive: false });
     btnReload.addEventListener('touchend', function () { btnReload.classList.remove('active'); });
 
     // Jump button
-    var btnJump = document.getElementById('btn-jump');
+    const btnJump = document.getElementById('btn-jump');
     btnJump.addEventListener('touchstart', function (e) {
-      e.preventDefault(); touch.jumping = true; btnJump.classList.add('active');
+      e.preventDefault();
+      touch.jumping = true;
+      btnJump.classList.add('active');
     }, { passive: false });
-    btnJump.addEventListener('touchend', function () { touch.jumping = false; btnJump.classList.remove('active'); });
+    btnJump.addEventListener('touchend', function () {
+      touch.jumping = false;
+      btnJump.classList.remove('active');
+    });
 
     // Sprint button (toggle)
-    var btnSprint = document.getElementById('btn-sprint');
+    const btnSprint = document.getElementById('btn-sprint');
     btnSprint.addEventListener('touchstart', function (e) {
       e.preventDefault();
       touch.sprinting = !touch.sprinting;
@@ -1117,19 +1135,23 @@ const GameManager = (function () {
     }, { passive: false });
 
     // Weapon prev/next
-    var btnPrev = document.getElementById('btn-weapon-prev');
-    var btnNext = document.getElementById('btn-weapon-next');
+    const btnPrev = document.getElementById('btn-weapon-prev');
+    const btnNext = document.getElementById('btn-weapon-next');
     btnPrev.addEventListener('touchstart', function (e) {
-      e.preventDefault(); Weapons.switchPrev(); btnPrev.classList.add('active');
+      e.preventDefault();
+      Weapons.switchPrev();
+      btnPrev.classList.add('active');
     }, { passive: false });
     btnPrev.addEventListener('touchend', function () { btnPrev.classList.remove('active'); });
     btnNext.addEventListener('touchstart', function (e) {
-      e.preventDefault(); Weapons.switchNext(); btnNext.classList.add('active');
+      e.preventDefault();
+      Weapons.switchNext();
+      btnNext.classList.add('active');
     }, { passive: false });
     btnNext.addEventListener('touchend', function () { btnNext.classList.remove('active'); });
 
     // Pause / inventory button
-    var btnPause = document.getElementById('btn-pause');
+    const btnPause = document.getElementById('btn-pause');
     btnPause.addEventListener('touchstart', function (e) {
       e.preventDefault();
       toggleInventory();
@@ -1138,7 +1160,7 @@ const GameManager = (function () {
 
   /* ── Inventory / Pause Toggle ───────────────────────────────────── */
   function toggleInventory() {
-    var invOverlay = document.getElementById('inventory-overlay');
+    const invOverlay = document.getElementById('inventory-overlay');
     if (gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE) {
       gameState = STATE.PAUSED;
       showInventory();
@@ -1152,20 +1174,20 @@ const GameManager = (function () {
   }
 
   function showInventory() {
-    var grid = document.getElementById('inventory-grid');
+    const grid = document.getElementById('inventory-grid');
     if (!grid) return;
     grid.innerHTML = '';
-    var count = Weapons.getWeaponCount();
-    var curIdx = Weapons.getCurrentIdx();
-    for (var i = 0; i < count; i++) {
-      var slot = document.createElement('div');
+    const count = Weapons.getWeaponCount();
+    const curIdx = Weapons.getCurrentIdx();
+    for (let i = 0; i < count; i++) {
+      const slot = document.createElement('div');
       slot.className = 'inv-slot';
-      var unlocked = Weapons.isUnlocked(i);
-      if (!unlocked) {
+      const isUnlocked = Weapons.isUnlocked(i);
+      if (!isUnlocked) {
         slot.classList.add('locked');
         slot.textContent = '🔒 ' + Weapons.getWeaponName(i);
       } else {
-        var info = Weapons.getWeaponInfo(i);
+        const info = Weapons.getWeaponInfo(i);
         if (i === curIdx) slot.classList.add('active');
         slot.textContent = info.name + '\n⚔' + info.damage;
         if (info.clip !== undefined && info.type !== 'MELEE') {
@@ -1174,8 +1196,8 @@ const GameManager = (function () {
       }
       slot.style.whiteSpace = 'pre-line';
 
-      // Allow tapping to switch weapons on mobile
-      if (unlocked) {
+      // Allow tapping to switch weapons
+      if (isUnlocked) {
         (function (idx) {
           slot.addEventListener('click', function () {
             Weapons.switchTo(idx);
@@ -1186,9 +1208,9 @@ const GameManager = (function () {
       grid.appendChild(slot);
     }
 
-    var statsEl = document.getElementById('player-stats');
+    const statsEl = document.getElementById('player-stats');
     if (statsEl) {
-      var stage = STAGES[currentStage];
+      const stage = STAGES[currentStage];
       statsEl.innerHTML =
         '❤ HP: ' + player.hp + '/' + player.maxHp +
         ' &nbsp;|&nbsp; 🏆 Score: ' + player.score +

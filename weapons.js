@@ -734,7 +734,7 @@ const Weapons = (() => {
     getWeaponName:  getWeaponName,
     getWeaponInfo:  function (i) {
       if (!WEAPONS[i]) return null;
-      var s = states[i];
+      const s = states[i];
       return { name: WEAPONS[i].name, damage: WEAPONS[i].damage, clip: s.clip, reserve: s.reserve, type: WEAPONS[i].type };
     },
     isUnlocked:     function (i) { return !!unlocked[i]; },
