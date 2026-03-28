@@ -37,7 +37,6 @@ const GameManager = (function () {
 
   /* ── Wave State ──────────────────────────────────────────────────── */
   let currentWave = 0;
-  const TOTAL_WAVES = 10;
   const SCORE_WAVE_BONUS = 500;
 
   /* ── Stage Definitions ──────────────────────────────────────────── */
