@@ -174,6 +174,11 @@ const GameManager = (function () {
     Automation.init();
     Pickups.init(_scene);
 
+    // Audio, Weather & ML systems
+    AudioSystem.init();
+    WeatherSystem.init(_scene, _camera);
+    MLSystem.init();
+
     // Create weapons
     Weapons.createGunMesh(_camera);
     Weapons.createMuzzleFlash(_scene, _camera);
@@ -288,7 +293,7 @@ const GameManager = (function () {
         if (e.code === 'Digit7' && gameState === STATE.PLAYING) Weapons.switchTo(6);
         if (e.code === 'Digit8') Weapons.switchTo(7);
         if (e.code === 'Digit9') Weapons.switchTo(8);
-        if (e.code === 'KeyR')   Weapons.forceReload();
+        if (e.code === 'KeyR')   { Weapons.forceReload(); AudioSystem.playReload(); MLSystem.onReload(); }
 
         // Build mode: template selection
         if (gameState === STATE.BUILD_MODE) {
@@ -551,6 +556,7 @@ const GameManager = (function () {
 
   /* ── Start Game ──────────────────────────────────────────────────── */
   function startGame() {
+    AudioSystem.resume();
     gameState = STATE.PLAYING;
     player.hp = player.maxHp;
     player.score = 0;
@@ -681,7 +687,9 @@ const GameManager = (function () {
   function beginWave(w) {
     currentWave = w;
     const stageDef = STAGES[currentStage];
-    Enemies.startWave(w, _scene, stageDef.difficulty);
+    const mlDiff = MLSystem.getDifficultyMult();
+    Enemies.startWave(w, _scene, stageDef.difficulty * mlDiff);
+    AudioSystem.playWaveStart();
     HUD.setWave(w, stageDef.wavesPerStage);
     HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage);
   }
@@ -689,6 +697,7 @@ const GameManager = (function () {
   function onWaveComplete() {
     player.score += SCORE_WAVE_BONUS;
     HUD.setScore(player.score);
+    MLSystem.onWaveComplete(currentWave, currentStage, player.hp / player.maxHp);
     RankSystem.onWaveComplete(currentWave);
     MissionSystem.onWaveCompleted();
 
@@ -837,9 +846,17 @@ const GameManager = (function () {
 
     if (mouseDown || touch.firing) {
       const targets = Enemies.getEnemyMeshes();
+      const weaponType = Weapons.getCurrentType();
+      const weaponId = Weapons.getCurrentId();
+      // Map weapon type to audio sound type
+      const audioMap = { MELEE: 'melee', PISTOL: 'pistol', ASSAULT: 'rifle', LMG: 'rifle', SNIPER: 'sniper', HMG: 'hmg', AT: 'launcher', ATGM: 'launcher', NATO: 'rifle' };
       Weapons.tryFire(_camera, targets, delta, function (hit) {
         onEnemyHit(hit);
       }, mouseNewPress);
+      if (mouseNewPress) {
+        AudioSystem.playGunshot(audioMap[weaponType] || 'rifle');
+        MLSystem.onShot(weaponId);
+      }
       mouseNewPress = false;
     }
   }
@@ -848,6 +865,8 @@ const GameManager = (function () {
     const enemy = Enemies.findByMesh(hit.object);
     if (!enemy || !enemy.alive) return;
 
+    AudioSystem.playHit();
+    MLSystem.onHit(Weapons.getCurrentId());
     const isHeadshot = hit.object === enemy.mesh.userData.headMesh;
     const baseDmg = Weapons.getDamage();
     const dmg = isHeadshot ? baseDmg * 2 : baseDmg;
@@ -863,6 +882,8 @@ const GameManager = (function () {
     }
 
     if (remaining <= 0) {
+      AudioSystem.playDeath();
+      MLSystem.onKill(Weapons.getCurrentId());
       player.score += enemy.scoreValue;
       player.kills++;
       HUD.setScore(player.score);
@@ -891,12 +912,14 @@ const GameManager = (function () {
   }
 
   function onPlayerHit(dmg) {
+    MLSystem.onDamageTaken(dmg);
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
 
     if (player.hp <= 0) {
       gameState = STATE.DEAD;
+      MLSystem.onDeath();
       showOverlay('dead');
       document.getElementById('dead-stage').textContent = STAGES[currentStage].id;
       document.getElementById('dead-score').textContent = player.score;
@@ -918,6 +941,8 @@ const GameManager = (function () {
     if (gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE) {
       // Core systems
       TimeSystem.update(delta);
+      WeatherSystem.update(delta);
+      MLSystem.trackFPS(delta);
       updatePlayer(delta);
       updateCombat(delta);
 
@@ -926,6 +951,8 @@ const GameManager = (function () {
         if (waveDone) onWaveComplete();
       });
       Pickups.update(delta, player.position, function (type) {
+        AudioSystem.playPickup();
+        MLSystem.onPickup();
         if (type === 'HEALTH') {
           player.hp = Math.min(player.maxHp, player.hp + 25);
           HUD.setHealth(player.hp, player.maxHp);

@@ -730,6 +730,8 @@ const Weapons = (() => {
     isZoomed,
     getWeaponCount: function () { return WEAPONS.length; },
     getCurrentIdx:  function () { return currentIdx; },
+    getCurrentType: function () { return cur().type; },
+    getCurrentId:   function () { return cur().id; },
     getCurrentName: function () { return cur().name; },
     getWeaponName:  getWeaponName,
     getWeaponInfo:  function (i) {
