@@ -345,7 +345,7 @@ const NPCSystem = (function () {
       new THREE.BoxGeometry(0.05, 0.05, 0.001),
       new THREE.MeshLambertMaterial({ color: 0xCC0000 })
     );
-    medPatch.position.set(-0.15, 0.85, 0.18);
+    medPatch.position.set(-0.15, 0.85, 0.21);
     group.add(medPatch);
 
     // ── Tourniquet (orange/red band on chest strap) ───────

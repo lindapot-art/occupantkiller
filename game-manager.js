@@ -831,6 +831,9 @@ const GameManager = (function () {
         AudioSystem.playFootstep();
         _footstepTimer = player.sprinting ? 0.28 : 0.42;
       }
+    } else {
+      // Reset footstep timer when not moving
+      _footstepTimer = 0;
     }
 
     // Gravity

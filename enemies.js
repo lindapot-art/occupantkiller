@@ -551,7 +551,8 @@ const Enemies = (() => {
         e.mesh.position.y -= delta * 1.2;
         if (e.deathTimer <= 0) {
           scene.remove(e.mesh);
-          if (e.hpBar) { scene.remove(e.hpBar.group); e.hpBar = null; }
+          disposeMesh(e.mesh);
+          if (e.hpBar) { scene.remove(e.hpBar.group); disposeMesh(e.hpBar.group); e.hpBar = null; }
           enemies.splice(i, 1);
         }
         continue;
@@ -689,12 +690,25 @@ const Enemies = (() => {
     enemies.forEach(e => {
       if (scene) {
         scene.remove(e.mesh);
-        if (e.hpBar) scene.remove(e.hpBar.group);
+        disposeMesh(e.mesh);
+        if (e.hpBar) { scene.remove(e.hpBar.group); disposeMesh(e.hpBar.group); }
       }
     });
     enemies    = [];
     spawnQueue = [];
     allDead    = false;
+  }
+
+  // ── Dispose all geometry/material/texture on a mesh tree ────
+  function disposeMesh(obj) {
+    if (!obj) return;
+    obj.traverse(function (child) {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (child.material.map) child.material.map.dispose();
+        child.material.dispose();
+      }
+    });
   }
 
   // ── Area damage (explosions) ────────────────────────────────
