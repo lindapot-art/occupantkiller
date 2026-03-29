@@ -97,7 +97,7 @@ const NPCSystem = (function () {
 
       // Skills (0-100)
       skills: {
-        combat:     rank === NPC_RANK.INFANTRY ? 30 : (rank === NPC_RANK.SPECIALIST ? 50 : (rank === NPC_RANK.VETERAN ? 70 : (rank === NPC_RANK.ELITE ? 90 : 5))),
+        combat:     { civilian: 5, trainee: 5, infantry: 30, specialist: 50, veteran: 70, elite: 90 }[rank] || 5,
         building:   10,
         crafting:   5,
         droneOps:   0,
@@ -488,7 +488,7 @@ const NPCSystem = (function () {
     const wep = npc.weapon;
 
     if (dist > wep.range * 0.7) {
-      // Move toward enemy, stop at 60% of max range
+      // Move toward enemy, stop at ~50% of max range
       const dir = new THREE.Vector3().subVectors(enemy.mesh.position, npc.position).setY(0).normalize();
       npc.target = npc.position.clone().add(dir.multiplyScalar(dist - wep.range * 0.5));
     } else if (dist >= 4) {
