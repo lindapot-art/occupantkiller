@@ -1692,9 +1692,9 @@ const VoxelWorld = (function () {
         generateMinefieldSigns(4);            // IDEA 22: Minefields around approaches
         generateFlagPole(0, 0);               // IDEA 18: Ukrainian flag at center
         // Heavy rubble scatter (coking plant battle damage)
-        for (var rb = 0; rb < 80; rb++) {
-          var rx = randInWorld(), rz = randInWorld();
-          var rh = getTerrainHeight(rx, rz);
+        for (let rb = 0; rb < 80; rb++) {
+          const rx = randInWorld(), rz = randInWorld();
+          const rh = getTerrainHeight(rx, rz);
           if (rh > 1) setBlock(rx, rh, rz, BLOCK.RUBBLE);
         }
         break;
@@ -1740,9 +1740,9 @@ const VoxelWorld = (function () {
         generateFlagPole(0, 0);                 // IDEA 18: Ukrainian flag at center
         generatePowerLines(-35, 15, 4);         // IDEA 5: Destroyed power lines
         // Extra rubble — city is total devastation
-        for (var rb2 = 0; rb2 < 100; rb2++) {
-          var rx2 = randInWorld(), rz2 = randInWorld();
-          var rh2 = getTerrainHeight(rx2, rz2);
+        for (let rb2 = 0; rb2 < 100; rb2++) {
+          const rx2 = randInWorld(), rz2 = randInWorld();
+          const rh2 = getTerrainHeight(rx2, rz2);
           if (rh2 > 1) setBlock(rx2, rh2, rz2, BLOCK.RUBBLE);
         }
         break;

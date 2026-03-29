@@ -42,7 +42,7 @@ const GameManager = (function () {
   /* ── Stage Definitions ──────────────────────────────────────────── */
   const STAGES = [
     {
-      id:           0,
+      id:           1,
       name:         'HOSTOMEL AIRPORT',
       theme:        'grassland',
       wavesPerStage: 5,
@@ -54,7 +54,7 @@ const GameManager = (function () {
       description:  'Stop the airborne assault at Hostomel Airport.',
     },
     {
-      id:           1,
+      id:           2,
       name:         'AVDIIVKA SECTOR',
       theme:        'urban',
       wavesPerStage: 5,
@@ -66,7 +66,7 @@ const GameManager = (function () {
       description:  'Industrial ruins of Avdiivka. Defend the coking plant.',
     },
     {
-      id:           2,
+      id:           3,
       name:         'BAKHMUT RUINS',
       theme:        'urban',
       wavesPerStage: 5,
@@ -78,7 +78,7 @@ const GameManager = (function () {
       description:  'Total destruction in Bakhmut. The city is a graveyard.',
     },
     {
-      id:           3,
+      id:           4,
       name:         'KHERSON CROSSING',
       theme:        'grassland',
       wavesPerStage: 5,
