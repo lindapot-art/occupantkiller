@@ -9,6 +9,8 @@
 
 const Enemies = (() => {
 
+  const MAX_CLIMBABLE_HEIGHT = 2; // Max terrain height difference enemies can climb
+
   // ── Russian EMR Digital Flora camo palette ─────────────────
   // 4 tones used across body/limb meshes via procedural canvas texture
   const EMR_CAMO = {
@@ -375,8 +377,10 @@ const Enemies = (() => {
       new THREE.MeshBasicMaterial({
         color:      0x330000,
         side:       THREE.DoubleSide,
-        depthTest:  false,
+        depthTest:  true,
         depthWrite: false,
+        transparent: true,
+        opacity:    0.85,
       })
     );
 
@@ -385,8 +389,10 @@ const Enemies = (() => {
       new THREE.MeshBasicMaterial({
         color:      0x44ff44,
         side:       THREE.DoubleSide,
-        depthTest:  false,
+        depthTest:  true,
         depthWrite: false,
+        transparent: true,
+        opacity:    0.9,
       })
     );
     fgMesh.position.z = 0.002;
@@ -503,19 +509,54 @@ const Enemies = (() => {
         }
       }
 
-      // Walk toward player
+      // Walk toward player with obstacle avoidance
       const dir = new THREE.Vector3()
         .subVectors(playerPos, e.mesh.position)
         .setY(0);
       const dist = dir.length();
 
+      // Always follow terrain height (even when idle/attacking)
+      if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
+        e.mesh.position.y = VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z);
+      }
+
       if (dist > 0.1) {
         dir.normalize();
-        e.mesh.position.addScaledVector(dir, e.speed * delta);
-        // Follow terrain height
-        if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
-          e.mesh.position.y = VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z);
+
+        // Simple obstacle avoidance: check if path ahead is blocked
+        const stepDist = e.speed * delta;
+        const nextX = e.mesh.position.x + dir.x * stepDist * 2;
+        const nextZ = e.mesh.position.z + dir.z * stepDist * 2;
+        let blocked = false;
+        if (typeof VoxelWorld !== 'undefined' && VoxelWorld.isSolid) {
+          const nextH = VoxelWorld.getTerrainHeight(nextX, nextZ);
+          const curH = e.mesh.position.y;
+          // If terrain ahead is more than climbable height, try to go around
+          if (nextH - curH > MAX_CLIMBABLE_HEIGHT) {
+            blocked = true;
+          }
+          // Also check for walls at head height
+          if (VoxelWorld.isSolid(nextX, curH + 1, nextZ)) {
+            blocked = true;
+          }
         }
+
+        if (blocked) {
+          // Steer sideways: try perpendicular directions
+          if (!e._avoidDir) e._avoidDir = Math.random() > 0.5 ? 1 : -1;
+          e._avoidTimer = (e._avoidTimer || 0) + delta;
+          const sideDir = new THREE.Vector3(-dir.z * e._avoidDir, 0, dir.x * e._avoidDir);
+          e.mesh.position.addScaledVector(sideDir, stepDist);
+          // After 1.5s of avoiding, try the other direction
+          if (e._avoidTimer > 1.5) {
+            e._avoidDir *= -1;
+            e._avoidTimer = 0;
+          }
+        } else {
+          e._avoidTimer = 0;
+          e.mesh.position.addScaledVector(dir, stepDist);
+        }
+
         e.mesh.lookAt(playerPos.x, e.mesh.position.y, playerPos.z);
 
         // Leg swing animation (speed-scaled)

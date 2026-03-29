@@ -732,6 +732,7 @@ const Weapons = (() => {
     unlockWeapon,
     handleRightDown,
     handleRightUp,
+    exitZoom,
     isZoomed,
     getWeaponCount: function () { return WEAPONS.length; },
     getCurrentIdx:  function () { return currentIdx; },
