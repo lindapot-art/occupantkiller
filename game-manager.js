@@ -253,9 +253,11 @@ const GameManager = (function () {
             gameState = STATE.PLAYING;
             Building.setBuildMode(false);
             Building.cancelTemplate();
+            document.getElementById('build-hud').style.display = 'none';
           } else {
             gameState = STATE.BUILD_MODE;
             Building.setBuildMode(true);
+            document.getElementById('build-hud').style.display = 'block';
           }
         }
 
@@ -389,7 +391,17 @@ const GameManager = (function () {
     });
 
     document.addEventListener('mousedown', function (e) {
+      // Resume audio context on any user gesture
+      AudioSystem.resume();
+
       if (e.button === 0) {
+        // If playing without pointer lock, re-acquire it on click
+        if (!isMobile && (gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE)
+            && !document.pointerLockElement) {
+          requestPointerLock();
+          return; // Don't fire on the lock-acquiring click
+        }
+
         mouseDown = true;
         mouseNewPress = true;
 
@@ -495,13 +507,16 @@ const GameManager = (function () {
       const ray = VoxelWorld.raycastBlock(_camera, 12);
       if (ray) {
         const p = ray.place;
-        const resources = Economy.getResources();
-        if (Building.placeTemplate(p.x, p.y, p.z, resources)) {
-          // Sync economy state
-          const newRes = Economy.getResources();
-          for (const k of Object.keys(newRes)) {
-            // Economy already deducted in placeTemplate
-          }
+        const tmpl = Building.getSelectedTemplate();
+        if (!tmpl || !tmpl.cost) return;
+        const cost = tmpl.cost;
+        // Check and deduct resources via Economy (not a copy)
+        if (!Economy.hasMultiple(cost)) {
+          HUD.notifyPickup('NOT ENOUGH RESOURCES', '#FF4444');
+          return;
+        }
+        if (Building.placeTemplate(p.x, p.y, p.z)) {
+          Economy.spendMultiple(cost);
           SkillSystem.onBuild();
           RankSystem.onBuild();
           HUD.notifyPickup('STRUCTURE BUILT!', '#00FF88');
@@ -583,7 +598,10 @@ const GameManager = (function () {
     HUD.setKills(0);
     HUD.setStage(STAGES[0].id, STAGES[0].name);
 
-    requestPointerLock();
+    // Delay pointer lock slightly so the button click doesn't interfere
+    setTimeout(function () {
+      requestPointerLock();
+    }, 100);
 
     // Announce first stage then begin first wave after delay
     HUD.announceStage(STAGES[0].id, STAGES[0].name, STAGES[0].description);
@@ -853,7 +871,8 @@ const GameManager = (function () {
       Weapons.tryFire(_camera, targets, delta, function (hit) {
         onEnemyHit(hit);
       }, mouseNewPress);
-      if (mouseNewPress) {
+      // Play sound on every actual shot (auto-fire included), not just first click
+      if (Weapons.didFire()) {
         AudioSystem.playGunshot(audioMap[weaponType] || 'rifle');
         MLSystem.onShot(weaponId);
       }
@@ -1137,6 +1156,8 @@ const GameManager = (function () {
     btnReload.addEventListener('touchstart', function (e) {
       e.preventDefault();
       Weapons.forceReload();
+      AudioSystem.playReload();
+      MLSystem.onReload();
       btnReload.classList.add('active');
     }, { passive: false });
     btnReload.addEventListener('touchend', function () { btnReload.classList.remove('active'); });

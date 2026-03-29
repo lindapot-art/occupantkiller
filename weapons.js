@@ -544,14 +544,19 @@ const Weapons = (() => {
   const raycaster = new THREE.Raycaster();
   const spreadVec = new THREE.Vector2();
 
+  // Track whether a shot was actually fired this frame (for sound)
+  let _firedThisFrame = false;
+
   function tryFire(camera, targets, delta, onHit, newPress) {
     const wep = cur();
     const st  = curState();
+    _firedThisFrame = false;
     st.fireCooldown -= delta;
     if (st.reloading) return;
     if (st.fireCooldown > 0) return;
     if (!wep.auto && !newPress) return;
     st.fireCooldown = wep.fireRate;
+    _firedThisFrame = true;
 
     // ── Melee: shovel ───────────────────────────────────
     if (wep.type === 'MELEE') {
@@ -576,7 +581,7 @@ const Weapons = (() => {
 
     // ── Projectile weapons (NLAW / Stugna) ──────────────
     if (wep.type === 'AT' || wep.type === 'ATGM') {
-      if (st.clip <= 0) { startReload(); return; }
+      if (st.clip <= 0) { startReload(); _firedThisFrame = false; return; }
       st.clip--;
       HUD.setAmmo(st.clip, st.reserve);
       showMuzzle();
@@ -587,7 +592,7 @@ const Weapons = (() => {
     }
 
     // ── Standard hitscan fire ───────────────────────────
-    if (st.clip <= 0) { startReload(); return; }
+    if (st.clip <= 0) { startReload(); _firedThisFrame = false; return; }
     st.clip--;
     HUD.setAmmo(st.clip, st.reserve);
 
@@ -740,5 +745,6 @@ const Weapons = (() => {
       return { name: WEAPONS[i].name, damage: WEAPONS[i].damage, clip: s.clip, reserve: s.reserve, type: WEAPONS[i].type };
     },
     isUnlocked:     function (i) { return !!unlocked[i]; },
+    didFire:        function () { return _firedThisFrame; },
   };
 })();

@@ -844,6 +844,10 @@ const VoxelWorld = (function () {
         generateControlTower(15, 10);
         generateBuilding(-25, -10, 10, 8, 5, BLOCK.METAL);    // hangar 1
         generateBuilding(20, -10, 10, 8, 5, BLOCK.METAL);     // hangar 2
+        generateTrenches();
+        generateDugouts(2);
+        generateDefensivePosition(-18, 15);
+        generateDefensivePosition(25, -15);
         scatterResources(BLOCK.WOOD, 0.003);
         break;
 
@@ -853,6 +857,10 @@ const VoxelWorld = (function () {
         generateTrenches();
         generateBrokenTrees(40);
         generateRuins(8);
+        generateDugouts(4);
+        generateDefensivePosition(-25, 10);
+        generateDefensivePosition(15, -20);
+        generateDefensivePosition(0, 25);
         // Industrial buildings
         generateBuilding(-20, -15, 15, 10, 6, BLOCK.METAL);
         generateBuilding(10, 15, 12, 8, 5, BLOCK.CONCRETE);
@@ -870,6 +878,11 @@ const VoxelWorld = (function () {
         generateRuins(18);
         generateCraters(15);
         generateBrokenTrees(15);
+        generateTrenches();  // double trench network for heavy fortification
+        generateTrenches();
+        generateDugouts(5);
+        generateDefensivePosition(-20, 20);
+        generateDefensivePosition(20, -20);
         break;
 
       case 'KHERSON':
@@ -879,6 +892,8 @@ const VoxelWorld = (function () {
         generateDefensivePosition(-20, -15);
         generateDefensivePosition(20, 15);
         generateDefensivePosition(-15, 20);
+        generateTrenches();
+        generateDugouts(3);
         generateBrokenTrees(20);
         scatterResources(BLOCK.WOOD, 0.002);
         break;
