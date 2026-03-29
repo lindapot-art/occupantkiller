@@ -39,12 +39,53 @@ const NPCSystem = (function () {
   let _scene = null;
   let nextId = 1;
 
+  /* ── Rank-based Weapon Assignment ────────────────────────────────── */
+  // Maps NPC rank to weapon: name, damage, fire rate, range, sound type
+  const RANK_WEAPONS = {
+    [NPC_RANK.CIVILIAN]:   null, // unarmed
+    [NPC_RANK.TRAINEE]:    { name: 'Makarov PM',  damage: 12, fireRate: 1.4, range: 14, soundType: 'pistol',  color: 0x333333, barrelLen: 0.10 },
+    [NPC_RANK.INFANTRY]:   { name: 'AK-74M',      damage: 24, fireRate: 1.0, range: 18, soundType: 'rifle',   color: 0x3a3a28, barrelLen: 0.28 },
+    [NPC_RANK.SPECIALIST]: { name: 'RPK-74',      damage: 20, fireRate: 0.7, range: 20, soundType: 'rifle',   color: 0x3a3a28, barrelLen: 0.34 },
+    [NPC_RANK.VETERAN]:    { name: 'PKM',         damage: 16, fireRate: 0.5, range: 22, soundType: 'hmg',     color: 0x2a2a18, barrelLen: 0.38 },
+    [NPC_RANK.ELITE]:      { name: 'M4A1',        damage: 28, fireRate: 0.6, range: 24, soundType: 'rifle',   color: 0x3a3a3a, barrelLen: 0.30 },
+  };
+
+  /* ── Build a simple weapon mesh for NPC's right hand ────────────── */
+  function buildNPCWeaponMesh(weaponDef) {
+    if (!weaponDef) return null;
+    const g = new THREE.Group();
+    // Barrel
+    const barrel = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, 0.03, weaponDef.barrelLen),
+      new THREE.MeshLambertMaterial({ color: 0x222222 })
+    );
+    barrel.position.set(0, 0, -weaponDef.barrelLen / 2 - 0.06);
+    g.add(barrel);
+    // Body
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.06, 0.14),
+      new THREE.MeshLambertMaterial({ color: weaponDef.color })
+    );
+    body.position.set(0, 0, -0.04);
+    g.add(body);
+    // Magazine
+    const mag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, 0.08, 0.04),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    mag.position.set(0, -0.06, -0.04);
+    g.add(mag);
+    return g;
+  }
+
   /* ── NPC Template ────────────────────────────────────────────────── */
   function createNPC(x, y, z, rank) {
+    const weaponDef = RANK_WEAPONS[rank] || null;
     const npc = {
       id: nextId++,
       rank: rank || NPC_RANK.CIVILIAN,
       job: JOB.IDLE,
+      weapon: weaponDef,
 
       // Needs (0-100)
       health:   100,
@@ -56,7 +97,7 @@ const NPCSystem = (function () {
 
       // Skills (0-100)
       skills: {
-        combat:     rank === NPC_RANK.INFANTRY ? 30 : 5,
+        combat:     rank === NPC_RANK.INFANTRY ? 30 : (rank === NPC_RANK.SPECIALIST ? 50 : (rank === NPC_RANK.VETERAN ? 70 : (rank === NPC_RANK.ELITE ? 90 : 5))),
         building:   10,
         crafting:   5,
         droneOps:   0,
@@ -341,6 +382,18 @@ const NPCSystem = (function () {
     eyeR.position.set(0.06, 1.30, 0.14);
     group.add(eyeL, eyeR);
 
+    // ── Weapon mesh (attached to right arm, based on rank) ──
+    const weaponDef = RANK_WEAPONS[npc.rank] || null;
+    if (weaponDef) {
+      const weaponMesh = buildNPCWeaponMesh(weaponDef);
+      if (weaponMesh) {
+        weaponMesh.position.set(0.32, 0.65, -0.12);
+        weaponMesh.rotation.x = -0.15;
+        group.add(weaponMesh);
+        group.userData.weaponMesh = weaponMesh;
+      }
+    }
+
     group.userData.npcId   = npc.id;
     group.userData.faction = 'ukrainian';
     group.castShadow = true;
@@ -420,18 +473,24 @@ const NPCSystem = (function () {
         nearest = e;
       }
     }
-    if (nearest && nearDist < 20) return { enemy: nearest, dist: nearDist };
+    // Use weapon range if armed, else 20 (unarmed shouldn't fight, but fallback)
+    const maxRange = npc.weapon ? npc.weapon.range : 20;
+    if (nearest && nearDist < maxRange) return { enemy: nearest, dist: nearDist };
     return null;
   }
 
   function updateCombat(npc, delta, target) {
+    // Civilians and unarmed NPCs cannot fight
+    if (!npc.weapon) return;
+
     const dist = target.dist;
     const enemy = target.enemy;
+    const wep = npc.weapon;
 
-    if (dist > 12) {
-      // Move toward enemy, stop 8 units away
+    if (dist > wep.range * 0.7) {
+      // Move toward enemy, stop at 60% of max range
       const dir = new THREE.Vector3().subVectors(enemy.mesh.position, npc.position).setY(0).normalize();
-      npc.target = npc.position.clone().add(dir.multiplyScalar(dist - 8));
+      npc.target = npc.position.clone().add(dir.multiplyScalar(dist - wep.range * 0.5));
     } else if (dist >= 4) {
       // Stop and shoot
       npc.target = null;
@@ -443,9 +502,9 @@ const NPCSystem = (function () {
 
       npc.combatCooldown -= delta;
       if (npc.combatCooldown <= 0) {
-        const fireRate = 1.5 - npc.skills.combat * 0.007; // 0.8-1.5s
-        npc.combatCooldown = Math.max(0.8, fireRate);
-        const dmg = 5 + npc.skills.combat * 0.3;
+        npc.combatCooldown = Math.max(0.3, wep.fireRate - npc.skills.combat * 0.005);
+        // Weapon damage + skill bonus
+        const dmg = wep.damage + npc.skills.combat * 0.15;
 
         if (typeof Enemies !== 'undefined' && Enemies.damage) {
           const remaining = Enemies.damage(enemy, dmg);
@@ -454,6 +513,11 @@ const NPCSystem = (function () {
             npc.morale = Math.min(100, npc.morale + 5);
             npc.combatTarget = null;
           }
+        }
+
+        // Play NPC gunshot sound
+        if (typeof AudioSystem !== 'undefined' && AudioSystem.playGunshot) {
+          AudioSystem.playGunshot(wep.soundType);
         }
 
         // Flash arms white when firing
@@ -477,11 +541,12 @@ const NPCSystem = (function () {
 
   /* ── AI Behavior ─────────────────────────────────────────────────── */
   function updateBehavior(npc, delta, timeInfo) {
-    // Combat takes highest priority for guards, patrols, and infantry+ ranks
-    if (['guard', 'patrol'].includes(npc.job) ||
-        RANK_ORDER.indexOf(npc.rank) >= RANK_ORDER.indexOf(NPC_RANK.INFANTRY)) {
+    // Combat takes highest priority for any armed NPC (trainee+), guards, patrols
+    if (npc.weapon && (
+        ['guard', 'patrol'].includes(npc.job) ||
+        RANK_ORDER.indexOf(npc.rank) >= RANK_ORDER.indexOf(NPC_RANK.TRAINEE))) {
       const nearestEnemy = findNearestEnemy(npc);
-      if (nearestEnemy && nearestEnemy.dist < 20) {
+      if (nearestEnemy) {
         npc.combatTarget = nearestEnemy.enemy;
         updateCombat(npc, delta, nearestEnemy);
         return;
@@ -564,6 +629,24 @@ const NPCSystem = (function () {
     const thresholds = [0, 30, 80, 150, 250, 400];
     if (rankIdx < RANK_ORDER.length - 1 && totalSkill >= thresholds[rankIdx + 1]) {
       npc.rank = RANK_ORDER[rankIdx + 1];
+      // Upgrade weapon on promotion
+      const newWeapon = RANK_WEAPONS[npc.rank] || null;
+      if (newWeapon && (!npc.weapon || newWeapon.damage > npc.weapon.damage)) {
+        npc.weapon = newWeapon;
+        // Replace weapon mesh on NPC
+        if (npc.mesh && npc.mesh.userData.weaponMesh) {
+          npc.mesh.remove(npc.mesh.userData.weaponMesh);
+        }
+        if (npc.mesh) {
+          const wepMesh = buildNPCWeaponMesh(newWeapon);
+          if (wepMesh) {
+            wepMesh.position.set(0.32, 0.65, -0.12);
+            wepMesh.rotation.x = -0.15;
+            npc.mesh.add(wepMesh);
+            npc.mesh.userData.weaponMesh = wepMesh;
+          }
+        }
+      }
     }
   }
 
