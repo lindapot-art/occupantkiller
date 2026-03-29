@@ -42,16 +42,28 @@ const GameManager = (function () {
   /* ── Stage Definitions ──────────────────────────────────────────── */
   const STAGES = [
     {
+      id:           0,
+      name:         'HOSTOMEL AIRPORT',
+      theme:        'grassland',
+      wavesPerStage: 5,
+      difficulty:   0.8,
+      fogColor:     0x4a5a3a,
+      bgColor:      0x4a5a3a,
+      sunColor:     0xff8833,
+      sunIntensity: 0.85,
+      description:  'Stop the airborne assault at Hostomel Airport.',
+    },
+    {
       id:           1,
       name:         'AVDIIVKA SECTOR',
-      theme:        'grassland',
+      theme:        'urban',
       wavesPerStage: 5,
       difficulty:   1.0,
       fogColor:     0x3a3028,
       bgColor:      0x3a3028,
-      sunColor:     0xff8833,
-      sunIntensity: 0.85,
-      description:  'Green fields of Avdiivka. Hold the line.',
+      sunColor:     0xccccdd,
+      sunIntensity: 0.7,
+      description:  'Industrial ruins of Avdiivka. Defend the coking plant.',
     },
     {
       id:           2,
@@ -63,19 +75,19 @@ const GameManager = (function () {
       bgColor:      0x2a2a2a,
       sunColor:     0xccccdd,
       sunIntensity: 0.65,
-      description:  'Urban ruins of Bakhmut. Every corner hides danger.',
+      description:  'Total destruction in Bakhmut. The city is a graveyard.',
     },
     {
       id:           3,
       name:         'KHERSON CROSSING',
-      theme:        'desert',
+      theme:        'grassland',
       wavesPerStage: 5,
       difficulty:   1.8,
-      fogColor:     0x5a4a30,
-      bgColor:      0x5a4a30,
-      sunColor:     0xffaa44,
-      sunIntensity: 1.0,
-      description:  'Sandy banks of Kherson. Final push to victory.',
+      fogColor:     0x4a5a3a,
+      bgColor:      0x4a5a3a,
+      sunColor:     0xffcc55,
+      sunIntensity: 0.9,
+      description:  'Cross the Dnipro at Kherson. Liberate the bridgehead.',
     },
   ];
 
@@ -156,11 +168,7 @@ const GameManager = (function () {
     // ── Init all sub-systems ─────────────────────────────────
     CameraSystem.init(_camera);
     VoxelWorld.init(_scene);
-
-    // Scatter resources on terrain
-    VoxelWorld.scatterResources(VoxelWorld.BLOCK.WOOD, 0.004);
-    VoxelWorld.scatterResources(VoxelWorld.BLOCK.METAL, 0.001);
-    VoxelWorld.scatterResources(VoxelWorld.BLOCK.ELECTRONICS, 0.0005);
+    VoxelWorld.generateLevel(0);
 
     TimeSystem.init(_scene, sunLight, ambLight, hemiLight);
     Building.init(_scene);
@@ -581,7 +589,7 @@ const GameManager = (function () {
     player.velocity.set(0, 0, 0);
 
     // Apply first stage
-    applyStage(STAGES[0]);
+    applyStage(0);
 
     const spawnH = VoxelWorld.getTerrainHeight(0, 0);
     player.position.set(0, spawnH + player.height, 0);
@@ -614,15 +622,11 @@ const GameManager = (function () {
   }
 
   /* ── Stage Management ───────────────────────────────────────────── */
-  function applyStage(stageDef) {
-    // Update terrain theme
-    VoxelWorld.setTheme(stageDef.theme);
-    VoxelWorld.regenerate();
+  function applyStage(stageIndex) {
+    var stageDef = STAGES[stageIndex];
 
-    // Scatter resources on new terrain
-    VoxelWorld.scatterResources(VoxelWorld.BLOCK.WOOD, 0.004);
-    VoxelWorld.scatterResources(VoxelWorld.BLOCK.METAL, 0.001);
-    VoxelWorld.scatterResources(VoxelWorld.BLOCK.ELECTRONICS, 0.0005);
+    // Generate level terrain and features
+    VoxelWorld.generateLevel(stageIndex);
 
     // Update scene colors
     _scene.background = new THREE.Color(stageDef.bgColor);
@@ -650,7 +654,7 @@ const GameManager = (function () {
     }
 
     const stageDef = STAGES[currentStage];
-    applyStage(stageDef);
+    applyStage(currentStage);
 
     // Reset wave count for new stage
     currentWave = 0;
@@ -938,6 +942,7 @@ const GameManager = (function () {
 
     if (player.hp <= 0) {
       gameState = STATE.DEAD;
+      Weapons.exitZoom();
       MLSystem.onDeath();
       showOverlay('dead');
       document.getElementById('dead-stage').textContent = STAGES[currentStage].id;
