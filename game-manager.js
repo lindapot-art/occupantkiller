@@ -623,7 +623,7 @@ const GameManager = (function () {
 
   /* ── Stage Management ───────────────────────────────────────────── */
   function applyStage(stageIndex) {
-    var stageDef = STAGES[stageIndex];
+    const stageDef = STAGES[stageIndex];
 
     // Generate level terrain and features
     VoxelWorld.generateLevel(stageIndex);
