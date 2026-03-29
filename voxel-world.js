@@ -480,9 +480,9 @@ const VoxelWorld = (function () {
   /* ── Level Definitions ────────────────────────────────────────────── */
   const LEVELS = [
     { id: 'HOSTOMEL',  name: 'Hostomel Airport',    desc: 'Stop the airborne assault',  theme: 'grassland', wavesPerLevel: 5, difficulty: 1.0, fogColor: 0x4a5a3a },
-    { id: 'AVDIIVKA',  name: 'Avdiivka Zombieland',  desc: 'Hold the industrial zone',   theme: 'urban',     wavesPerLevel: 5, difficulty: 1.3, fogColor: 0x3a3028 },
+    { id: 'AVDIIVKA',  name: 'Avdiivka Industrial Zone', desc: 'Hold the coking plant',  theme: 'urban',     wavesPerLevel: 5, difficulty: 1.3, fogColor: 0x3a3028 },
     { id: 'BAKHMUT',   name: 'Bakhmut Ruins',        desc: 'Defend the city',             theme: 'urban',     wavesPerLevel: 5, difficulty: 1.6, fogColor: 0x2a2a2a },
-    { id: 'KHERSON',   name: 'Kherson Bridgehead',   desc: 'Cross the Dnipro',            theme: 'desert',    wavesPerLevel: 5, difficulty: 1.9, fogColor: 0x5a4a30 },
+    { id: 'KHERSON',   name: 'Kherson Bridgehead',   desc: 'Cross the Dnipro',            theme: 'grassland', wavesPerLevel: 5, difficulty: 1.9, fogColor: 0x4a5a3a },
   ];
 
   const PROC_CITIES = ['Mariupol','Severodonetsk','Lysychansk','Bucha','Irpin','Izium','Kupyansk','Robotyne','Vuhledar'];
@@ -812,6 +812,801 @@ const VoxelWorld = (function () {
     }
   }
 
+  /* ── NEW Terrain Feature Generators (25 Level Improvement Ideas) ── */
+
+  // IDEA 1: Soviet apartment blocks (5-9 story panel buildings)
+  function generateApartmentBlock(ox, oz, floors) {
+    const surfH = getTerrainHeight(ox, oz);
+    const w = 10 + Math.floor(Math.random() * 6);
+    const d = 6;
+    const floorH = 3;
+    floors = floors || (5 + Math.floor(Math.random() * 5));
+    const totalH = floors * floorH;
+
+    for (let y = 0; y < totalH; y++) {
+      for (let x = 0; x < w; x++) {
+        for (let z = 0; z < d; z++) {
+          const isWall = x === 0 || x === w - 1 || z === 0 || z === d - 1;
+          const isFloor = y % floorH === 0;
+          if (isWall || isFloor) {
+            // Random damage on upper floors
+            if (y > floorH * 2 && Math.random() < 0.15) continue;
+            setBlock(ox + x, surfH + y, oz + z, BLOCK.CONCRETE);
+          }
+        }
+      }
+      // Windows every 2 blocks on walls (air gaps)
+      if (y % floorH === 1 || y % floorH === 2) {
+        for (let x = 2; x < w - 2; x += 3) {
+          setBlock(ox + x, surfH + y, oz, BLOCK.AIR);
+          setBlock(ox + x, surfH + y, oz + d - 1, BLOCK.AIR);
+        }
+      }
+    }
+    // Roof
+    for (let x = 0; x < w; x++) {
+      for (let z = 0; z < d; z++) {
+        setBlock(ox + x, surfH + totalH, oz + z, BLOCK.CONCRETE);
+      }
+    }
+    // Stairwell (internal column)
+    for (let y = 0; y < totalH; y++) {
+      setBlock(ox + Math.floor(w / 2), surfH + y, oz + 2, BLOCK.CONCRETE);
+      setBlock(ox + Math.floor(w / 2), surfH + y, oz + 3, BLOCK.CONCRETE);
+    }
+    // Entrance
+    setBlock(ox + Math.floor(w / 2), surfH, oz, BLOCK.AIR);
+    setBlock(ox + Math.floor(w / 2), surfH + 1, oz, BLOCK.AIR);
+    setBlock(ox + Math.floor(w / 2), surfH + 2, oz, BLOCK.AIR);
+  }
+
+  // IDEA 2: Industrial complex (coking plant for Avdiivka)
+  function generateIndustrialComplex(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Main factory hall
+    const hallW = 20, hallD = 12, hallH = 8;
+    for (let y = 0; y < hallH; y++) {
+      for (let x = 0; x < hallW; x++) {
+        for (let z = 0; z < hallD; z++) {
+          const isWall = x === 0 || x === hallW - 1 || z === 0 || z === hallD - 1;
+          const isRoof = y === hallH - 1;
+          if (isWall || isRoof) {
+            if (Math.random() < 0.12) continue; // Battle damage
+            setBlock(ox + x, surfH + y, oz + z, BLOCK.METAL);
+          }
+        }
+      }
+    }
+    // Smokestacks (tall chimneys)
+    for (let i = 0; i < 3; i++) {
+      const sx = ox + 4 + i * 6;
+      const sz = oz + hallD + 2;
+      for (let y = 0; y < 14; y++) {
+        setBlock(sx, surfH + y, sz, BLOCK.BRICK);
+        setBlock(sx + 1, surfH + y, sz, BLOCK.BRICK);
+        setBlock(sx, surfH + y, sz + 1, BLOCK.BRICK);
+        setBlock(sx + 1, surfH + y, sz + 1, BLOCK.BRICK);
+      }
+    }
+    // Storage silos
+    for (let i = 0; i < 2; i++) {
+      const cx = ox - 5 + i * (hallW + 8);
+      const cz = oz + 3;
+      for (let y = 0; y < 6; y++) {
+        for (let a = 0; a < Math.PI * 2; a += 0.4) {
+          const bx = Math.round(Math.cos(a) * 2.5);
+          const bz = Math.round(Math.sin(a) * 2.5);
+          setBlock(cx + bx, surfH + y, cz + bz, BLOCK.METAL);
+        }
+      }
+      // Cap
+      for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+          if (dx * dx + dz * dz <= 6) {
+            setBlock(cx + dx, surfH + 6, cz + dz, BLOCK.METAL);
+          }
+        }
+      }
+    }
+    // Loading dock
+    for (let x = 0; x < 8; x++) {
+      for (let z = 0; z < 4; z++) {
+        setBlock(ox + hallW + 1 + x, surfH, oz + z, BLOCK.CONCRETE);
+      }
+      setBlock(ox + hallW + 1 + x, surfH + 1, oz, BLOCK.CONCRETE);
+    }
+    // Pipe network (connecting buildings)
+    for (let x = 0; x < hallW + 10; x++) {
+      setBlock(ox + x, surfH + hallH + 1, oz + Math.floor(hallD / 2), BLOCK.METAL);
+    }
+    // Rubble around (battle damage)
+    for (let rb = 0; rb < 30; rb++) {
+      const rx = ox + Math.floor(Math.random() * (hallW + 10)) - 3;
+      const rz = oz + Math.floor(Math.random() * (hallD + 8)) - 3;
+      const h = getTerrainHeight(rx, rz);
+      if (h > 0) setBlock(rx, h, rz, BLOCK.RUBBLE);
+    }
+  }
+
+  // IDEA 3: Railway tracks
+  function generateRailway(startX, startZ, length, horizontal) {
+    for (let i = 0; i < length; i++) {
+      const wx = horizontal ? startX + i : startX;
+      const wz = horizontal ? startZ : startZ + i;
+      const h = getTerrainHeight(wx, wz);
+      // Rail bed (stone)
+      for (let w = -1; w <= 1; w++) {
+        const rx = horizontal ? wx : wx + w;
+        const rz = horizontal ? wz + w : wz;
+        setBlock(rx, h, rz, BLOCK.STONE);
+      }
+      // Rails (metal on top)
+      if (i % 2 === 0) {
+        const r1x = horizontal ? wx : wx - 1;
+        const r1z = horizontal ? wz - 1 : wz;
+        const r2x = horizontal ? wx : wx + 1;
+        const r2z = horizontal ? wz + 1 : wz;
+        setBlock(r1x, h + 1, r1z, BLOCK.METAL);
+        setBlock(r2x, h + 1, r2z, BLOCK.METAL);
+      }
+      // Sleepers (wood crossbars every 3 blocks)
+      if (i % 3 === 0) {
+        for (let w = -1; w <= 1; w++) {
+          const sx = horizontal ? wx : wx + w;
+          const sz = horizontal ? wz + w : wz;
+          setBlock(sx, h + 1, sz, BLOCK.WOOD);
+        }
+      }
+    }
+  }
+
+  // IDEA 4: Destroyed vehicles as cover
+  function generateDestroyedVehicles(count) {
+    for (let v = 0; v < count; v++) {
+      const vx = randInWorld();
+      const vz = randInWorld();
+      const h = getTerrainHeight(vx, vz);
+      if (h <= 1) continue;
+      const type = Math.random();
+      if (type < 0.5) {
+        // Destroyed car/truck (small)
+        for (let x = 0; x < 3; x++) {
+          for (let z = 0; z < 2; z++) {
+            setBlock(vx + x, h, vz + z, BLOCK.METAL);
+            if (x > 0 && x < 2) setBlock(vx + x, h + 1, vz + z, BLOCK.METAL);
+          }
+        }
+        // Burnt marks
+        setBlock(vx + 1, h + 2, vz, BLOCK.RUBBLE);
+      } else {
+        // Destroyed APC/tank (larger)
+        for (let x = 0; x < 5; x++) {
+          for (let z = 0; z < 3; z++) {
+            setBlock(vx + x, h, vz + z, BLOCK.METAL);
+            if (x >= 1 && x <= 3 && z >= 0 && z <= 2) {
+              setBlock(vx + x, h + 1, vz + z, BLOCK.METAL);
+            }
+          }
+        }
+        // Turret
+        setBlock(vx + 2, h + 2, vz + 1, BLOCK.METAL);
+        setBlock(vx + 3, h + 2, vz + 1, BLOCK.METAL);
+        // Rubble/debris around
+        setBlock(vx - 1, h, vz + 1, BLOCK.RUBBLE);
+        setBlock(vx + 5, h, vz, BLOCK.RUBBLE);
+      }
+    }
+  }
+
+  // IDEA 5: Power line towers
+  function generatePowerLines(ox, oz, count) {
+    for (let i = 0; i < count; i++) {
+      const px = ox + i * 16;
+      const h = getTerrainHeight(px, oz);
+      // Tower base
+      setBlock(px, h, oz, BLOCK.METAL);
+      setBlock(px + 1, h, oz, BLOCK.METAL);
+      setBlock(px, h, oz + 1, BLOCK.METAL);
+      setBlock(px + 1, h, oz + 1, BLOCK.METAL);
+      // Tower shaft
+      for (let y = 1; y < 10; y++) {
+        setBlock(px, h + y, oz, BLOCK.METAL);
+        setBlock(px + 1, h + y, oz + 1, BLOCK.METAL);
+      }
+      // Cross arms
+      for (let a = -2; a <= 3; a++) {
+        setBlock(px + a, h + 9, oz, BLOCK.METAL);
+        setBlock(px + a, h + 10, oz, BLOCK.METAL);
+      }
+      // Some towers damaged (broken top)
+      if (Math.random() < 0.3) {
+        for (let y = 7; y <= 10; y++) {
+          setBlock(px, h + y, oz, BLOCK.AIR);
+          setBlock(px + 1, h + y, oz + 1, BLOCK.AIR);
+        }
+        setBlock(px, h + 7, oz, BLOCK.RUBBLE);
+      }
+    }
+  }
+
+  // IDEA 6: Grain silos (for Kherson agricultural theme)
+  function generateGrainSilo(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    const radius = 3;
+    const height = 10;
+    // Cylindrical silo
+    for (let y = 0; y < height; y++) {
+      for (let a = 0; a < Math.PI * 2; a += 0.3) {
+        const bx = Math.round(Math.cos(a) * radius);
+        const bz = Math.round(Math.sin(a) * radius);
+        setBlock(ox + bx, surfH + y, oz + bz, BLOCK.METAL);
+      }
+    }
+    // Conical roof
+    for (let r = radius; r >= 0; r--) {
+      const y = surfH + height + (radius - r);
+      for (let a = 0; a < Math.PI * 2; a += 0.3) {
+        const bx = Math.round(Math.cos(a) * r);
+        const bz = Math.round(Math.sin(a) * r);
+        setBlock(ox + bx, y, oz + bz, BLOCK.METAL);
+      }
+    }
+    // Access door
+    setBlock(ox + radius, surfH, oz, BLOCK.AIR);
+    setBlock(ox + radius, surfH + 1, oz, BLOCK.AIR);
+  }
+
+  // IDEA 7: Salt mine entrance (for Bakhmut/Soledar)
+  function generateSaltMine(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Entrance structure
+    for (let x = 0; x < 6; x++) {
+      for (let z = 0; z < 4; z++) {
+        setBlock(ox + x, surfH, oz + z, BLOCK.CONCRETE);
+        setBlock(ox + x, surfH + 3, oz + z, BLOCK.CONCRETE);
+        if (x === 0 || x === 5 || z === 0 || z === 3) {
+          setBlock(ox + x, surfH + 1, oz + z, BLOCK.CONCRETE);
+          setBlock(ox + x, surfH + 2, oz + z, BLOCK.CONCRETE);
+        }
+      }
+    }
+    // Entrance opening
+    for (let x = 2; x <= 3; x++) {
+      for (let y = 0; y < 3; y++) {
+        setBlock(ox + x, surfH + y, oz, BLOCK.AIR);
+      }
+    }
+    // Tunnel going underground
+    for (let depth = 1; depth <= 12; depth++) {
+      const ty = surfH - depth;
+      if (ty < 1) break;
+      for (let x = 1; x <= 4; x++) {
+        for (let z = 0; z < 4; z++) {
+          setBlock(ox + x, ty, oz + z - depth, BLOCK.AIR);
+        }
+        // Support beams
+        if (depth % 3 === 0) {
+          setBlock(ox + 1, ty, oz - depth, BLOCK.WOOD);
+          setBlock(ox + 4, ty, oz - depth, BLOCK.WOOD);
+          for (let bx = 1; bx <= 4; bx++) {
+            setBlock(ox + bx, ty + 3, oz - depth, BLOCK.WOOD);
+          }
+        }
+      }
+    }
+    // Mining cart tracks
+    for (let d = 0; d < 10; d++) {
+      const ty = surfH - d;
+      if (ty < 1) break;
+      setBlock(ox + 2, ty, oz - d, BLOCK.METAL);
+      setBlock(ox + 3, ty, oz - d, BLOCK.METAL);
+    }
+  }
+
+  // IDEA 8: Water tower
+  function generateWaterTower(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Support legs (4 corners)
+    for (let y = 0; y < 8; y++) {
+      setBlock(ox, surfH + y, oz, BLOCK.METAL);
+      setBlock(ox + 3, surfH + y, oz, BLOCK.METAL);
+      setBlock(ox, surfH + y, oz + 3, BLOCK.METAL);
+      setBlock(ox + 3, surfH + y, oz + 3, BLOCK.METAL);
+    }
+    // Cross bracing
+    for (let y = 3; y < 8; y += 3) {
+      for (let x = 0; x <= 3; x++) {
+        setBlock(ox + x, surfH + y, oz, BLOCK.METAL);
+        setBlock(ox + x, surfH + y, oz + 3, BLOCK.METAL);
+      }
+    }
+    // Tank (cylindrical)
+    for (let y = 0; y < 4; y++) {
+      for (let dx = -1; dx <= 4; dx++) {
+        for (let dz = -1; dz <= 4; dz++) {
+          const cx = dx - 1.5, cz = dz - 1.5;
+          if (cx * cx + cz * cz <= 7) {
+            setBlock(ox + dx, surfH + 8 + y, oz + dz, BLOCK.METAL);
+          }
+        }
+      }
+    }
+  }
+
+  // IDEA 9: Checkpoint/roadblock
+  function generateCheckpoint(ox, oz, horizontal) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Concrete barriers
+    for (let i = 0; i < 6; i++) {
+      const bx = horizontal ? ox + i : ox;
+      const bz = horizontal ? oz : oz + i;
+      setBlock(bx, surfH, bz, BLOCK.CONCRETE);
+      setBlock(bx, surfH + 1, bz, BLOCK.CONCRETE);
+    }
+    // Gap in middle for passage
+    const mx = horizontal ? ox + 3 : ox;
+    const mz = horizontal ? oz : oz + 3;
+    setBlock(mx, surfH, mz, BLOCK.AIR);
+    setBlock(mx, surfH + 1, mz, BLOCK.AIR);
+    // Sandbag positions on sides
+    for (let s = -2; s <= -1; s++) {
+      const sx = horizontal ? ox + s : ox;
+      const sz = horizontal ? oz : oz + s;
+      setBlock(sx, surfH, sz, BLOCK.SANDBAG);
+      setBlock(sx, surfH + 1, sz, BLOCK.SANDBAG);
+    }
+    for (let s = 7; s <= 8; s++) {
+      const sx = horizontal ? ox + s : ox;
+      const sz = horizontal ? oz : oz + s;
+      setBlock(sx, surfH, sz, BLOCK.SANDBAG);
+      setBlock(sx, surfH + 1, sz, BLOCK.SANDBAG);
+    }
+    // Guard booth
+    const gx = horizontal ? ox - 3 : ox - 2;
+    const gz = horizontal ? oz - 2 : oz - 3;
+    generateBuilding(gx, gz, 3, 3, 3, BLOCK.WOOD);
+  }
+
+  // IDEA 10: Barbed wire obstacles
+  function generateBarbedWire(ox, oz, length, horizontal) {
+    for (let i = 0; i < length; i++) {
+      const wx = horizontal ? ox + i : ox;
+      const wz = horizontal ? oz : oz + i;
+      const h = getTerrainHeight(wx, wz);
+      // Posts
+      if (i % 3 === 0) {
+        setBlock(wx, h, wz, BLOCK.WOOD);
+        setBlock(wx, h + 1, wz, BLOCK.WOOD);
+      }
+      // Wire (fence blocks)
+      setBlock(wx, h + 1, wz, BLOCK.FENCE);
+    }
+  }
+
+  // IDEA 11: Anti-tank hedgehogs (Czech hedgehogs)
+  function generateAntiTankHedgehogs(count) {
+    for (let i = 0; i < count; i++) {
+      const hx = randInWorld();
+      const hz = randInWorld();
+      const h = getTerrainHeight(hx, hz);
+      if (h <= 1) continue;
+      // X-shaped metal structure
+      setBlock(hx, h, hz, BLOCK.METAL);
+      setBlock(hx, h + 1, hz, BLOCK.METAL);
+      setBlock(hx - 1, h, hz, BLOCK.METAL);
+      setBlock(hx + 1, h, hz, BLOCK.METAL);
+      setBlock(hx, h, hz - 1, BLOCK.METAL);
+      setBlock(hx, h, hz + 1, BLOCK.METAL);
+    }
+  }
+
+  // IDEA 12: Ammunition depot
+  function generateAmmoDepot(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Bunker-style building
+    for (let x = 0; x < 8; x++) {
+      for (let z = 0; z < 6; z++) {
+        setBlock(ox + x, surfH, oz + z, BLOCK.REINFORCED);
+        setBlock(ox + x, surfH + 3, oz + z, BLOCK.REINFORCED);
+        if (x === 0 || x === 7 || z === 0 || z === 5) {
+          for (let y = 1; y < 3; y++) {
+            setBlock(ox + x, surfH + y, oz + z, BLOCK.REINFORCED);
+          }
+        }
+      }
+    }
+    // Door
+    setBlock(ox + 4, surfH + 1, oz, BLOCK.AIR);
+    setBlock(ox + 4, surfH + 2, oz, BLOCK.AIR);
+    // Crates inside
+    for (let c = 0; c < 6; c++) {
+      const cx = ox + 2 + Math.floor(Math.random() * 4);
+      const cz = oz + 1 + Math.floor(Math.random() * 4);
+      setBlock(cx, surfH + 1, cz, BLOCK.CRATE);
+      if (Math.random() > 0.5) setBlock(cx, surfH + 2, cz, BLOCK.CRATE);
+    }
+    // Sandbag perimeter
+    for (let i = -1; i <= 8; i++) {
+      setBlock(ox + i, surfH, oz - 1, BLOCK.SANDBAG);
+      setBlock(ox + i, surfH + 1, oz - 1, BLOCK.SANDBAG);
+    }
+  }
+
+  // IDEA 13: Field hospital tent
+  function generateFieldHospital(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Tent structure (fabric represented by wood blocks for color)
+    for (let x = 0; x < 6; x++) {
+      for (let z = 0; z < 8; z++) {
+        // Floor
+        setBlock(ox + x, surfH, oz + z, BLOCK.CONCRETE);
+        // Roof (peaked)
+        const peakY = x < 3 ? x : 5 - x;
+        setBlock(ox + x, surfH + 2 + peakY, oz + z, BLOCK.WOOD);
+      }
+    }
+    // Side walls (partial)
+    for (let z = 0; z < 8; z++) {
+      setBlock(ox, surfH + 1, oz + z, BLOCK.WOOD);
+      setBlock(ox + 5, surfH + 1, oz + z, BLOCK.WOOD);
+    }
+    // Entrance (open ends)
+    // Crates inside for supplies
+    for (let c = 0; c < 3; c++) {
+      setBlock(ox + 1 + c * 2, surfH + 1, oz + 2, BLOCK.CRATE);
+    }
+  }
+
+  // IDEA 14: Communication tower/antenna
+  function generateCommTower(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Base building
+    generateBuilding(ox - 1, oz - 1, 4, 4, 3, BLOCK.CONCRETE);
+    // Tower (tall metal lattice)
+    for (let y = 0; y < 16; y++) {
+      setBlock(ox, surfH + 3 + y, oz, BLOCK.METAL);
+      setBlock(ox + 1, surfH + 3 + y, oz + 1, BLOCK.METAL);
+      // Cross members every 4 blocks
+      if (y % 4 === 0) {
+        setBlock(ox + 1, surfH + 3 + y, oz, BLOCK.METAL);
+        setBlock(ox, surfH + 3 + y, oz + 1, BLOCK.METAL);
+      }
+    }
+    // Dish at top
+    setBlock(ox - 1, surfH + 18, oz, BLOCK.METAL);
+    setBlock(ox + 2, surfH + 18, oz, BLOCK.METAL);
+    setBlock(ox, surfH + 19, oz, BLOCK.METAL);
+    setBlock(ox + 1, surfH + 19, oz, BLOCK.METAL);
+  }
+
+  // IDEA 15: Underground bunker command post
+  function generateUndergroundBunker(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    const roomY = Math.max(1, surfH - 5);
+    // Large underground room
+    for (let dx = 0; dx < 8; dx++) {
+      for (let dz = 0; dz < 8; dz++) {
+        for (let dy = 0; dy < 4; dy++) {
+          setBlock(ox + dx, roomY + dy, oz + dz, BLOCK.AIR);
+        }
+        // Reinforced ceiling
+        setBlock(ox + dx, roomY + 4, oz + dz, BLOCK.REINFORCED);
+        // Reinforced floor
+        setBlock(ox + dx, roomY - 1, oz + dz, BLOCK.REINFORCED);
+      }
+    }
+    // Support pillars
+    for (let px = 2; px <= 5; px += 3) {
+      for (let pz = 2; pz <= 5; pz += 3) {
+        for (let y = 0; y < 4; y++) {
+          setBlock(ox + px, roomY + y, oz + pz, BLOCK.REINFORCED);
+        }
+      }
+    }
+    // Entrance stairwell
+    for (let s = 0; s <= 5; s++) {
+      setBlock(ox - 1, surfH - s, oz + 3, BLOCK.AIR);
+      setBlock(ox - 1, surfH - s, oz + 4, BLOCK.AIR);
+      setBlock(ox - 1, surfH - s + 1, oz + 3, BLOCK.AIR);
+      setBlock(ox - 1, surfH - s + 1, oz + 4, BLOCK.AIR);
+    }
+    // Equipment inside
+    setBlock(ox + 1, roomY, oz + 1, BLOCK.ELECTRONICS);
+    setBlock(ox + 2, roomY, oz + 1, BLOCK.ELECTRONICS);
+    setBlock(ox + 6, roomY, oz + 1, BLOCK.CRATE);
+    setBlock(ox + 6, roomY, oz + 6, BLOCK.CRATE);
+  }
+
+  // IDEA 16: Bridge fortifications
+  function generateFortifiedBridge(ox, oz, length, width) {
+    // Base bridge
+    generateBridge(ox, oz, length, width);
+    const surfH = getTerrainHeight(ox, oz);
+    const bridgeY = surfH + 2;
+    // Sandbag barriers on bridge
+    for (let i = 0; i < length; i += 5) {
+      for (let w = 0; w < width; w++) {
+        setBlock(ox + i, bridgeY + 1, oz + w, BLOCK.SANDBAG);
+        setBlock(ox + i, bridgeY + 2, oz + w, BLOCK.SANDBAG);
+      }
+    }
+    // Checkpoint at bridge entrance
+    for (let w = 0; w < width; w++) {
+      setBlock(ox, bridgeY + 1, oz + w, BLOCK.CONCRETE);
+      setBlock(ox, bridgeY + 2, oz + w, BLOCK.CONCRETE);
+      setBlock(ox + length - 1, bridgeY + 1, oz + w, BLOCK.CONCRETE);
+      setBlock(ox + length - 1, bridgeY + 2, oz + w, BLOCK.CONCRETE);
+    }
+    // Gate opening
+    setBlock(ox, bridgeY + 1, oz + Math.floor(width / 2), BLOCK.AIR);
+    setBlock(ox, bridgeY + 2, oz + Math.floor(width / 2), BLOCK.AIR);
+    setBlock(ox + length - 1, bridgeY + 1, oz + Math.floor(width / 2), BLOCK.AIR);
+    setBlock(ox + length - 1, bridgeY + 2, oz + Math.floor(width / 2), BLOCK.AIR);
+  }
+
+  // IDEA 17: Crop fields (for Kherson)
+  function generateCropFields(ox, oz, fieldW, fieldD) {
+    // Flat farmland with dirt rows
+    for (let x = 0; x < fieldW; x++) {
+      for (let z = 0; z < fieldD; z++) {
+        const h = getTerrainHeight(ox + x, oz + z);
+        setBlock(ox + x, h, oz + z, BLOCK.DIRT);
+        // Crop rows (alternate grass blocks = crops)
+        if (z % 2 === 0 && Math.random() > 0.2) {
+          setBlock(ox + x, h + 1, oz + z, BLOCK.GRASS);
+        }
+      }
+    }
+    // Farm path borders
+    for (let x = 0; x < fieldW; x++) {
+      setBlock(ox + x, getTerrainHeight(ox + x, oz - 1), oz - 1, BLOCK.DIRT);
+      setBlock(ox + x, getTerrainHeight(ox + x, oz + fieldD), oz + fieldD, BLOCK.DIRT);
+    }
+  }
+
+  // IDEA 18: Flag pole (Ukrainian flag at objectives)
+  function generateFlagPole(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Pole
+    for (let y = 0; y < 8; y++) {
+      setBlock(ox, surfH + y, oz, BLOCK.METAL);
+    }
+    // Flag (blue + yellow blocks) - Ukrainian colors
+    // Blue stripe (top)
+    setBlock(ox + 1, surfH + 7, oz, BLOCK.WATER);
+    setBlock(ox + 2, surfH + 7, oz, BLOCK.WATER);
+    setBlock(ox + 1, surfH + 6, oz, BLOCK.WATER);
+    setBlock(ox + 2, surfH + 6, oz, BLOCK.WATER);
+    // Yellow stripe (bottom)
+    setBlock(ox + 1, surfH + 5, oz, BLOCK.SAND);
+    setBlock(ox + 2, surfH + 5, oz, BLOCK.SAND);
+    setBlock(ox + 1, surfH + 4, oz, BLOCK.SAND);
+    setBlock(ox + 2, surfH + 4, oz, BLOCK.SAND);
+  }
+
+  // IDEA 19: Propaganda signs / billboards
+  function generateBillboard(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Support posts
+    setBlock(ox, surfH, oz, BLOCK.METAL);
+    setBlock(ox, surfH + 1, oz, BLOCK.METAL);
+    setBlock(ox, surfH + 2, oz, BLOCK.METAL);
+    setBlock(ox, surfH + 3, oz, BLOCK.METAL);
+    setBlock(ox + 5, surfH, oz, BLOCK.METAL);
+    setBlock(ox + 5, surfH + 1, oz, BLOCK.METAL);
+    setBlock(ox + 5, surfH + 2, oz, BLOCK.METAL);
+    setBlock(ox + 5, surfH + 3, oz, BLOCK.METAL);
+    // Board surface
+    for (let x = 0; x <= 5; x++) {
+      setBlock(ox + x, surfH + 4, oz, BLOCK.WOOD);
+      setBlock(ox + x, surfH + 5, oz, BLOCK.WOOD);
+      setBlock(ox + x, surfH + 6, oz, BLOCK.WOOD);
+    }
+  }
+
+  // IDEA 20: Church/memorial
+  function generateChurch(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Main structure
+    for (let y = 0; y < 6; y++) {
+      for (let x = 0; x < 8; x++) {
+        for (let z = 0; z < 6; z++) {
+          const isWall = x === 0 || x === 7 || z === 0 || z === 5;
+          const isRoof = y === 5;
+          if (isWall || isRoof) {
+            setBlock(ox + x, surfH + y, oz + z, BLOCK.BRICK);
+          }
+        }
+      }
+    }
+    // Peaked roof
+    for (let r = 0; r < 3; r++) {
+      for (let z = 0; z < 6; z++) {
+        setBlock(ox + 2 + r, surfH + 6 + r, oz + z, BLOCK.BRICK);
+        setBlock(ox + 5 - r, surfH + 6 + r, oz + z, BLOCK.BRICK);
+      }
+    }
+    // Bell tower/steeple
+    for (let y = 0; y < 4; y++) {
+      setBlock(ox + 3, surfH + 9 + y, oz + 2, BLOCK.BRICK);
+      setBlock(ox + 4, surfH + 9 + y, oz + 2, BLOCK.BRICK);
+      setBlock(ox + 3, surfH + 9 + y, oz + 3, BLOCK.BRICK);
+      setBlock(ox + 4, surfH + 9 + y, oz + 3, BLOCK.BRICK);
+    }
+    // Cross on top
+    setBlock(ox + 3, surfH + 13, oz + 2, BLOCK.METAL);
+    setBlock(ox + 3, surfH + 14, oz + 2, BLOCK.METAL);
+    setBlock(ox + 2, surfH + 13, oz + 2, BLOCK.METAL);
+    setBlock(ox + 4, surfH + 13, oz + 2, BLOCK.METAL);
+    // Windows (glass on walls)
+    for (let y = 2; y <= 3; y++) {
+      setBlock(ox, surfH + y, oz + 2, BLOCK.GLASS);
+      setBlock(ox + 7, surfH + y, oz + 2, BLOCK.GLASS);
+      setBlock(ox, surfH + y, oz + 3, BLOCK.GLASS);
+      setBlock(ox + 7, surfH + y, oz + 3, BLOCK.GLASS);
+    }
+    // Entrance
+    setBlock(ox + 3, surfH, oz, BLOCK.AIR);
+    setBlock(ox + 3, surfH + 1, oz, BLOCK.AIR);
+    setBlock(ox + 3, surfH + 2, oz, BLOCK.AIR);
+    setBlock(ox + 4, surfH, oz, BLOCK.AIR);
+    setBlock(ox + 4, surfH + 1, oz, BLOCK.AIR);
+    setBlock(ox + 4, surfH + 2, oz, BLOCK.AIR);
+  }
+
+  // IDEA 21: Evacuation bus/civilian vehicles
+  function generateEvacVehicles(count) {
+    for (let v = 0; v < count; v++) {
+      const vx = randInWorld();
+      const vz = randInWorld();
+      const h = getTerrainHeight(vx, vz);
+      if (h <= 1) continue;
+      // Bus shape
+      for (let x = 0; x < 6; x++) {
+        for (let z = 0; z < 2; z++) {
+          setBlock(vx + x, h, vz + z, BLOCK.METAL);
+          setBlock(vx + x, h + 1, vz + z, BLOCK.METAL);
+          if (x >= 1 && x <= 4) {
+            setBlock(vx + x, h + 2, vz + z, BLOCK.GLASS); // windows
+          }
+          setBlock(vx + x, h + 3, vz + z, BLOCK.METAL); // roof
+        }
+      }
+    }
+  }
+
+  // IDEA 22: Minefield warning signs
+  function generateMinefieldSigns(count) {
+    for (let m = 0; m < count; m++) {
+      const mx = randInWorld();
+      const mz = randInWorld();
+      const h = getTerrainHeight(mx, mz);
+      if (h <= 1) continue;
+      // Warning post
+      setBlock(mx, h, mz, BLOCK.WOOD);
+      setBlock(mx, h + 1, mz, BLOCK.WOOD);
+      // Sign (red block = danger)
+      setBlock(mx, h + 2, mz, BLOCK.BRICK);
+      // Scattered disturbed dirt around (mines beneath)
+      for (let d = 0; d < 8; d++) {
+        const dx = mx + Math.floor(Math.random() * 10) - 5;
+        const dz = mz + Math.floor(Math.random() * 10) - 5;
+        const dh = getTerrainHeight(dx, dz);
+        if (dh > 1) setBlock(dx, dh, dz, BLOCK.DIRT);
+      }
+    }
+  }
+
+  // IDEA 23: Sniper nest in ruins
+  function generateSniperNest(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Tall ruined building
+    const h = 7 + Math.floor(Math.random() * 4);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < 5; x++) {
+        for (let z = 0; z < 5; z++) {
+          const isWall = x === 0 || x === 4 || z === 0 || z === 4;
+          if (isWall) {
+            if (Math.random() < 0.1 && y > 3) continue; // damage
+            setBlock(ox + x, surfH + y, oz + z, BLOCK.CONCRETE);
+          }
+        }
+      }
+    }
+    // Observation slit at top
+    setBlock(ox + 2, surfH + h - 1, oz, BLOCK.AIR);
+    setBlock(ox + 2, surfH + h - 2, oz, BLOCK.AIR);
+    // Floor at top
+    for (let x = 1; x < 4; x++) {
+      for (let z = 1; z < 4; z++) {
+        setBlock(ox + x, surfH + h - 3, oz + z, BLOCK.CONCRETE);
+      }
+    }
+    // Sandbag firing position
+    setBlock(ox + 1, surfH + h - 2, oz + 1, BLOCK.SANDBAG);
+    setBlock(ox + 3, surfH + h - 2, oz + 1, BLOCK.SANDBAG);
+    // Internal stairs
+    for (let y = 0; y < h - 3; y++) {
+      setBlock(ox + 1, surfH + y, oz + 3, BLOCK.STONE);
+    }
+    // Entrance
+    setBlock(ox + 2, surfH, oz, BLOCK.AIR);
+    setBlock(ox + 2, surfH + 1, oz, BLOCK.AIR);
+  }
+
+  // IDEA 24: Farm buildings (for Kherson)
+  function generateFarmBuilding(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Barn
+    for (let y = 0; y < 5; y++) {
+      for (let x = 0; x < 8; x++) {
+        for (let z = 0; z < 6; z++) {
+          const isWall = x === 0 || x === 7 || z === 0 || z === 5;
+          const isRoof = y === 4;
+          if (isWall || isRoof) {
+            setBlock(ox + x, surfH + y, oz + z, BLOCK.WOOD);
+          }
+        }
+      }
+    }
+    // Peaked roof
+    for (let r = 0; r < 3; r++) {
+      for (let z = 0; z < 6; z++) {
+        setBlock(ox + 2 + r, surfH + 5, oz + z, BLOCK.WOOD);
+        setBlock(ox + 5 - r, surfH + 5, oz + z, BLOCK.WOOD);
+      }
+    }
+    // Barn door
+    for (let y = 0; y < 3; y++) {
+      setBlock(ox + 3, surfH + y, oz, BLOCK.AIR);
+      setBlock(ox + 4, surfH + y, oz, BLOCK.AIR);
+    }
+    // Haystacks next to barn
+    for (let hx = 0; hx < 3; hx++) {
+      setBlock(ox + 9 + hx, surfH, oz + 2, BLOCK.SAND);
+      setBlock(ox + 9 + hx, surfH + 1, oz + 2, BLOCK.SAND);
+      setBlock(ox + 10, surfH + 2, oz + 2, BLOCK.SAND);
+    }
+    // Fence around area
+    for (let f = -2; f < 12; f++) {
+      setBlock(ox + f, surfH, oz - 2, BLOCK.FENCE);
+      setBlock(ox + f, surfH + 1, oz - 2, BLOCK.FENCE);
+      setBlock(ox + f, surfH, oz + 8, BLOCK.FENCE);
+      setBlock(ox + f, surfH + 1, oz + 8, BLOCK.FENCE);
+    }
+  }
+
+  // IDEA 25: Burning/fire ruins (visual only - rubble with "fire" colored blocks)
+  function generateBurningRuin(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    const w = 5 + Math.floor(Math.random() * 4);
+    const d = 5 + Math.floor(Math.random() * 4);
+    // Collapsed structure
+    for (let x = 0; x < w; x++) {
+      for (let z = 0; z < d; z++) {
+        setBlock(ox + x, surfH, oz + z, BLOCK.RUBBLE);
+        if (Math.random() > 0.5) {
+          setBlock(ox + x, surfH + 1, oz + z, BLOCK.RUBBLE);
+        }
+        // "Fire" represented by fuel barrel blocks (orange color)
+        if (Math.random() < 0.15) {
+          setBlock(ox + x, surfH + 1, oz + z, BLOCK.FUEL_BARREL);
+          if (Math.random() < 0.3) {
+            setBlock(ox + x, surfH + 2, oz + z, BLOCK.FUEL_BARREL);
+          }
+        }
+      }
+    }
+    // Remaining wall fragments
+    for (let y = 0; y < 3; y++) {
+      for (let x = 0; x < w; x++) {
+        if (Math.random() < 0.3) {
+          setBlock(ox + x, surfH + y + 1, oz, BLOCK.BRICK);
+        }
+      }
+    }
+  }
+
   /* ── Level Generation ──────────────────────────────────────────── */
   function generateLevel(index) {
     const level = getLevelDef(index);
@@ -836,9 +1631,11 @@ const VoxelWorld = (function () {
       }
     }
 
-    // Level-specific features
+    // Level-specific features — historically accurate terrain for each battle
     switch (level.id) {
       case 'HOSTOMEL':
+        // Battle of Hostomel Airport, Feb 24-25, 2022
+        // VDV airborne assault on Antonov Airport
         generateRunway(-30, -3, 60, 6);
         generateBuilding(-10, 10, 12, 8, 4, BLOCK.CONCRETE);  // terminal
         generateControlTower(15, 10);
@@ -848,69 +1645,174 @@ const VoxelWorld = (function () {
         generateDugouts(2);
         generateDefensivePosition(-18, 15);
         generateDefensivePosition(25, -15);
+        generateDestroyedVehicles(5);       // IDEA 4: destroyed Russian vehicles on runway
+        generateAntiTankHedgehogs(8);       // IDEA 11: Ukrainian defenses
+        generateCheckpoint(-5, 0, true);    // IDEA 9: airport checkpoint
+        generateFlagPole(0, 12);            // IDEA 18: Ukrainian flag at terminal
+        generateBarbedWire(-25, 5, 30, true); // IDEA 10: perimeter wire
+        generateFieldHospital(30, 5);       // IDEA 13: medical station
         scatterResources(BLOCK.WOOD, 0.003);
         break;
 
       case 'AVDIIVKA':
-        generateCraters(28);
+        // Battle of Avdiivka, Oct 2023 - Feb 2024
+        // Industrial zone centered on the coking plant, Soviet apartment blocks,
+        // dense trench networks, constant shelling creating massive crater fields
+        generateIndustrialComplex(-15, -10);  // IDEA 2: Avdiivka Coking Plant (main objective)
+        generateApartmentBlock(-35, 10, 7);   // IDEA 1: Soviet 7-story apartment block
+        generateApartmentBlock(-35, 25, 5);   // IDEA 1: Another apartment block
+        generateApartmentBlock(25, -20, 9);   // IDEA 1: Tall apartment block (eastern front)
+        generateApartmentBlock(30, 10, 6);    // IDEA 1: Apartment block near plant
+        generateRailway(-40, 0, 80, true);    // IDEA 3: Railway through industrial zone
+        generateCraters(35);                  // Heavy shelling — more craters than before
+        generateTrenches();                   // Triple trench network
         generateTrenches();
         generateTrenches();
-        generateBrokenTrees(40);
-        generateRuins(8);
-        generateDugouts(4);
+        generateBrokenTrees(45);              // Almost no trees survive the shelling
+        generateRuins(12);                    // Many destroyed buildings
+        generateDugouts(6);                   // Underground positions critical for survival
         generateDefensivePosition(-25, 10);
         generateDefensivePosition(15, -20);
         generateDefensivePosition(0, 25);
-        // Industrial buildings
-        generateBuilding(-20, -15, 15, 10, 6, BLOCK.METAL);
-        generateBuilding(10, 15, 12, 8, 5, BLOCK.CONCRETE);
-        generateBuilding(-5, 20, 10, 10, 4, BLOCK.BRICK);
-        // Scatter rubble
-        for (let rb = 0; rb < 50; rb++) {
-          const rx = randInWorld(), rz = randInWorld();
-          const h = getTerrainHeight(rx, rz);
-          if (h > 1) setBlock(rx, h, rz, BLOCK.RUBBLE);
+        generateDefensivePosition(-10, -30);
+        generateDestroyedVehicles(12);        // IDEA 4: Destroyed Russian armor everywhere
+        generateAntiTankHedgehogs(15);        // IDEA 11: Anti-tank obstacles on approaches
+        generatePowerLines(-40, -25, 5);      // IDEA 5: Damaged power infrastructure
+        generateCheckpoint(10, 0, true);      // IDEA 9: Ukrainian checkpoint
+        generateAmmoDepot(-30, -25);          // IDEA 12: Ammunition storage
+        generateUndergroundBunker(5, -15);    // IDEA 15: Underground command post
+        generateSniperNest(-20, 30);          // IDEA 23: Sniper position in ruins
+        generateSniperNest(20, -30);          // IDEA 23: Second sniper nest
+        generateBarbedWire(-30, -15, 40, true); // IDEA 10: Defensive perimeter
+        generateBarbedWire(20, -25, 30, false); // IDEA 10: Eastern approach wire
+        generateCommTower(35, 0);             // IDEA 14: Military communications
+        generateBurningRuin(-8, -25);         // IDEA 25: Recently shelled building
+        generateBurningRuin(15, 20);          // IDEA 25: Another burning ruin
+        generateBillboard(-20, 0);            // IDEA 19: Billboard sign
+        generateMinefieldSigns(4);            // IDEA 22: Minefields around approaches
+        generateFlagPole(0, 0);               // IDEA 18: Ukrainian flag at center
+        // Heavy rubble scatter (coking plant battle damage)
+        for (var rb = 0; rb < 80; rb++) {
+          var rx = randInWorld(), rz = randInWorld();
+          var rh = getTerrainHeight(rx, rz);
+          if (rh > 1) setBlock(rx, rh, rz, BLOCK.RUBBLE);
         }
         break;
 
       case 'BAKHMUT':
-        generateStreetGrid(-30, -30, 5, 5, 6);
-        generateRuins(18);
-        generateCraters(15);
-        generateBrokenTrees(15);
-        generateTrenches();  // double trench network for heavy fortification
+        // Battle of Bakhmut (Artyomovsk), Aug 2022 - May 2023
+        // Total urban devastation, Wagner PMC wave attacks,
+        // salt mines (Soledar nearby), every building destroyed
+        generateStreetGrid(-30, -30, 5, 5, 6); // Dense urban grid
+        generateStreetGrid(5, 5, 3, 3, 8);     // Additional city blocks
+        generateRuins(25);                      // Massive destruction
+        generateCraters(20);                    // Heavy shelling
+        generateBrokenTrees(10);                // Almost no vegetation
+        generateTrenches();                     // Triple trench network around city
         generateTrenches();
-        generateDugouts(5);
+        generateTrenches();
+        generateDugouts(6);                     // Underground fighting positions
         generateDefensivePosition(-20, 20);
         generateDefensivePosition(20, -20);
+        generateDefensivePosition(-30, -10);
+        generateDefensivePosition(30, 10);
+        generateSaltMine(-25, 25);              // IDEA 7: Salt mine entrance (Soledar connection)
+        generateSaltMine(30, -25);              // IDEA 7: Second mine entrance
+        generateDestroyedVehicles(15);          // IDEA 4: Destroyed vehicles everywhere
+        generateSniperNest(-15, -15);           // IDEA 23: Sniper positions in ruins
+        generateSniperNest(15, 15);             // IDEA 23: Another sniper nest
+        generateSniperNest(-25, 10);            // IDEA 23: Third sniper nest
+        generateUndergroundBunker(-10, -20);    // IDEA 15: Underground command bunker
+        generateUndergroundBunker(15, 10);      // IDEA 15: Second bunker
+        generateAmmoDepot(25, 0);               // IDEA 12: Ammo depot
+        generateFieldHospital(-30, 0);          // IDEA 13: Field hospital
+        generateCommTower(0, 30);               // IDEA 14: Communications tower
+        generateAntiTankHedgehogs(12);          // IDEA 11: Anti-tank obstacles
+        generateBarbedWire(-25, -20, 50, true); // IDEA 10: Wire barriers
+        generateBarbedWire(20, -30, 40, false); // IDEA 10: More wire
+        generateBurningRuin(-10, 10);           // IDEA 25: Burning buildings
+        generateBurningRuin(10, -10);           // IDEA 25: More burning
+        generateBurningRuin(-5, -30);           // IDEA 25: More burning
+        generateEvacVehicles(4);                // IDEA 21: Abandoned civilian vehicles
+        generateMinefieldSigns(6);              // IDEA 22: Minefields
+        generateChurch(0, -20);                 // IDEA 20: Damaged church
+        generateBillboard(-15, 5);              // IDEA 19: Billboard
+        generateFlagPole(0, 0);                 // IDEA 18: Ukrainian flag at center
+        generatePowerLines(-35, 15, 4);         // IDEA 5: Destroyed power lines
+        // Extra rubble — city is total devastation
+        for (var rb2 = 0; rb2 < 100; rb2++) {
+          var rx2 = randInWorld(), rz2 = randInWorld();
+          var rh2 = getTerrainHeight(rx2, rz2);
+          if (rh2 > 1) setBlock(rx2, rh2, rz2, BLOCK.RUBBLE);
+        }
         break;
 
       case 'KHERSON':
-        generateRiver(0, 8);
-        generateBridge(-6, -2, 20, 4);
-        generateMarsh(6);
+        // Kherson counteroffensive, Aug-Nov 2022
+        // Flat agricultural terrain, Dnipro River crossing,
+        // Antonivskyi Bridge, farmland, liberation theme
+        generateRiver(-5, 12);                  // Wide Dnipro River (wider than before)
+        generateRiver(5, 8);                    // Second river channel (delta islands)
+        generateFortifiedBridge(-10, -2, 24, 5); // IDEA 16: Fortified Antonivskyi Bridge
+        generateMarsh(8);                       // Wetlands near river
         generateDefensivePosition(-20, -15);
         generateDefensivePosition(20, 15);
         generateDefensivePosition(-15, 20);
+        generateDefensivePosition(10, -25);
         generateTrenches();
-        generateDugouts(3);
-        generateBrokenTrees(20);
-        scatterResources(BLOCK.WOOD, 0.002);
+        generateTrenches();
+        generateDugouts(4);
+        generateGrainSilo(-30, -20);            // IDEA 6: Agricultural grain silos
+        generateGrainSilo(25, -15);             // IDEA 6: Second silo
+        generateFarmBuilding(-25, 15);          // IDEA 24: Farm buildings
+        generateFarmBuilding(20, -30);          // IDEA 24: Second farm
+        generateCropFields(-20, -35, 15, 10);   // IDEA 17: Agricultural fields
+        generateCropFields(15, 25, 12, 8);      // IDEA 17: More fields
+        generateCropFields(-35, -10, 10, 15);   // IDEA 17: Fields near river
+        generateCheckpoint(-8, -10, true);      // IDEA 9: Ukrainian checkpoint
+        generateCheckpoint(15, 5, false);       // IDEA 9: Another checkpoint
+        generateDestroyedVehicles(8);           // IDEA 4: Destroyed vehicles at crossing
+        generateAntiTankHedgehogs(10);          // IDEA 11: Bridge defenses
+        generateBarbedWire(-20, -5, 40, true);  // IDEA 10: Wire along riverbank
+        generateWaterTower(-30, 5);             // IDEA 8: Water tower
+        generateWaterTower(30, -10);            // IDEA 8: Second water tower
+        generateFieldHospital(25, 20);          // IDEA 13: Medical station
+        generateAmmoDepot(-30, -30);            // IDEA 12: Supply depot
+        generateBillboard(10, -20);             // IDEA 19: Billboard
+        generateFlagPole(0, 0);                 // IDEA 18: Ukrainian flag (liberation!)
+        generateFlagPole(-15, 15);              // IDEA 18: Flag at checkpoint
+        generateFlagPole(20, -20);              // IDEA 18: Flag at farm
+        generateChurch(30, 25);                 // IDEA 20: Village church
+        generateEvacVehicles(3);                // IDEA 21: Civilian evacuation vehicles
+        generateMinefieldSigns(5);              // IDEA 22: Russian minefields
+        generatePowerLines(-35, -30, 4);        // IDEA 5: Power infrastructure
+        generateBrokenTrees(15);                // Some damaged trees
+        scatterResources(BLOCK.WOOD, 0.003);    // More vegetation than Bakhmut
         break;
 
       default:
-        // Procedural: random mix
+        // Procedural: rich random mix of all features
         generateCraters(10 + Math.floor(Math.random() * 15));
         generateRuins(5 + Math.floor(Math.random() * 10));
+        generateTrenches();
         generateTrenches();
         generateBrokenTrees(15 + Math.floor(Math.random() * 20));
         generateDugouts(2 + Math.floor(Math.random() * 4));
         if (Math.random() > 0.5) generateRiver(randInWorld(), 5 + Math.floor(Math.random() * 4));
         if (Math.random() > 0.5) generateMarsh(3);
         generateDefensivePosition(randInWorld(), randInWorld());
+        generateDefensivePosition(randInWorld(), randInWorld());
+        generateDestroyedVehicles(5 + Math.floor(Math.random() * 8));
+        generateAntiTankHedgehogs(5 + Math.floor(Math.random() * 8));
+        if (Math.random() > 0.5) generateApartmentBlock(randInWorld(), randInWorld(), 5);
+        if (Math.random() > 0.5) generateSniperNest(randInWorld(), randInWorld());
+        if (Math.random() > 0.3) generateCheckpoint(randInWorld(), randInWorld(), Math.random() > 0.5);
+        generateBarbedWire(randInWorld(), randInWorld(), 20, Math.random() > 0.5);
+        generateMinefieldSigns(2 + Math.floor(Math.random() * 3));
+        generateFlagPole(0, 0);
+        if (Math.random() > 0.5) generateChurch(randInWorld(), randInWorld());
         break;
     }
-
     rebuildAll();
     return level;
   }

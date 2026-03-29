@@ -168,7 +168,6 @@ const GameManager = (function () {
     // ── Init all sub-systems ─────────────────────────────────
     CameraSystem.init(_camera);
     VoxelWorld.init(_scene);
-    VoxelWorld.generateLevel(0);
 
     TimeSystem.init(_scene, sunLight, ambLight, hemiLight);
     Building.init(_scene);
