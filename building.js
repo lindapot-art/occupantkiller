@@ -131,7 +131,7 @@ const Building = (function () {
 
     commandCenter: {
       name: 'Command Center',
-      cost: { metal: 80, electronics: 60, concrete: 40 },
+      cost: { metal: 80, electronics: 60, stone: 40 },
       size: { x: 10, y: 6, z: 10 },
       unlocks: ['strategic_view', 'missions'],
       generate(ox, oy, oz) {
@@ -265,20 +265,9 @@ const Building = (function () {
     return true;
   }
 
-  function placeTemplate(wx, wy, wz, resources) {
+  function placeTemplate(wx, wy, wz) {
     if (!_selectedTemplate) return false;
     if (!canPlaceTemplate(wx, wy, wz)) return false;
-
-    // Check resources
-    const cost = _selectedTemplate.cost;
-    for (const [res, amount] of Object.entries(cost)) {
-      if (!resources || (resources[res] || 0) < amount) return false;
-    }
-
-    // Deduct resources
-    for (const [res, amount] of Object.entries(cost)) {
-      resources[res] -= amount;
-    }
 
     // Place blocks
     const blockList = _selectedTemplate.generate(wx, wy, wz);

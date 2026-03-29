@@ -253,9 +253,11 @@ const GameManager = (function () {
             gameState = STATE.PLAYING;
             Building.setBuildMode(false);
             Building.cancelTemplate();
+            document.getElementById('build-hud').style.display = 'none';
           } else {
             gameState = STATE.BUILD_MODE;
             Building.setBuildMode(true);
+            document.getElementById('build-hud').style.display = 'block';
           }
         }
 
@@ -505,13 +507,14 @@ const GameManager = (function () {
       const ray = VoxelWorld.raycastBlock(_camera, 12);
       if (ray) {
         const p = ray.place;
-        const resources = Economy.getResources();
-        if (Building.placeTemplate(p.x, p.y, p.z, resources)) {
-          // Sync economy state
-          const newRes = Economy.getResources();
-          for (const k of Object.keys(newRes)) {
-            // Economy already deducted in placeTemplate
-          }
+        const cost = Building.getSelectedTemplate().cost;
+        // Check and deduct resources via Economy (not a copy)
+        if (!Economy.hasMultiple(cost)) {
+          HUD.notifyPickup('NOT ENOUGH RESOURCES', '#FF4444');
+          return;
+        }
+        if (Building.placeTemplate(p.x, p.y, p.z)) {
+          Economy.spendMultiple(cost);
           SkillSystem.onBuild();
           RankSystem.onBuild();
           HUD.notifyPickup('STRUCTURE BUILT!', '#00FF88');
@@ -1151,6 +1154,8 @@ const GameManager = (function () {
     btnReload.addEventListener('touchstart', function (e) {
       e.preventDefault();
       Weapons.forceReload();
+      AudioSystem.playReload();
+      MLSystem.onReload();
       btnReload.classList.add('active');
     }, { passive: false });
     btnReload.addEventListener('touchend', function () { btnReload.classList.remove('active'); });

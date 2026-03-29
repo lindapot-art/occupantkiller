@@ -46,7 +46,8 @@ const Pickups = (() => {
     ringMesh.rotation.x = Math.PI / 2;
 
     group.add(boxMesh, ringMesh);
-    group.position.set(worldPos.x, 0.3, worldPos.z);
+    const spawnY = worldPos.y + 0.3;
+    group.position.set(worldPos.x, spawnY, worldPos.z);
     scene.add(group);
 
     pickups.push({
@@ -54,7 +55,7 @@ const Pickups = (() => {
       boxMesh,
       ringMesh,
       type,
-      baseY: 0.3,
+      baseY: spawnY,
       phase: Math.random() * Math.PI * 2,
     });
   }

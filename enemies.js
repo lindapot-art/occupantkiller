@@ -564,7 +564,7 @@ const Enemies = (() => {
 
       // White flash on hit — start timer; update() resets colors
     enemy.mesh.userData.parts.forEach(p => {
-      if (p.material && p.material.visible !== false) {
+      if (p.material && p.material.visible !== false && !p.material.transparent) {
         // Cache original color on first hit
         if (p.userData.origColor === undefined) {
           p.userData.origColor = p.material.color.getHex();
