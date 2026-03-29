@@ -116,6 +116,9 @@ const GameManager = (function () {
   let ambLight  = null;
   let hemiLight = null;
 
+  /* ── Sound Timers ────────────────────────────────────────────────── */
+  let _footstepTimer = 0;
+
   /* ── Init ────────────────────────────────────────────────────────── */
   function init() {
     // Create renderer
@@ -200,14 +203,15 @@ const GameManager = (function () {
     const spawnH = VoxelWorld.getTerrainHeight(0, 0);
     player.position.set(0, spawnH + player.height, 0);
 
-    // Spawn initial NPCs
+    // Spawn initial NPCs (all armed ranks so they can fight)
+    const startRanks = ['trainee', 'infantry', 'trainee', 'infantry'];
     for (let i = 0; i < 4; i++) {
       const angle = (i / 4) * Math.PI * 2;
       const dist = 5 + Math.random() * 5;
       const nx = Math.cos(angle) * dist;
       const nz = Math.sin(angle) * dist;
       const nh = VoxelWorld.getTerrainHeight(nx, nz);
-      NPCSystem.spawn(nx, nh, nz, i < 2 ? 'civilian' : 'trainee');
+      NPCSystem.spawn(nx, nh, nz, startRanks[i]);
     }
 
     // Spawn a starter vehicle
@@ -306,6 +310,12 @@ const GameManager = (function () {
             'F4': 'droneHangar',
             'F5': 'commandCenter',
             'F6': 'wall',
+            'F7': 'trench',
+            'F8': 'dugout',
+            'F9': 'sandbagWall',
+            'F10': 'bunker',
+            'F11': 'foxhole',
+            'F12': 'observationPost',
           };
           if (templateKeys[e.code]) {
             e.preventDefault();
@@ -670,15 +680,16 @@ const GameManager = (function () {
     Pickups.clear();
     DroneSystem.clear();
 
-    // Respawn NPCs on new terrain
+    // Respawn NPCs on new terrain (all armed)
     NPCSystem.clear();
+    const stageRanks = ['infantry', 'infantry', 'specialist', 'trainee'];
     for (let i = 0; i < 4; i++) {
       const angle = (i / 4) * Math.PI * 2;
       const dist = 5 + Math.random() * 5;
       const nx = Math.cos(angle) * dist;
       const nz = Math.sin(angle) * dist;
       const nh = VoxelWorld.getTerrainHeight(nx, nz);
-      NPCSystem.spawn(nx, nh, nz, i < 2 ? 'civilian' : 'trainee');
+      NPCSystem.spawn(nx, nh, nz, stageRanks[i]);
     }
 
     // Respawn vehicle
@@ -702,12 +713,17 @@ const GameManager = (function () {
   }
 
   /* ── Wave Management ─────────────────────────────────────────────── */
+  let _ambientWind = null;
   function beginWave(w) {
     currentWave = w;
     const stageDef = STAGES[currentStage];
     const mlDiff = MLSystem.getDifficultyMult();
     Enemies.startWave(w, _scene, stageDef.difficulty * mlDiff);
     AudioSystem.playWaveStart();
+    // Start ambient wind on first wave if not already playing
+    if (!_ambientWind) {
+      _ambientWind = AudioSystem.playAmbientWind();
+    }
     HUD.setWave(w, stageDef.wavesPerStage);
     HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage);
   }
@@ -808,6 +824,13 @@ const GameManager = (function () {
       moveDir.multiplyScalar(speed * delta);
 
       if (player.sprinting) SkillSystem.onSprint();
+
+      // Footstep sounds
+      _footstepTimer -= delta;
+      if (_footstepTimer <= 0 && player.onGround) {
+        AudioSystem.playFootstep();
+        _footstepTimer = player.sprinting ? 0.28 : 0.42;
+      }
     }
 
     // Gravity

@@ -174,6 +174,179 @@ const Building = (function () {
         return blocks;
       }
     },
+
+    trench: {
+      name: 'Trench Section',
+      cost: { wood: 10 },
+      size: { x: 6, y: 3, z: 2 },
+      generate(ox, oy, oz) {
+        const blocks = [];
+        // Dig trench: clear center, reinforce sides with sandbags
+        for (let x = 0; x < 6; x++) {
+          for (let d = 0; d < 3; d++) {
+            // Clear the walking area
+            blocks.push({ x: ox + x, y: oy - 1 - d, z: oz, t: B.AIR });
+            blocks.push({ x: ox + x, y: oy - 1 - d, z: oz + 1, t: B.AIR });
+          }
+          // Sandbag walls on both sides
+          for (let d = 0; d < 2; d++) {
+            blocks.push({ x: ox + x, y: oy + d, z: oz - 1, t: B.SANDBAG });
+            blocks.push({ x: ox + x, y: oy + d, z: oz + 2, t: B.SANDBAG });
+          }
+        }
+        // Floor reinforcement
+        for (let x = 0; x < 6; x++) {
+          blocks.push({ x: ox + x, y: oy - 4, z: oz, t: B.WOOD });
+          blocks.push({ x: ox + x, y: oy - 4, z: oz + 1, t: B.WOOD });
+        }
+        return blocks;
+      }
+    },
+
+    dugout: {
+      name: 'Dugout',
+      cost: { wood: 25, stone: 15 },
+      size: { x: 4, y: 4, z: 4 },
+      npcCapacity: 4,
+      generate(ox, oy, oz) {
+        const blocks = [];
+        // Excavate underground room
+        for (let x = 0; x < 4; x++)
+          for (let z = 0; z < 4; z++) {
+            // Reinforced floor
+            blocks.push({ x: ox + x, y: oy - 4, z: oz + z, t: B.WOOD });
+            // Clear interior
+            for (let y = -3; y <= -1; y++) {
+              blocks.push({ x: ox + x, y: oy + y, z: oz + z, t: B.AIR });
+            }
+            // Log roof
+            blocks.push({ x: ox + x, y: oy, z: oz + z, t: B.WOOD });
+          }
+        // Walls (sandbag reinforcement around perimeter)
+        for (let y = -3; y <= -1; y++) {
+          for (let x = 0; x < 4; x++) {
+            blocks.push({ x: ox + x, y: oy + y, z: oz - 1, t: B.SANDBAG });
+            blocks.push({ x: ox + x, y: oy + y, z: oz + 4, t: B.SANDBAG });
+          }
+          for (let z = 0; z < 4; z++) {
+            blocks.push({ x: ox - 1, y: oy + y, z: oz + z, t: B.SANDBAG });
+            blocks.push({ x: ox + 4, y: oy + y, z: oz + z, t: B.SANDBAG });
+          }
+        }
+        // Entrance (one side open)
+        blocks.push({ x: ox + 1, y: oy - 3, z: oz - 1, t: B.AIR });
+        blocks.push({ x: ox + 1, y: oy - 2, z: oz - 1, t: B.AIR });
+        blocks.push({ x: ox + 2, y: oy - 3, z: oz - 1, t: B.AIR });
+        blocks.push({ x: ox + 2, y: oy - 2, z: oz - 1, t: B.AIR });
+        return blocks;
+      }
+    },
+
+    sandbagWall: {
+      name: 'Sandbag Wall',
+      cost: { stone: 5 },
+      size: { x: 5, y: 2, z: 1 },
+      generate(ox, oy, oz) {
+        const blocks = [];
+        for (let x = 0; x < 5; x++)
+          for (let y = 0; y < 2; y++)
+            blocks.push({ x: ox + x, y: oy + y, z: oz, t: B.SANDBAG });
+        return blocks;
+      }
+    },
+
+    bunker: {
+      name: 'Bunker',
+      cost: { stone: 40, metal: 20, wood: 10 },
+      size: { x: 6, y: 4, z: 6 },
+      defense: true,
+      npcCapacity: 6,
+      generate(ox, oy, oz) {
+        const blocks = [];
+        // Thick concrete floor
+        for (let x = 0; x < 6; x++)
+          for (let z = 0; z < 6; z++)
+            blocks.push({ x: ox + x, y: oy, z: oz + z, t: B.REINFORCED });
+        // Thick concrete walls (double-layer)
+        for (let y = 1; y <= 3; y++) {
+          for (let x = 0; x < 6; x++) {
+            blocks.push({ x: ox + x, y: oy + y, z: oz, t: B.REINFORCED });
+            blocks.push({ x: ox + x, y: oy + y, z: oz + 5, t: B.REINFORCED });
+          }
+          for (let z = 1; z < 5; z++) {
+            blocks.push({ x: ox, y: oy + y, z: oz + z, t: B.REINFORCED });
+            blocks.push({ x: ox + 5, y: oy + y, z: oz + z, t: B.REINFORCED });
+          }
+        }
+        // Thick roof
+        for (let x = 0; x < 6; x++)
+          for (let z = 0; z < 6; z++)
+            blocks.push({ x: ox + x, y: oy + 4, z: oz + z, t: B.REINFORCED });
+        // Door opening
+        blocks.push({ x: ox + 2, y: oy + 1, z: oz, t: B.AIR });
+        blocks.push({ x: ox + 2, y: oy + 2, z: oz, t: B.AIR });
+        blocks.push({ x: ox + 3, y: oy + 1, z: oz, t: B.AIR });
+        blocks.push({ x: ox + 3, y: oy + 2, z: oz, t: B.AIR });
+        // Firing slits (narrow windows)
+        blocks.push({ x: ox + 1, y: oy + 2, z: oz + 5, t: B.AIR });
+        blocks.push({ x: ox + 4, y: oy + 2, z: oz + 5, t: B.AIR });
+        blocks.push({ x: ox, y: oy + 2, z: oz + 2, t: B.AIR });
+        blocks.push({ x: ox + 5, y: oy + 2, z: oz + 3, t: B.AIR });
+        return blocks;
+      }
+    },
+
+    foxhole: {
+      name: 'Foxhole',
+      cost: { wood: 5 },
+      size: { x: 2, y: 2, z: 2 },
+      generate(ox, oy, oz) {
+        const blocks = [];
+        // Dig pit
+        for (let x = 0; x < 2; x++)
+          for (let z = 0; z < 2; z++)
+            for (let d = 0; d < 2; d++)
+              blocks.push({ x: ox + x, y: oy - 1 - d, z: oz + z, t: B.AIR });
+        // Sandbag ring around top
+        for (let x = -1; x <= 2; x++) {
+          blocks.push({ x: ox + x, y: oy, z: oz - 1, t: B.SANDBAG });
+          blocks.push({ x: ox + x, y: oy, z: oz + 2, t: B.SANDBAG });
+        }
+        blocks.push({ x: ox - 1, y: oy, z: oz, t: B.SANDBAG });
+        blocks.push({ x: ox - 1, y: oy, z: oz + 1, t: B.SANDBAG });
+        blocks.push({ x: ox + 2, y: oy, z: oz, t: B.SANDBAG });
+        blocks.push({ x: ox + 2, y: oy, z: oz + 1, t: B.SANDBAG });
+        return blocks;
+      }
+    },
+
+    observationPost: {
+      name: 'Observation Post',
+      cost: { wood: 20, metal: 10 },
+      size: { x: 3, y: 6, z: 3 },
+      defense: true,
+      generate(ox, oy, oz) {
+        const blocks = [];
+        // Central pillar (wood)
+        for (let y = 0; y < 5; y++)
+          blocks.push({ x: ox + 1, y: oy + y, z: oz + 1, t: B.WOOD });
+        // Platform at top (3×3)
+        for (let x = 0; x < 3; x++)
+          for (let z = 0; z < 3; z++)
+            blocks.push({ x: ox + x, y: oy + 5, z: oz + z, t: B.WOOD });
+        // Railing (sandbag walls on edges)
+        for (let x = 0; x < 3; x++) {
+          blocks.push({ x: ox + x, y: oy + 6, z: oz, t: B.SANDBAG });
+          blocks.push({ x: ox + x, y: oy + 6, z: oz + 2, t: B.SANDBAG });
+        }
+        blocks.push({ x: ox, y: oy + 6, z: oz + 1, t: B.SANDBAG });
+        blocks.push({ x: ox + 2, y: oy + 6, z: oz + 1, t: B.SANDBAG });
+        // Ladder (metal rungs along pillar)
+        for (let y = 0; y < 5; y++)
+          blocks.push({ x: ox + 1, y: oy + y, z: oz, t: B.METAL });
+        return blocks;
+      }
+    },
   };
 
   /* ── Placed structures tracking ──────────────────────────────────── */

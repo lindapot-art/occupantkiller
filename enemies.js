@@ -67,6 +67,10 @@ const Enemies = (() => {
       attackRate:  1.2,
       scoreValue:  100,
       dropChance:  0.30,
+      shootRange:  18,
+      shootDmg:    4,
+      shootRate:   1.8,
+      soundType:   'rifle',
     },
     STORMER: {
       name:        'STORMER',
@@ -83,6 +87,10 @@ const Enemies = (() => {
       attackRate:  0.7,
       scoreValue:  150,
       dropChance:  0.20,
+      shootRange:  12,
+      shootDmg:    3,
+      shootRate:   1.0,
+      soundType:   'rifle',
     },
     ARMORED: {
       name:        'ARMORED',
@@ -99,6 +107,10 @@ const Enemies = (() => {
       attackRate:  1.8,
       scoreValue:  350,
       dropChance:  0.85,
+      shootRange:  22,
+      shootDmg:    8,
+      shootRate:   2.0,
+      soundType:   'hmg',
     },
   };
 
@@ -218,6 +230,54 @@ const Enemies = (() => {
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
     return tex;
+  }
+
+  // ── Enemy weapon definitions per type ──────────────────────
+  const ENEMY_WEAPONS = {
+    CONSCRIPT: { name: 'AK-74',    color: 0x3a3a28, barrelLen: 0.26, bodyLen: 0.14, magH: 0.08 },
+    STORMER:   { name: 'AKS-74U',  color: 0x3a3a28, barrelLen: 0.18, bodyLen: 0.12, magH: 0.06 },
+    ARMORED:   { name: 'PKM',      color: 0x2a2a18, barrelLen: 0.36, bodyLen: 0.16, magH: 0.10 },
+  };
+
+  // Build a weapon mesh for enemy NPCs (held in right hand)
+  function buildEnemyWeaponMesh(typeName, scale) {
+    const wep = ENEMY_WEAPONS[typeName] || ENEMY_WEAPONS.CONSCRIPT;
+    const s = scale;
+    const g = new THREE.Group();
+
+    // Barrel
+    const barrel = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03 * s, 0.03 * s, wep.barrelLen * s),
+      new THREE.MeshLambertMaterial({ color: 0x222222 })
+    );
+    barrel.position.set(0, 0, -wep.barrelLen * s / 2 - 0.06 * s);
+    g.add(barrel);
+
+    // Body / receiver
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05 * s, 0.06 * s, wep.bodyLen * s),
+      new THREE.MeshLambertMaterial({ color: wep.color })
+    );
+    body.position.set(0, 0, -0.04 * s);
+    g.add(body);
+
+    // Magazine
+    const mag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03 * s, wep.magH * s, 0.04 * s),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    mag.position.set(0, -0.06 * s, -0.04 * s);
+    g.add(mag);
+
+    // Stock (wood/polymer)
+    const stock = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04 * s, 0.05 * s, 0.10 * s),
+      new THREE.MeshLambertMaterial({ color: 0x4a3a1a })
+    );
+    stock.position.set(0, 0, 0.08 * s);
+    g.add(stock);
+
+    return g;
   }
 
   // ── Build humanoid mesh scaled to typeCfg ─────────────────
@@ -350,6 +410,13 @@ const Enemies = (() => {
     eyeR.position.set(0.08 * s, 1.42 * s, 0.18 * s);
     group.add(eyeL, eyeR);
 
+    // ── Weapon mesh (held in right hand) ──────────────────
+    const weaponMesh = buildEnemyWeaponMesh(typeCfg.name, s);
+    weaponMesh.position.set(0.35 * s, 0.70 * s, -0.14 * s);
+    weaponMesh.rotation.x = -0.15;
+    group.add(weaponMesh);
+    group.userData.weaponMesh = weaponMesh;
+
     // Invisible hitbox — use transparent+opacity:0 so Raycaster still detects it
     const hitbox = new THREE.Mesh(
       new THREE.BoxGeometry(0.6 * s, 1.75 * s, 0.4 * s),
@@ -432,6 +499,7 @@ const Enemies = (() => {
       attackDmg:   typeCfg.attackDmg,
       attackTimer: Math.random() * typeCfg.attackRate,
       attackRate:  typeCfg.attackRate,
+      shootTimer:  Math.random() * (typeCfg.shootRate || 2.0),
       scoreValue:  rank.score,
       dropChance:  typeCfg.dropChance,
       alive:       true,
@@ -533,6 +601,21 @@ const Enemies = (() => {
         if (e.attackTimer <= 0) {
           onPlayerHit(e.attackDmg);
           e.attackTimer = e.attackRate;
+        }
+      }
+
+      // Ranged shooting when in range but not melee
+      const shootRange = e.typeCfg.shootRange || 0;
+      if (shootRange > 0 && dist >= meleeRange && dist < shootRange) {
+        e.shootTimer -= delta;
+        if (e.shootTimer <= 0) {
+          e.shootTimer = e.typeCfg.shootRate || 2.0;
+          const shootDmg = e.typeCfg.shootDmg || 3;
+          onPlayerHit(shootDmg);
+          // Play enemy gunshot sound
+          if (typeof AudioSystem !== 'undefined' && AudioSystem.playGunshot) {
+            AudioSystem.playGunshot(e.typeCfg.soundType || 'rifle');
+          }
         }
       }
 

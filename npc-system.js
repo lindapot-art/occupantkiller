@@ -325,13 +325,20 @@ const NPCSystem = (function () {
     armR.userData.isArm = true;
     group.add(armR);
 
-    // ── Plate Carrier (coyote brown — NATO style) ─────────
+    // ── Plate Carrier (coyote brown — NATO style, thin shell over torso) ─
     const plateCarrier = new THREE.Mesh(
-      new THREE.BoxGeometry(0.44, 0.50, 0.34),
+      new THREE.BoxGeometry(0.43, 0.40, 0.05),
       new THREE.MeshLambertMaterial({ color: 0x8B7355 })
     );
-    plateCarrier.position.y = 0.82;
+    plateCarrier.position.set(0, 0.82, 0.18);
     group.add(plateCarrier);
+    // Back plate
+    const backPlate = new THREE.Mesh(
+      new THREE.BoxGeometry(0.43, 0.40, 0.05),
+      new THREE.MeshLambertMaterial({ color: 0x8B7355 })
+    );
+    backPlate.position.set(0, 0.82, -0.18);
+    group.add(backPlate);
 
     // ── Medical cross patch on plate carrier ──────────────
     const medPatch = new THREE.Mesh(
