@@ -9,6 +9,8 @@
 
 const Enemies = (() => {
 
+  const MAX_CLIMBABLE_HEIGHT = 2; // Max terrain height difference enemies can climb
+
   // ── Russian EMR Digital Flora camo palette ─────────────────
   // 4 tones used across body/limb meshes via procedural canvas texture
   const EMR_CAMO = {
@@ -529,8 +531,8 @@ const Enemies = (() => {
         if (typeof VoxelWorld !== 'undefined' && VoxelWorld.isSolid) {
           const nextH = VoxelWorld.getTerrainHeight(nextX, nextZ);
           const curH = e.mesh.position.y;
-          // If terrain ahead is more than 2 blocks higher, try to go around
-          if (nextH - curH > 2) {
+          // If terrain ahead is more than climbable height, try to go around
+          if (nextH - curH > MAX_CLIMBABLE_HEIGHT) {
             blocked = true;
           }
           // Also check for walls at head height
