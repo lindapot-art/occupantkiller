@@ -507,7 +507,9 @@ const GameManager = (function () {
       const ray = VoxelWorld.raycastBlock(_camera, 12);
       if (ray) {
         const p = ray.place;
-        const cost = Building.getSelectedTemplate().cost;
+        const tmpl = Building.getSelectedTemplate();
+        if (!tmpl || !tmpl.cost) return;
+        const cost = tmpl.cost;
         // Check and deduct resources via Economy (not a copy)
         if (!Economy.hasMultiple(cost)) {
           HUD.notifyPickup('NOT ENOUGH RESOURCES', '#FF4444');

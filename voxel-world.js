@@ -878,7 +878,7 @@ const VoxelWorld = (function () {
         generateRuins(18);
         generateCraters(15);
         generateBrokenTrees(15);
-        generateTrenches();
+        generateTrenches();  // double trench network for heavy fortification
         generateTrenches();
         generateDugouts(5);
         generateDefensivePosition(-20, 20);

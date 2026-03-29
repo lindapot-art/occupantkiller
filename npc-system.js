@@ -631,7 +631,7 @@ const NPCSystem = (function () {
       npc.rank = RANK_ORDER[rankIdx + 1];
       // Upgrade weapon on promotion
       const newWeapon = RANK_WEAPONS[npc.rank] || null;
-      if (newWeapon && (!npc.weapon || newWeapon.damage > npc.weapon.damage)) {
+      if (newWeapon && (!npc.weapon || newWeapon.damage >= npc.weapon.damage)) {
         npc.weapon = newWeapon;
         // Replace weapon mesh on NPC
         if (npc.mesh && npc.mesh.userData.weaponMesh) {
