@@ -821,6 +821,10 @@ const VoxelWorld = (function () {
     const d = 6;
     const floorH = 3;
     floors = floors || (5 + Math.floor(Math.random() * 5));
+    // Cap floors so building doesn't exceed chunk height
+    const maxFloors = Math.floor((CHUNK_HEIGHT - surfH - 2) / floorH);
+    floors = Math.min(floors, maxFloors);
+    if (floors < 2) return; // Not enough room for a building
     const totalH = floors * floorH;
 
     for (let y = 0; y < totalH; y++) {
