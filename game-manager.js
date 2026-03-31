@@ -220,17 +220,17 @@ const GameManager = (function () {
     // Spawn starter vehicle fleet
     const vh = VoxelWorld.getTerrainHeight(8, 8);
     VehicleSystem.spawn(8, vh, 8, 'transport');
-    var startVh2 = VoxelWorld.getTerrainHeight(12, 5);
+    const startVh2 = VoxelWorld.getTerrainHeight(12, 5);
     VehicleSystem.spawn(12, startVh2, 5, 'combat');
-    var startVh3 = VoxelWorld.getTerrainHeight(-8, -8);
+    const startVh3 = VoxelWorld.getTerrainHeight(-8, -8);
     VehicleSystem.spawn(-8, startVh3, -8, 'turret_rover');
 
     // Spawn starter drones
-    var startDh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
+    const startDh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
     DroneSystem.spawn(5, startDh1, 5, 'recon');
-    var startDh2 = VoxelWorld.getTerrainHeight(-5, 5) + 8;
+    const startDh2 = VoxelWorld.getTerrainHeight(-5, 5) + 8;
     DroneSystem.spawn(-5, startDh2, 5, 'fpv_attack');
-    var startDh3 = VoxelWorld.getTerrainHeight(0, -10) + 10;
+    const startDh3 = VoxelWorld.getTerrainHeight(0, -10) + 10;
     DroneSystem.spawn(0, startDh3, -10, 'bomb');
 
     // Input setup
@@ -611,6 +611,24 @@ const GameManager = (function () {
     Weapons.reset();
     Enemies.clear();
     Pickups.clear();
+    VehicleSystem.clear();
+    DroneSystem.clear();
+
+    // Respawn vehicle fleet for first stage
+    const sgVh = VoxelWorld.getTerrainHeight(8, 8);
+    VehicleSystem.spawn(8, sgVh, 8, 'transport');
+    const sgVh2 = VoxelWorld.getTerrainHeight(12, 5);
+    VehicleSystem.spawn(12, sgVh2, 5, 'combat');
+    const sgVh3 = VoxelWorld.getTerrainHeight(-8, -8);
+    VehicleSystem.spawn(-8, sgVh3, -8, 'turret_rover');
+
+    // Respawn drones
+    const sgDh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
+    DroneSystem.spawn(5, sgDh1, 5, 'recon');
+    const sgDh2 = VoxelWorld.getTerrainHeight(-5, 5) + 8;
+    DroneSystem.spawn(-5, sgDh2, 5, 'fpv_attack');
+    const sgDh3 = VoxelWorld.getTerrainHeight(0, -10) + 10;
+    DroneSystem.spawn(0, sgDh3, -10, 'bomb');
 
     hideOverlays();
     HUD.show();
@@ -703,18 +721,17 @@ const GameManager = (function () {
     const vh = VoxelWorld.getTerrainHeight(8, 8);
     VehicleSystem.clear();
     VehicleSystem.spawn(8, vh, 8, 'transport');
-    var vh2 = VoxelWorld.getTerrainHeight(12, 5);
+    const vh2 = VoxelWorld.getTerrainHeight(12, 5);
     VehicleSystem.spawn(12, vh2, 5, 'combat');
-    var vh3 = VoxelWorld.getTerrainHeight(-8, -8);
+    const vh3 = VoxelWorld.getTerrainHeight(-8, -8);
     VehicleSystem.spawn(-8, vh3, -8, 'turret_rover');
 
     // Spawn drones
-    DroneSystem.clear();
-    var dh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
+    const dh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
     DroneSystem.spawn(5, dh1, 5, 'recon');
-    var dh2 = VoxelWorld.getTerrainHeight(-5, 5) + 8;
+    const dh2 = VoxelWorld.getTerrainHeight(-5, 5) + 8;
     DroneSystem.spawn(-5, dh2, 5, 'fpv_attack');
-    var dh3 = VoxelWorld.getTerrainHeight(0, -10) + 10;
+    const dh3 = VoxelWorld.getTerrainHeight(0, -10) + 10;
     DroneSystem.spawn(0, dh3, -10, 'bomb');
 
     // Update HUD

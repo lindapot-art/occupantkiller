@@ -1,6 +1,6 @@
 /**
- * weapons.js – 9-weapon Ukrainian war arsenal with melee, projectiles & scope zoom
- * Switch with keys 1-9. Weapons 0 (shovel) and 1 (pistol) start unlocked.
+ * weapons.js – 16-weapon Ukrainian war arsenal with melee, projectiles, grenades, fire & scope zoom
+ * Switch with keys 1-0, Q/E scroll. Weapons 0 (shovel) and 1 (pistol) start unlocked.
  * Depends on: Three.js global (THREE), HUD, VoxelWorld, Enemies
  */
 
