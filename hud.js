@@ -16,7 +16,7 @@ const HUD = (() => {
     ammo:         document.getElementById('ammo-display'),
     ammoRes:      document.getElementById('ammo-reserve'),
     weaponName:   document.getElementById('weapon-name-display'),
-    weaponSlots:  [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => document.getElementById('wslot-' + i)),
+    weaponSlots:  Array.from({length: 16}, function(_, i) { return document.getElementById('wslot-' + i); }),
     reload:       document.getElementById('reload-indicator'),
     hitMarker:    document.getElementById('hit-marker'),
     vignette:     document.getElementById('damage-vignette'),

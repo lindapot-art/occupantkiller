@@ -266,7 +266,51 @@ const DroneSystem = (function () {
     drone.mesh.children.forEach(child => {
       if (child.userData.isPayload) child.visible = false;
     });
-    return { position: drone.position.clone(), damage: drone.damage };
+    // Create explosion at drop point
+    const dropPos = drone.position.clone();
+    dropPos.y -= 1; // Drop below drone
+    if (typeof Enemies !== 'undefined') {
+      Enemies.damageInRadius(dropPos, 5, drone.damage);
+    }
+    createDroneExplosion(dropPos);
+    if (typeof AudioSystem !== 'undefined') AudioSystem.playGunshot('launcher');
+    return { position: dropPos, damage: drone.damage };
+  }
+
+  function fireAttack(droneId) {
+    const drone = drones.find(d => d.id === droneId);
+    if (!drone || drone.type !== DRONE_TYPE.FPV_ATTACK) return false;
+    // FPV kamikaze: damage enemies at drone position, destroy drone
+    if (typeof Enemies !== 'undefined') {
+      Enemies.damageInRadius(drone.position, 3, drone.damage);
+    }
+    createDroneExplosion(drone.position.clone());
+    if (typeof AudioSystem !== 'undefined') AudioSystem.playGunshot('launcher');
+    destroyDrone(drone);
+    return true;
+  }
+
+  function createDroneExplosion(pos) {
+    if (!_scene) return;
+    const flash = new THREE.Mesh(
+      new THREE.SphereGeometry(2, 8, 8),
+      new THREE.MeshBasicMaterial({
+        color: 0xff6600, transparent: true, opacity: 0.9,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    flash.position.copy(pos);
+    _scene.add(flash);
+    let t = 0.3;
+    const fadeInterval = setInterval(function () {
+      t -= 0.016;
+      flash.material.opacity = Math.max(0, t / 0.3) * 0.9;
+      flash.scale.setScalar(1 + (0.3 - t) * 4);
+      if (t <= 0) {
+        _scene.remove(flash);
+        clearInterval(fadeInterval);
+      }
+    }, 16);
   }
 
   function setPatrol(droneId, points) {
@@ -320,6 +364,7 @@ const DroneSystem = (function () {
     update,
     markTarget,
     dropPayload,
+    fireAttack,
     setPatrol,
     damageDrone,
     destroyDrone,

@@ -322,11 +322,11 @@ canvas {
   flex-wrap: wrap;
 }
 .wslot {
-  font-size: 10px;
+  font-size: 9px;
   color: #555;
-  padding: 2px 4px;
+  padding: 1px 3px;
   border: 1px solid #444;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   transition: color 0.15s, border-color 0.15s;
 }
 .wslot.locked {
