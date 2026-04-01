@@ -32,7 +32,44 @@ const NPCSystem = (function () {
     DRONE_OP:   'drone_op',
     SCOUT:      'scout',
     REST:       'rest',
+    MEDIC:      'medic',
+    EVAC:       'evac',
+    ASSAULT:    'assault',
   });
+
+  /* ── Friendly Assault Group System ─────────────────────────────── */
+  const NUM_FRIENDLY_GROUPS = 4;
+  const friendlyGroups = [];
+
+  const FGROUP_STATE = Object.freeze({
+    STAGING:    'staging',
+    ADVANCING:  'advancing',
+    ENGAGING:   'engaging',
+    DEFENDING:  'defending',
+    RETREATING: 'retreating',
+    REGROUPING: 'regrouping',
+  });
+
+  function createFriendlyGroup(id) {
+    const angle = (id / NUM_FRIENDLY_GROUPS) * Math.PI * 2 + 0.4;
+    const dist = 4 + Math.random() * 6;
+    const pos = new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+
+    // Defensive objective (guard point)
+    const defAngle = angle + (Math.random() - 0.5) * 0.6;
+    const defDist = 8 + Math.random() * 8;
+
+    return {
+      id: id,
+      state: FGROUP_STATE.STAGING,
+      stateTimer: 2 + Math.random() * 3,
+      rallyPoint: pos.clone(),
+      guardPoint: new THREE.Vector3(Math.cos(defAngle) * defDist, 0, Math.sin(defAngle) * defDist),
+      members: [],       // npc ids
+      morale: 85 + Math.random() * 15,
+      hasMedic: false,
+    };
+  }
 
   /* ── State ───────────────────────────────────────────────────────── */
   const npcs = [];
@@ -123,6 +160,11 @@ const NPCSystem = (function () {
       combatTarget: null,
       combatCooldown: 0,
       fireFlash: 0,
+
+      // Assault group
+      groupId:   -1,
+      groupRole: null,
+      guardPos:  null,
     };
 
     npc.mesh = buildNPCMesh(npc);
@@ -405,6 +447,7 @@ const NPCSystem = (function () {
     _scene = scene;
     npcs.length = 0;
     nextId = 1;
+    friendlyGroups.length = 0;
   }
 
   /* ── Spawn NPC ───────────────────────────────────────────────────── */
@@ -415,14 +458,181 @@ const NPCSystem = (function () {
     return npc;
   }
 
+  /* ── Spawn Friendly Assault Groups ──────────────────────────────── */
+  function spawnAssaultGroups() {
+    friendlyGroups.length = 0;
+    for (let g = 0; g < NUM_FRIENDLY_GROUPS; g++) {
+      const group = createFriendlyGroup(g);
+
+      // Group composition: 1 specialist (leader), 1 medic, 2-3 infantry
+      const leaderAngle = (g / NUM_FRIENDLY_GROUPS) * Math.PI * 2 + 0.4;
+      const leaderDist = 4 + Math.random() * 4;
+      const lx = Math.cos(leaderAngle) * leaderDist;
+      const lz = Math.sin(leaderAngle) * leaderDist;
+      const lh = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(lx, lz) : 0;
+
+      // Leader (specialist)
+      const leader = spawn(lx, lh, lz, NPC_RANK.SPECIALIST);
+      leader.job = JOB.ASSAULT;
+      leader.groupId = g;
+      leader.groupRole = 'leader';
+      group.members.push(leader.id);
+
+      // Medic (infantry rank, medic job)
+      const mx = lx + (Math.random() - 0.5) * 3;
+      const mz = lz + (Math.random() - 0.5) * 3;
+      const mh = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(mx, mz) : 0;
+      const medic = spawn(mx, mh, mz, NPC_RANK.INFANTRY);
+      medic.job = JOB.MEDIC;
+      medic.groupId = g;
+      medic.groupRole = 'medic';
+      group.members.push(medic.id);
+      group.hasMedic = true;
+
+      // 2-3 infantry
+      const infantryCount = 2 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < infantryCount; i++) {
+        const ix = lx + (Math.random() - 0.5) * 4;
+        const iz = lz + (Math.random() - 0.5) * 4;
+        const ih = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(ix, iz) : 0;
+        const rank = Math.random() < 0.4 ? NPC_RANK.VETERAN : NPC_RANK.INFANTRY;
+        const inf = spawn(ix, ih, iz, rank);
+        inf.job = JOB.ASSAULT;
+        inf.groupId = g;
+        inf.groupRole = 'rifleman';
+        group.members.push(inf.id);
+      }
+
+      friendlyGroups.push(group);
+    }
+  }
+
+  /* ── Assign Guard Positions ─────────────────────────────────────── */
+  function assignGuardPositions(positions) {
+    const guards = npcs.filter(n => n.alive && n.weapon && n.job !== JOB.MEDIC);
+    for (let i = 0; i < Math.min(positions.length, guards.length); i++) {
+      const npc = guards[i];
+      npc.job = JOB.GUARD;
+      npc.guardPos = positions[i].clone();
+      npc.target = positions[i].clone();
+    }
+  }
+
   /* ── Update All NPCs ─────────────────────────────────────────────── */
   function update(delta, timeInfo) {
+    // Update friendly assault group AI
+    updateFriendlyGroups(delta);
+
     for (const npc of npcs) {
       if (!npc.alive) continue;
       updateNeeds(npc, delta, timeInfo);
       updateBehavior(npc, delta, timeInfo);
       updateMovement(npc, delta);
       updateAnimation(npc, delta);
+    }
+  }
+
+  /* ── Friendly Assault Group AI ──────────────────────────────────── */
+  function updateFriendlyGroups(delta) {
+    for (const grp of friendlyGroups) {
+      const aliveMembers = grp.members
+        .map(id => npcs.find(n => n.id === id))
+        .filter(n => n && n.alive);
+      if (aliveMembers.length === 0) continue;
+
+      grp.stateTimer -= delta;
+      const lossRatio = 1 - aliveMembers.length / grp.members.length;
+      grp.morale = Math.max(10, grp.morale - lossRatio * delta * 3);
+
+      // Check if any member is in combat
+      const inCombat = aliveMembers.some(n => n.combatTarget);
+
+      switch (grp.state) {
+        case FGROUP_STATE.STAGING:
+          if (grp.stateTimer <= 0) {
+            grp.state = FGROUP_STATE.ADVANCING;
+            grp.stateTimer = 12 + Math.random() * 18;
+            // Set guard point as target for all members
+            for (const npc of aliveMembers) {
+              if (npc.job === JOB.ASSAULT) npc.target = grp.guardPoint.clone();
+            }
+          }
+          break;
+
+        case FGROUP_STATE.ADVANCING:
+          if (inCombat) {
+            grp.state = FGROUP_STATE.ENGAGING;
+            grp.stateTimer = 20 + Math.random() * 25;
+          } else if (grp.stateTimer <= 0) {
+            grp.state = FGROUP_STATE.DEFENDING;
+            grp.stateTimer = 30 + Math.random() * 30;
+            for (const npc of aliveMembers) {
+              if (npc.job === JOB.ASSAULT) {
+                npc.job = JOB.GUARD;
+                npc.guardPos = grp.guardPoint.clone();
+              }
+            }
+          }
+          break;
+
+        case FGROUP_STATE.ENGAGING:
+          if (grp.morale < 35) {
+            grp.state = FGROUP_STATE.RETREATING;
+            grp.stateTimer = 8 + Math.random() * 10;
+          } else if (grp.stateTimer <= 0 && !inCombat) {
+            grp.state = FGROUP_STATE.DEFENDING;
+            grp.stateTimer = 20 + Math.random() * 20;
+          }
+          break;
+
+        case FGROUP_STATE.DEFENDING:
+          if (grp.stateTimer <= 0) {
+            // Re-advance to new position
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 6 + Math.random() * 10;
+            grp.guardPoint.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+            grp.state = FGROUP_STATE.ADVANCING;
+            grp.stateTimer = 12 + Math.random() * 15;
+            for (const npc of aliveMembers) {
+              if (npc.job === JOB.GUARD) {
+                npc.job = JOB.ASSAULT;
+                npc.target = grp.guardPoint.clone();
+              }
+            }
+          }
+          break;
+
+        case FGROUP_STATE.RETREATING:
+          for (const npc of aliveMembers) {
+            npc.target = grp.rallyPoint.clone();
+          }
+          if (grp.stateTimer <= 0) {
+            grp.state = FGROUP_STATE.REGROUPING;
+            grp.stateTimer = 10 + Math.random() * 10;
+            grp.morale = Math.min(100, grp.morale + 20);
+          }
+          break;
+
+        case FGROUP_STATE.REGROUPING:
+          // Medics heal wounded during regroup
+          for (const npc of aliveMembers) {
+            if (npc.job === JOB.MEDIC) {
+              const wounded = aliveMembers.find(m => m.health < 60 && m !== npc);
+              if (wounded) {
+                npc.target = wounded.position.clone();
+                const d = npc.position.distanceTo(wounded.position);
+                if (d < 2) {
+                  wounded.health = Math.min(100, wounded.health + delta * 10);
+                }
+              }
+            }
+          }
+          if (grp.stateTimer <= 0) {
+            grp.state = FGROUP_STATE.STAGING;
+            grp.stateTimer = 3 + Math.random() * 4;
+          }
+          break;
+      }
     }
   }
 
@@ -541,10 +751,55 @@ const NPCSystem = (function () {
 
   /* ── AI Behavior ─────────────────────────────────────────────────── */
   function updateBehavior(npc, delta, timeInfo) {
-    // Combat takes highest priority for any armed NPC (trainee+), guards, patrols
-    if (npc.weapon && (
-        ['guard', 'patrol'].includes(npc.job) ||
+    // Combat takes highest priority for armed NPCs (except medics who heal first)
+    if (npc.weapon && npc.job !== JOB.MEDIC && (
+        ['guard', 'patrol', 'assault'].includes(npc.job) ||
         RANK_ORDER.indexOf(npc.rank) >= RANK_ORDER.indexOf(NPC_RANK.TRAINEE))) {
+      const nearestEnemy = findNearestEnemy(npc);
+      if (nearestEnemy) {
+        npc.combatTarget = nearestEnemy.enemy;
+        updateCombat(npc, delta, nearestEnemy);
+        return;
+      }
+    }
+
+    // Medic behavior: heal nearby wounded friendlies
+    if (npc.job === JOB.MEDIC) {
+      const wounded = npcs.find(n => n.alive && n !== npc && n.health < 60 &&
+        npc.position.distanceTo(n.position) < 18);
+      if (wounded) {
+        const d = npc.position.distanceTo(wounded.position);
+        if (d > 2) {
+          npc.target = wounded.position.clone();
+        } else {
+          npc.target = null;
+          wounded.health = Math.min(100, wounded.health + delta * 12);
+          wounded.stress = Math.max(0, wounded.stress - delta * 2);
+        }
+        return;
+      }
+      // If no wounded, engage enemies
+      if (npc.weapon) {
+        const nearestEnemy = findNearestEnemy(npc);
+        if (nearestEnemy) {
+          npc.combatTarget = nearestEnemy.enemy;
+          updateCombat(npc, delta, nearestEnemy);
+          return;
+        }
+      }
+    }
+
+    // Guard position behavior: return to guard point if too far
+    if (npc.job === JOB.GUARD && npc.guardPos) {
+      const gDist = npc.position.distanceTo(npc.guardPos);
+      if (gDist > 3 && !npc.combatTarget) {
+        npc.target = npc.guardPos.clone();
+      }
+    }
+
+    // Assault job: handled by group AI, just ensure combat readiness
+    if (npc.job === JOB.ASSAULT && !npc.target) {
+      // If no group target, look for enemies
       const nearestEnemy = findNearestEnemy(npc);
       if (nearestEnemy) {
         npc.combatTarget = nearestEnemy.enemy;
@@ -562,13 +817,13 @@ const NPCSystem = (function () {
     }
 
     if (npc.hunger < 15 && npc.job !== JOB.REST) {
-      // Should find food (go to nearest supply)
       npc.stress = Math.min(100, npc.stress + delta * 0.5);
     }
 
-    // Night behavior: non-guards go to rest
+    // Night behavior: non-combat roles go to rest
     if (timeInfo && timeInfo.phase === 'night') {
-      if (npc.job !== JOB.GUARD && npc.job !== JOB.PATROL && npc.job !== JOB.REST) {
+      if (npc.job !== JOB.GUARD && npc.job !== JOB.PATROL &&
+          npc.job !== JOB.REST && npc.job !== JOB.ASSAULT && npc.job !== JOB.MEDIC) {
         if (npc.fatigue > 40) {
           npc.job = JOB.REST;
           npc.asleep = true;
@@ -760,6 +1015,7 @@ const NPCSystem = (function () {
       if (npc.mesh && _scene) _scene.remove(npc.mesh);
     }
     npcs.length = 0;
+    friendlyGroups.length = 0;
   }
 
   return {
@@ -779,5 +1035,8 @@ const NPCSystem = (function () {
     getByRank,
     getAverageMorale,
     clear,
+    spawnAssaultGroups,
+    assignGuardPositions,
+    getFriendlyGroups: function () { return friendlyGroups; },
   };
 })();

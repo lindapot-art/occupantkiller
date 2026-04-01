@@ -33,6 +33,8 @@ const GameManager = (function () {
     onGround:   false,
     sprinting:  false,
     height:     1.7,
+    stealth:    false,        // invisibility toggle
+    role:       'lonewolf',   // 'brigade' or 'lonewolf'
   };
 
   /* ── Wave State ──────────────────────────────────────────────────── */
@@ -302,6 +304,11 @@ const GameManager = (function () {
             const nearby = VehicleSystem.getNearby(player.position, 5);
             if (nearby.length > 0) VehicleSystem.enter(nearby[0].id);
           }
+        }
+
+        // Stealth / invisibility toggle
+        if (e.code === 'KeyI') {
+          toggleStealth();
         }
 
         // Weapon switching (1-9 = weapons 0-8, 0 = weapon 9)
@@ -1081,6 +1088,9 @@ const GameManager = (function () {
 
       // Update extended HUD
       updateExtendedHUD();
+
+      // Sync stealth state to enemy detection system
+      Enemies.setPlayerStealth(player.stealth);
     }
 
     _renderer.render(_scene, _camera);
@@ -1343,6 +1353,60 @@ const GameManager = (function () {
     }
   }
 
+  /* ── Role / Stealth / Weapons-grid helpers ────────────────────────── */
+  function setRole(r) {
+    player.role = (r === 'brigade') ? 'brigade' : 'lonewolf';
+    updateRoleIndicator();
+    HUD.notifyPickup(player.role === 'brigade' ? '🎖 ASSAULT BRIGADE' : '🐺 LONE WOLF',
+      player.role === 'brigade' ? '#00aaff' : '#ffaa00');
+  }
+
+  function updateRoleIndicator() {
+    var el = document.getElementById('role-indicator');
+    if (el) {
+      el.textContent = player.role === 'brigade' ? '🎖 BRIGADE' : '🐺 LONE WOLF';
+      el.style.color = player.role === 'brigade' ? '#0af' : '#fa0';
+    }
+    // highlight active button on start screen
+    var sb = document.getElementById('start-role-brigade');
+    var sl = document.getElementById('start-role-lonewolf');
+    if (sb) sb.style.opacity = player.role === 'brigade' ? '1' : '0.4';
+    if (sl) sl.style.opacity = player.role === 'lonewolf' ? '1' : '0.4';
+    // highlight active button on pause screen
+    var pb = document.getElementById('role-brigade-btn');
+    var pl = document.getElementById('role-lonewolf-btn');
+    if (pb) pb.style.opacity = player.role === 'brigade' ? '1' : '0.4';
+    if (pl) pl.style.opacity = player.role === 'lonewolf' ? '1' : '0.4';
+  }
+
+  function toggleStealth() {
+    player.stealth = !player.stealth;
+    var stInd = document.getElementById('stealth-indicator');
+    if (stInd) stInd.style.display = player.stealth ? 'block' : 'none';
+    HUD.notifyPickup(player.stealth ? '👻 STEALTH ON' : '👁 STEALTH OFF',
+      player.stealth ? '#00ff66' : '#ff6600');
+    // update pause button text
+    var btn = document.getElementById('stealth-toggle-btn');
+    if (btn) btn.textContent = player.stealth ? '👻 STEALTH ON' : '👻 TOGGLE STEALTH';
+  }
+
+  function populateWeaponsGrid(containerId) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = '';
+    var count = Weapons.getWeaponCount();
+    for (var i = 0; i < count; i++) {
+      var info = Weapons.getWeaponInfo(i);
+      if (!info) continue;
+      var cell = document.createElement('div');
+      cell.style.cssText = 'background:rgba(255,255,255,0.06);border:1px solid #444;padding:4px;border-radius:3px;text-align:center;color:#ccc';
+      var key = i < 9 ? String(i + 1) : (i === 9 ? '0' : '');
+      cell.innerHTML = '<div style="color:#fff;font-weight:bold;font-size:11px">' + (key ? '[' + key + '] ' : '') + info.name + '</div>' +
+        '<div style="font-size:9px;color:#aaa">' + info.type + ' · DMG ' + info.damage + '</div>';
+      el.appendChild(cell);
+    }
+  }
+
   /* ── Resize ──────────────────────────────────────────────────────── */
   function onResize() {
     _camera.aspect = window.innerWidth / window.innerHeight;
@@ -1364,6 +1428,10 @@ const GameManager = (function () {
     requestPointerLock,
     toggleInventory,
     isMobile,
+    setRole,
+    toggleStealth,
+    populateWeaponsGrid,
+    updateRoleIndicator,
     getState:        function () { return gameState; },
     setState:        function (s) { gameState = s; },
     getPlayer:       function () { return player; },
