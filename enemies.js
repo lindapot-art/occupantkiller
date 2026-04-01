@@ -1080,7 +1080,7 @@ const Enemies = (() => {
 
   function clear() {
     // Clean up blood particles
-    bloodParticles.forEach(function(bp) {
+    bloodParticles.forEach(bp => {
       if (scene) scene.remove(bp.mesh);
     });
     bloodParticles.length = 0;

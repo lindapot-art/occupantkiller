@@ -23,6 +23,7 @@ const GameManager = (function () {
   let _renderer     = null;
 
   /* ── Player State ────────────────────────────────────────────────── */
+  const GOD_MODE_HP = 999999;
   const player = {
     position:   new THREE.Vector3(0, 10, 0),
     velocity:   new THREE.Vector3(0, 0, 0),
@@ -35,7 +36,7 @@ const GameManager = (function () {
     height:     1.7,
     stealth:    false,        // invisibility toggle
     role:       'lonewolf',   // 'brigade' or 'lonewolf'
-    godMode: false,       // god mode: all weapons, invincible, invisible
+    godMode: false,       // God Mode: all weapons, invincible, invisible
   };
 
   /* ── Wave State ──────────────────────────────────────────────────── */
@@ -612,8 +613,8 @@ const GameManager = (function () {
 
     // Reset god mode effects on game start
     if (player.godMode) {
-      player.maxHp = 999999;
-      player.hp = 999999;
+      player.maxHp = GOD_MODE_HP;
+      player.hp = GOD_MODE_HP;
       // Unlock all weapons in god mode
       for (var i = 0; i < Weapons.getWeaponCount(); i++) {
         Weapons.unlockWeapon(i);
@@ -1418,8 +1419,8 @@ const GameManager = (function () {
         Weapons.unlockWeapon(i);
       }
       // Set infinite health
-      player.maxHp = 999999;
-      player.hp = 999999;
+      player.maxHp = GOD_MODE_HP;
+      player.hp = GOD_MODE_HP;
       HUD.setHealth(player.hp, player.maxHp);
       // Enable stealth (enemies can't see player)
       player.stealth = true;
