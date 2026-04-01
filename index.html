@@ -297,6 +297,30 @@
     GameManager.toggleInventory();
   });
 
+  // ── Role selection ──────────────────────────────────────
+  document.getElementById('start-role-brigade').addEventListener('click', function () {
+    GameManager.setRole('brigade');
+  });
+  document.getElementById('start-role-lonewolf').addEventListener('click', function () {
+    GameManager.setRole('lonewolf');
+  });
+  document.getElementById('role-brigade-btn').addEventListener('click', function () {
+    GameManager.setRole('brigade');
+  });
+  document.getElementById('role-lonewolf-btn').addEventListener('click', function () {
+    GameManager.setRole('lonewolf');
+  });
+
+  // ── Stealth toggle (pause menu) ────────────────────────
+  document.getElementById('stealth-toggle-btn').addEventListener('click', function () {
+    GameManager.toggleStealth();
+  });
+
+  // ── Populate weapons grids & role indicator ────────────
+  GameManager.populateWeaponsGrid('start-weapons-grid');
+  GameManager.populateWeaponsGrid('pause-weapons-grid');
+  GameManager.updateRoleIndicator();
+
   // Start render loop
   GameManager.update();
 })();
