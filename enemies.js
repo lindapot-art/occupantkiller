@@ -615,14 +615,21 @@ const Enemies = (() => {
     // Cache player position for spawning
     _playerPos = playerPos;
 
-    // Spawn from queue
+    // Spawn reinforcements from queue (slow drip every 3-6s)
     if (spawnQueue.length > 0) {
       spawnTimer -= delta;
       if (spawnTimer <= 0) {
         spawnOne(spawnQueue.pop());
-        spawnTimer = 0.45 + Math.random() * 0.75;
+        spawnTimer = 3.0 + Math.random() * 3.0;
       }
     }
+
+    // Update assault groups
+    updateAssaultGroups(delta, playerPos);
+
+    // Get friendly NPCs for NPC-vs-NPC combat
+    const friendlyNPCs = (typeof NPCSystem !== 'undefined' && NPCSystem.getAll)
+      ? NPCSystem.getAll() : [];
 
     let alive = 0;
 
@@ -656,21 +663,102 @@ const Enemies = (() => {
         }
       }
 
-      // Walk toward player with obstacle avoidance
-      const dir = new THREE.Vector3()
-        .subVectors(playerPos, e.mesh.position)
-        .setY(0);
-      const dist = dir.length();
-
-      // Always follow terrain height (even when idle/attacking)
+      // Always follow terrain height
       if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
         e.mesh.position.y = VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z);
       }
 
-      if (dist > 0.1) {
-        dir.normalize();
+      // ── Detection system: enemies must spot the player ──
+      const dirToPlayer = new THREE.Vector3()
+        .subVectors(playerPos, e.mesh.position).setY(0);
+      const distToPlayer = dirToPlayer.length();
 
-        // Simple obstacle avoidance: check if path ahead is blocked
+      // Medic behavior: heal wounded groupmates instead of fighting
+      if (e.squadRole === SQUAD_ROLE.MEDIC && !e.playerSpotted) {
+        const healed = updateMedicBehavior(e, delta);
+        if (healed) {
+          updateHpBar(e, playerPos);
+          continue;
+        }
+      }
+
+      // Determine primary target: NPC or player
+      let moveTarget = null;
+      let targetIsNPC = false;
+      let targetDist = Infinity;
+
+      // Find nearest friendly NPC to attack
+      let nearestNPC = null;
+      let nearestNPCDist = Infinity;
+      for (const npc of friendlyNPCs) {
+        if (!npc.alive) continue;
+        const d = e.mesh.position.distanceTo(npc.position);
+        if (d < nearestNPCDist) {
+          nearestNPCDist = d;
+          nearestNPC = npc;
+        }
+      }
+
+      // Player detection: only spot if not stealthed and within detection range/angle
+      if (!_playerStealth && distToPlayer < DETECTION_RANGE) {
+        // Check if player is roughly in front of enemy (FOV cone)
+        const facingDir = new THREE.Vector3(0, 0, -1).applyQuaternion(e.mesh.quaternion);
+        const angleToPlayer = facingDir.angleTo(dirToPlayer.clone().normalize());
+        if (angleToPlayer < DETECTION_ANGLE || distToPlayer < 4) {
+          e.spotLevel = Math.min(SPOT_TIME + 0.5, e.spotLevel + delta);
+        } else {
+          e.spotLevel = Math.max(0, e.spotLevel - delta * 0.3);
+        }
+      } else {
+        e.spotLevel = Math.max(0, e.spotLevel - delta * 0.5);
+      }
+      e.playerSpotted = e.spotLevel >= SPOT_TIME;
+
+      // If player shot this enemy, immediately spot them
+      if (e.flashTimer > 0 && e.flashTimer > 0.07) {
+        e.spotLevel = SPOT_TIME + 0.5;
+        e.playerSpotted = true;
+      }
+
+      // Choose target priority: nearest NPC within 20, or spotted player
+      if (nearestNPC && nearestNPCDist < 20) {
+        moveTarget = nearestNPC.position;
+        targetIsNPC = true;
+        targetDist = nearestNPCDist;
+        e.npcTarget = nearestNPC;
+      }
+      if (e.playerSpotted && distToPlayer < nearestNPCDist * 0.8) {
+        moveTarget = playerPos;
+        targetIsNPC = false;
+        targetDist = distToPlayer;
+        e.npcTarget = null;
+      }
+
+      // If no target, follow group objective or patrol
+      if (!moveTarget && e.groupId >= 0 && e.groupId < assaultGroups.length) {
+        const grp = assaultGroups[e.groupId];
+        if (grp) {
+          moveTarget = grp.state === GROUP_STATE.RETREATING ? grp.rallyPoint : grp.objective;
+          targetDist = e.mesh.position.distanceTo(moveTarget);
+        }
+      }
+      if (!moveTarget) {
+        // Wander randomly (patrol behavior)
+        if (!e._wanderTarget || e.mesh.position.distanceTo(e._wanderTarget) < 2) {
+          const wa = Math.random() * Math.PI * 2;
+          const wd = 6 + Math.random() * 10;
+          e._wanderTarget = new THREE.Vector3(
+            e.mesh.position.x + Math.cos(wa) * wd, 0,
+            e.mesh.position.z + Math.sin(wa) * wd
+          );
+        }
+        moveTarget = e._wanderTarget;
+        targetDist = e.mesh.position.distanceTo(moveTarget);
+      }
+
+      // ── Movement toward target with obstacle avoidance ──
+      if (moveTarget && targetDist > 1.0) {
+        const dir = new THREE.Vector3().subVectors(moveTarget, e.mesh.position).setY(0).normalize();
         const stepDist = e.speed * delta;
         const nextX = e.mesh.position.x + dir.x * stepDist * 2;
         const nextZ = e.mesh.position.z + dir.z * stepDist * 2;
@@ -678,35 +766,25 @@ const Enemies = (() => {
         if (typeof VoxelWorld !== 'undefined' && VoxelWorld.isSolid) {
           const nextH = VoxelWorld.getTerrainHeight(nextX, nextZ);
           const curH = e.mesh.position.y;
-          // If terrain ahead is more than climbable height, try to go around
-          if (nextH - curH > MAX_CLIMBABLE_HEIGHT) {
-            blocked = true;
-          }
-          // Also check for walls at head height
-          if (VoxelWorld.isSolid(nextX, curH + 1, nextZ)) {
-            blocked = true;
-          }
+          if (nextH - curH > MAX_CLIMBABLE_HEIGHT) blocked = true;
+          if (VoxelWorld.isSolid(nextX, curH + 1, nextZ)) blocked = true;
         }
 
         if (blocked) {
-          // Steer sideways: try perpendicular directions
           if (!e._avoidDir) e._avoidDir = Math.random() > 0.5 ? 1 : -1;
           e._avoidTimer = (e._avoidTimer || 0) + delta;
           const sideDir = new THREE.Vector3(-dir.z * e._avoidDir, 0, dir.x * e._avoidDir);
           e.mesh.position.addScaledVector(sideDir, stepDist);
-          // After 1.5s of avoiding, try the other direction
-          if (e._avoidTimer > 1.5) {
-            e._avoidDir *= -1;
-            e._avoidTimer = 0;
-          }
+          if (e._avoidTimer > 1.5) { e._avoidDir *= -1; e._avoidTimer = 0; }
         } else {
           e._avoidTimer = 0;
           e.mesh.position.addScaledVector(dir, stepDist);
         }
 
-        e.mesh.lookAt(playerPos.x, e.mesh.position.y, playerPos.z);
+        // Face toward target
+        e.mesh.lookAt(moveTarget.x, e.mesh.position.y, moveTarget.z);
 
-        // Leg swing animation (speed-scaled)
+        // Leg swing animation
         e.legAngle += e.legDir * (e.speed / 2.2) * 4 * delta;
         if (Math.abs(e.legAngle) > 0.45) e.legDir *= -1;
         const parts = e.mesh.userData.parts;
@@ -714,28 +792,35 @@ const Enemies = (() => {
         if (parts[4]) parts[4].rotation.x = -e.legAngle;
       }
 
-      // Melee attack when close enough
-      const meleeRange = 1.6 * e.typeCfg.scale;
-      if (dist < meleeRange) {
-        e.attackTimer -= delta;
-        if (e.attackTimer <= 0) {
-          onPlayerHit(e.attackDmg);
-          e.attackTimer = e.attackRate;
+      // ── Combat: melee attack on player if spotted and close ──
+      if (e.playerSpotted && !targetIsNPC) {
+        const meleeRange = 1.6 * e.typeCfg.scale;
+        if (distToPlayer < meleeRange) {
+          e.attackTimer -= delta;
+          if (e.attackTimer <= 0) {
+            onPlayerHit(e.attackDmg);
+            e.attackTimer = e.attackRate;
+          }
+        }
+      }
+
+      // ── Combat: attack friendly NPCs ──
+      if (targetIsNPC && e.npcTarget && e.npcTarget.alive) {
+        const npcDist = e.mesh.position.distanceTo(e.npcTarget.position);
+        const attackRange = 2.0 * e.typeCfg.scale;
+        if (npcDist < attackRange) {
+          e.attackTimer -= delta;
+          if (e.attackTimer <= 0) {
+            e.attackTimer = e.attackRate;
+            if (typeof NPCSystem !== 'undefined' && NPCSystem.damage) {
+              NPCSystem.damage(e.npcTarget.id, e.attackDmg);
+            }
+          }
         }
       }
 
       // Update floating HP bar
-      if (e.hpBar) {
-        const pct    = e.hp / e.maxHp;
-        e.hpBar.fg.scale.x     = pct;
-        e.hpBar.fg.position.x  = -0.35 * (1 - pct);   // left-anchor the fill
-        const hpColor = pct > 0.6 ? 0x44ff44 : pct > 0.3 ? 0xffaa00 : 0xff2222;
-        e.hpBar.fg.material.color.setHex(hpColor);
-
-        const barY = e.mesh.position.y + 1.75 * e.typeCfg.scale + 0.35;
-        e.hpBar.group.position.set(e.mesh.position.x, barY, e.mesh.position.z);
-        e.hpBar.group.lookAt(playerPos.x, barY, playerPos.z);
-      }
+      updateHpBar(e, playerPos);
     }
 
     // Wave complete?
@@ -744,6 +829,155 @@ const Enemies = (() => {
       onEnemyDied(true);
     }
   }
+
+  // ── Update HP bar helper ──────────────────────────────────
+  function updateHpBar(e, playerPos) {
+    if (e.hpBar) {
+      const pct    = e.hp / e.maxHp;
+      e.hpBar.fg.scale.x     = pct;
+      e.hpBar.fg.position.x  = -0.35 * (1 - pct);
+      const hpColor = pct > 0.6 ? 0x44ff44 : pct > 0.3 ? 0xffaa00 : 0xff2222;
+      e.hpBar.fg.material.color.setHex(hpColor);
+
+      const barY = e.mesh.position.y + 1.75 * e.typeCfg.scale + 0.35;
+      e.hpBar.group.position.set(e.mesh.position.x, barY, e.mesh.position.z);
+      e.hpBar.group.lookAt(playerPos.x, barY, playerPos.z);
+    }
+  }
+
+  // ── Medic behavior: heal nearest wounded groupmate ────────
+  function updateMedicBehavior(medic, delta) {
+    if (medic.groupId < 0) return false;
+    // Find wounded groupmate (hp < 60% of max)
+    let wounded = null;
+    let wDist = Infinity;
+    for (const e of enemies) {
+      if (!e.alive || e === medic || e.groupId !== medic.groupId) continue;
+      if (e.hp < e.maxHp * 0.6) {
+        const d = medic.mesh.position.distanceTo(e.mesh.position);
+        if (d < wDist) { wDist = d; wounded = e; }
+      }
+    }
+    if (!wounded) return false;
+
+    // Move toward wounded
+    if (wDist > 1.5) {
+      const dir = new THREE.Vector3().subVectors(wounded.mesh.position, medic.mesh.position).setY(0).normalize();
+      medic.mesh.position.addScaledVector(dir, medic.speed * 1.2 * delta);
+      medic.mesh.lookAt(wounded.mesh.position.x, medic.mesh.position.y, wounded.mesh.position.z);
+    } else {
+      // Heal
+      wounded.hp = Math.min(wounded.maxHp, wounded.hp + 8 * delta);
+      wounded.wounded = wounded.hp < wounded.maxHp * 0.4;
+    }
+    return true;
+  }
+
+  // ── Assault Group AI ──────────────────────────────────────
+  function updateAssaultGroups(delta, playerPos) {
+    for (const grp of assaultGroups) {
+      // Count alive members
+      const aliveMembers = grp.members.filter(idx => enemies[idx] && enemies[idx].alive);
+      if (aliveMembers.length === 0) continue;
+
+      grp.stateTimer -= delta;
+
+      // Calculate group center
+      let cx = 0, cz = 0;
+      for (const idx of aliveMembers) {
+        cx += enemies[idx].mesh.position.x;
+        cz += enemies[idx].mesh.position.z;
+      }
+      cx /= aliveMembers.length;
+      cz /= aliveMembers.length;
+
+      // Morale drop on losses
+      const lossRatio = 1 - aliveMembers.length / grp.members.length;
+      grp.morale = Math.max(10, grp.morale - lossRatio * delta * 5);
+
+      // State machine
+      switch (grp.state) {
+        case GROUP_STATE.FORMING:
+          if (grp.stateTimer <= 0) {
+            grp.state = GROUP_STATE.ADVANCING;
+            grp.stateTimer = 15 + Math.random() * 20;
+          }
+          break;
+
+        case GROUP_STATE.ADVANCING:
+          // Move toward objective
+          if (grp.stateTimer <= 0 || lossRatio > 0.3) {
+            grp.state = lossRatio > 0.5 ? GROUP_STATE.RETREATING : GROUP_STATE.ASSAULTING;
+            grp.stateTimer = 20 + Math.random() * 30;
+          }
+          // Set objective on terrain
+          if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
+            grp.objective.y = VoxelWorld.getTerrainHeight(grp.objective.x, grp.objective.z);
+          }
+          break;
+
+        case GROUP_STATE.ASSAULTING:
+          // Pick new objective near friendly NPCs
+          if (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) {
+            const friendlies = NPCSystem.getAll();
+            if (friendlies.length > 0) {
+              const target = friendlies[Math.floor(Math.random() * friendlies.length)];
+              grp.objective.copy(target.position);
+            }
+          }
+          if (grp.stateTimer <= 0) {
+            grp.state = grp.morale < 40 ? GROUP_STATE.RETREATING : GROUP_STATE.REGROUPING;
+            grp.stateTimer = 10 + Math.random() * 15;
+          }
+          break;
+
+        case GROUP_STATE.RETREATING:
+          // Check for wounded — trigger evac
+          const hasWounded = aliveMembers.some(idx => enemies[idx].hp < enemies[idx].maxHp * 0.3);
+          if (hasWounded && grp.hasMedic) {
+            grp.state = GROUP_STATE.EVAC;
+            grp.stateTimer = 8 + Math.random() * 10;
+          } else if (grp.stateTimer <= 0) {
+            grp.state = GROUP_STATE.REGROUPING;
+            grp.stateTimer = 8 + Math.random() * 12;
+            // Pick new rally point further from center
+            const rAngle = Math.random() * Math.PI * 2;
+            const rDist = ARENA_SIZE * 0.3 + Math.random() * 8;
+            grp.rallyPoint.set(Math.cos(rAngle) * rDist, 0, Math.sin(rAngle) * rDist);
+          }
+          break;
+
+        case GROUP_STATE.EVAC:
+          if (grp.stateTimer <= 0) {
+            // Heal wounded members slightly during evac
+            for (const idx of aliveMembers) {
+              if (enemies[idx].hp < enemies[idx].maxHp * 0.5) {
+                enemies[idx].hp = Math.min(enemies[idx].maxHp, enemies[idx].hp + enemies[idx].maxHp * 0.2);
+                enemies[idx].wounded = false;
+              }
+            }
+            grp.state = GROUP_STATE.REGROUPING;
+            grp.stateTimer = 5 + Math.random() * 8;
+          }
+          break;
+
+        case GROUP_STATE.REGROUPING:
+          if (grp.stateTimer <= 0) {
+            // Pick new objective and re-advance
+            const oAngle = Math.random() * Math.PI * 2;
+            const oDist = 6 + Math.random() * 14;
+            grp.objective.set(Math.cos(oAngle) * oDist, 0, Math.sin(oAngle) * oDist);
+            grp.morale = Math.min(100, grp.morale + 15);
+            grp.state = GROUP_STATE.ADVANCING;
+            grp.stateTimer = 15 + Math.random() * 20;
+          }
+          break;
+      }
+    }
+  }
+
+  // ── Set player stealth state ──────────────────────────────
+  function setPlayerStealth(val) { _playerStealth = !!val; }
 
   // ── Apply damage, return remaining HP ─────────────────────
   function damage(enemy, amount) {
@@ -800,6 +1034,7 @@ const Enemies = (() => {
     enemies    = [];
     spawnQueue = [];
     allDead    = false;
+    assaultGroups.length = 0;
   }
 
   // ── Area damage (explosions) ────────────────────────────────
@@ -820,6 +1055,9 @@ const Enemies = (() => {
   // ── Get all alive enemies ─────────────────────────────────
   function getAll() { return enemies.filter(e => e.alive); }
 
+  // ── Get assault groups info ───────────────────────────────
+  function getAssaultGroups() { return assaultGroups; }
+
   return {
     startWave,
     update,
@@ -831,6 +1069,8 @@ const Enemies = (() => {
     isWaveDone,
     clear,
     getAll,
+    getAssaultGroups,
+    setPlayerStealth,
     RANKS,
     UNITS,
   };
