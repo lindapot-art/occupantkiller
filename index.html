@@ -131,6 +131,10 @@
       <button class="btn" id="start-role-lonewolf" style="font-size:13px;padding:6px 16px;border-color:#fa0;color:#fa0;display:inline-block;margin:0 6px">🐺 LONE WOLF</button>
       <p id="start-role-desc" style="color:#888;font-size:12px;margin:6px 0">Brigade: fight alongside your squad. Lone Wolf: observe &amp; engage freestyle.</p>
     </div>
+    <div id="god-mode-select" style="margin:8px 0">
+      <button class="btn" id="god-mode-btn" style="font-size:13px;padding:6px 16px;border-color:#ff0;color:#ff0;display:inline-block;margin:0 6px;text-shadow:0 0 8px #ff0">⚡ GOD MODE</button>
+      <p id="god-mode-desc" style="color:#666;font-size:11px;margin:4px 0;display:none">All weapons · Infinite health · Invisible to enemies</p>
+    </div>
     <div id="start-weapons-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin:8px auto;max-width:520px;font-size:10px"></div>
     <button class="btn" id="start-btn">▶ START MISSION</button>
     <div id="controls-hint">
@@ -314,6 +318,20 @@
   // ── Stealth toggle (pause menu) ────────────────────────
   document.getElementById('stealth-toggle-btn').addEventListener('click', function () {
     GameManager.toggleStealth();
+  });
+
+  // ── God Mode toggle ────────────────────────────────────
+  document.getElementById('god-mode-btn').addEventListener('click', function () {
+    GameManager.toggleGodMode();
+    var desc = document.getElementById('god-mode-desc');
+    var btn = document.getElementById('god-mode-btn');
+    var active = GameManager.isGodMode();
+    if (desc) desc.style.display = active ? 'block' : 'none';
+    if (btn) {
+      btn.style.borderColor = active ? '#0f0' : '#ff0';
+      btn.style.color = active ? '#0f0' : '#ff0';
+      btn.textContent = active ? '⚡ GOD MODE: ON' : '⚡ GOD MODE';
+    }
   });
 
   // ── Populate weapons grids & role indicator ────────────

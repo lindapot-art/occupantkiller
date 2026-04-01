@@ -24,6 +24,7 @@ const VoxelWorld = (function () {
     FENCE:       15,
     RUBBLE:      16,
     SANDBAG:     17,
+    ASPHALT:     18,
   });
 
   const BLOCK_COLORS = {
@@ -44,6 +45,7 @@ const VoxelWorld = (function () {
     [BLOCK.FENCE]:       0x8B7355,
     [BLOCK.RUBBLE]:      0x7a6a5a,
     [BLOCK.SANDBAG]:     0xC2B280,
+    18: 0x333338,  // dark asphalt
   };
 
   const BLOCK_HARDNESS = {
@@ -64,6 +66,7 @@ const VoxelWorld = (function () {
     [BLOCK.FENCE]:       1,
     [BLOCK.RUBBLE]:      2,
     [BLOCK.SANDBAG]:     1,
+    18: 3,  // asphalt road
   };
 
   const BLOCK_TRANSPARENT = new Set([BLOCK.AIR, BLOCK.WATER, BLOCK.GLASS]);

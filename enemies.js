@@ -10,6 +10,7 @@
 const Enemies = (() => {
 
   const MAX_CLIMBABLE_HEIGHT = 2; // Max terrain height difference enemies can climb
+  const bloodParticles = [];
 
   // ── Russian EMR Digital Flora camo palette ─────────────────
   // 4 tones used across body/limb meshes via procedural canvas texture
@@ -615,6 +616,34 @@ const Enemies = (() => {
     // Cache player position for spawning
     _playerPos = playerPos;
 
+    // Update blood voxel particles
+    for (var bp = bloodParticles.length - 1; bp >= 0; bp--) {
+      var blood = bloodParticles[bp];
+      blood.velocity.y -= blood.gravity * delta;
+      blood.mesh.position.addScaledVector(blood.velocity, delta);
+      blood.mesh.rotation.x += delta * 3;
+      blood.mesh.rotation.z += delta * 2;
+      blood.life -= delta;
+      // Fade out in last 0.5s
+      if (blood.life < 0.5) {
+        blood.mesh.material.opacity = blood.life / 0.5;
+        blood.mesh.material.transparent = true;
+      }
+      // Ground collision
+      if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
+        var groundY = VoxelWorld.getTerrainHeight(blood.mesh.position.x, blood.mesh.position.z);
+        if (blood.mesh.position.y <= groundY + 0.05) {
+          blood.mesh.position.y = groundY + 0.05;
+          blood.velocity.set(0, 0, 0);
+          blood.gravity = 0;
+        }
+      }
+      if (blood.life <= 0) {
+        if (scene) scene.remove(blood.mesh);
+        bloodParticles.splice(bp, 1);
+      }
+    }
+
     // Spawn reinforcements from queue (slow drip every 3-6s)
     if (spawnQueue.length > 0) {
       spawnTimer -= delta;
@@ -996,6 +1025,31 @@ const Enemies = (() => {
     });
     enemy.flashTimer = 0.08;
 
+    // Spawn blood voxel particles
+    if (scene) {
+      var bloodCount = Math.min(8, Math.ceil(amount / 10));
+      for (var b = 0; b < bloodCount; b++) {
+        var bloodSize = 0.08 + Math.random() * 0.12;
+        var bloodMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(bloodSize, bloodSize, bloodSize),
+          new THREE.MeshLambertMaterial({ color: Math.random() < 0.5 ? 0xaa0000 : 0x880000 })
+        );
+        bloodMesh.position.copy(enemy.mesh.position);
+        bloodMesh.position.y += 0.5 + Math.random() * 1.0;
+        scene.add(bloodMesh);
+        bloodParticles.push({
+          mesh: bloodMesh,
+          velocity: new THREE.Vector3(
+            (Math.random() - 0.5) * 4,
+            1.5 + Math.random() * 3,
+            (Math.random() - 0.5) * 4
+          ),
+          life: 1.5 + Math.random() * 1.0,
+          gravity: 12,
+        });
+      }
+    }
+
     if (enemy.hp <= 0) {
       enemy.alive      = false;
       enemy.deathTimer = 0.6;
@@ -1025,6 +1079,12 @@ const Enemies = (() => {
   function isWaveDone() { return allDead; }
 
   function clear() {
+    // Clean up blood particles
+    bloodParticles.forEach(bp => {
+      if (scene) scene.remove(bp.mesh);
+    });
+    bloodParticles.length = 0;
+
     enemies.forEach(e => {
       if (scene) {
         scene.remove(e.mesh);
