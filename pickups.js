@@ -12,8 +12,12 @@ const Pickups = (() => {
   const COLLECT_DIST_SQ = COLLECT_DIST * COLLECT_DIST;
 
   const TYPE_CONFIG = {
-    HEALTH: { color: 0x22ff55, emissive: 0x115522, size: 0.28 },
-    AMMO:   { color: 0xffcc00, emissive: 0x664400, size: 0.24 },
+    HEALTH:  { color: 0x22ff55, emissive: 0x115522, size: 0.28 },
+    AMMO:    { color: 0xffcc00, emissive: 0x664400, size: 0.24 },
+    ARMOR:   { color: 0x4488ff, emissive: 0x224488, size: 0.30 },
+    GRENADE: { color: 0xff6622, emissive: 0x883311, size: 0.20 },
+    MEDKIT:  { color: 0xff4444, emissive: 0x882222, size: 0.32 },
+    STIM:    { color: 0xcc44ff, emissive: 0x662288, size: 0.18 },
   };
 
   let scene   = null;

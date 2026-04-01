@@ -43,13 +43,75 @@ const GameManager = (function () {
   let currentWave = 0;
   const SCORE_WAVE_BONUS = 500;
 
+  /* ── Battlefield Events ─────────────────────────────────────────── */
+  const BATTLE_EVENTS = [
+    { id: 'ARTILLERY',    label: '💥 ARTILLERY BARRAGE!',    color: '#ff4444', chance: 0.35 },
+    { id: 'SUPPLY_DROP',  label: '📦 SUPPLY DROP INCOMING!', color: '#44ff88', chance: 0.30 },
+    { id: 'MORTAR',       label: '💣 MORTAR STRIKE!',        color: '#ff8800', chance: 0.20 },
+    { id: 'REINFORCEMENT',label: '🛡 ALLIED REINFORCEMENTS!',color: '#4488ff', chance: 0.15 },
+  ];
+
+  function triggerBattlefieldEvent() {
+    const roll = Math.random();
+    let cumulative = 0;
+    let event = null;
+    for (const ev of BATTLE_EVENTS) {
+      cumulative += ev.chance;
+      if (roll < cumulative) { event = ev; break; }
+    }
+    if (!event) return;
+
+    HUD.notifyPickup(event.label, event.color);
+
+    switch (event.id) {
+      case 'ARTILLERY':
+        // Damage enemies in a random area
+        for (let i = 0; i < 5; i++) {
+          const bx = player.position.x + (Math.random() - 0.5) * 30;
+          const bz = player.position.z + (Math.random() - 0.5) * 30;
+          const bh = VoxelWorld.getTerrainHeight(bx, bz);
+          Enemies.damageInRadius(new THREE.Vector3(bx, bh, bz), 5, 40);
+        }
+        break;
+      case 'SUPPLY_DROP':
+        // Drop pickups near player
+        for (let i = 0; i < 4; i++) {
+          const sx = player.position.x + (Math.random() - 0.5) * 12;
+          const sz = player.position.z + (Math.random() - 0.5) * 12;
+          const sh = VoxelWorld.getTerrainHeight(sx, sz);
+          const types = ['HEALTH', 'AMMO', 'ARMOR', 'MEDKIT', 'GRENADE', 'STIM'];
+          Pickups.spawn(new THREE.Vector3(sx, sh, sz), types[Math.floor(Math.random() * types.length)]);
+        }
+        break;
+      case 'MORTAR':
+        // Single large explosion near enemies
+        const all = Enemies.getAll();
+        if (all.length > 0) {
+          const target = all[Math.floor(Math.random() * all.length)];
+          Enemies.damageInRadius(target.mesh.position, 8, 80);
+        }
+        break;
+      case 'REINFORCEMENT':
+        // Spawn extra friendly NPCs
+        for (let i = 0; i < 3; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 4 + Math.random() * 6;
+          const nx = player.position.x + Math.cos(angle) * dist;
+          const nz = player.position.z + Math.sin(angle) * dist;
+          const nh = VoxelWorld.getTerrainHeight(nx, nz);
+          NPCSystem.spawn(nx, nh, nz, 'infantry');
+        }
+        break;
+    }
+  }
+
   /* ── Stage Definitions ──────────────────────────────────────────── */
   const STAGES = [
     {
       id:           1,
       name:         'HOSTOMEL AIRPORT',
       theme:        'grassland',
-      wavesPerStage: 5,
+      wavesPerStage: 7,
       difficulty:   0.8,
       fogColor:     0x4a5a3a,
       bgColor:      0x4a5a3a,
@@ -61,7 +123,7 @@ const GameManager = (function () {
       id:           2,
       name:         'AVDIIVKA SECTOR',
       theme:        'urban',
-      wavesPerStage: 5,
+      wavesPerStage: 7,
       difficulty:   1.0,
       fogColor:     0x3a3028,
       bgColor:      0x3a3028,
@@ -73,7 +135,7 @@ const GameManager = (function () {
       id:           3,
       name:         'BAKHMUT RUINS',
       theme:        'urban',
-      wavesPerStage: 5,
+      wavesPerStage: 7,
       difficulty:   1.4,
       fogColor:     0x2a2a2a,
       bgColor:      0x2a2a2a,
@@ -85,7 +147,7 @@ const GameManager = (function () {
       id:           4,
       name:         'KHERSON CROSSING',
       theme:        'grassland',
-      wavesPerStage: 5,
+      wavesPerStage: 7,
       difficulty:   1.8,
       fogColor:     0x4a5a3a,
       bgColor:      0x4a5a3a,
@@ -787,6 +849,11 @@ const GameManager = (function () {
     RankSystem.onWaveComplete(currentWave);
     MissionSystem.onWaveCompleted();
 
+    // Trigger a random battlefield event between waves (from wave 2+)
+    if (currentWave >= 2) {
+      setTimeout(function () { triggerBattlefieldEvent(); }, 1500);
+    }
+
     const stageDef = STAGES[currentStage];
 
     // Check if all waves in this stage are done
@@ -872,10 +939,17 @@ const GameManager = (function () {
     if (isMoving) {
       moveDir.normalize();
       player.sprinting = !!keys['ShiftLeft'] || touch.sprinting;
-      const speed = MOVE_SPEED * (player.sprinting ? SPRINT_MULT : 1);
+      let speed = MOVE_SPEED * (player.sprinting ? SPRINT_MULT : 1);
+      // Stim boost: +60% speed while active
+      if (player._stimTimer && player._stimTimer > 0) speed *= 1.6;
       moveDir.multiplyScalar(speed * delta);
 
       if (player.sprinting) SkillSystem.onSprint();
+    }
+
+    // Decay stim timer
+    if (player._stimTimer && player._stimTimer > 0) {
+      player._stimTimer -= delta;
     }
 
     // Gravity
@@ -1002,9 +1076,16 @@ const GameManager = (function () {
       HUD.setKills(player.kills);
       RankSystem.onKill(isHeadshot);
 
-      // Pickup spawn
+      // Pickup spawn — expanded loot table
       if (Math.random() < enemy.dropChance) {
-        const type = Math.random() < 0.5 ? 'HEALTH' : 'AMMO';
+        const lootRoll = Math.random();
+        let type;
+        if (lootRoll < 0.30)      type = 'HEALTH';
+        else if (lootRoll < 0.55) type = 'AMMO';
+        else if (lootRoll < 0.70) type = 'ARMOR';
+        else if (lootRoll < 0.82) type = 'GRENADE';
+        else if (lootRoll < 0.92) type = 'MEDKIT';
+        else                      type = 'STIM';
         Pickups.spawn(enemy.mesh.position, type);
       }
 
@@ -1072,9 +1153,25 @@ const GameManager = (function () {
           player.hp = Math.min(player.maxHp, player.hp + 25);
           HUD.setHealth(player.hp, player.maxHp);
           HUD.notifyPickup('+25 HP', '#22ff55');
-        } else {
+        } else if (type === 'AMMO') {
           Weapons.addAmmo(30);
           HUD.notifyPickup('+30 AMMO', '#ffcc00');
+        } else if (type === 'ARMOR') {
+          player.hp = Math.min(player.maxHp + 50, player.hp + 50);
+          HUD.setHealth(player.hp, player.maxHp);
+          HUD.notifyPickup('+50 ARMOR', '#4488ff');
+        } else if (type === 'GRENADE') {
+          // Area damage around player pickup spot
+          Enemies.damageInRadius(player.position, 6, 60);
+          HUD.notifyPickup('GRENADE BLAST!', '#ff6622');
+        } else if (type === 'MEDKIT') {
+          player.hp = player.maxHp;
+          HUD.setHealth(player.hp, player.maxHp);
+          HUD.notifyPickup('FULL HEAL!', '#ff4444');
+        } else if (type === 'STIM') {
+          // Temporary speed boost (handled via flag)
+          player._stimTimer = 8.0;
+          HUD.notifyPickup('STIM BOOST! 8s', '#cc44ff');
         }
       });
 

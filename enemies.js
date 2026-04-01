@@ -149,6 +149,57 @@ const Enemies = (() => {
       dropChance:  0.60,
       role:        'officer',
     },
+    SNIPER: {
+      name:        'SNIPER',
+      hpBase:      45,
+      speedBase:   1.2,
+      scale:       1.0,
+      camoVariant: 'dark',
+      bodyColor:   EMR_CAMO.dark,
+      headColor:   0xb09070,
+      limbColor:   0x1a2a0a,
+      helmetColor: 0x1a2a1a,
+      eyeColor:    0xff6600,
+      attackDmg:   28,
+      attackRate:  2.8,
+      scoreValue:  400,
+      dropChance:  0.55,
+      role:        'sniper',
+    },
+    ENGINEER: {
+      name:        'ENGINEER',
+      hpBase:      65,
+      speedBase:   1.6,
+      scale:       1.05,
+      camoVariant: 'light',
+      bodyColor:   EMR_CAMO.medium,
+      headColor:   0xc8a882,
+      limbColor:   EMR_CAMO.dark,
+      helmetColor: 0x3a4a3a,
+      eyeColor:    0xffaa00,
+      attackDmg:   10,
+      attackRate:  1.4,
+      scoreValue:  300,
+      dropChance:  0.65,
+      role:        'engineer',
+    },
+    DRONE_OP: {
+      name:        'DRONE_OP',
+      hpBase:      35,
+      speedBase:   1.8,
+      scale:       0.95,
+      camoVariant: 'light',
+      bodyColor:   EMR_CAMO.medium,
+      headColor:   0xc8a882,
+      limbColor:   EMR_CAMO.dark,
+      helmetColor: 0x2a3a2a,
+      eyeColor:    0x00ccff,
+      attackDmg:   15,
+      attackRate:  3.0,
+      scoreValue:  350,
+      dropChance:  0.45,
+      role:        'drone_op',
+    },
   };
 
   // ── Enemy Roles for Assault Groups ──────────────────────
@@ -259,8 +310,14 @@ const Enemies = (() => {
   // ── Choose a type appropriate for the current wave ────────
   function pickTypeForWave(w) {
     const r = Math.random();
-    if (w >= 5 && r < 0.20) return 'ARMORED';
+    // Late waves: introduce specialists and heavy units
+    if (w >= 7 && r < 0.08) return 'DRONE_OP';
+    if (w >= 6 && r < 0.12) return 'SNIPER';
+    if (w >= 5 && r < 0.18) return 'ENGINEER';
+    if (w >= 5 && r < 0.30) return 'ARMORED';
+    if (w >= 4 && r < 0.15) return 'SNIPER';
     if (w >= 3 && r < 0.50) return 'STORMER';
+    if (w >= 2 && r < 0.10) return 'ENGINEER';
     return 'CONSCRIPT';
   }
 

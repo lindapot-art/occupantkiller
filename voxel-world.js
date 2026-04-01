@@ -482,10 +482,10 @@ const VoxelWorld = (function () {
 
   /* ── Level Definitions ────────────────────────────────────────────── */
   const LEVELS = [
-    { id: 'HOSTOMEL',  name: 'Hostomel Airport',    desc: 'Stop the airborne assault',  theme: 'grassland', wavesPerLevel: 5, difficulty: 1.0, fogColor: 0x4a5a3a },
-    { id: 'AVDIIVKA',  name: 'Avdiivka Industrial Zone', desc: 'Hold the coking plant',  theme: 'urban',     wavesPerLevel: 5, difficulty: 1.3, fogColor: 0x3a3028 },
-    { id: 'BAKHMUT',   name: 'Bakhmut Ruins',        desc: 'Defend the city',             theme: 'urban',     wavesPerLevel: 5, difficulty: 1.6, fogColor: 0x2a2a2a },
-    { id: 'KHERSON',   name: 'Kherson Bridgehead',   desc: 'Cross the Dnipro',            theme: 'grassland', wavesPerLevel: 5, difficulty: 1.9, fogColor: 0x4a5a3a },
+    { id: 'HOSTOMEL',  name: 'Hostomel Airport',    desc: 'Stop the airborne assault',  theme: 'grassland', wavesPerLevel: 7, difficulty: 1.0, fogColor: 0x4a5a3a },
+    { id: 'AVDIIVKA',  name: 'Avdiivka Industrial Zone', desc: 'Hold the coking plant',  theme: 'urban',     wavesPerLevel: 7, difficulty: 1.3, fogColor: 0x3a3028 },
+    { id: 'BAKHMUT',   name: 'Bakhmut Ruins',        desc: 'Defend the city',             theme: 'urban',     wavesPerLevel: 7, difficulty: 1.6, fogColor: 0x2a2a2a },
+    { id: 'KHERSON',   name: 'Kherson Bridgehead',   desc: 'Cross the Dnipro',            theme: 'grassland', wavesPerLevel: 7, difficulty: 1.9, fogColor: 0x4a5a3a },
   ];
 
   const PROC_CITIES = ['Mariupol','Severodonetsk','Lysychansk','Bucha','Irpin','Izium','Kupyansk','Robotyne','Vuhledar'];
@@ -500,7 +500,7 @@ const VoxelWorld = (function () {
       name: PROC_CITIES[cityIdx],
       desc: 'Liberate ' + PROC_CITIES[cityIdx],
       theme: theme,
-      wavesPerLevel: 5,
+      wavesPerLevel: 7,
       difficulty: 1.0 + index * 0.35,
       fogColor: THEMES[theme].fogColor,
     };
@@ -1614,6 +1614,120 @@ const VoxelWorld = (function () {
     }
   }
 
+  // ── New Terrain Generators ──────────────────────────────────────
+
+  function generateMortarPit(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Dig a circular pit
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        if (dx * dx + dz * dz <= 5) {
+          setBlock(ox + dx, surfH, oz + dz, BLOCK.AIR);
+          setBlock(ox + dx, surfH - 1, oz + dz, BLOCK.DIRT);
+        }
+      }
+    }
+    // Sandbag ring
+    for (let dx = -3; dx <= 3; dx++) {
+      for (let dz = -3; dz <= 3; dz++) {
+        const d = dx * dx + dz * dz;
+        if (d >= 7 && d <= 10) {
+          setBlock(ox + dx, surfH, oz + dz, BLOCK.SANDBAG);
+          setBlock(ox + dx, surfH + 1, oz + dz, BLOCK.SANDBAG);
+        }
+      }
+    }
+    // Mortar tube (metal block stack)
+    setBlock(ox, surfH, oz, BLOCK.METAL);
+    setBlock(ox, surfH + 1, oz, BLOCK.METAL);
+  }
+
+  function generateWatchtower(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // 4 legs
+    for (let y = 0; y < 8; y++) {
+      setBlock(ox - 1, surfH + y + 1, oz - 1, BLOCK.WOOD);
+      setBlock(ox + 1, surfH + y + 1, oz - 1, BLOCK.WOOD);
+      setBlock(ox - 1, surfH + y + 1, oz + 1, BLOCK.WOOD);
+      setBlock(ox + 1, surfH + y + 1, oz + 1, BLOCK.WOOD);
+    }
+    // Platform
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        setBlock(ox + dx, surfH + 8, oz + dz, BLOCK.WOOD);
+      }
+    }
+    // Railing
+    for (let dx = -2; dx <= 2; dx++) {
+      setBlock(ox + dx, surfH + 9, oz - 2, BLOCK.FENCE);
+      setBlock(ox + dx, surfH + 9, oz + 2, BLOCK.FENCE);
+    }
+    for (let dz = -2; dz <= 2; dz++) {
+      setBlock(ox - 2, surfH + 9, oz + dz, BLOCK.FENCE);
+      setBlock(ox + 2, surfH + 9, oz + dz, BLOCK.FENCE);
+    }
+    // Ladder
+    for (let y = 1; y <= 8; y++) {
+      setBlock(ox, surfH + y, oz - 2, BLOCK.WOOD);
+    }
+  }
+
+  function generateAmmoCache(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Small enclosed ammo storage
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        setBlock(ox + dx, surfH + 1, oz + dz, BLOCK.CRATE);
+        if (Math.random() < 0.5) setBlock(ox + dx, surfH + 2, oz + dz, BLOCK.CRATE);
+      }
+    }
+    // Sandbag surround
+    for (let dx = -2; dx <= 2; dx++) {
+      setBlock(ox + dx, surfH + 1, oz - 2, BLOCK.SANDBAG);
+      setBlock(ox + dx, surfH + 1, oz + 2, BLOCK.SANDBAG);
+    }
+    for (let dz = -1; dz <= 1; dz++) {
+      setBlock(ox - 2, surfH + 1, oz + dz, BLOCK.SANDBAG);
+      setBlock(ox + 2, surfH + 1, oz + dz, BLOCK.SANDBAG);
+    }
+  }
+
+  function generateRazorWireMaze(ox, oz, size) {
+    // Zigzag fence wire pattern
+    let cx = ox, cz = oz;
+    for (let seg = 0; seg < size; seg++) {
+      const len = 4 + Math.floor(Math.random() * 6);
+      const horizontal = seg % 2 === 0;
+      for (let i = 0; i < len; i++) {
+        const wx = horizontal ? cx + i : cx;
+        const wz = horizontal ? cz : cz + i;
+        const h = getTerrainHeight(wx, wz);
+        setBlock(wx, h + 1, wz, BLOCK.FENCE);
+      }
+      if (horizontal) cx += len; else cz += len;
+    }
+  }
+
+  function generateSupplyTent(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Green canvas tent (using grass blocks as proxy)
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -3; dz <= 3; dz++) {
+        const roofH = 3 - Math.abs(dx);
+        setBlock(ox + dx, surfH + roofH, oz + dz, BLOCK.GRASS);
+      }
+    }
+    // Support poles
+    setBlock(ox - 2, surfH + 1, oz - 3, BLOCK.WOOD);
+    setBlock(ox + 2, surfH + 1, oz - 3, BLOCK.WOOD);
+    setBlock(ox - 2, surfH + 1, oz + 3, BLOCK.WOOD);
+    setBlock(ox + 2, surfH + 1, oz + 3, BLOCK.WOOD);
+    // Crates inside
+    setBlock(ox, surfH + 1, oz, BLOCK.CRATE);
+    setBlock(ox + 1, surfH + 1, oz, BLOCK.CRATE);
+    setBlock(ox - 1, surfH + 1, oz + 1, BLOCK.CRATE);
+  }
+
   /* ── Level Generation ──────────────────────────────────────────── */
   function generateLevel(index) {
     const level = getLevelDef(index);
@@ -1658,6 +1772,11 @@ const VoxelWorld = (function () {
         generateFlagPole(0, 12);            // IDEA 18: Ukrainian flag at terminal
         generateBarbedWire(-25, 5, 30, true); // IDEA 10: perimeter wire
         generateFieldHospital(30, 5);       // IDEA 13: medical station
+        generateWatchtower(-15, -18);       // NEW: observation watchtower
+        generateMortarPit(18, 18);          // NEW: mortar position
+        generateAmmoCache(-28, 12);         // NEW: ammo crate storage
+        generateSupplyTent(25, 18);         // NEW: supply tent
+        generateRazorWireMaze(-35, -10, 4); // NEW: razor wire obstacle
         scatterResources(BLOCK.WOOD, 0.003);
         break;
 
@@ -1698,6 +1817,13 @@ const VoxelWorld = (function () {
         generateBillboard(-20, 0);            // IDEA 19: Billboard sign
         generateMinefieldSigns(4);            // IDEA 22: Minefields around approaches
         generateFlagPole(0, 0);               // IDEA 18: Ukrainian flag at center
+        generateMortarPit(-25, 20);           // NEW: mortar pit near apartments
+        generateMortarPit(30, -15);           // NEW: second mortar position
+        generateWatchtower(35, 25);           // NEW: observation tower
+        generateAmmoCache(-5, 30);            // NEW: ammo storage
+        generateAmmoCache(25, -25);           // NEW: second ammo cache
+        generateSupplyTent(-35, -5);          // NEW: supply tent
+        generateRazorWireMaze(-15, 25, 6);    // NEW: razor wire defensive maze
         // Heavy rubble scatter (coking plant battle damage)
         for (let rb = 0; rb < 80; rb++) {
           const rx = randInWorld(), rz = randInWorld();
@@ -1746,6 +1872,14 @@ const VoxelWorld = (function () {
         generateBillboard(-15, 5);              // IDEA 19: Billboard
         generateFlagPole(0, 0);                 // IDEA 18: Ukrainian flag at center
         generatePowerLines(-35, 15, 4);         // IDEA 5: Destroyed power lines
+        generateMortarPit(-20, -25);            // NEW: mortar in ruins
+        generateMortarPit(25, 20);              // NEW: mortar in city
+        generateWatchtower(-30, -30);           // NEW: watchtower on perimeter
+        generateAmmoCache(10, 25);              // NEW: ammo in building
+        generateAmmoCache(-25, -15);            // NEW: hidden ammo cache
+        generateSupplyTent(30, -20);            // NEW: supply tent
+        generateRazorWireMaze(-10, -35, 8);     // NEW: heavy razor wire maze
+        generateRazorWireMaze(15, 25, 5);       // NEW: more razor wire
         // Extra rubble — city is total devastation
         for (let rb2 = 0; rb2 < 100; rb2++) {
           const rx2 = randInWorld(), rz2 = randInWorld();
@@ -1794,6 +1928,11 @@ const VoxelWorld = (function () {
         generateMinefieldSigns(5);              // IDEA 22: Russian minefields
         generatePowerLines(-35, -30, 4);        // IDEA 5: Power infrastructure
         generateBrokenTrees(15);                // Some damaged trees
+        generateMortarPit(-25, -20);            // NEW: mortar position
+        generateWatchtower(25, 25);             // NEW: watchtower near river
+        generateAmmoCache(-20, 20);             // NEW: ammo cache at checkpoint
+        generateSupplyTent(-10, -25);           // NEW: supply tent
+        generateRazorWireMaze(10, 10, 5);       // NEW: razor wire near bridge
         scatterResources(BLOCK.WOOD, 0.003);    // More vegetation than Bakhmut
         break;
 
@@ -1818,6 +1957,17 @@ const VoxelWorld = (function () {
         generateMinefieldSigns(2 + Math.floor(Math.random() * 3));
         generateFlagPole(0, 0);
         if (Math.random() > 0.5) generateChurch(randInWorld(), randInWorld());
+        // NEW procedural features
+        if (Math.random() > 0.4) generateMortarPit(randInWorld(), randInWorld());
+        if (Math.random() > 0.4) generateWatchtower(randInWorld(), randInWorld());
+        if (Math.random() > 0.5) generateAmmoCache(randInWorld(), randInWorld());
+        if (Math.random() > 0.5) generateSupplyTent(randInWorld(), randInWorld());
+        if (Math.random() > 0.3) generateRazorWireMaze(randInWorld(), randInWorld(), 3 + Math.floor(Math.random() * 4));
+        if (Math.random() > 0.6) generateIndustrialComplex(randInWorld(), randInWorld());
+        if (Math.random() > 0.6) generateGrainSilo(randInWorld(), randInWorld());
+        if (Math.random() > 0.5) generateBurningRuin(randInWorld(), randInWorld());
+        if (Math.random() > 0.5) generateFieldHospital(randInWorld(), randInWorld());
+        if (Math.random() > 0.6) generateCommTower(randInWorld(), randInWorld());
         break;
     }
     rebuildAll();
