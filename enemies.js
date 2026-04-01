@@ -522,6 +522,39 @@ const Enemies = (() => {
     return group;
   }
 
+  // ── Rank-based weapon visual for enemy mesh ───────────────
+  // Adds a weapon mesh to the right arm based on enemy rank/type
+  const ENEMY_WEAPON_VISUALS = {
+    CONSCRIPT:  { len: 0.22, color: 0x3a3a28, name: 'AK-74' },
+    STORMER:    { len: 0.16, color: 0x2a2a2a, name: 'PP-19 Vityaz' },
+    ARMORED:    { len: 0.30, color: 0x2a2a1a, name: 'PKP Pecheneg' },
+    MEDIC:      { len: 0.12, color: 0x333333, name: 'Makarov PM' },
+    OFFICER:    { len: 0.24, color: 0x2a2a2a, name: 'AK-12' },
+    SNIPER:     { len: 0.35, color: 0x3a3a2a, name: 'SV-98' },
+    ENGINEER:   { len: 0.20, color: 0x3a3a28, name: 'AKS-74U' },
+    DRONE_OP:   { len: 0.14, color: 0x2a2a2a, name: 'Makarov PM' },
+  };
+
+  function attachWeaponVisual(mesh, typeCfg) {
+    const wInfo = ENEMY_WEAPON_VISUALS[typeCfg.name];
+    if (!wInfo) return;
+    const s = typeCfg.scale;
+    // Weapon barrel attached to right arm area
+    const barrel = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04 * s, 0.04 * s, wInfo.len * s),
+      new THREE.MeshLambertMaterial({ color: wInfo.color })
+    );
+    barrel.position.set(0.35 * s, 0.70 * s, 0.18 * s);
+    mesh.add(barrel);
+    // Weapon body (receiver)
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05 * s, 0.05 * s, 0.10 * s),
+      new THREE.MeshLambertMaterial({ color: wInfo.color })
+    );
+    body.position.set(0.35 * s, 0.72 * s, 0.06 * s);
+    mesh.add(body);
+  }
+
   // ── Floating HP bar (lives in scene, follows enemy) ───────
   function buildHpBar() {
     const group = new THREE.Group();
@@ -578,6 +611,8 @@ const Enemies = (() => {
     const sy = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
       ? VoxelWorld.getTerrainHeight(sx, sz) : 0;
     const mesh  = buildMesh(typeCfg);
+    // Attach rank-based weapon visual to enemy mesh
+    attachWeaponVisual(mesh, typeCfg);
     mesh.position.set(sx, sy, sz);
     scene.add(mesh);
 
@@ -858,9 +893,28 @@ const Enemies = (() => {
         targetDist = e.mesh.position.distanceTo(moveTarget);
       }
 
-      // ── Movement toward target with obstacle avoidance ──
+      // ── Movement toward target with obstacle avoidance + strategic flanking ──
       if (moveTarget && targetDist > 1.0) {
         const dir = new THREE.Vector3().subVectors(moveTarget, e.mesh.position).setY(0).normalize();
+
+        // ── Strategic flanking: stormers and officers approach from the side ──
+        if (e.playerSpotted && !targetIsNPC && targetDist > 6 && targetDist < 25) {
+          const typeName = e.typeCfg.name;
+          if (typeName === 'STORMER' || typeName === 'OFFICER') {
+            // Flank: perpendicular offset based on enemy ID (alternating L/R)
+            const flankSign = (e.id % 2 === 0) ? 1 : -1;
+            const flankStrength = Math.min(1, (targetDist - 6) / 10) * 0.7;
+            const perp = new THREE.Vector3(-dir.z * flankSign, 0, dir.x * flankSign);
+            dir.addScaledVector(perp, flankStrength).normalize();
+          } else if (typeName === 'SNIPER') {
+            // Snipers maintain distance: slow approach, prefer to hold at range
+            if (targetDist < 12) {
+              const retreatStrength = (12 - targetDist) / 12 * 0.6;
+              dir.multiplyScalar(-retreatStrength).normalize();
+            }
+          }
+        }
+
         const stepDist = e.speed * delta;
         const nextX = e.mesh.position.x + dir.x * stepDist * 2;
         const nextZ = e.mesh.position.z + dir.z * stepDist * 2;
@@ -1208,6 +1262,7 @@ const Enemies = (() => {
     getAll,
     getAssaultGroups,
     setPlayerStealth,
+    spawnSingle: function (typeName, pos) { spawnOne(typeName, -1, pos); },
     RANKS,
     UNITS,
   };

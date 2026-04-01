@@ -283,9 +283,38 @@ const VehicleSystem = (function () {
   const COMBAT_SPEED_FACTOR = 0.55;     // fraction of max speed when engaging
   const COMBAT_ENGAGE_RANGE = 25;       // notice enemies within this range
   const COMBAT_HOLD_RANGE = 10;         // stop advancing at this distance
+  const ROAD_SPEED_FACTOR = 0.65;       // faster speed when on roads
 
   function pickWaypoint(v) {
-    // Random point within PATROL_RADIUS of spawn, biased to stay in-world
+    // Prefer road waypoints when available (vehicles drive on roads)
+    if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getRoadWaypoints) {
+      const roadWPs = VoxelWorld.getRoadWaypoints();
+      if (roadWPs.length > 0) {
+        // Pick the nearest road waypoint that is different from current target
+        let bestIdx = -1;
+        let bestDist = Infinity;
+        // Find nearest road waypoint first
+        for (let i = 0; i < roadWPs.length; i++) {
+          const d = v.position.distanceTo(roadWPs[i]);
+          if (d < bestDist && d > WAYPOINT_ARRIVE_DIST) {
+            bestDist = d;
+            bestIdx = i;
+          }
+        }
+        if (bestIdx >= 0) {
+          // Once on a road, follow sequential waypoints for realistic driving
+          if (v._roadIdx === undefined) v._roadIdx = bestIdx;
+          v._roadIdx = (v._roadIdx + 1) % roadWPs.length;
+          v.waypoint = roadWPs[v._roadIdx].clone();
+          v.waypoint.y = 0;
+          v._onRoad = true;
+          v.waypointTimer = 12 + Math.random() * 8;
+          return;
+        }
+      }
+    }
+    // Fallback: Random point within PATROL_RADIUS of spawn
+    v._onRoad = false;
     const home = v.spawnPos;
     const angle = Math.random() * Math.PI * 2;
     const dist  = 8 + Math.random() * PATROL_RADIUS;
@@ -370,7 +399,7 @@ const VehicleSystem = (function () {
 
     // Drive towards waypoint
     const dir = toWP.normalize();
-    const moveSpeed = v.speed * PATROL_SPEED_FACTOR;
+    const moveSpeed = v.speed * (v._onRoad ? ROAD_SPEED_FACTOR : PATROL_SPEED_FACTOR);
     v.velocity.x = dir.x * moveSpeed;
     v.velocity.z = dir.z * moveSpeed;
     // Smoothly face movement direction
