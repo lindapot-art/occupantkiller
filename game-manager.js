@@ -35,6 +35,7 @@ const GameManager = (function () {
     height:     1.7,
     stealth:    false,        // invisibility toggle
     role:       'lonewolf',   // 'brigade' or 'lonewolf'
+    godMode: false,       // god mode: all weapons, invincible, invisible
   };
 
   /* ── Wave State ──────────────────────────────────────────────────── */
@@ -609,6 +610,17 @@ const GameManager = (function () {
     currentStage = 0;
     player.velocity.set(0, 0, 0);
 
+    // Reset god mode effects on game start
+    if (player.godMode) {
+      player.maxHp = 999999;
+      player.hp = 999999;
+      // Unlock all weapons in god mode
+      for (var i = 0; i < Weapons.getWeaponCount(); i++) {
+        Weapons.unlockWeapon(i);
+      }
+      player.stealth = true;
+    }
+
     // Apply first stage
     applyStage(0);
 
@@ -1012,6 +1024,7 @@ const GameManager = (function () {
   }
 
   function onPlayerHit(dmg) {
+    if (player.godMode) return; // God mode: immune to damage
     MLSystem.onDamageTaken(dmg);
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
@@ -1091,6 +1104,13 @@ const GameManager = (function () {
 
       // Sync stealth state to enemy detection system
       Enemies.setPlayerStealth(player.stealth);
+
+      // God mode: keep health maxed and stealth on
+      if (player.godMode) {
+        player.hp = player.maxHp;
+        player.stealth = true;
+        Enemies.setPlayerStealth(true);
+      }
     }
 
     _renderer.render(_scene, _camera);
@@ -1390,6 +1410,39 @@ const GameManager = (function () {
     if (btn) btn.textContent = player.stealth ? '👻 STEALTH ON' : '👻 TOGGLE STEALTH';
   }
 
+  function toggleGodMode() {
+    player.godMode = !player.godMode;
+    if (player.godMode) {
+      // Unlock all weapons
+      for (var i = 0; i < Weapons.getWeaponCount(); i++) {
+        Weapons.unlockWeapon(i);
+      }
+      // Set infinite health
+      player.maxHp = 999999;
+      player.hp = 999999;
+      HUD.setHealth(player.hp, player.maxHp);
+      // Enable stealth (enemies can't see player)
+      player.stealth = true;
+      Enemies.setPlayerStealth(true);
+      var stInd = document.getElementById('stealth-indicator');
+      if (stInd) stInd.style.display = 'block';
+      HUD.notifyPickup('⚡ GOD MODE ACTIVATED', '#ffff00');
+    } else {
+      // Reset health
+      player.maxHp = 100;
+      player.hp = 100;
+      HUD.setHealth(player.hp, player.maxHp);
+      // Disable forced stealth
+      player.stealth = false;
+      Enemies.setPlayerStealth(false);
+      var stInd = document.getElementById('stealth-indicator');
+      if (stInd) stInd.style.display = 'none';
+      HUD.notifyPickup('⚡ GOD MODE DEACTIVATED', '#ff6600');
+    }
+  }
+
+  function isGodMode() { return player.godMode; }
+
   function populateWeaponsGrid(containerId) {
     var el = document.getElementById(containerId);
     if (!el) return;
@@ -1430,6 +1483,8 @@ const GameManager = (function () {
     isMobile,
     setRole,
     toggleStealth,
+    toggleGodMode,
+    isGodMode,
     populateWeaponsGrid,
     updateRoleIndicator,
     getState:        function () { return gameState; },
