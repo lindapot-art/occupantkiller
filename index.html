@@ -107,9 +107,16 @@
       <div>B · Build Mode</div>
       <div>F · Possess Drone</div>
       <div>G · Enter Vehicle</div>
+      <div>I · Stealth Mode</div>
       <div>4-7 · Time Speed</div>
       <div>P · Pause Time</div>
     </div>
+
+    <!-- Stealth indicator -->
+    <div id="stealth-indicator" style="display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(0,255,100,0.15);border:1px solid #00ff66;color:#00ff66;padding:4px 18px;border-radius:4px;font-size:13px;z-index:200;pointer-events:none">👻 STEALTH ACTIVE</div>
+
+    <!-- Role indicator -->
+    <div id="role-indicator" style="position:fixed;top:52px;right:12px;color:#aaa;font-size:12px;z-index:200;pointer-events:none"></div>
   </div>
 
   <!-- Start screen -->
@@ -118,10 +125,17 @@
     <h1>ZOMBIELAND</h1>
     <p>Avdiivka sector. Voxel world. Build. Command. Fight.</p>
     <p class="subtitle">Clear 4 stages across different battlefields to achieve victory.</p>
+    <div id="start-role-select" style="margin:10px 0">
+      <p style="color:#ccc;font-size:14px;margin:4px 0">Choose your role:</p>
+      <button class="btn" id="start-role-brigade" style="font-size:13px;padding:6px 16px;border-color:#0af;color:#0af;display:inline-block;margin:0 6px">🎖 ASSAULT BRIGADE</button>
+      <button class="btn" id="start-role-lonewolf" style="font-size:13px;padding:6px 16px;border-color:#fa0;color:#fa0;display:inline-block;margin:0 6px">🐺 LONE WOLF</button>
+      <p id="start-role-desc" style="color:#888;font-size:12px;margin:6px 0">Brigade: fight alongside your squad. Lone Wolf: observe &amp; engage freestyle.</p>
+    </div>
+    <div id="start-weapons-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin:8px auto;max-width:520px;font-size:10px"></div>
     <button class="btn" id="start-btn">▶ START MISSION</button>
     <div id="controls-hint">
       WASD · MOVE &nbsp;|&nbsp; MOUSE · AIM &nbsp;|&nbsp; LMB · FIRE &nbsp;|&nbsp; R · RELOAD &nbsp;|&nbsp; 1-0 · WEAPON &nbsp;|&nbsp; SHIFT · SPRINT &nbsp;|&nbsp; SPACE · JUMP<br/>
-      V · CAMERA MODE &nbsp;|&nbsp; B · BUILD &nbsp;|&nbsp; F · DRONE &nbsp;|&nbsp; G · VEHICLE &nbsp;|&nbsp; Q/E · SCROLL WEAPONS &nbsp;|&nbsp; ESC · PAUSE
+      V · CAMERA MODE &nbsp;|&nbsp; B · BUILD &nbsp;|&nbsp; F · DRONE &nbsp;|&nbsp; G · VEHICLE &nbsp;|&nbsp; Q/E · SCROLL WEAPONS &nbsp;|&nbsp; I · STEALTH &nbsp;|&nbsp; ESC · PAUSE
     </div>
   </div>
 
@@ -157,6 +171,13 @@
   <!-- Pause screen -->
   <div id="overlay-pause" class="overlay" style="display:none">
     <h1 style="color:#ffffff">PAUSED</h1>
+    <div id="pause-role-select" style="margin:8px 0">
+      <span style="color:#aaa;font-size:13px">ROLE:</span>
+      <button class="btn" id="role-brigade-btn" style="font-size:12px;padding:4px 12px;border-color:#0af;color:#0af;display:inline-block;margin:0 4px">🎖 ASSAULT BRIGADE</button>
+      <button class="btn" id="role-lonewolf-btn" style="font-size:12px;padding:4px 12px;border-color:#fa0;color:#fa0;display:inline-block;margin:0 4px">🐺 LONE WOLF</button>
+    </div>
+    <button class="btn" id="stealth-toggle-btn" style="border-color:#0f6;color:#0f6;margin-top:8px">👻 TOGGLE STEALTH</button>
+    <div id="pause-weapons-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:10px auto;max-width:500px;font-size:11px"></div>
     <button class="btn" id="resume-btn" style="border-color:#fff;color:#fff">▶ RESUME</button>
     <button class="btn" id="quit-btn" style="margin-top:12px;border-color:#888;color:#888">✕ QUIT TO MENU</button>
   </div>

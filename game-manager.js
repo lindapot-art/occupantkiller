@@ -33,11 +33,14 @@ const GameManager = (function () {
     onGround:   false,
     sprinting:  false,
     height:     1.7,
+    stealth:    false,        // invisibility toggle
+    role:       'lonewolf',   // 'brigade' or 'lonewolf'
   };
 
   /* ── Wave State ──────────────────────────────────────────────────── */
   let currentWave = 0;
   const SCORE_WAVE_BONUS = 500;
+  let autoAdvance = false;   // auto-advance waves/stages
 
   /* ── Stage Definitions ──────────────────────────────────────────── */
   const STAGES = [
@@ -302,6 +305,14 @@ const GameManager = (function () {
             const nearby = VehicleSystem.getNearby(player.position, 5);
             if (nearby.length > 0) VehicleSystem.enter(nearby[0].id);
           }
+        }
+
+        // Stealth / invisibility toggle
+        if (e.code === 'KeyI') {
+          player.stealth = !player.stealth;
+          const stInd = document.getElementById('stealth-indicator');
+          if (stInd) stInd.style.display = player.stealth ? 'block' : 'none';
+          HUD.notifyPickup(player.stealth ? '👻 STEALTH ON' : '👁 STEALTH OFF', player.stealth ? '#00ff66' : '#ff6600');
         }
 
         // Weapon switching (1-9 = weapons 0-8, 0 = weapon 9)

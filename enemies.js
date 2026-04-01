@@ -102,7 +102,88 @@ const Enemies = (() => {
       scoreValue:  350,
       dropChance:  0.85,
     },
+    MEDIC: {
+      name:        'MEDIC',
+      hpBase:      35,
+      speedBase:   2.5,
+      scale:       1.0,
+      camoVariant: 'light',
+      bodyColor:   EMR_CAMO.medium,
+      headColor:   0xc8a882,
+      limbColor:   EMR_CAMO.dark,
+      helmetColor: 0x3a3a2a,
+      eyeColor:    0x00aa00,
+      attackDmg:   4,
+      attackRate:  2.0,
+      scoreValue:  200,
+      dropChance:  0.50,
+      role:        'medic',
+    },
+    OFFICER: {
+      name:        'OFFICER',
+      hpBase:      80,
+      speedBase:   1.8,
+      scale:       1.1,
+      camoVariant: 'dark',
+      bodyColor:   EMR_CAMO.dark,
+      headColor:   0xd0b090,
+      limbColor:   0x2a3a1a,
+      helmetColor: 0x2a2a2a,
+      eyeColor:    0xff2200,
+      attackDmg:   14,
+      attackRate:  1.0,
+      scoreValue:  500,
+      dropChance:  0.60,
+      role:        'officer',
+    },
   };
+
+  // ── Enemy Roles for Assault Groups ──────────────────────
+  const SQUAD_ROLE = Object.freeze({
+    POINTMAN:  'pointman',   // leads group, scouts ahead
+    RIFLEMAN:  'rifleman',   // basic combat
+    SUPPORT:   'support',    // suppressive fire
+    MEDIC:     'medic',      // heals wounded
+    OFFICER:   'officer',    // group leader, boosts morale
+    EVAC:      'evac',       // drags wounded to safety
+  });
+
+  // ── Assault Group System ────────────────────────────────
+  // 5 enemy assault groups, Russian army "штурмовая группа" style
+  const NUM_ASSAULT_GROUPS = 5;
+  const assaultGroups = [];
+
+  // Group states
+  const GROUP_STATE = Object.freeze({
+    FORMING:    'forming',     // gathering at rally point
+    ADVANCING:  'advancing',   // moving toward objective
+    ASSAULTING: 'assaulting',  // attacking objective/NPCs
+    RETREATING: 'retreating',  // falling back with wounded
+    REGROUPING: 'regrouping',  // reforming after losses
+    EVAC:       'evac',        // evacuating wounded
+  });
+
+  function createAssaultGroup(id, spawnCenter) {
+    const objectiveAngle = Math.random() * Math.PI * 2;
+    const objectiveDist = 8 + Math.random() * 12;
+    return {
+      id: id,
+      state: GROUP_STATE.FORMING,
+      stateTimer: 3 + Math.random() * 5,
+      rallyPoint: spawnCenter.clone(),
+      objective: new THREE.Vector3(
+        Math.cos(objectiveAngle) * objectiveDist,
+        0,
+        Math.sin(objectiveAngle) * objectiveDist
+      ),
+      members: [],        // enemy indices
+      wounded: [],         // wounded member indices
+      morale: 80 + Math.random() * 20,
+      hasOfficer: false,
+      hasMedic: false,
+      formationSpread: 2 + Math.random() * 2,
+    };
+  }
 
   // ── Military Ranks ───────────────────────────────────────
   const RANKS = [
@@ -155,8 +236,12 @@ const Enemies = (() => {
   let allDead    = false;
   let stageMult  = 1;    // stage difficulty multiplier
   let _playerPos = null; // cached player position for spawning
+  let _playerStealth = false; // player stealth state
 
   const ARENA_SIZE = 24;
+  const DETECTION_RANGE = 14;   // enemies detect player within this range
+  const DETECTION_ANGLE = 1.2;  // ~70° half-cone FOV for detection
+  const SPOT_TIME = 1.5;        // seconds to fully spot player
 
   // ── Choose a type appropriate for the current wave ────────
   function pickTypeForWave(w) {
@@ -403,18 +488,24 @@ const Enemies = (() => {
   }
 
   // ── Spawn one enemy ───────────────────────────────────────
-  function spawnOne(typeName) {
+  function spawnOne(typeName, groupId, spawnPos) {
     const typeCfg = TYPES[typeName] || TYPES.CONSCRIPT;
     const rank = pickRank(wave);
     const unit = pickUnit();
 
-    // Spawn around the player, not world origin, and place on terrain
-    const angle = Math.random() * Math.PI * 2;
-    const r     = ARENA_SIZE * 0.46 + Math.random() * 4;
-    const px = _playerPos ? _playerPos.x : 0;
-    const pz = _playerPos ? _playerPos.z : 0;
-    const sx = px + Math.cos(angle) * r;
-    const sz = pz + Math.sin(angle) * r;
+    // Spawn position: if spawnPos provided (for group), use it; else around player
+    let sx, sz;
+    if (spawnPos) {
+      sx = spawnPos.x + (Math.random() - 0.5) * 4;
+      sz = spawnPos.z + (Math.random() - 0.5) * 4;
+    } else {
+      const angle = Math.random() * Math.PI * 2;
+      const r     = ARENA_SIZE * 0.46 + Math.random() * 4;
+      const px = _playerPos ? _playerPos.x : 0;
+      const pz = _playerPos ? _playerPos.z : 0;
+      sx = px + Math.cos(angle) * r;
+      sz = pz + Math.sin(angle) * r;
+    }
     const sy = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
       ? VoxelWorld.getTerrainHeight(sx, sz) : 0;
     const mesh  = buildMesh(typeCfg);
@@ -425,6 +516,12 @@ const Enemies = (() => {
     const waveSpeedBonus = (1 + (wave - 1) * 0.06) * (1 + (stageMult - 1) * 0.3);
     const hp             = typeCfg.hpBase * waveHpBonus * rank.hpMult;
 
+    // Determine squad role
+    let squadRole = SQUAD_ROLE.RIFLEMAN;
+    if (typeCfg.role === 'medic') squadRole = SQUAD_ROLE.MEDIC;
+    else if (typeCfg.role === 'officer') squadRole = SQUAD_ROLE.OFFICER;
+
+    const idx = enemies.length;
     enemies.push({
       mesh,
       hpBar:       buildHpBar(),
@@ -445,7 +542,50 @@ const Enemies = (() => {
       legAngle:    0,
       legDir:      1,
       deathTimer:  0,
+      // Assault group & detection
+      groupId:     groupId !== undefined ? groupId : -1,
+      squadRole:   squadRole,
+      spotLevel:   0,           // 0=unaware, >=SPOT_TIME = spotted player
+      playerSpotted: false,     // true = actively targeting player
+      npcTarget:   null,        // reference to friendly NPC being targeted
+      wounded:     false,       // wounded, needs medic
+      retreating:  false,       // falling back
     });
+    return idx;
+  }
+
+  // ── Spawn an assault group ─────────────────────────────────
+  function spawnAssaultGroup(groupId, sc) {
+    const angle = (groupId / NUM_ASSAULT_GROUPS) * Math.PI * 2 + Math.random() * 0.5;
+    const dist = ARENA_SIZE * 0.44 + Math.random() * 6;
+    const center = new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+
+    const group = createAssaultGroup(groupId, center);
+
+    // Compose group: 1 officer, 1 medic, 2-4 riflemen, 1 stormer(pointman)
+    const officerIdx = spawnOne('OFFICER', groupId, center);
+    group.members.push(officerIdx);
+    group.hasOfficer = true;
+
+    const medicIdx = spawnOne('MEDIC', groupId, center);
+    group.members.push(medicIdx);
+    group.hasMedic = true;
+
+    // Pointman (stormer)
+    const pointIdx = spawnOne('STORMER', groupId, center);
+    enemies[pointIdx].squadRole = SQUAD_ROLE.POINTMAN;
+    group.members.push(pointIdx);
+
+    // Riflemen
+    const rifleCt = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < rifleCt; i++) {
+      const typ = Math.random() < 0.3 ? 'ARMORED' : 'CONSCRIPT';
+      const idx = spawnOne(typ, groupId, center);
+      group.members.push(idx);
+    }
+
+    assaultGroups.push(group);
+    return group;
   }
 
   // ── Initialise a wave ─────────────────────────────────────
@@ -455,12 +595,19 @@ const Enemies = (() => {
     stageMult = stageMultiplier || 1;
     enemies   = [];
     allDead   = false;
+    assaultGroups.length = 0;
 
-    // Avdiivka-style: 8 on wave 1, +3 per wave, scaled by stage
-    const baseCount = 8 + (w - 1) * 3;
-    const count = Math.floor(baseCount * (1 + (stageMult - 1) * 0.5));
-    spawnQueue  = Array.from({ length: count }, () => pickTypeForWave(w));
-    spawnTimer  = 0;
+    // Spawn 5 enemy assault groups (Russian army штурмовые группы)
+    for (let g = 0; g < NUM_ASSAULT_GROUPS; g++) {
+      spawnAssaultGroup(g, sc);
+    }
+
+    // Additional loose enemies spawn over time (stragglers, reinforcements)
+    // Longer waves: 12 base + 5 per wave, slower spawn rate
+    const baseExtra = 12 + (w - 1) * 5;
+    const extraCount = Math.floor(baseExtra * (1 + (stageMult - 1) * 0.5));
+    spawnQueue  = Array.from({ length: extraCount }, () => pickTypeForWave(w));
+    spawnTimer  = 8 + Math.random() * 4; // delay before first reinforcement
   }
 
   // ── Per-frame update ──────────────────────────────────────

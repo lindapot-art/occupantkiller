@@ -98,7 +98,7 @@ const Weapons = (() => {
   }
   let states     = WEAPONS.map(makeState);
   let currentIdx = 0;
-  let unlocked   = [true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false];
+  let unlocked   = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
 
   function cur()      { return WEAPONS[currentIdx]; }
   function curState() { return states[currentIdx]; }
@@ -1027,7 +1027,7 @@ const Weapons = (() => {
   function reset() {
     states     = WEAPONS.map(makeState);
     currentIdx = 0;
-    unlocked   = [true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false];
+    unlocked   = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
     if (zoomed) exitZoom();
     recoilOffset = 0;
     reloadAnimAngle = 0;
