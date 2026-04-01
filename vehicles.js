@@ -29,6 +29,10 @@ const VehicleSystem = (function () {
   let nextId = 1;
   let _occupiedVehicle = null;
 
+  /* ── Turret Projectile State ────────────────────────────────────── */
+  const turretProjectiles = [];
+  const TURRET_PROJ_SPEED = 40;
+
   /* ── Build Vehicle Mesh ──────────────────────────────────────────── */
   function buildVehicleMesh(type) {
     const group = new THREE.Group();
@@ -149,6 +153,8 @@ const VehicleSystem = (function () {
       alive: true,
       occupied: false,
       passengers: [],
+      fireCooldown: 0,
+      fireRate: type === 'combat' ? 1.5 : type === 'turret_rover' ? 2.0 : 0,
     };
 
     vehicle.mesh = buildVehicleMesh(type);
@@ -187,7 +193,7 @@ const VehicleSystem = (function () {
   function isInVehicle() { return _occupiedVehicle !== null; }
 
   /* ── Vehicle Input ───────────────────────────────────────────────── */
-  const _vKeys = { w: false, a: false, s: false, d: false, up: false, down: false };
+  const _vKeys = { w: false, a: false, s: false, d: false, up: false, down: false, fire: false };
   function setVehicleKey(key, pressed) {
     if (key in _vKeys) _vKeys[key] = pressed;
   }
@@ -197,8 +203,15 @@ const VehicleSystem = (function () {
     for (const v of vehicles) {
       if (!v.alive) continue;
 
+      // Fire cooldown
+      if (v.fireCooldown > 0) v.fireCooldown -= delta;
+
       if (v === _occupiedVehicle) {
         updatePlayerVehicle(v, delta);
+        // Player vehicle fires with mouse/fire key
+        if (_vKeys.fire && v.damage > 0 && v.fireCooldown <= 0) {
+          fireTurret(v);
+        }
       } else if (v.ai) {
         updateAIVehicle(v, delta);
       }
@@ -225,6 +238,9 @@ const VehicleSystem = (function () {
       // Friction
       v.velocity.multiplyScalar(0.95);
     }
+
+    // Update turret projectiles
+    updateTurretProjectiles(delta);
   }
 
   function updatePlayerVehicle(v, delta) {
@@ -254,8 +270,116 @@ const VehicleSystem = (function () {
   }
 
   function updateAIVehicle(v, delta) {
-    // Simple AI: patrol around or defend position
-    // TODO: more complex AI behavior
+    // AI turret rovers: find nearest enemy and shoot
+    if (v.damage > 0 && typeof Enemies !== 'undefined') {
+      const enemies = Enemies.getAll ? Enemies.getAll() : [];
+      let nearestDist = 25; // firing range
+      let nearestEnemy = null;
+      for (let i = 0; i < enemies.length; i++) {
+        const e = enemies[i];
+        if (!e.alive || !e.mesh) continue;
+        const d = v.position.distanceTo(e.mesh.position);
+        if (d < nearestDist) {
+          nearestDist = d;
+          nearestEnemy = e;
+        }
+      }
+      if (nearestEnemy && v.fireCooldown <= 0) {
+        // Face the enemy
+        const dir = nearestEnemy.mesh.position.clone().sub(v.position).normalize();
+        v.rotation.y = Math.atan2(dir.x, dir.z);
+        fireTurretAt(v, nearestEnemy.mesh.position);
+      }
+      // Slow patrol towards closest enemy
+      if (nearestEnemy) {
+        const dir = nearestEnemy.mesh.position.clone().sub(v.position);
+        if (dir.length() > 12) {
+          dir.normalize().multiplyScalar(v.speed * 0.5);
+          v.velocity.x = dir.x;
+          v.velocity.z = dir.z;
+          v.rotation.y = Math.atan2(dir.x, dir.z);
+        }
+      }
+    }
+  }
+
+  /* ── Turret Fire ────────────────────────────────────────────────── */
+  function fireTurret(v) {
+    if (!_scene || v.fireCooldown > 0 || v.damage <= 0) return;
+    v.fireCooldown = v.fireRate;
+    // Fire in the direction the camera is facing (player-controlled)
+    const yaw = CameraSystem.getYaw();
+    const dir = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+    spawnTurretProjectile(v.position, dir, v.damage);
+    if (typeof AudioSystem !== 'undefined') AudioSystem.playGunshot('hmg');
+  }
+
+  function fireTurretAt(v, targetPos) {
+    if (!_scene || v.fireCooldown > 0 || v.damage <= 0) return;
+    v.fireCooldown = v.fireRate;
+    const dir = targetPos.clone().sub(v.position).normalize();
+    spawnTurretProjectile(v.position, dir, v.damage);
+    if (typeof AudioSystem !== 'undefined') AudioSystem.playGunshot('hmg');
+  }
+
+  function spawnTurretProjectile(origin, dir, damage) {
+    if (!_scene) return;
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.1, 0.3),
+      new THREE.MeshBasicMaterial({ color: 0xffcc22 })
+    );
+    const start = origin.clone();
+    start.y += 1.6; // Turret height
+    mesh.position.copy(start);
+    mesh.lookAt(start.clone().add(dir));
+    _scene.add(mesh);
+    turretProjectiles.push({
+      mesh: mesh, dir: dir.clone(), speed: TURRET_PROJ_SPEED,
+      damage: damage, life: 3.0,
+    });
+  }
+
+  function updateTurretProjectiles(delta) {
+    for (let i = turretProjectiles.length - 1; i >= 0; i--) {
+      const p = turretProjectiles[i];
+      p.mesh.position.addScaledVector(p.dir, p.speed * delta);
+      p.life -= delta;
+
+      // Check enemy collision
+      let hit = false;
+      if (typeof Enemies !== 'undefined') {
+        const enemyMeshes = Enemies.getEnemyMeshes();
+        const rc = new THREE.Raycaster(
+          p.mesh.position.clone(),
+          p.dir.clone(),
+          0,
+          p.speed * delta + 0.5
+        );
+        const hits = rc.intersectObjects(enemyMeshes, true);
+        if (hits.length > 0) {
+          hit = true;
+          const enemy = Enemies.findByMesh(hits[0].object);
+          if (enemy && enemy.alive) {
+            Enemies.damage(enemy, p.damage);
+          }
+        }
+      }
+
+      // Check terrain collision
+      if (!hit && typeof VoxelWorld !== 'undefined') {
+        const fakeCamera = {
+          position: p.mesh.position.clone(),
+          getWorldDirection: function(v) { return v.copy(p.dir); },
+        };
+        const ray = VoxelWorld.raycastBlock(fakeCamera, p.speed * delta + 0.5);
+        if (ray) hit = true;
+      }
+
+      if (hit || p.life <= 0) {
+        if (_scene) _scene.remove(p.mesh);
+        turretProjectiles.splice(i, 1);
+      }
+    }
   }
 
   /* ── Damage ──────────────────────────────────────────────────────── */
@@ -287,6 +411,11 @@ const VehicleSystem = (function () {
     }
     vehicles.length = 0;
     _occupiedVehicle = null;
+    // Clean up turret projectiles
+    for (const p of turretProjectiles) {
+      if (p.mesh && _scene) _scene.remove(p.mesh);
+    }
+    turretProjectiles.length = 0;
   }
 
   return {
@@ -300,6 +429,7 @@ const VehicleSystem = (function () {
     isInVehicle,
     setVehicleKey,
     update,
+    fireTurret,
     damageVehicle,
     getAll,
     getById,

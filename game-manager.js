@@ -217,9 +217,21 @@ const GameManager = (function () {
       NPCSystem.spawn(nx, nh, nz, i < 2 ? 'civilian' : 'trainee');
     }
 
-    // Spawn a starter vehicle
+    // Spawn starter vehicle fleet
     const vh = VoxelWorld.getTerrainHeight(8, 8);
     VehicleSystem.spawn(8, vh, 8, 'transport');
+    const startVh2 = VoxelWorld.getTerrainHeight(12, 5);
+    VehicleSystem.spawn(12, startVh2, 5, 'combat');
+    const startVh3 = VoxelWorld.getTerrainHeight(-8, -8);
+    VehicleSystem.spawn(-8, startVh3, -8, 'turret_rover');
+
+    // Spawn starter drones
+    const startDh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
+    DroneSystem.spawn(5, startDh1, 5, 'recon');
+    const startDh2 = VoxelWorld.getTerrainHeight(-5, 5) + 8;
+    DroneSystem.spawn(-5, startDh2, 5, 'fpv_attack');
+    const startDh3 = VoxelWorld.getTerrainHeight(0, -10) + 10;
+    DroneSystem.spawn(0, startDh3, -10, 'bomb');
 
     // Input setup
     setupInput();
@@ -292,7 +304,7 @@ const GameManager = (function () {
           }
         }
 
-        // Weapon switching (1-9)
+        // Weapon switching (1-9 = weapons 0-8, 0 = weapon 9)
         if (e.code === 'Digit1') Weapons.switchTo(0);
         if (e.code === 'Digit2') Weapons.switchTo(1);
         if (e.code === 'Digit3') Weapons.switchTo(2);
@@ -302,6 +314,9 @@ const GameManager = (function () {
         if (e.code === 'Digit7' && gameState === STATE.PLAYING) Weapons.switchTo(6);
         if (e.code === 'Digit8') Weapons.switchTo(7);
         if (e.code === 'Digit9') Weapons.switchTo(8);
+        if (e.code === 'Digit0') Weapons.switchTo(9);
+        if (e.code === 'KeyQ')   Weapons.switchPrev();
+        if (e.code === 'KeyE' && gameState === STATE.PLAYING) Weapons.switchNext();
         if (e.code === 'KeyR')   { Weapons.forceReload(); AudioSystem.playReload(); MLSystem.onReload(); }
 
         // Build mode: template selection
@@ -596,6 +611,24 @@ const GameManager = (function () {
     Weapons.reset();
     Enemies.clear();
     Pickups.clear();
+    VehicleSystem.clear();
+    DroneSystem.clear();
+
+    // Respawn vehicle fleet for first stage
+    const sgVh = VoxelWorld.getTerrainHeight(8, 8);
+    VehicleSystem.spawn(8, sgVh, 8, 'transport');
+    const sgVh2 = VoxelWorld.getTerrainHeight(12, 5);
+    VehicleSystem.spawn(12, sgVh2, 5, 'combat');
+    const sgVh3 = VoxelWorld.getTerrainHeight(-8, -8);
+    VehicleSystem.spawn(-8, sgVh3, -8, 'turret_rover');
+
+    // Respawn drones
+    const sgDh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
+    DroneSystem.spawn(5, sgDh1, 5, 'recon');
+    const sgDh2 = VoxelWorld.getTerrainHeight(-5, 5) + 8;
+    DroneSystem.spawn(-5, sgDh2, 5, 'fpv_attack');
+    const sgDh3 = VoxelWorld.getTerrainHeight(0, -10) + 10;
+    DroneSystem.spawn(0, sgDh3, -10, 'bomb');
 
     hideOverlays();
     HUD.show();
@@ -684,10 +717,22 @@ const GameManager = (function () {
       NPCSystem.spawn(nx, nh, nz, i < 2 ? 'civilian' : 'trainee');
     }
 
-    // Respawn vehicle
+    // Respawn vehicle fleet
     const vh = VoxelWorld.getTerrainHeight(8, 8);
     VehicleSystem.clear();
     VehicleSystem.spawn(8, vh, 8, 'transport');
+    const vh2 = VoxelWorld.getTerrainHeight(12, 5);
+    VehicleSystem.spawn(12, vh2, 5, 'combat');
+    const vh3 = VoxelWorld.getTerrainHeight(-8, -8);
+    VehicleSystem.spawn(-8, vh3, -8, 'turret_rover');
+
+    // Spawn drones
+    const dh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
+    DroneSystem.spawn(5, dh1, 5, 'recon');
+    const dh2 = VoxelWorld.getTerrainHeight(-5, 5) + 8;
+    DroneSystem.spawn(-5, dh2, 5, 'fpv_attack');
+    const dh3 = VoxelWorld.getTerrainHeight(0, -10) + 10;
+    DroneSystem.spawn(0, dh3, -10, 'bomb');
 
     // Update HUD
     HUD.setStage(stageDef.id, stageDef.name);
@@ -862,7 +907,32 @@ const GameManager = (function () {
 
   /* ── Combat ──────────────────────────────────────────────────────── */
   function updateCombat(delta) {
-    if (DroneSystem.isPossessing() || VehicleSystem.isInVehicle()) return;
+    // Drone combat: LMB triggers drone action
+    if (DroneSystem.isPossessing()) {
+      if (mouseDown || touch.firing) {
+        const drone = DroneSystem.getPossessed();
+        if (drone) {
+          if (drone.type === 'fpv_attack') {
+            DroneSystem.fireAttack(drone.id);
+          } else if (drone.type === 'bomb' && drone.hasPayload) {
+            DroneSystem.dropPayload(drone.id);
+          }
+        }
+        mouseNewPress = false;
+      }
+      return;
+    }
+
+    // Vehicle combat: LMB triggers turret fire
+    if (VehicleSystem.isInVehicle()) {
+      if (mouseDown || touch.firing) {
+        VehicleSystem.setVehicleKey('fire', true);
+      } else {
+        VehicleSystem.setVehicleKey('fire', false);
+      }
+      return;
+    }
+
     if (CameraSystem.getMode() === CameraSystem.MODE.STRATEGIC) return;
 
     if (mouseDown || touch.firing) {
@@ -870,7 +940,7 @@ const GameManager = (function () {
       const weaponType = Weapons.getCurrentType();
       const weaponId = Weapons.getCurrentId();
       // Map weapon type to audio sound type
-      const audioMap = { MELEE: 'melee', PISTOL: 'pistol', ASSAULT: 'rifle', LMG: 'rifle', SNIPER: 'sniper', HMG: 'hmg', AT: 'launcher', ATGM: 'launcher', NATO: 'rifle' };
+      const audioMap = { MELEE: 'melee', PISTOL: 'pistol', ASSAULT: 'rifle', LMG: 'rifle', SNIPER: 'sniper', HMG: 'hmg', AT: 'launcher', ATGM: 'launcher', NATO: 'rifle', AT_HEAVY: 'launcher', AT_LIGHT: 'launcher', AA: 'launcher', GRENADE: 'launcher', NATO_HEAVY: 'rifle', HMG_HEAVY: 'hmg', INCENDIARY: 'launcher' };
       Weapons.tryFire(_camera, targets, delta, function (hit) {
         onEnemyHit(hit);
       }, mouseNewPress);
@@ -918,10 +988,11 @@ const GameManager = (function () {
         Pickups.spawn(enemy.mesh.position, type);
       }
 
-      // Weapon unlock drop (pickup weapons 2-8)
+      // Weapon unlock drop (pickup weapons 2-15)
       if (Math.random() < 0.12) {
         const candidates = [];
-        for (let wi = 2; wi <= 8; wi++) {
+        const weaponCount = Weapons.getWeaponCount();
+        for (let wi = 2; wi < weaponCount; wi++) {
           if (!Weapons.isUnlocked(wi)) candidates.push(wi);
         }
         if (candidates.length > 0) {
