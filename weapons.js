@@ -1,5 +1,5 @@
 /**
- * weapons.js – 16-weapon Ukrainian war arsenal with melee, projectiles, grenades, fire & scope zoom
+ * weapons.js – 23-weapon Ukrainian war arsenal with melee, projectiles, grenades, fire & scope zoom
  * Switch with keys 1-0, Q/E scroll. Weapons 0 (shovel) and 1 (pistol) start unlocked.
  * Depends on: Three.js global (THREE), HUD, VoxelWorld, Enemies
  */
@@ -87,6 +87,42 @@ const Weapons = (() => {
       fireRate: 1.0, clipSize: 1, maxReserve: 5, reloadTime: 0.5,
       spread: 0.02, auto: false, type: 'INCENDIARY', blastRadius: 3,
     },
+    // ── 7 new weapons ──────────────────────────────────────
+    {
+      id: 'MG3', name: 'MG3 Machine Gun', damage: 32,
+      fireRate: 0.05, clipSize: 120, maxReserve: 360, reloadTime: 5.5,
+      spread: 0.055, auto: true, type: 'MACHINEGUN',
+    },
+    {
+      id: 'MP5', name: 'MP5 SMG', damage: 18,
+      fireRate: 0.06, clipSize: 30, maxReserve: 150, reloadTime: 2.0,
+      spread: 0.04, auto: true, type: 'SMG',
+    },
+    {
+      id: 'BARRETTM82', name: 'Barrett M82', damage: 250,
+      fireRate: 1.5, clipSize: 10, maxReserve: 30, reloadTime: 4.0,
+      spread: 0.002, auto: false, type: 'AMR', hasScope: true,
+    },
+    {
+      id: 'MINIGUN', name: 'M134 Minigun', damage: 12,
+      fireRate: 0.02, clipSize: 500, maxReserve: 1000, reloadTime: 8.0,
+      spread: 0.08, auto: true, type: 'MINIGUN',
+    },
+    {
+      id: 'CROSSBOW', name: 'Tactical Crossbow', damage: 65,
+      fireRate: 1.2, clipSize: 1, maxReserve: 15, reloadTime: 1.8,
+      spread: 0.006, auto: false, type: 'SILENT',
+    },
+    {
+      id: 'FLAMETHROWER', name: 'RPO-A Shmel', damage: 200,
+      fireRate: 2.0, clipSize: 1, maxReserve: 3, reloadTime: 3.5,
+      spread: 0.03, auto: false, type: 'THERMOBARIC', blastRadius: 5,
+    },
+    {
+      id: 'DOUBLEBARREL', name: 'IZH-43 Shotgun', damage: 120,
+      fireRate: 0.3, clipSize: 2, maxReserve: 24, reloadTime: 2.0,
+      spread: 0.12, auto: false, type: 'SHOTGUN',
+    },
   ];
 
   // ── Per-weapon mutable state ───────────────────────────────
@@ -98,7 +134,7 @@ const Weapons = (() => {
   }
   let states     = WEAPONS.map(makeState);
   let currentIdx = 0;
-  let unlocked   = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
+  let unlocked   = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
 
   function cur()      { return WEAPONS[currentIdx]; }
   function curState() { return states[currentIdx]; }
@@ -632,11 +668,234 @@ const Weapons = (() => {
     return g;
   }
 
+  function buildMg3Mesh() {
+    const g = new THREE.Group();
+    const barrel = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.05, 0.65),
+      new THREE.MeshLambertMaterial({ color: 0x2a2a2a })
+    );
+    barrel.position.set(0.17, -0.12, -0.52);
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.10, 0.10, 0.30),
+      new THREE.MeshLambertMaterial({ color: 0x3a3a28 })
+    );
+    body.position.set(0.17, -0.13, -0.22);
+    const beltBox = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.10, 0.08),
+      new THREE.MeshLambertMaterial({ color: 0x4a4a2a })
+    );
+    beltBox.position.set(0.24, -0.18, -0.20);
+    const stock = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.05, 0.16),
+      new THREE.MeshLambertMaterial({ color: 0x5a3a1a })
+    );
+    stock.position.set(0.17, -0.13, -0.02);
+    const bipod1 = new THREE.Mesh(
+      new THREE.BoxGeometry(0.012, 0.14, 0.012),
+      new THREE.MeshLambertMaterial({ color: 0x333333 })
+    );
+    bipod1.position.set(0.13, -0.22, -0.60);
+    bipod1.rotation.z = 0.25;
+    const bipod2 = bipod1.clone();
+    bipod2.position.set(0.21, -0.22, -0.60);
+    bipod2.rotation.z = -0.25;
+    g.add(barrel, body, beltBox, stock, bipod1, bipod2);
+    return g;
+  }
+
+  function buildMp5Mesh() {
+    const g = new THREE.Group();
+    const barrel = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, 0.03, 0.22),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    barrel.position.set(0.18, -0.14, -0.38);
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.07, 0.20),
+      new THREE.MeshLambertMaterial({ color: 0x222222 })
+    );
+    body.position.set(0.18, -0.14, -0.22);
+    const mag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.035, 0.12, 0.04),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    mag.position.set(0.18, -0.24, -0.22);
+    mag.rotation.x = 0.08;
+    const stock = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.04, 0.10),
+      new THREE.MeshLambertMaterial({ color: 0x222222 })
+    );
+    stock.position.set(0.18, -0.14, -0.08);
+    const grip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.035, 0.07, 0.035),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    grip.position.set(0.18, -0.22, -0.16);
+    g.add(barrel, body, mag, stock, grip);
+    return g;
+  }
+
+  function buildBarrettMesh() {
+    const g = new THREE.Group();
+    const barrel = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.05, 0.75),
+      new THREE.MeshLambertMaterial({ color: 0x2a2a2a })
+    );
+    barrel.position.set(0.17, -0.12, -0.60);
+    const brake = new THREE.Mesh(
+      new THREE.BoxGeometry(0.07, 0.07, 0.08),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    brake.position.set(0.17, -0.12, -1.00);
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.10, 0.12, 0.32),
+      new THREE.MeshLambertMaterial({ color: 0x3a3a3a })
+    );
+    body.position.set(0.17, -0.13, -0.24);
+    const scope = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.025, 0.15, 8),
+      new THREE.MeshLambertMaterial({ color: 0x111111 })
+    );
+    scope.rotation.x = Math.PI / 2;
+    scope.position.set(0.17, -0.04, -0.30);
+    const mag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.12, 0.06),
+      new THREE.MeshLambertMaterial({ color: 0x2a2a2a })
+    );
+    mag.position.set(0.17, -0.24, -0.22);
+    const stock = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.07, 0.18),
+      new THREE.MeshLambertMaterial({ color: 0x3a3a3a })
+    );
+    stock.position.set(0.17, -0.12, -0.02);
+    g.add(barrel, brake, body, scope, mag, stock);
+    return g;
+  }
+
+  function buildMinigunMesh() {
+    const g = new THREE.Group();
+    // 6 rotating barrels
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const b = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.015, 0.015, 0.50, 6),
+        new THREE.MeshLambertMaterial({ color: 0x2a2a2a })
+      );
+      b.rotation.x = Math.PI / 2;
+      b.position.set(0.17 + Math.cos(a) * 0.04, -0.12 + Math.sin(a) * 0.04, -0.50);
+      g.add(b);
+    }
+    const housing = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.06, 0.20, 10),
+      new THREE.MeshLambertMaterial({ color: 0x3a3a3a })
+    );
+    housing.rotation.x = Math.PI / 2;
+    housing.position.set(0.17, -0.12, -0.22);
+    const ammo = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.10, 0.12),
+      new THREE.MeshLambertMaterial({ color: 0x4a4a2a })
+    );
+    ammo.position.set(0.17, -0.26, -0.18);
+    const grip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.10, 0.04),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    grip.position.set(0.17, -0.22, -0.08);
+    g.add(housing, ammo, grip);
+    return g;
+  }
+
+  function buildCrossbowMesh() {
+    const g = new THREE.Group();
+    const stock = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.04, 0.35),
+      new THREE.MeshLambertMaterial({ color: 0x3a3a3a })
+    );
+    stock.position.set(0.17, -0.14, -0.30);
+    const limb = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, 0.02, 0.03),
+      new THREE.MeshLambertMaterial({ color: 0x222222 })
+    );
+    limb.position.set(0.17, -0.12, -0.48);
+    const string = new THREE.Mesh(
+      new THREE.BoxGeometry(0.30, 0.005, 0.005),
+      new THREE.MeshLambertMaterial({ color: 0xaaaaaa })
+    );
+    string.position.set(0.17, -0.12, -0.42);
+    const scope = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, 0.08, 6),
+      new THREE.MeshLambertMaterial({ color: 0x111111 })
+    );
+    scope.rotation.x = Math.PI / 2;
+    scope.position.set(0.17, -0.08, -0.30);
+    g.add(stock, limb, string, scope);
+    return g;
+  }
+
+  function buildFlamethrowerMesh() {
+    const g = new THREE.Group();
+    const tube = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.06, 0.55, 10),
+      new THREE.MeshLambertMaterial({ color: 0x4a5a3a })
+    );
+    tube.rotation.x = Math.PI / 2;
+    tube.position.set(0.17, -0.12, -0.40);
+    const capFront = new THREE.Mesh(
+      new THREE.SphereGeometry(0.062, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshLambertMaterial({ color: 0x3a4a2a })
+    );
+    capFront.rotation.x = -Math.PI / 2;
+    capFront.position.set(0.17, -0.12, -0.68);
+    const grip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.10, 0.06),
+      new THREE.MeshLambertMaterial({ color: 0x2a2a2a })
+    );
+    grip.position.set(0.17, -0.22, -0.25);
+    const sight = new THREE.Mesh(
+      new THREE.BoxGeometry(0.02, 0.04, 0.02),
+      new THREE.MeshLambertMaterial({ color: 0x333333 })
+    );
+    sight.position.set(0.17, -0.05, -0.50);
+    g.add(tube, capFront, grip, sight);
+    return g;
+  }
+
+  function buildDoubleBarrelMesh() {
+    const g = new THREE.Group();
+    const barrel1 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.025, 0.45, 8),
+      new THREE.MeshLambertMaterial({ color: 0x2a2a2a })
+    );
+    barrel1.rotation.x = Math.PI / 2;
+    barrel1.position.set(0.15, -0.12, -0.45);
+    const barrel2 = barrel1.clone();
+    barrel2.position.set(0.19, -0.12, -0.45);
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.06, 0.15),
+      new THREE.MeshLambertMaterial({ color: 0x3a3a28 })
+    );
+    body.position.set(0.17, -0.13, -0.18);
+    const stock = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.05, 0.20),
+      new THREE.MeshLambertMaterial({ color: 0x5a3a1a })
+    );
+    stock.position.set(0.17, -0.14, -0.02);
+    const grip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.035, 0.08, 0.04),
+      new THREE.MeshLambertMaterial({ color: 0x3a2a1a })
+    );
+    grip.position.set(0.17, -0.22, -0.14);
+    g.add(barrel1, barrel2, body, stock, grip);
+    return g;
+  }
+
   const meshBuilders = [
     buildShovelMesh, buildMakarovMesh, buildAkMesh, buildRpkMesh,
     buildSvdMesh, buildPkmMesh, buildNlawMesh, buildStugnaMesh, buildM4Mesh,
     buildJavelinMesh, buildRpg7Mesh, buildIglaMesh, buildGp25Mesh,
     buildScarHMesh, buildDshkMesh, buildMolotovMesh,
+    buildMg3Mesh, buildMp5Mesh, buildBarrettMesh, buildMinigunMesh,
+    buildCrossbowMesh, buildFlamethrowerMesh, buildDoubleBarrelMesh,
   ];
 
   function createGunMesh(camera) {
@@ -926,16 +1185,38 @@ const Weapons = (() => {
       return;
     }
 
-    // ── Projectile weapons (AT/ATGM/AT_HEAVY/AT_LIGHT/AA/GRENADE/INCENDIARY) ──
+    // ── Projectile weapons (AT/ATGM/AT_HEAVY/AT_LIGHT/AA/GRENADE/INCENDIARY/THERMOBARIC) ──
     if (wep.type === 'AT' || wep.type === 'ATGM' || wep.type === 'AT_HEAVY' ||
         wep.type === 'AT_LIGHT' || wep.type === 'AA' || wep.type === 'GRENADE' ||
-        wep.type === 'INCENDIARY') {
+        wep.type === 'INCENDIARY' || wep.type === 'THERMOBARIC') {
       if (st.clip <= 0) { startReload(); _firedThisFrame = false; return; }
       st.clip--;
       HUD.setAmmo(st.clip, st.reserve);
       showMuzzle();
       spawnProjectile(camera, wep);
       recoilOffset = 0.04;
+      if (st.clip === 0 && st.reserve > 0) startReload();
+      return;
+    }
+
+    // ── Shotgun: multi-pellet hitscan (8 pellets per shot) ──
+    if (wep.type === 'SHOTGUN') {
+      if (st.clip <= 0) { startReload(); _firedThisFrame = false; return; }
+      st.clip--;
+      HUD.setAmmo(st.clip, st.reserve);
+      showMuzzle();
+      recoilOffset = 0.05;
+      const pellets = 8;
+      for (let p = 0; p < pellets; p++) {
+        spreadVec.set(
+          (Math.random() - 0.5) * wep.spread * 2,
+          (Math.random() - 0.5) * wep.spread * 2
+        );
+        raycaster.setFromCamera(spreadVec, camera);
+        raycaster.far = 25; // shotgun effective range
+        const pelletHits = raycaster.intersectObjects(targets, true);
+        if (pelletHits.length > 0) onHit(pelletHits[0], Math.floor(wep.damage / pellets));
+      }
       if (st.clip === 0 && st.reserve > 0) startReload();
       return;
     }
