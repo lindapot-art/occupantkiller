@@ -40,7 +40,6 @@ const GameManager = (function () {
   /* ── Wave State ──────────────────────────────────────────────────── */
   let currentWave = 0;
   const SCORE_WAVE_BONUS = 500;
-  let autoAdvance = false;   // auto-advance waves/stages
 
   /* ── Stage Definitions ──────────────────────────────────────────── */
   const STAGES = [

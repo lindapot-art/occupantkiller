@@ -715,7 +715,7 @@ const Enemies = (() => {
       e.playerSpotted = e.spotLevel >= SPOT_TIME;
 
       // If player shot this enemy, immediately spot them
-      if (e.flashTimer > 0 && e.flashTimer > 0.07) {
+      if (e.flashTimer > 0.07) {
         e.spotLevel = SPOT_TIME + 0.5;
         e.playerSpotted = true;
       }
