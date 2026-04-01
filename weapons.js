@@ -1312,7 +1312,7 @@ const Weapons = (() => {
   function reset() {
     states     = WEAPONS.map(makeState);
     currentIdx = 0;
-    unlocked   = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
+    unlocked   = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
     if (zoomed) exitZoom();
     recoilOffset = 0;
     reloadAnimAngle = 0;
