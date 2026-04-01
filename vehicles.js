@@ -227,9 +227,8 @@ const VehicleSystem = (function () {
       }
 
       // Keep within world bounds
-      const WORLD_HALF = 45;
-      v.position.x = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, v.position.x));
-      v.position.z = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, v.position.z));
+      v.position.x = Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, v.position.x));
+      v.position.z = Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, v.position.z));
 
       // Update mesh
       v.mesh.position.copy(v.position);
@@ -276,6 +275,8 @@ const VehicleSystem = (function () {
   }
 
   /* ── AI Patrol Waypoint System ─────────────────────────────────── */
+  const WORLD_BOUND   = 45;             // hard position clamp
+  const PATROL_BOUND  = 43;             // waypoints stay inside hard clamp
   const PATROL_RADIUS = 30;             // how far from spawn to patrol
   const WAYPOINT_ARRIVE_DIST = 4;       // close enough = pick new waypoint
   const PATROL_SPEED_FACTOR = 0.35;     // fraction of max speed for patrol
@@ -285,17 +286,16 @@ const VehicleSystem = (function () {
 
   function pickWaypoint(v) {
     // Random point within PATROL_RADIUS of spawn, biased to stay in-world
-    const home = v.spawnPos || v.position;
+    const home = v.spawnPos;
     const angle = Math.random() * Math.PI * 2;
     const dist  = 8 + Math.random() * PATROL_RADIUS;
     const wx = home.x + Math.cos(angle) * dist;
     const wz = home.z + Math.sin(angle) * dist;
-    // Clamp within world
-    const WORLD_HALF = 43;
+    // Clamp within patrol bounds
     v.waypoint = new THREE.Vector3(
-      Math.max(-WORLD_HALF, Math.min(WORLD_HALF, wx)),
+      Math.max(-PATROL_BOUND, Math.min(PATROL_BOUND, wx)),
       0,
-      Math.max(-WORLD_HALF, Math.min(WORLD_HALF, wz))
+      Math.max(-PATROL_BOUND, Math.min(PATROL_BOUND, wz))
     );
     v.waypointTimer = 8 + Math.random() * 10; // timeout to force new waypoint
   }
@@ -346,6 +346,9 @@ const VehicleSystem = (function () {
         const moveSpeed = v.speed * COMBAT_SPEED_FACTOR;
         v.velocity.x = faceDir.x * moveSpeed;
         v.velocity.z = faceDir.z * moveSpeed;
+      } else {
+        v.velocity.x = 0;
+        v.velocity.z = 0;
       }
       return; // skip patrol when in combat
     }
@@ -359,6 +362,8 @@ const VehicleSystem = (function () {
 
     if (distToWP < WAYPOINT_ARRIVE_DIST) {
       // Arrived at waypoint — pick a new one
+      v.velocity.x = 0;
+      v.velocity.z = 0;
       pickWaypoint(v);
       return;
     }
