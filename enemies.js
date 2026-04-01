@@ -315,7 +315,6 @@ const Enemies = (() => {
     if (w >= 6 && r < 0.12) return 'SNIPER';
     if (w >= 5 && r < 0.18) return 'ENGINEER';
     if (w >= 5 && r < 0.30) return 'ARMORED';
-    if (w >= 4 && r < 0.15) return 'SNIPER';
     if (w >= 3 && r < 0.50) return 'STORMER';
     if (w >= 2 && r < 0.10) return 'ENGINEER';
     return 'CONSCRIPT';

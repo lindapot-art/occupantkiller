@@ -851,7 +851,7 @@ const GameManager = (function () {
 
     // Trigger a random battlefield event between waves (from wave 2+)
     if (currentWave >= 2) {
-      setTimeout(function () { triggerBattlefieldEvent(); }, 1500);
+      setTimeout(triggerBattlefieldEvent, 1500);
     }
 
     const stageDef = STAGES[currentStage];

@@ -1692,10 +1692,10 @@ const VoxelWorld = (function () {
     }
   }
 
-  function generateRazorWireMaze(ox, oz, size) {
-    // Zigzag fence wire pattern
+  function generateRazorWireMaze(ox, oz, segments) {
+    // Zigzag fence wire pattern; segments = number of zigzag legs
     let cx = ox, cz = oz;
-    for (let seg = 0; seg < size; seg++) {
+    for (let seg = 0; seg < segments; seg++) {
       const len = 4 + Math.floor(Math.random() * 6);
       const horizontal = seg % 2 === 0;
       for (let i = 0; i < len; i++) {
