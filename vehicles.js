@@ -212,7 +212,8 @@ const VehicleSystem = (function () {
         if (_vKeys.fire && v.damage > 0 && v.fireCooldown <= 0) {
           fireTurret(v);
         }
-      } else if (v.ai) {
+      } else {
+        // ALL unoccupied vehicles get autonomous AI movement
         updateAIVehicle(v, delta);
       }
 
@@ -224,6 +225,11 @@ const VehicleSystem = (function () {
         const terrainH = VoxelWorld.getTerrainHeight(v.position.x, v.position.z);
         if (v.position.y < terrainH) v.position.y = terrainH;
       }
+
+      // Keep within world bounds
+      const WORLD_HALF = 45;
+      v.position.x = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, v.position.x));
+      v.position.z = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, v.position.z));
 
       // Update mesh
       v.mesh.position.copy(v.position);
@@ -269,12 +275,49 @@ const VehicleSystem = (function () {
     }
   }
 
+  /* ── AI Patrol Waypoint System ─────────────────────────────────── */
+  const PATROL_RADIUS = 30;             // how far from spawn to patrol
+  const WAYPOINT_ARRIVE_DIST = 4;       // close enough = pick new waypoint
+  const PATROL_SPEED_FACTOR = 0.35;     // fraction of max speed for patrol
+  const COMBAT_SPEED_FACTOR = 0.55;     // fraction of max speed when engaging
+  const COMBAT_ENGAGE_RANGE = 25;       // notice enemies within this range
+  const COMBAT_HOLD_RANGE = 10;         // stop advancing at this distance
+
+  function pickWaypoint(v) {
+    // Random point within PATROL_RADIUS of spawn, biased to stay in-world
+    const home = v.spawnPos || v.position;
+    const angle = Math.random() * Math.PI * 2;
+    const dist  = 8 + Math.random() * PATROL_RADIUS;
+    const wx = home.x + Math.cos(angle) * dist;
+    const wz = home.z + Math.sin(angle) * dist;
+    // Clamp within world
+    const WORLD_HALF = 43;
+    v.waypoint = new THREE.Vector3(
+      Math.max(-WORLD_HALF, Math.min(WORLD_HALF, wx)),
+      0,
+      Math.max(-WORLD_HALF, Math.min(WORLD_HALF, wz))
+    );
+    v.waypointTimer = 8 + Math.random() * 10; // timeout to force new waypoint
+  }
+
   function updateAIVehicle(v, delta) {
-    // AI turret rovers: find nearest enemy and shoot
-    if (v.damage > 0 && typeof Enemies !== 'undefined') {
+    // Initialize patrol state on first call
+    if (!v.spawnPos) {
+      v.spawnPos = v.position.clone();
+      pickWaypoint(v);
+    }
+
+    // Decrement waypoint timeout
+    if (v.waypointTimer !== undefined) {
+      v.waypointTimer -= delta;
+      if (v.waypointTimer <= 0) pickWaypoint(v);
+    }
+
+    // ── Find nearest enemy ──
+    let nearestEnemy = null;
+    let nearestDist = COMBAT_ENGAGE_RANGE;
+    if (typeof Enemies !== 'undefined') {
       const enemies = Enemies.getAll ? Enemies.getAll() : [];
-      let nearestDist = 25; // firing range
-      let nearestEnemy = null;
       for (let i = 0; i < enemies.length; i++) {
         const e = enemies[i];
         if (!e.alive || !e.mesh) continue;
@@ -284,23 +327,54 @@ const VehicleSystem = (function () {
           nearestEnemy = e;
         }
       }
-      if (nearestEnemy && v.fireCooldown <= 0) {
-        // Face the enemy
-        const dir = nearestEnemy.mesh.position.clone().sub(v.position).normalize();
-        v.rotation.y = Math.atan2(dir.x, dir.z);
+    }
+
+    // ── Combat behavior (armed vehicles) ──
+    if (nearestEnemy && v.damage > 0) {
+      const toEnemy = nearestEnemy.mesh.position.clone().sub(v.position);
+      const enemyDist = toEnemy.length();
+      const faceDir = toEnemy.normalize();
+      v.rotation.y = Math.atan2(faceDir.x, faceDir.z);
+
+      // Fire at enemy
+      if (v.fireCooldown <= 0) {
         fireTurretAt(v, nearestEnemy.mesh.position);
       }
-      // Slow patrol towards closest enemy
-      if (nearestEnemy) {
-        const dir = nearestEnemy.mesh.position.clone().sub(v.position);
-        if (dir.length() > 12) {
-          dir.normalize().multiplyScalar(v.speed * 0.5);
-          v.velocity.x = dir.x;
-          v.velocity.z = dir.z;
-          v.rotation.y = Math.atan2(dir.x, dir.z);
-        }
+
+      // Drive towards enemy if far, hold position if close
+      if (enemyDist > COMBAT_HOLD_RANGE) {
+        const moveSpeed = v.speed * COMBAT_SPEED_FACTOR;
+        v.velocity.x = faceDir.x * moveSpeed;
+        v.velocity.z = faceDir.z * moveSpeed;
       }
+      return; // skip patrol when in combat
     }
+
+    // ── Patrol behavior (all vehicles when no enemy) ──
+    if (!v.waypoint) pickWaypoint(v);
+
+    const toWP = v.waypoint.clone().sub(v.position);
+    toWP.y = 0;
+    const distToWP = toWP.length();
+
+    if (distToWP < WAYPOINT_ARRIVE_DIST) {
+      // Arrived at waypoint — pick a new one
+      pickWaypoint(v);
+      return;
+    }
+
+    // Drive towards waypoint
+    const dir = toWP.normalize();
+    const moveSpeed = v.speed * PATROL_SPEED_FACTOR;
+    v.velocity.x = dir.x * moveSpeed;
+    v.velocity.z = dir.z * moveSpeed;
+    // Smoothly face movement direction
+    const targetYaw = Math.atan2(dir.x, dir.z);
+    let yawDiff = targetYaw - v.rotation.y;
+    // Normalize to [-PI, PI]
+    while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
+    while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
+    v.rotation.y += yawDiff * Math.min(1, delta * 3);
   }
 
   /* ── Turret Fire ────────────────────────────────────────────────── */
