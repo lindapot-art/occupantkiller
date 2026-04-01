@@ -72,6 +72,13 @@
           <span class="wslot" id="wslot-13">SCAR</span>
           <span class="wslot" id="wslot-14">DShK</span>
           <span class="wslot" id="wslot-15">Molotov</span>
+          <span class="wslot" id="wslot-16">MG3</span>
+          <span class="wslot" id="wslot-17">MP5</span>
+          <span class="wslot" id="wslot-18">Barrett</span>
+          <span class="wslot" id="wslot-19">Minigun</span>
+          <span class="wslot" id="wslot-20">Xbow</span>
+          <span class="wslot" id="wslot-21">Shmel</span>
+          <span class="wslot" id="wslot-22">IZH-43</span>
         </div>
       </div>
     </div>
@@ -181,6 +188,7 @@
       <button class="btn" id="role-lonewolf-btn" style="font-size:12px;padding:4px 12px;border-color:#fa0;color:#fa0;display:inline-block;margin:0 4px">🐺 LONE WOLF</button>
     </div>
     <button class="btn" id="stealth-toggle-btn" style="border-color:#0f6;color:#0f6;margin-top:8px">👻 TOGGLE STEALTH</button>
+    <button class="btn" id="pause-god-mode-btn" style="font-size:12px;padding:4px 12px;border-color:#ff0;color:#ff0;display:inline-block;margin:4px 0;text-shadow:0 0 8px #ff0">⚡ GOD MODE</button>
     <div id="pause-weapons-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:10px auto;max-width:500px;font-size:11px"></div>
     <button class="btn" id="resume-btn" style="border-color:#fff;color:#fff">▶ RESUME</button>
     <button class="btn" id="quit-btn" style="margin-top:12px;border-color:#888;color:#888">✕ QUIT TO MENU</button>
@@ -321,17 +329,32 @@
   });
 
   // ── God Mode toggle ────────────────────────────────────
+  function updateGodModeButtons() {
+    var active = GameManager.isGodMode();
+    // Start screen button
+    var desc = document.getElementById('god-mode-desc');
+    var startBtn = document.getElementById('god-mode-btn');
+    if (desc) desc.style.display = active ? 'block' : 'none';
+    if (startBtn) {
+      startBtn.style.borderColor = active ? '#0f0' : '#ff0';
+      startBtn.style.color = active ? '#0f0' : '#ff0';
+      startBtn.textContent = active ? '⚡ GOD MODE: ON' : '⚡ GOD MODE';
+    }
+    // Pause screen button
+    var pauseBtn = document.getElementById('pause-god-mode-btn');
+    if (pauseBtn) {
+      pauseBtn.style.borderColor = active ? '#0f0' : '#ff0';
+      pauseBtn.style.color = active ? '#0f0' : '#ff0';
+      pauseBtn.textContent = active ? '⚡ GOD MODE: ON' : '⚡ GOD MODE';
+    }
+  }
   document.getElementById('god-mode-btn').addEventListener('click', function () {
     GameManager.toggleGodMode();
-    var desc = document.getElementById('god-mode-desc');
-    var btn = document.getElementById('god-mode-btn');
-    var active = GameManager.isGodMode();
-    if (desc) desc.style.display = active ? 'block' : 'none';
-    if (btn) {
-      btn.style.borderColor = active ? '#0f0' : '#ff0';
-      btn.style.color = active ? '#0f0' : '#ff0';
-      btn.textContent = active ? '⚡ GOD MODE: ON' : '⚡ GOD MODE';
-    }
+    updateGodModeButtons();
+  });
+  document.getElementById('pause-god-mode-btn').addEventListener('click', function () {
+    GameManager.toggleGodMode();
+    updateGodModeButtons();
   });
 
   // ── Populate weapons grids & role indicator ────────────

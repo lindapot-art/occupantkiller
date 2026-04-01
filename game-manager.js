@@ -45,10 +45,15 @@ const GameManager = (function () {
 
   /* ── Battlefield Events ─────────────────────────────────────────── */
   const BATTLE_EVENTS = [
-    { id: 'ARTILLERY',    label: '💥 ARTILLERY BARRAGE!',    color: '#ff4444', chance: 0.35 },
-    { id: 'SUPPLY_DROP',  label: '📦 SUPPLY DROP INCOMING!', color: '#44ff88', chance: 0.30 },
-    { id: 'MORTAR',       label: '💣 MORTAR STRIKE!',        color: '#ff8800', chance: 0.20 },
-    { id: 'REINFORCEMENT',label: '🛡 ALLIED REINFORCEMENTS!',color: '#4488ff', chance: 0.15 },
+    { id: 'ARTILLERY',     label: '💥 ARTILLERY BARRAGE!',      color: '#ff4444', chance: 0.20 },
+    { id: 'SUPPLY_DROP',   label: '📦 SUPPLY DROP INCOMING!',   color: '#44ff88', chance: 0.18 },
+    { id: 'MORTAR',        label: '💣 MORTAR STRIKE!',          color: '#ff8800', chance: 0.12 },
+    { id: 'REINFORCEMENT', label: '🛡 ALLIED REINFORCEMENTS!',  color: '#4488ff', chance: 0.10 },
+    { id: 'AMBUSH',        label: '⚠ ENEMY AMBUSH!',           color: '#ff2222', chance: 0.10 },
+    { id: 'SNIPER_DUEL',   label: '🎯 SNIPER DUEL!',           color: '#ffaa00', chance: 0.08 },
+    { id: 'ARMOR_PUSH',    label: '🛡 ENEMY ARMOR PUSH!',      color: '#cc0000', chance: 0.07 },
+    { id: 'AIR_SUPPORT',   label: '✈ FRIENDLY AIR SUPPORT!',   color: '#00aaff', chance: 0.08 },
+    { id: 'DRONE_SWARM',   label: '🤖 ENEMY DRONE SWARM!',     color: '#ff4488', chance: 0.07 },
   ];
 
   function triggerBattlefieldEvent() {
@@ -100,6 +105,58 @@ const GameManager = (function () {
           const nz = player.position.z + Math.sin(angle) * dist;
           const nh = VoxelWorld.getTerrainHeight(nx, nz);
           NPCSystem.spawn(nx, nh, nz, 'infantry');
+        }
+        break;
+      case 'AMBUSH':
+        // Enemy ambush: spawn fast stormers all around the player
+        for (let i = 0; i < 6; i++) {
+          const aa = (i / 6) * Math.PI * 2;
+          const ad = 8 + Math.random() * 4;
+          Enemies.spawnSingle('STORMER', new THREE.Vector3(
+            player.position.x + Math.cos(aa) * ad, 0,
+            player.position.z + Math.sin(aa) * ad
+          ));
+        }
+        break;
+      case 'SNIPER_DUEL':
+        // Spawn enemy snipers at long range + give player ammo
+        for (let i = 0; i < 3; i++) {
+          const sa = Math.random() * Math.PI * 2;
+          const sd = 18 + Math.random() * 8;
+          Enemies.spawnSingle('SNIPER', new THREE.Vector3(
+            player.position.x + Math.cos(sa) * sd, 0,
+            player.position.z + Math.sin(sa) * sd
+          ));
+        }
+        Weapons.addAmmo(20);
+        break;
+      case 'ARMOR_PUSH':
+        // Spawn armored enemies in formation
+        for (let i = 0; i < 4; i++) {
+          const fa = (Math.random() - 0.5) * 1.5;
+          const fd = 15 + Math.random() * 6;
+          Enemies.spawnSingle('ARMORED', new THREE.Vector3(
+            player.position.x + Math.cos(fa) * fd, 0,
+            player.position.z + Math.sin(fa) * fd
+          ));
+        }
+        break;
+      case 'AIR_SUPPORT':
+        // Massive damage to enemies in a large area
+        const allEnemies = Enemies.getAll();
+        for (let i = 0; i < allEnemies.length && i < 10; i++) {
+          if (allEnemies[i].alive) {
+            Enemies.damageInRadius(allEnemies[i].mesh.position, 6, 60);
+          }
+        }
+        break;
+      case 'DRONE_SWARM':
+        // Spawn extra drones for the player
+        for (let i = 0; i < 2; i++) {
+          const dx = player.position.x + (Math.random() - 0.5) * 10;
+          const dz = player.position.z + (Math.random() - 0.5) * 10;
+          const dh = VoxelWorld.getTerrainHeight(dx, dz) + 8;
+          DroneSystem.spawn(dx, dh, dz, i === 0 ? 'fpv_attack' : 'bomb');
         }
         break;
     }
@@ -1034,7 +1091,7 @@ const GameManager = (function () {
       const weaponType = Weapons.getCurrentType();
       const weaponId = Weapons.getCurrentId();
       // Map weapon type to audio sound type
-      const audioMap = { MELEE: 'melee', PISTOL: 'pistol', ASSAULT: 'rifle', LMG: 'rifle', SNIPER: 'sniper', HMG: 'hmg', AT: 'launcher', ATGM: 'launcher', NATO: 'rifle', AT_HEAVY: 'launcher', AT_LIGHT: 'launcher', AA: 'launcher', GRENADE: 'launcher', NATO_HEAVY: 'rifle', HMG_HEAVY: 'hmg', INCENDIARY: 'launcher' };
+      const audioMap = { MELEE: 'melee', PISTOL: 'pistol', ASSAULT: 'rifle', LMG: 'rifle', SNIPER: 'sniper', HMG: 'hmg', AT: 'launcher', ATGM: 'launcher', NATO: 'rifle', AT_HEAVY: 'launcher', AT_LIGHT: 'launcher', AA: 'launcher', GRENADE: 'launcher', NATO_HEAVY: 'rifle', HMG_HEAVY: 'hmg', INCENDIARY: 'launcher', MACHINEGUN: 'hmg', SMG: 'pistol', AMR: 'sniper', MINIGUN: 'hmg', SILENT: 'pistol', THERMOBARIC: 'launcher', SHOTGUN: 'rifle' };
       Weapons.tryFire(_camera, targets, delta, function (hit) {
         onEnemyHit(hit);
       }, mouseNewPress);

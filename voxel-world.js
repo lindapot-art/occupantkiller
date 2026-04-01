@@ -778,13 +778,13 @@ const VoxelWorld = (function () {
         }
       }
     }
-    // Pave streets
+    // Pave streets with ASPHALT
     for (let gx = 0; gx <= gridW; gx++) {
       const sx = ox + gx * (blockSize + streetWidth) - streetWidth;
       for (let z = oz; z < oz + gridD * (blockSize + streetWidth); z++) {
         for (let sw = 0; sw < streetWidth; sw++) {
           const h = getTerrainHeight(sx + sw, z);
-          setBlock(sx + sw, h, z, BLOCK.CONCRETE);
+          setBlock(sx + sw, h, z, BLOCK.ASPHALT);
         }
       }
     }
@@ -793,9 +793,72 @@ const VoxelWorld = (function () {
       for (let x = ox; x < ox + gridW * (blockSize + streetWidth); x++) {
         for (let sw = 0; sw < streetWidth; sw++) {
           const h = getTerrainHeight(x, sz + sw);
-          setBlock(x, h, sz + sw, BLOCK.CONCRETE);
+          setBlock(x, h, sz + sw, BLOCK.ASPHALT);
         }
       }
+    }
+  }
+
+  /* ── Road Generation System ─────────────────────────────────────── */
+  // Stores road waypoints for vehicle AI to follow
+  const _roadWaypoints = [];
+
+  /**
+   * Generate an asphalt road between two points using Bresenham-style line with width.
+   * Also registers waypoints for vehicle AI road-following.
+   * @param {number} x1 - Start X
+   * @param {number} z1 - Start Z
+   * @param {number} x2 - End X
+   * @param {number} z2 - End Z
+   * @param {number} [width=3] - Road width in blocks
+   */
+  function generateRoad(x1, z1, x2, z2, width) {
+    const w = width || 3;
+    const hw = Math.floor(w / 2);
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const steps = Math.max(Math.abs(dx), Math.abs(dz));
+    if (steps === 0) return;
+    const xInc = dx / steps;
+    const zInc = dz / steps;
+
+    for (let s = 0; s <= steps; s++) {
+      const cx = Math.round(x1 + xInc * s);
+      const cz = Math.round(z1 + zInc * s);
+      for (let wx = -hw; wx <= hw; wx++) {
+        for (let wz = -hw; wz <= hw; wz++) {
+          // Only place blocks along the perpendicular width (not diagonal fill)
+          if (Math.abs(dx) >= Math.abs(dz)) {
+            // Primarily horizontal road — expand in Z
+            const bx = cx + 0;
+            const bz = cz + wx;
+            const h = getTerrainHeight(bx, bz);
+            setBlock(bx, h, bz, BLOCK.ASPHALT);
+          } else {
+            // Primarily vertical road — expand in X
+            const bx = cx + wx;
+            const bz = cz + 0;
+            const h = getTerrainHeight(bx, bz);
+            setBlock(bx, h, bz, BLOCK.ASPHALT);
+          }
+        }
+      }
+      // Register waypoints every 8 blocks for vehicle road-following
+      if (s % 8 === 0) {
+        const h = getTerrainHeight(cx, cz);
+        _roadWaypoints.push(new THREE.Vector3(cx, h + 0.5, cz));
+      }
+    }
+  }
+
+  /**
+   * Generate a road network for a level. Accepts an array of road segments.
+   * Each segment is [x1, z1, x2, z2, width].
+   */
+  function generateRoadNetwork(segments) {
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      generateRoad(seg[0], seg[1], seg[2], seg[3], seg[4] || 3);
     }
   }
 
@@ -1757,6 +1820,22 @@ const VoxelWorld = (function () {
       case 'HOSTOMEL':
         // Battle of Hostomel Airport, Feb 24-25, 2022
         // VDV airborne assault on Antonov Airport
+        // ── Road network: airport access roads based on real Hostomel layout ──
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          // Main E40 highway (east-west through Hostomel, south of airport)
+          [-45, 20, 45, 20, 4],
+          // Airport access road (north from highway to terminal)
+          [0, 20, 0, -5, 3],
+          // Perimeter road around airport (north side)
+          [-35, -8, 35, -8, 3],
+          // Taxiway parallel to runway
+          [-30, 2, 30, 2, 2],
+          // Side road to hangars (west)
+          [-25, 20, -25, -10, 2],
+          // Side road to eastern positions
+          [25, 20, 25, -15, 2],
+        ]);
         generateRunway(-30, -3, 60, 6);
         generateBuilding(-10, 10, 12, 8, 4, BLOCK.CONCRETE);  // terminal
         generateControlTower(15, 10);
@@ -1784,6 +1863,23 @@ const VoxelWorld = (function () {
         // Battle of Avdiivka, Oct 2023 - Feb 2024
         // Industrial zone centered on the coking plant, Soviet apartment blocks,
         // dense trench networks, constant shelling creating massive crater fields
+        // ── Road network: Avdiivka's real industrial roads ──
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          // Main M04 highway (north-south through Avdiivka)
+          [0, -45, 0, 45, 4],
+          // Industrial access road to coking plant (east-west)
+          [-40, 0, 40, 0, 3],
+          // Residential street grid (east side)
+          [15, -30, 15, 30, 2],
+          [30, -30, 30, 30, 2],
+          [15, -15, 30, -15, 2],
+          [15, 15, 30, 15, 2],
+          // Railway crossing road
+          [-35, -20, -10, -20, 2],
+          // Southern approach road
+          [-20, 35, 20, 35, 3],
+        ]);
         generateIndustrialComplex(-15, -10);  // IDEA 2: Avdiivka Coking Plant (main objective)
         generateApartmentBlock(-35, 10, 7);   // IDEA 1: Soviet 7-story apartment block
         generateApartmentBlock(-35, 25, 5);   // IDEA 1: Another apartment block
@@ -1836,6 +1932,26 @@ const VoxelWorld = (function () {
         // Battle of Bakhmut (Artyomovsk), Aug 2022 - May 2023
         // Total urban devastation, Wagner PMC wave attacks,
         // salt mines (Soledar nearby), every building destroyed
+        // ── Road network: Bakhmut's devastated urban roads ──
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          // T0504 highway (main east-west road through Bakhmut)
+          [-45, 0, 45, 0, 4],
+          // M03 highway (north-south arterial)
+          [0, -45, 0, 45, 4],
+          // Chasiv Yar road (western approach)
+          [-45, -15, -10, -15, 3],
+          // Soledar road (northeast approach to salt mines)
+          [10, 10, 40, 40, 3],
+          // Inner city ring road
+          [-20, -20, 20, -20, 2],
+          [20, -20, 20, 20, 2],
+          [-20, 20, 20, 20, 2],
+          [-20, -20, -20, 20, 2],
+          // Southern residential streets
+          [-15, -35, 15, -35, 2],
+          [0, -35, 0, -20, 2],
+        ]);
         generateStreetGrid(-30, -30, 5, 5, 6); // Dense urban grid
         generateStreetGrid(5, 5, 3, 3, 8);     // Additional city blocks
         generateRuins(25);                      // Massive destruction
@@ -1892,6 +2008,24 @@ const VoxelWorld = (function () {
         // Kherson counteroffensive, Aug-Nov 2022
         // Flat agricultural terrain, Dnipro River crossing,
         // Antonivskyi Bridge, farmland, liberation theme
+        // ── Road network: Kherson's real roads to Antonivskyi Bridge ──
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          // M14 highway (main approach road to Antonivskyi Bridge, east-west)
+          [-45, -5, 45, -5, 4],
+          // Antonivskyi Bridge approach road (north-south to bridge)
+          [-10, -30, -10, 10, 3],
+          // Farm access road (western agricultural area)
+          [-40, -25, -40, 25, 2],
+          // Eastern rural road
+          [30, -30, 30, 30, 2],
+          // Southern perimeter road
+          [-30, -35, 30, -35, 2],
+          // Northern riverside road
+          [-30, 25, 30, 25, 2],
+          // Cross-road connecting farms
+          [-40, 0, -10, 0, 2],
+        ]);
         generateRiver(-5, 12);                  // Wide Dnipro River (wider than before)
         generateRiver(5, 8);                    // Second river channel (delta islands)
         generateFortifiedBridge(-10, -2, 24, 5); // IDEA 16: Fortified Antonivskyi Bridge
@@ -1968,6 +2102,14 @@ const VoxelWorld = (function () {
         if (Math.random() > 0.5) generateBurningRuin(randInWorld(), randInWorld());
         if (Math.random() > 0.5) generateFieldHospital(randInWorld(), randInWorld());
         if (Math.random() > 0.6) generateCommTower(randInWorld(), randInWorld());
+        // Procedural road network
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          [-40, 0, 40, 0, 3],
+          [0, -40, 0, 40, 3],
+          [-30, -30, 30, -30, 2],
+          [-30, 30, 30, 30, 2],
+        ]);
         break;
     }
     rebuildAll();
@@ -1999,5 +2141,6 @@ const VoxelWorld = (function () {
     worldToChunk,
     getLevelDef,
     generateLevel,
+    getRoadWaypoints: function () { return _roadWaypoints.slice(); },
   };
 })();
