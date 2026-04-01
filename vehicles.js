@@ -376,6 +376,8 @@ const VehicleSystem = (function () {
       }
 
       if (hit || p.life <= 0) {
+        p.mesh.geometry.dispose();
+        p.mesh.material.dispose();
         if (_scene) _scene.remove(p.mesh);
         turretProjectiles.splice(i, 1);
       }
@@ -394,7 +396,13 @@ const VehicleSystem = (function () {
   function destroyVehicle(v) {
     v.alive = false;
     if (v === _occupiedVehicle) exit();
-    if (v.mesh && _scene) _scene.remove(v.mesh);
+    if (v.mesh) {
+      v.mesh.traverse(function (child) {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      });
+      if (_scene) _scene.remove(v.mesh);
+    }
   }
 
   /* ── Queries ─────────────────────────────────────────────────────── */
@@ -407,13 +415,23 @@ const VehicleSystem = (function () {
 
   function clear() {
     for (const v of vehicles) {
-      if (v.mesh && _scene) _scene.remove(v.mesh);
+      if (v.mesh) {
+        v.mesh.traverse(function (child) {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) child.material.dispose();
+        });
+        if (_scene) _scene.remove(v.mesh);
+      }
     }
     vehicles.length = 0;
     _occupiedVehicle = null;
     // Clean up turret projectiles
     for (const p of turretProjectiles) {
-      if (p.mesh && _scene) _scene.remove(p.mesh);
+      if (p.mesh) {
+        p.mesh.geometry.dispose();
+        p.mesh.material.dispose();
+        if (_scene) _scene.remove(p.mesh);
+      }
     }
     turretProjectiles.length = 0;
   }

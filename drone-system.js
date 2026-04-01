@@ -292,13 +292,12 @@ const DroneSystem = (function () {
 
   function createDroneExplosion(pos) {
     if (!_scene) return;
-    const flash = new THREE.Mesh(
-      new THREE.SphereGeometry(2, 8, 8),
-      new THREE.MeshBasicMaterial({
-        color: 0xff6600, transparent: true, opacity: 0.9,
-        blending: THREE.AdditiveBlending,
-      })
-    );
+    const flashGeo = new THREE.SphereGeometry(2, 8, 8);
+    const flashMat = new THREE.MeshBasicMaterial({
+      color: 0xff6600, transparent: true, opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+    });
+    const flash = new THREE.Mesh(flashGeo, flashMat);
     flash.position.copy(pos);
     _scene.add(flash);
     let t = 0.3;
@@ -308,6 +307,8 @@ const DroneSystem = (function () {
       flash.scale.setScalar(1 + (0.3 - t) * 4);
       if (t <= 0) {
         _scene.remove(flash);
+        flashGeo.dispose();
+        flashMat.dispose();
         clearInterval(fadeInterval);
       }
     }, 16);
@@ -334,7 +335,13 @@ const DroneSystem = (function () {
     drone.alive = false;
     drone.active = false;
     if (drone === _possessedDrone) release();
-    if (drone.mesh && _scene) _scene.remove(drone.mesh);
+    if (drone.mesh) {
+      drone.mesh.traverse(function (child) {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      });
+      if (_scene) _scene.remove(drone.mesh);
+    }
   }
 
   /* ── Queries ─────────────────────────────────────────────────────── */
@@ -345,7 +352,13 @@ const DroneSystem = (function () {
 
   function clear() {
     for (const drone of drones) {
-      if (drone.mesh && _scene) _scene.remove(drone.mesh);
+      if (drone.mesh) {
+        drone.mesh.traverse(function (child) {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) child.material.dispose();
+        });
+        if (_scene) _scene.remove(drone.mesh);
+      }
     }
     drones.length = 0;
     _possessedDrone = null;

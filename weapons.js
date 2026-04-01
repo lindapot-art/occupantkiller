@@ -820,6 +820,8 @@ const Weapons = (() => {
         } else {
           createExplosionFlash(p.mesh.position);
         }
+        p.mesh.geometry.dispose();
+        p.mesh.material.dispose();
         _scene.remove(p.mesh);
         projectiles.splice(i, 1);
       }
@@ -828,13 +830,12 @@ const Weapons = (() => {
 
   function createExplosionFlash(pos) {
     if (!_scene) return;
-    const flash = new THREE.Mesh(
-      new THREE.SphereGeometry(1.5, 8, 8),
-      new THREE.MeshBasicMaterial({
-        color: 0xff6600, transparent: true, opacity: 0.9,
-        blending: THREE.AdditiveBlending,
-      })
-    );
+    const flashGeo = new THREE.SphereGeometry(1.5, 8, 8);
+    const flashMat = new THREE.MeshBasicMaterial({
+      color: 0xff6600, transparent: true, opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+    });
+    const flash = new THREE.Mesh(flashGeo, flashMat);
     flash.position.copy(pos);
     _scene.add(flash);
     let t = 0.2;
@@ -844,6 +845,8 @@ const Weapons = (() => {
       flash.scale.setScalar(1 + (0.2 - t) * 5);
       if (t <= 0) {
         _scene.remove(flash);
+        flashGeo.dispose();
+        flashMat.dispose();
         clearInterval(fadeInterval);
       }
     }, 16);
@@ -852,13 +855,12 @@ const Weapons = (() => {
   function createFireArea(pos, radius) {
     if (!_scene) return;
     // Flat fire disc on the ground
-    const fire = new THREE.Mesh(
-      new THREE.CylinderGeometry(radius, radius, 0.15, 12),
-      new THREE.MeshBasicMaterial({
-        color: 0xff4400, transparent: true, opacity: 0.7,
-        blending: THREE.AdditiveBlending,
-      })
-    );
+    const fireGeo = new THREE.CylinderGeometry(radius, radius, 0.15, 12);
+    const fireMat = new THREE.MeshBasicMaterial({
+      color: 0xff4400, transparent: true, opacity: 0.7,
+      blending: THREE.AdditiveBlending,
+    });
+    const fire = new THREE.Mesh(fireGeo, fireMat);
     fire.position.copy(pos);
     fire.position.y += 0.1;
     _scene.add(fire);
@@ -875,6 +877,8 @@ const Weapons = (() => {
       }
       if (burnTime <= 0) {
         _scene.remove(fire);
+        fireGeo.dispose();
+        fireMat.dispose();
         clearInterval(burnInterval);
       }
     }, 250);

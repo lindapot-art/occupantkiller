@@ -633,8 +633,9 @@ const NPCSystem = (function () {
       const newWeapon = RANK_WEAPONS[npc.rank] || null;
       if (newWeapon && (!npc.weapon || newWeapon.damage >= npc.weapon.damage)) {
         npc.weapon = newWeapon;
-        // Replace weapon mesh on NPC
+        // Replace weapon mesh on NPC — dispose old mesh to prevent memory leak
         if (npc.mesh && npc.mesh.userData.weaponMesh) {
+          disposeMesh(npc.mesh.userData.weaponMesh);
           npc.mesh.remove(npc.mesh.userData.weaponMesh);
         }
         if (npc.mesh) {
@@ -706,11 +707,24 @@ const NPCSystem = (function () {
     }
   }
 
+  /* ── Dispose helper — release Three.js GPU resources ─────────── */
+  function disposeMesh(obj) {
+    if (!obj) return;
+    obj.traverse(function (child) {
+      if (child.geometry)  child.geometry.dispose();
+      if (child.material) {
+        if (child.material.map) child.material.map.dispose();
+        child.material.dispose();
+      }
+    });
+  }
+
   /* ── NPC Death ───────────────────────────────────────────────────── */
   function killNPC(npc) {
     npc.alive = false;
-    if (npc.mesh && _scene) {
-      _scene.remove(npc.mesh);
+    if (npc.mesh) {
+      disposeMesh(npc.mesh);
+      if (_scene) _scene.remove(npc.mesh);
     }
   }
 
@@ -757,7 +771,10 @@ const NPCSystem = (function () {
   /* ── Cleanup ─────────────────────────────────────────────────────── */
   function clear() {
     for (const npc of npcs) {
-      if (npc.mesh && _scene) _scene.remove(npc.mesh);
+      if (npc.mesh) {
+        disposeMesh(npc.mesh);
+        if (_scene) _scene.remove(npc.mesh);
+      }
     }
     npcs.length = 0;
   }

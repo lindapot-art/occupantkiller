@@ -11,6 +11,18 @@ const Enemies = (() => {
 
   const MAX_CLIMBABLE_HEIGHT = 2; // Max terrain height difference enemies can climb
 
+  // ── Dispose helper — release Three.js GPU resources ────────
+  function disposeMeshTree(obj) {
+    if (!obj) return;
+    obj.traverse(function (child) {
+      if (child.geometry)  child.geometry.dispose();
+      if (child.material) {
+        if (child.material.map) child.material.map.dispose();
+        child.material.dispose();
+      }
+    });
+  }
+
   // ── Russian EMR Digital Flora camo palette ─────────────────
   // 4 tones used across body/limb meshes via procedural canvas texture
   const EMR_CAMO = {
@@ -488,8 +500,13 @@ const Enemies = (() => {
         e.deathTimer -= delta;
         e.mesh.position.y -= delta * 1.2;
         if (e.deathTimer <= 0) {
+          disposeMeshTree(e.mesh);
           scene.remove(e.mesh);
-          if (e.hpBar) { scene.remove(e.hpBar.group); e.hpBar = null; }
+          if (e.hpBar) {
+            disposeMeshTree(e.hpBar.group);
+            scene.remove(e.hpBar.group);
+            e.hpBar = null;
+          }
           enemies.splice(i, 1);
         }
         continue;
@@ -646,8 +663,12 @@ const Enemies = (() => {
   function clear() {
     enemies.forEach(e => {
       if (scene) {
+        disposeMeshTree(e.mesh);
         scene.remove(e.mesh);
-        if (e.hpBar) scene.remove(e.hpBar.group);
+        if (e.hpBar) {
+          disposeMeshTree(e.hpBar.group);
+          scene.remove(e.hpBar.group);
+        }
       }
     });
     enemies    = [];
