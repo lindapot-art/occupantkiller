@@ -516,7 +516,15 @@ const Enemies = (() => {
 
     group.userData.headMesh = head;
     group.userData.hitbox   = hitbox;
-    group.userData.parts    = [torso, head, helmet, legL, legR, armL, armR, hitbox];
+    // Include ALL mesh parts so raycaster can detect hits on vest, boots, equipment
+    group.userData.parts    = [torso, head, helmet, legL, legR, armL, armR, hitbox,
+                               vest, canteen, radio, belt, eyeL, eyeR];
+    // Add boots and knee pads from the group's children
+    group.children.forEach(function (child) {
+      if (group.userData.parts.indexOf(child) < 0) {
+        group.userData.parts.push(child);
+      }
+    });
     group.userData.faction  = 'occupant';
 
     return group;
@@ -880,14 +888,35 @@ const Enemies = (() => {
         }
       }
       if (!moveTarget) {
-        // Wander randomly (patrol behavior)
+        // Tactical patrol: enemies patrol toward strategic objectives instead of wandering
         if (!e._wanderTarget || e.mesh.position.distanceTo(e._wanderTarget) < 2) {
-          const wa = Math.random() * Math.PI * 2;
-          const wd = 6 + Math.random() * 10;
-          e._wanderTarget = new THREE.Vector3(
-            e.mesh.position.x + Math.cos(wa) * wd, 0,
-            e.mesh.position.z + Math.sin(wa) * wd
-          );
+          // Prioritize patrolling toward friendly positions, buildings, or roads
+          var strategicTarget = null;
+          // Try to target friendly NPCs in area
+          if (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) {
+            var friendlies = NPCSystem.getAll();
+            if (friendlies.length > 0) {
+              var picked = friendlies[Math.floor(Math.random() * friendlies.length)];
+              if (picked.alive) strategicTarget = picked.position.clone();
+            }
+          }
+          // Try road waypoints for flanking maneuvers
+          if (!strategicTarget && typeof VoxelWorld !== 'undefined' && VoxelWorld.getRoadWaypoints) {
+            var roadWPs = VoxelWorld.getRoadWaypoints();
+            if (roadWPs.length > 0) {
+              strategicTarget = roadWPs[Math.floor(Math.random() * roadWPs.length)].clone();
+            }
+          }
+          // Fallback to directed patrol toward center with spread
+          if (!strategicTarget) {
+            var wa = Math.random() * Math.PI * 2;
+            var wd = 6 + Math.random() * 10;
+            strategicTarget = new THREE.Vector3(
+              Math.cos(wa) * wd, 0,
+              Math.sin(wa) * wd
+            );
+          }
+          e._wanderTarget = strategicTarget;
         }
         moveTarget = e._wanderTarget;
         targetDist = e.mesh.position.distanceTo(moveTarget);
@@ -971,6 +1000,32 @@ const Enemies = (() => {
             if (typeof NPCSystem !== 'undefined' && NPCSystem.damage) {
               NPCSystem.damage(e.npcTarget.id, e.attackDmg);
             }
+          }
+        }
+      }
+
+      // ── Anti-drone combat: enemies shoot at nearby drones ──
+      if (typeof DroneSystem !== 'undefined' && DroneSystem.getAll) {
+        var drones = DroneSystem.getAll();
+        for (var di = 0; di < drones.length; di++) {
+          var drone = drones[di];
+          if (!drone.alive || !drone.active) continue;
+          var droneDist = e.mesh.position.distanceTo(drone.position);
+          // Enemies shoot at drones within 18 range, DRONE_OP type has 30 range
+          var droneEngageRange = e.typeCfg.name === 'DRONE_OP' ? 30 : 18;
+          if (droneDist < droneEngageRange) {
+            if (!e._droneFireTimer) e._droneFireTimer = 0;
+            e._droneFireTimer -= delta;
+            if (e._droneFireTimer <= 0) {
+              // Accuracy depends on distance and enemy type
+              var droneHitChance = e.typeCfg.name === 'DRONE_OP' ? 0.35 :
+                                   e.typeCfg.name === 'SNIPER' ? 0.25 : 0.12;
+              if (Math.random() < droneHitChance) {
+                DroneSystem.damageDrone(drone.id, e.attackDmg * 0.6);
+              }
+              e._droneFireTimer = e.attackRate * 1.5;
+            }
+            break; // Only target one drone at a time
           }
         }
       }

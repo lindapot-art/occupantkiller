@@ -340,13 +340,17 @@ const GameManager = (function () {
       NPCSystem.spawn(nx, nh, nz, i < 2 ? 'civilian' : 'trainee');
     }
 
-    // Spawn starter vehicle fleet
-    const vh = VoxelWorld.getTerrainHeight(8, 8);
-    VehicleSystem.spawn(8, vh, 8, 'transport');
-    const startVh2 = VoxelWorld.getTerrainHeight(12, 5);
-    VehicleSystem.spawn(12, startVh2, 5, 'combat');
-    const startVh3 = VoxelWorld.getTerrainHeight(-8, -8);
-    VehicleSystem.spawn(-8, startVh3, -8, 'turret_rover');
+    // Spawn starter vehicle fleet on roads (road-level positions)
+    var roadWPs = (VoxelWorld.getRoadWaypoints ? VoxelWorld.getRoadWaypoints() : []);
+    var _rp0 = roadWPs.length > 2 ? roadWPs[2] : new THREE.Vector3(8, 0, 20);
+    var _rp1 = roadWPs.length > 6 ? roadWPs[6] : new THREE.Vector3(12, 0, 20);
+    var _rp2 = roadWPs.length > 10 ? roadWPs[10] : new THREE.Vector3(-8, 0, 20);
+    var vh = VoxelWorld.getTerrainHeight(_rp0.x, _rp0.z);
+    VehicleSystem.spawn(_rp0.x, vh, _rp0.z, 'transport');
+    var startVh2 = VoxelWorld.getTerrainHeight(_rp1.x, _rp1.z);
+    VehicleSystem.spawn(_rp1.x, startVh2, _rp1.z, 'combat');
+    var startVh3 = VoxelWorld.getTerrainHeight(_rp2.x, _rp2.z);
+    VehicleSystem.spawn(_rp2.x, startVh3, _rp2.z, 'turret_rover');
 
     // Spawn starter drones
     const startDh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
@@ -413,7 +417,7 @@ const GameManager = (function () {
           }
         }
 
-        // Vehicle enter/exit
+        // Vehicle enter/exit/hijack
         if (e.code === 'KeyG') {
           if (VehicleSystem.isInVehicle()) {
             const exitPos = VehicleSystem.exit();
@@ -423,8 +427,29 @@ const GameManager = (function () {
             }
           } else {
             const nearby = VehicleSystem.getNearby(player.position, 5);
-            if (nearby.length > 0) VehicleSystem.enter(nearby[0].id);
+            if (nearby.length > 0) {
+              var targetVehicle = nearby[0];
+              if (targetVehicle.faction === 'enemy') {
+                // Hijack enemy vehicle — steal it
+                VehicleSystem.hijack(targetVehicle.id);
+                HUD.notifyPickup('🚗 VEHICLE HIJACKED!', '#ff4444');
+              } else if (targetVehicle.occupied) {
+                // Hijack friendly vehicle if already occupied
+                VehicleSystem.hijack(targetVehicle.id);
+                HUD.notifyPickup('🚗 VEHICLE COMMANDEERED!', '#ffaa00');
+              } else {
+                VehicleSystem.enter(targetVehicle.id);
+                HUD.notifyPickup('🚗 ENTERED VEHICLE', '#44ff44');
+              }
+            }
           }
+        }
+
+        // Toggle vehicle camera view (first person / third person)
+        if (e.code === 'KeyT' && VehicleSystem.isInVehicle()) {
+          VehicleSystem.toggleVehicleView();
+          var veh = VehicleSystem.getOccupied();
+          HUD.notifyPickup(veh && veh.viewMode === 'first' ? '👁 FIRST PERSON VIEW' : '🎥 THIRD PERSON VIEW', '#00ccff');
         }
 
         // Stealth / invisibility toggle
@@ -753,13 +778,17 @@ const GameManager = (function () {
     VehicleSystem.clear();
     DroneSystem.clear();
 
-    // Respawn vehicle fleet for first stage
-    const sgVh = VoxelWorld.getTerrainHeight(8, 8);
-    VehicleSystem.spawn(8, sgVh, 8, 'transport');
-    const sgVh2 = VoxelWorld.getTerrainHeight(12, 5);
-    VehicleSystem.spawn(12, sgVh2, 5, 'combat');
-    const sgVh3 = VoxelWorld.getTerrainHeight(-8, -8);
-    VehicleSystem.spawn(-8, sgVh3, -8, 'turret_rover');
+    // Respawn vehicle fleet on roads for first stage
+    var _rwps = (VoxelWorld.getRoadWaypoints ? VoxelWorld.getRoadWaypoints() : []);
+    var _sp0 = _rwps.length > 2 ? _rwps[2] : new THREE.Vector3(8, 0, 20);
+    var _sp1 = _rwps.length > 6 ? _rwps[6] : new THREE.Vector3(12, 0, 20);
+    var _sp2 = _rwps.length > 10 ? _rwps[10] : new THREE.Vector3(-8, 0, 20);
+    var sgVh = VoxelWorld.getTerrainHeight(_sp0.x, _sp0.z);
+    VehicleSystem.spawn(_sp0.x, sgVh, _sp0.z, 'transport');
+    var sgVh2 = VoxelWorld.getTerrainHeight(_sp1.x, _sp1.z);
+    VehicleSystem.spawn(_sp1.x, sgVh2, _sp1.z, 'combat');
+    var sgVh3 = VoxelWorld.getTerrainHeight(_sp2.x, _sp2.z);
+    VehicleSystem.spawn(_sp2.x, sgVh3, _sp2.z, 'turret_rover');
 
     // Respawn drones
     const sgDh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
@@ -856,14 +885,18 @@ const GameManager = (function () {
       NPCSystem.spawn(nx, nh, nz, i < 2 ? 'civilian' : 'trainee');
     }
 
-    // Respawn vehicle fleet
-    const vh = VoxelWorld.getTerrainHeight(8, 8);
+    // Respawn vehicle fleet on roads
+    var _nsWps = (VoxelWorld.getRoadWaypoints ? VoxelWorld.getRoadWaypoints() : []);
+    var _nsp0 = _nsWps.length > 2 ? _nsWps[2] : new THREE.Vector3(8, 0, 20);
+    var _nsp1 = _nsWps.length > 6 ? _nsWps[6] : new THREE.Vector3(12, 0, 20);
+    var _nsp2 = _nsWps.length > 10 ? _nsWps[10] : new THREE.Vector3(-8, 0, 20);
+    var vh = VoxelWorld.getTerrainHeight(_nsp0.x, _nsp0.z);
     VehicleSystem.clear();
-    VehicleSystem.spawn(8, vh, 8, 'transport');
-    const vh2 = VoxelWorld.getTerrainHeight(12, 5);
-    VehicleSystem.spawn(12, vh2, 5, 'combat');
-    const vh3 = VoxelWorld.getTerrainHeight(-8, -8);
-    VehicleSystem.spawn(-8, vh3, -8, 'turret_rover');
+    VehicleSystem.spawn(_nsp0.x, vh, _nsp0.z, 'transport');
+    var vh2 = VoxelWorld.getTerrainHeight(_nsp1.x, _nsp1.z);
+    VehicleSystem.spawn(_nsp1.x, vh2, _nsp1.z, 'combat');
+    var vh3 = VoxelWorld.getTerrainHeight(_nsp2.x, _nsp2.z);
+    VehicleSystem.spawn(_nsp2.x, vh3, _nsp2.z, 'turret_rover');
 
     // Spawn drones
     const dh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
@@ -897,6 +930,25 @@ const GameManager = (function () {
     AudioSystem.playWaveStart();
     HUD.setWave(w, stageDef.wavesPerStage);
     HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage);
+
+    // Spawn enemy vehicles on later waves (Russian armored assault)
+    if (w >= 3) {
+      var enemySpawnAngle = Math.random() * Math.PI * 2;
+      var enemySpawnDist = 35 + Math.random() * 10;
+      var evx = Math.cos(enemySpawnAngle) * enemySpawnDist;
+      var evz = Math.sin(enemySpawnAngle) * enemySpawnDist;
+      var evy = VoxelWorld.getTerrainHeight(evx, evz);
+      VehicleSystem.spawnEnemy(evx, evy, evz, 'combat');
+      HUD.notifyPickup('⚠ ENEMY ARMOR SPOTTED!', '#ff4444');
+    }
+    if (w >= 5) {
+      var evAngle2 = Math.random() * Math.PI * 2;
+      var evDist2 = 30 + Math.random() * 10;
+      var evx2 = Math.cos(evAngle2) * evDist2;
+      var evz2 = Math.sin(evAngle2) * evDist2;
+      var evy2 = VoxelWorld.getTerrainHeight(evx2, evz2);
+      VehicleSystem.spawnEnemy(evx2, evy2, evz2, 'transport');
+    }
   }
 
   function onWaveComplete() {
@@ -1239,6 +1291,30 @@ const GameManager = (function () {
       Automation.update(delta);
       MissionSystem.update(delta);
 
+      // ── NPC auto-boarding: friendly NPCs jump into nearby player vehicles ──
+      if (VehicleSystem.isInVehicle()) {
+        var playerVeh = VehicleSystem.getOccupied();
+        if (playerVeh && playerVeh.damage > 0 && !playerVeh.occupiedByNPC) {
+          // Find nearest armed NPC to board as gunner
+          var allNPCs = (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) ? NPCSystem.getAll() : [];
+          var bestNPC = null;
+          var bestDist = 8; // NPC must be within 8 units to board
+          for (var ni = 0; ni < allNPCs.length; ni++) {
+            var npc = allNPCs[ni];
+            if (!npc.alive || npc.rank === 'civilian') continue;
+            var nd = playerVeh.position.distanceTo(npc.position);
+            if (nd < bestDist) {
+              bestDist = nd;
+              bestNPC = npc;
+            }
+          }
+          if (bestNPC) {
+            VehicleSystem.boardNPCGunner(playerVeh.id, bestNPC);
+            HUD.notifyPickup('👥 NPC GUNNER BOARDED!', '#00ff88');
+          }
+        }
+      }
+
       // Voxel chunk rebuilds
       VoxelWorld.updateDirtyChunks();
 
@@ -1482,20 +1558,42 @@ const GameManager = (function () {
   }
 
   function showInventory() {
-    const grid = document.getElementById('inventory-grid');
+    // ── Materials / Resources section ──
+    var matGrid = document.getElementById('materials-grid');
+    if (matGrid) {
+      matGrid.innerHTML = '';
+      var resIcons = { wood: '🪵', metal: '🔩', electronics: '⚡', fuel: '⛽', stone: '🪨', food: '🍞' };
+      var resColors = { wood: '#8B6914', metal: '#aaa', electronics: '#00ccff', fuel: '#ff8800', stone: '#999', food: '#aacc44' };
+      var resources = Economy.getResources();
+      for (var resType in resources) {
+        var cell = document.createElement('div');
+        cell.style.cssText = 'background:rgba(255,255,255,0.05);border:1px solid ' + (resColors[resType] || '#555') + ';border-radius:4px;padding:6px;text-align:center';
+        cell.innerHTML = '<div style="font-size:20px">' + (resIcons[resType] || '📦') + '</div>' +
+          '<div style="font-size:11px;color:#ccc;text-transform:uppercase">' + resType + '</div>' +
+          '<div style="font-size:16px;font-weight:bold;color:' + (resColors[resType] || '#fff') + '">' + resources[resType] + '</div>';
+        matGrid.appendChild(cell);
+      }
+    }
+    var currDisplay = document.getElementById('currency-display');
+    if (currDisplay) {
+      currDisplay.textContent = '💰 Currency: ' + Economy.getCurrency() + ' gold';
+    }
+
+    // ── Weapons grid ──
+    var grid = document.getElementById('inventory-grid');
     if (!grid) return;
     grid.innerHTML = '';
-    const count = Weapons.getWeaponCount();
-    const curIdx = Weapons.getCurrentIdx();
-    for (let i = 0; i < count; i++) {
-      const slot = document.createElement('div');
+    var count = Weapons.getWeaponCount();
+    var curIdx = Weapons.getCurrentIdx();
+    for (var i = 0; i < count; i++) {
+      var slot = document.createElement('div');
       slot.className = 'inv-slot';
-      const isUnlocked = Weapons.isUnlocked(i);
+      var isUnlocked = Weapons.isUnlocked(i);
       if (!isUnlocked) {
         slot.classList.add('locked');
         slot.textContent = '🔒 ' + Weapons.getWeaponName(i);
       } else {
-        const info = Weapons.getWeaponInfo(i);
+        var info = Weapons.getWeaponInfo(i);
         if (i === curIdx) slot.classList.add('active');
         slot.textContent = info.name + '\n⚔' + info.damage;
         if (info.clip !== undefined && info.type !== 'MELEE') {
@@ -1516,15 +1614,21 @@ const GameManager = (function () {
       grid.appendChild(slot);
     }
 
-    const statsEl = document.getElementById('player-stats');
+    var statsEl = document.getElementById('player-stats');
     if (statsEl) {
-      const stage = STAGES[currentStage];
+      var stage = STAGES[currentStage];
+      var npcCount = (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) ? NPCSystem.getAll().length : 0;
+      var vehicleCount = VehicleSystem.getAll().length;
+      var droneCount = (typeof DroneSystem !== 'undefined' && DroneSystem.getAll) ? DroneSystem.getAll().length : 0;
       statsEl.innerHTML =
         '❤ HP: ' + player.hp + '/' + player.maxHp +
         ' &nbsp;|&nbsp; 🏆 Score: ' + player.score +
         ' &nbsp;|&nbsp; 💀 Kills: ' + player.kills +
         '<br>📍 Stage ' + stage.id + ': ' + stage.name +
-        ' &nbsp;|&nbsp; 🌊 Wave: ' + currentWave + '/' + stage.wavesPerStage;
+        ' &nbsp;|&nbsp; 🌊 Wave: ' + currentWave + '/' + stage.wavesPerStage +
+        '<br>👥 NPCs: ' + npcCount +
+        ' &nbsp;|&nbsp; 🚗 Vehicles: ' + vehicleCount +
+        ' &nbsp;|&nbsp; 🛸 Drones: ' + droneCount;
     }
   }
 

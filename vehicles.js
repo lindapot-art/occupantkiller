@@ -137,6 +137,7 @@ const VehicleSystem = (function () {
     const vehicle = {
       id: nextId++,
       type,
+      faction: 'friendly',     // 'friendly' or 'enemy' — determines hijack behavior
       position: new THREE.Vector3(x, y, z),
       rotation: new THREE.Euler(0, 0, 0),
       velocity: new THREE.Vector3(),
@@ -152,9 +153,13 @@ const VehicleSystem = (function () {
       mesh: null,
       alive: true,
       occupied: false,
+      occupiedByNPC: false,      // true when an NPC gunner is aboard
+      npcGunner: null,           // reference to NPC using this vehicle's gun
       passengers: [],
       fireCooldown: 0,
       fireRate: type === 'combat' ? 1.5 : type === 'turret_rover' ? 2.0 : 0,
+      crewExposed: (type === 'combat'),  // tank crew is exposed in hatches
+      viewMode: 'third',        // 'first' or 'third' — camera mode when occupied
     };
 
     vehicle.mesh = buildVehicleMesh(type);
@@ -166,15 +171,54 @@ const VehicleSystem = (function () {
     return vehicle;
   }
 
-  /* ── Enter / Exit ────────────────────────────────────────────────── */
+  /* ── Enter / Exit / Hijack ─────────────────────────────────────────── */
   function enter(vehicleId) {
     const v = vehicles.find(v => v.id === vehicleId && v.alive && !v.occupied);
     if (!v || v.seats <= 0) return false;
     v.occupied = true;
     _occupiedVehicle = v;
-    CameraSystem.setMode(CameraSystem.MODE.VEHICLE);
+    // Apply correct camera mode based on vehicle view preference
+    if (v.viewMode === 'first') {
+      CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
+    } else {
+      CameraSystem.setMode(CameraSystem.MODE.VEHICLE);
+    }
     CameraSystem.setVehicleTarget(v.mesh);
     return true;
+  }
+
+  /** Hijack a vehicle (steal from enemy or friendly). Changes faction to friendly. */
+  function hijack(vehicleId) {
+    const v = vehicles.find(v => v.id === vehicleId && v.alive);
+    if (!v || v.seats <= 0) return false;
+    // Clean up prior state
+    if (v.occupiedByNPC) {
+      v.occupiedByNPC = false;
+      v.npcGunner = null;
+    }
+    v.faction = 'friendly';
+    v.occupied = true;
+    _occupiedVehicle = v;
+    if (v.viewMode === 'first') {
+      CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
+    } else {
+      CameraSystem.setMode(CameraSystem.MODE.VEHICLE);
+    }
+    CameraSystem.setVehicleTarget(v.mesh);
+    return true;
+  }
+
+  /** Toggle between first-person and third-person view while in vehicle */
+  function toggleVehicleView() {
+    if (!_occupiedVehicle) return;
+    if (_occupiedVehicle.viewMode === 'first') {
+      _occupiedVehicle.viewMode = 'third';
+      CameraSystem.setMode(CameraSystem.MODE.VEHICLE);
+    } else {
+      _occupiedVehicle.viewMode = 'first';
+      CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
+    }
+    CameraSystem.setVehicleTarget(_occupiedVehicle.mesh);
   }
 
   function exit() {
@@ -182,11 +226,34 @@ const VehicleSystem = (function () {
       _occupiedVehicle.occupied = false;
       _occupiedVehicle.velocity.set(0, 0, 0);
       const exitPos = _occupiedVehicle.position.clone();
+      // Eject NPC gunner too
+      if (_occupiedVehicle.npcGunner) {
+        _occupiedVehicle.occupiedByNPC = false;
+        _occupiedVehicle.npcGunner = null;
+      }
       _occupiedVehicle = null;
+      // Clear vehicle camera target so FPS camera doesn't stay locked to vehicle
+      CameraSystem.setVehicleTarget(null);
       CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
       return exitPos;
     }
     return null;
+  }
+
+  /** Spawn an enemy vehicle (for tactical enemy vehicle spawns) */
+  function spawnEnemy(x, y, z, type) {
+    var v = spawn(x, y, z, type);
+    if (v) v.faction = 'enemy';
+    return v;
+  }
+
+  /** Let an NPC board as gunner */
+  function boardNPCGunner(vehicleId, npc) {
+    var v = vehicles.find(v => v.id === vehicleId && v.alive);
+    if (!v || v.occupiedByNPC) return false;
+    v.occupiedByNPC = true;
+    v.npcGunner = npc;
+    return true;
   }
 
   function getOccupied() { return _occupiedVehicle; }
@@ -211,6 +278,10 @@ const VehicleSystem = (function () {
         // Player vehicle fires with mouse/fire key
         if (_vKeys.fire && v.damage > 0 && v.fireCooldown <= 0) {
           fireTurret(v);
+        }
+        // NPC gunner fires at nearby enemies while player drives
+        if (v.occupiedByNPC && v.npcGunner && v.damage > 0) {
+          updateNPCGunner(v, delta);
         }
       } else {
         // ALL unoccupied vehicles get autonomous AI movement
@@ -342,18 +413,38 @@ const VehicleSystem = (function () {
       if (v.waypointTimer <= 0) pickWaypoint(v);
     }
 
-    // ── Find nearest enemy ──
+    // ── Find nearest target (depends on vehicle faction) ──
     let nearestEnemy = null;
     let nearestDist = COMBAT_ENGAGE_RANGE;
-    if (typeof Enemies !== 'undefined') {
-      const enemies = Enemies.getAll ? Enemies.getAll() : [];
-      for (let i = 0; i < enemies.length; i++) {
-        const e = enemies[i];
-        if (!e.alive || !e.mesh) continue;
-        const d = v.position.distanceTo(e.mesh.position);
-        if (d < nearestDist) {
-          nearestDist = d;
-          nearestEnemy = e;
+
+    if (v.faction === 'enemy') {
+      // Enemy vehicles target friendly NPCs and the player
+      if (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) {
+        var friendlies = NPCSystem.getAll();
+        for (var fi = 0; fi < friendlies.length; fi++) {
+          var npc = friendlies[fi];
+          if (!npc.alive) continue;
+          var nd = v.position.distanceTo(npc.position);
+          if (nd < nearestDist) {
+            nearestDist = nd;
+            nearestEnemy = { alive: true, mesh: { position: npc.position } };
+          }
+        }
+      }
+      // Also fire at player if closer (via onPlayerHit callback not available here,
+      // so just drive toward player position for aggression)
+    } else {
+      // Friendly vehicles target occupant enemies
+      if (typeof Enemies !== 'undefined') {
+        const enemies = Enemies.getAll ? Enemies.getAll() : [];
+        for (let i = 0; i < enemies.length; i++) {
+          const e = enemies[i];
+          if (!e.alive || !e.mesh) continue;
+          const d = v.position.distanceTo(e.mesh.position);
+          if (d < nearestDist) {
+            nearestDist = d;
+            nearestEnemy = e;
+          }
         }
       }
     }
@@ -428,6 +519,28 @@ const VehicleSystem = (function () {
     const dir = targetPos.clone().sub(v.position).normalize();
     spawnTurretProjectile(v.position, dir, v.damage);
     if (typeof AudioSystem !== 'undefined') AudioSystem.playGunshot('hmg');
+  }
+
+  /** NPC gunner AI: finds nearest enemy and fires turret at it */
+  function updateNPCGunner(v, delta) {
+    if (!v.occupiedByNPC || v.fireCooldown > 0) return;
+    // Find nearest enemy
+    if (typeof Enemies === 'undefined' || !Enemies.getAll) return;
+    var enemies = Enemies.getAll();
+    var nearestDist = COMBAT_ENGAGE_RANGE;
+    var nearestEnemy = null;
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (!e.alive || !e.mesh) continue;
+      var d = v.position.distanceTo(e.mesh.position);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestEnemy = e;
+      }
+    }
+    if (nearestEnemy) {
+      fireTurretAt(v, nearestEnemy.mesh.position);
+    }
   }
 
   function spawnTurretProjectile(origin, dir, damage) {
@@ -549,8 +662,12 @@ const VehicleSystem = (function () {
     VEHICLE_STATS,
     init,
     spawn,
+    spawnEnemy,
     enter,
     exit,
+    hijack,
+    toggleVehicleView,
+    boardNPCGunner,
     getOccupied,
     isInVehicle,
     setVehicleKey,
