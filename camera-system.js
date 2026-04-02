@@ -132,6 +132,16 @@ const CameraSystem = (function () {
 
   /* ── FPS Camera ──────────────────────────────────────────────────── */
   function updateFPS(delta, playerPos, isMoving, isGrounded) {
+    // If we have a vehicle target (first-person vehicle mode), use vehicle pos
+    if (_vehicleObj) {
+      var vPos = _vehicleObj.position.clone();
+      vPos.y += 2.0; // Hatch view height
+      _camera.position.copy(vPos);
+      var euler = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+      _camera.quaternion.setFromEuler(euler);
+      return;
+    }
+
     // Head bob
     if (isMoving && isGrounded) {
       bobPhase += delta * BOB_FREQ;
@@ -206,12 +216,15 @@ const CameraSystem = (function () {
 
   function updateVehicle(delta) {
     if (!_vehicleObj) return;
-    // Follow behind vehicle
+    // Follow behind vehicle (third person vehicle view)
     const behind = new THREE.Vector3(0, 3, 8);
     behind.applyQuaternion(_vehicleObj.quaternion);
     _camera.position.copy(_vehicleObj.position).add(behind);
     _camera.lookAt(_vehicleObj.position);
   }
+
+  /** Get the vehicle target for FPS mode inside vehicle */
+  function getVehicleObj() { return _vehicleObj; }
 
   /* ── Getters ─────────────────────────────────────────────────────── */
   function getYaw()   { return yaw; }

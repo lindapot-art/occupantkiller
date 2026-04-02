@@ -206,11 +206,23 @@
 
   <!-- Inventory / Pause overlay -->
   <div id="inventory-overlay" class="overlay" style="display:none">
-    <div class="overlay-content">
-      <h1>⏸ PAUSED</h1>
-      <div id="inventory-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:15px 0;"></div>
-      <div id="player-stats" style="text-align:left;font-size:14px;margin:10px 0;"></div>
-      <p style="color:#888">Press ESC or tap ⏸ to resume</p>
+    <div class="overlay-content" style="max-width:700px;max-height:90vh;overflow-y:auto">
+      <h1>⏸ INVENTORY</h1>
+
+      <!-- Materials / Resources Section -->
+      <div id="materials-section" style="background:rgba(0,0,0,0.4);border:1px solid #555;border-radius:6px;padding:10px;margin:10px 0">
+        <h3 style="margin:0 0 8px 0;color:#ffcc00;font-size:14px">📦 COLLECTED MATERIALS</h3>
+        <div id="materials-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:13px"></div>
+        <div id="currency-display" style="margin-top:8px;font-size:14px;color:#ffd700;text-align:center"></div>
+      </div>
+
+      <!-- Weapon Switching Section -->
+      <h3 style="margin:10px 0 6px 0;color:#ff8844;font-size:14px">🔫 WEAPONS (click to equip)</h3>
+      <div id="inventory-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0;"></div>
+
+      <!-- Player Stats -->
+      <div id="player-stats" style="text-align:left;font-size:14px;margin:10px 0;background:rgba(0,0,0,0.3);padding:8px;border-radius:4px"></div>
+      <p style="color:#888;font-size:12px">Press ESC or tap ⏸ to resume</p>
       <button class="btn" id="inv-resume-btn" style="border-color:#fff;color:#fff">▶ RESUME</button>
     </div>
   </div>
