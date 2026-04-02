@@ -551,10 +551,13 @@ const NPCSystem = (function () {
         case FGROUP_STATE.STAGING:
           if (grp.stateTimer <= 0) {
             grp.state = FGROUP_STATE.ADVANCING;
-            grp.stateTimer = 12 + Math.random() * 18;
+            grp.stateTimer = 5 + Math.random() * 8;
             // Set guard point as target for all members
             for (const npc of aliveMembers) {
-              if (npc.job === JOB.ASSAULT) npc.target = grp.guardPoint.clone();
+              if (npc.job === JOB.ASSAULT || npc.job === JOB.IDLE) {
+                npc.job = JOB.ASSAULT;
+                npc.target = grp.guardPoint.clone();
+              }
             }
           }
           break;
@@ -562,10 +565,10 @@ const NPCSystem = (function () {
         case FGROUP_STATE.ADVANCING:
           if (inCombat) {
             grp.state = FGROUP_STATE.ENGAGING;
-            grp.stateTimer = 20 + Math.random() * 25;
+            grp.stateTimer = 15 + Math.random() * 15;
           } else if (grp.stateTimer <= 0) {
             grp.state = FGROUP_STATE.DEFENDING;
-            grp.stateTimer = 30 + Math.random() * 30;
+            grp.stateTimer = 15 + Math.random() * 15;
             for (const npc of aliveMembers) {
               if (npc.job === JOB.ASSAULT) {
                 npc.job = JOB.GUARD;
@@ -683,8 +686,8 @@ const NPCSystem = (function () {
         nearest = e;
       }
     }
-    // Use weapon range if armed, else 20 (unarmed shouldn't fight, but fallback)
-    const maxRange = npc.weapon ? npc.weapon.range : 20;
+    // Extended detection range: weapon range + 10 bonus, minimum 30
+    const maxRange = npc.weapon ? Math.max(30, npc.weapon.range + 10) : 30;
     if (nearest && nearDist < maxRange) return { enemy: nearest, dist: nearDist };
     return null;
   }
@@ -751,19 +754,30 @@ const NPCSystem = (function () {
 
   /* ── AI Behavior ─────────────────────────────────────────────────── */
   function updateBehavior(npc, delta, timeInfo) {
-    // Combat takes highest priority for armed NPCs (except medics who heal first)
-    if (npc.weapon && npc.job !== JOB.MEDIC && (
-        ['guard', 'patrol', 'assault'].includes(npc.job) ||
-        RANK_ORDER.indexOf(npc.rank) >= RANK_ORDER.indexOf(NPC_RANK.TRAINEE))) {
+    // Combat takes highest priority for ALL armed NPCs (except medics who heal first)
+    if (npc.weapon && npc.job !== JOB.MEDIC) {
       const nearestEnemy = findNearestEnemy(npc);
       if (nearestEnemy) {
         npc.combatTarget = nearestEnemy.enemy;
         updateCombat(npc, delta, nearestEnemy);
         return;
       }
+      // No enemy in range — actively patrol toward center / known battle areas
+      if (!npc.target && npc.job !== JOB.REST && npc.job !== JOB.MEDIC) {
+        // Move toward center (0,0,0) where battles happen, with some randomness
+        const toCenter = new THREE.Vector3(-npc.position.x, 0, -npc.position.z).normalize();
+        const randomOffset = new THREE.Vector3(
+          (Math.random() - 0.5) * 10,
+          0,
+          (Math.random() - 0.5) * 10
+        );
+        const huntTarget = npc.position.clone().add(toCenter.multiplyScalar(5 + Math.random() * 10)).add(randomOffset);
+        huntTarget.y = 0;
+        npc.target = huntTarget;
+      }
     }
 
-    // Medic behavior: heal nearby wounded friendlies
+    // Medic behavior: heal nearby wounded friendlies, then fight
     if (npc.job === JOB.MEDIC) {
       const wounded = npcs.find(n => n.alive && n !== npc && n.health < 60 &&
         npc.position.distanceTo(n.position) < 18);
@@ -841,13 +855,18 @@ const NPCSystem = (function () {
       improveSkill(npc);
     }
 
-    // Wander if idle
+    // Wander if idle — patrol toward battle areas, not random
     if (npc.job === JOB.IDLE && !npc.target) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 3 + Math.random() * 8;
-      npc.target = npc.position.clone().add(
-        new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist)
+      // Move toward center where enemies likely are, with randomness
+      const toCenter = new THREE.Vector3(-npc.position.x, 0, -npc.position.z).normalize();
+      const idleOffset = new THREE.Vector3(
+        (Math.random() - 0.5) * 8,
+        0,
+        (Math.random() - 0.5) * 8
       );
+      const idleTarget = npc.position.clone().add(toCenter.multiplyScalar(3 + Math.random() * 8)).add(idleOffset);
+      idleTarget.y = 0;
+      npc.target = idleTarget;
     }
   }
 

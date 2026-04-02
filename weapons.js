@@ -9,8 +9,8 @@ const Weapons = (() => {
   const WEAPONS = [
     {
       id: 'SHOVEL', name: 'Army Shovel (МПЛ-50)', damage: 35,
-      fireRate: 0.4, clipSize: 0, maxReserve: 0, reloadTime: 0,
-      spread: 0, auto: false, type: 'MELEE', recoilY: 0, recoilX: 0,
+      fireRate: 0.25, clipSize: 0, maxReserve: 0, reloadTime: 0,
+      spread: 0, auto: true, type: 'MELEE', recoilY: 0, recoilX: 0,
     },
     {
       id: 'MAKAROV', name: 'Makarov PM', damage: 15,
@@ -152,18 +152,67 @@ const Weapons = (() => {
 
   function buildShovelMesh() {
     const g = new THREE.Group();
+    // Wooden handle — tapered, longer
     const handle = new THREE.Mesh(
-      new THREE.BoxGeometry(0.025, 0.40, 0.025),
-      new THREE.MeshLambertMaterial({ color: 0x5a3a1a })
+      new THREE.CylinderGeometry(0.012, 0.016, 0.50, 8),
+      new THREE.MeshLambertMaterial({ color: 0x6B4226 })
     );
-    handle.position.set(0.18, -0.22, -0.25);
+    handle.position.set(0.18, -0.18, -0.25);
+    g.add(handle);
+
+    // Grip wrap (darker rubber/leather tape near top)
+    const grip = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.017, 0.017, 0.08, 8),
+      new THREE.MeshLambertMaterial({ color: 0x2a1a0a })
+    );
+    grip.position.set(0.18, 0.03, -0.25);
+    g.add(grip);
+
+    // T-handle crossbar at top
+    const crossbar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.01, 0.01, 0.06, 6),
+      new THREE.MeshLambertMaterial({ color: 0x6B4226 })
+    );
+    crossbar.position.set(0.18, 0.07, -0.25);
+    crossbar.rotation.z = Math.PI / 2;
+    g.add(crossbar);
+
+    // Steel blade — wider spade shape
     const blade = new THREE.Mesh(
-      new THREE.BoxGeometry(0.10, 0.12, 0.015),
-      new THREE.MeshLambertMaterial({ color: 0x666666 })
+      new THREE.BoxGeometry(0.13, 0.14, 0.008),
+      new THREE.MeshPhongMaterial({ color: 0x888888, shininess: 60, specular: 0x555555 })
     );
-    blade.position.set(0.18, -0.43, -0.27);
-    blade.rotation.x = -0.2;
-    g.add(handle, blade);
+    blade.position.set(0.18, -0.46, -0.27);
+    blade.rotation.x = -0.25;
+    g.add(blade);
+
+    // Blade edge (sharpened lighter steel strip)
+    const edge = new THREE.Mesh(
+      new THREE.BoxGeometry(0.13, 0.015, 0.009),
+      new THREE.MeshPhongMaterial({ color: 0xbbbbbb, shininess: 90, specular: 0x999999 })
+    );
+    edge.position.set(0.18, -0.535, -0.28);
+    edge.rotation.x = -0.25;
+    g.add(edge);
+
+    // Steel collar where blade meets handle
+    const collar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.018, 0.03, 8),
+      new THREE.MeshLambertMaterial({ color: 0x555555 })
+    );
+    collar.position.set(0.18, -0.38, -0.26);
+    g.add(collar);
+
+    // Rivet dots on blade (2 rivets)
+    for (let i = -1; i <= 1; i += 2) {
+      const rivet = new THREE.Mesh(
+        new THREE.SphereGeometry(0.005, 4, 4),
+        new THREE.MeshLambertMaterial({ color: 0x444444 })
+      );
+      rivet.position.set(0.18 + i * 0.03, -0.41, -0.263);
+      g.add(rivet);
+    }
+
     return g;
   }
 
@@ -1093,6 +1142,22 @@ const Weapons = (() => {
       if (hit || p.life <= 0) {
         // Explosion effect
         Enemies.damageInRadius(p.mesh.position, p.radius, p.damage);
+        // Destroy terrain blocks in blast radius
+        if (typeof VoxelWorld !== 'undefined') {
+          const cx = Math.round(p.mesh.position.x);
+          const cy = Math.round(p.mesh.position.y);
+          const cz = Math.round(p.mesh.position.z);
+          const blastR = Math.ceil(p.radius);
+          for (let bx = -blastR; bx <= blastR; bx++) {
+            for (let by = -blastR; by <= blastR; by++) {
+              for (let bz = -blastR; bz <= blastR; bz++) {
+                if (bx * bx + by * by + bz * bz <= blastR * blastR) {
+                  VoxelWorld.setBlock(cx + bx, cy + by, cz + bz, 0);
+                }
+              }
+            }
+          }
+        }
         if (p.isMolotov) {
           createFireArea(p.mesh.position, p.radius);
         } else {
@@ -1235,7 +1300,18 @@ const Weapons = (() => {
         raycaster.setFromCamera(spreadVec, camera);
         raycaster.far = 25; // shotgun effective range
         const pelletHits = raycaster.intersectObjects(targets, true);
-        if (pelletHits.length > 0) onHit(pelletHits[0], Math.floor(wep.damage / pellets));
+        if (pelletHits.length > 0) {
+          onHit(pelletHits[0], Math.floor(wep.damage / pellets));
+        } else if (typeof VoxelWorld !== 'undefined') {
+          // Pellet missed — dig terrain using pellet's spread direction
+          const pelletDir = raycaster.ray.direction.clone();
+          const pelletCam = {
+            position: camera.position,
+            getWorldDirection: function(v) { return v.copy(pelletDir); },
+          };
+          const pRay = VoxelWorld.raycastBlock(pelletCam, 25);
+          if (pRay) VoxelWorld.setBlock(pRay.hit.x, pRay.hit.y, pRay.hit.z, 0);
+        }
       }
       if (st.clip === 0 && st.reserve > 0) startReload();
       return;
@@ -1256,7 +1332,20 @@ const Weapons = (() => {
     showMuzzle();
     recoilOffset = 0.02;
 
-    if (hits.length > 0) onHit(hits[0], wep.damage);
+    if (hits.length > 0) {
+      onHit(hits[0], wep.damage);
+    } else if (typeof VoxelWorld !== 'undefined') {
+      // Bullet missed enemies — dig terrain on impact using bullet's spread direction
+      const bulletDir = raycaster.ray.direction.clone();
+      const bulletCam = {
+        position: camera.position,
+        getWorldDirection: function(v) { return v.copy(bulletDir); },
+      };
+      const bRay = VoxelWorld.raycastBlock(bulletCam, 80);
+      if (bRay) {
+        VoxelWorld.setBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z, 0);
+      }
+    }
     if (st.clip === 0 && st.reserve > 0) startReload();
   }
 
