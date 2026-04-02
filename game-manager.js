@@ -474,17 +474,7 @@ const GameManager = (function () {
         // Inventory/Tab toggle
         if (e.code === 'Tab') {
           e.preventDefault();
-          var invOverlay = document.getElementById('overlay-inventory');
-          if (invOverlay) {
-            if (invOverlay.style.display === 'none' || !invOverlay.style.display) {
-              invOverlay.style.display = 'flex';
-              gameState = STATE.PAUSED;
-            } else {
-              invOverlay.style.display = 'none';
-              gameState = STATE.PLAYING;
-              requestPointerLock();
-            }
-          }
+          toggleInventory();
         }
 
         // Weapon switching (1-9 = weapons 0-8, 0 = weapon 9)

@@ -1303,8 +1303,13 @@ const Weapons = (() => {
         if (pelletHits.length > 0) {
           onHit(pelletHits[0], Math.floor(wep.damage / pellets));
         } else if (typeof VoxelWorld !== 'undefined') {
-          // Pellet missed — dig terrain
-          const ray = VoxelWorld.raycastBlock(camera, 25);
+          // Pellet missed — dig terrain using pellet's spread direction
+          var pelletDir = raycaster.ray.direction.clone();
+          var pelletCam = {
+            position: camera.position,
+            getWorldDirection: function(v) { return v.copy(pelletDir); },
+          };
+          var ray = VoxelWorld.raycastBlock(pelletCam, 25);
           if (ray) VoxelWorld.setBlock(ray.hit.x, ray.hit.y, ray.hit.z, 0);
         }
       }
@@ -1330,8 +1335,13 @@ const Weapons = (() => {
     if (hits.length > 0) {
       onHit(hits[0], wep.damage);
     } else if (typeof VoxelWorld !== 'undefined') {
-      // Bullet missed enemies — dig terrain on impact
-      const ray = VoxelWorld.raycastBlock(camera, 80);
+      // Bullet missed enemies — dig terrain on impact using bullet's spread direction
+      var bulletDir = raycaster.ray.direction.clone();
+      var bulletCam = {
+        position: camera.position,
+        getWorldDirection: function(v) { return v.copy(bulletDir); },
+      };
+      var ray = VoxelWorld.raycastBlock(bulletCam, 80);
       if (ray) {
         VoxelWorld.setBlock(ray.hit.x, ray.hit.y, ray.hit.z, 0);
       }

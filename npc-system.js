@@ -754,8 +754,8 @@ const NPCSystem = (function () {
 
   /* ── AI Behavior ─────────────────────────────────────────────────── */
   function updateBehavior(npc, delta, timeInfo) {
-    // Combat takes highest priority for ALL armed NPCs (any rank with a weapon)
-    if (npc.weapon) {
+    // Combat takes highest priority for ALL armed NPCs (except medics who heal first)
+    if (npc.weapon && npc.job !== JOB.MEDIC) {
       const nearestEnemy = findNearestEnemy(npc);
       if (nearestEnemy) {
         npc.combatTarget = nearestEnemy.enemy;
@@ -788,6 +788,15 @@ const NPCSystem = (function () {
           wounded.stress = Math.max(0, wounded.stress - delta * 2);
         }
         return;
+      }
+      // If no wounded, engage enemies
+      if (npc.weapon) {
+        const nearestEnemy = findNearestEnemy(npc);
+        if (nearestEnemy) {
+          npc.combatTarget = nearestEnemy.enemy;
+          updateCombat(npc, delta, nearestEnemy);
+          return;
+        }
       }
     }
 
