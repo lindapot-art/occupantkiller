@@ -286,6 +286,75 @@ const HUD = (() => {
     ctx.restore();
   }
 
+  // ── Tactical Compass ──────────────────────────────────────
+  const compassEl = document.getElementById('tactical-compass');
+
+  function updateCompass(yaw) {
+    if (!compassEl) return;
+    // Cardinal directions spread across compass bar based on player yaw
+    var degs = (-yaw * 180 / Math.PI) % 360;
+    if (degs < 0) degs += 360;
+    var dirs = [
+      {label:'N', deg:0}, {label:'NE', deg:45}, {label:'E', deg:90},
+      {label:'SE', deg:135}, {label:'S', deg:180}, {label:'SW', deg:225},
+      {label:'W', deg:270}, {label:'NW', deg:315}
+    ];
+    var html = '';
+    for (var i = 0; i < dirs.length; i++) {
+      var diff = dirs[i].deg - degs;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+      if (Math.abs(diff) < 60) {
+        var pos = 50 + diff * 1.5; // percentage position
+        var opacity = 1 - Math.abs(diff) / 60;
+        var isCardinal = dirs[i].label.length === 1;
+        html += '<span style="position:absolute;left:' + pos + '%;transform:translateX(-50%);' +
+          'opacity:' + opacity.toFixed(2) + ';color:' + (isCardinal ? '#00ff44' : '#888') +
+          ';font-size:' + (isCardinal ? '13px' : '10px') + ';font-weight:' + (isCardinal ? 'bold' : 'normal') +
+          '">' + dirs[i].label + '</span>';
+      }
+    }
+    // Degree readout at center
+    html += '<span style="position:absolute;left:50%;transform:translateX(-50%);bottom:0;font-size:9px;color:#666">' + Math.round(degs) + '°</span>';
+    compassEl.innerHTML = html;
+  }
+
+  // ── Kill Streak Display ────────────────────────────────────
+  const streakEl = document.getElementById('streak-display');
+
+  function showStreak(count, multiplier) {
+    if (!streakEl) return;
+    if (count < 2) { streakEl.style.display = 'none'; return; }
+    streakEl.style.display = 'block';
+    var color = count >= 10 ? '#ff0000' : count >= 5 ? '#ff8800' : '#ffcc00';
+    streakEl.innerHTML = '🔥 ' + count + 'x STREAK <span style="color:' + color + '">(' + multiplier.toFixed(1) + 'x)</span>';
+    streakEl.style.color = color;
+  }
+
+  // ── Bleed Indicator ────────────────────────────────────────
+  const bleedEl = document.getElementById('bleed-indicator');
+
+  function showBleed(active) {
+    if (!bleedEl) return;
+    bleedEl.style.display = active ? 'block' : 'none';
+  }
+
+  // ── Prone Indicator ────────────────────────────────────────
+  const proneEl = document.getElementById('prone-indicator');
+
+  function showProne(active) {
+    if (!proneEl) return;
+    proneEl.style.display = active ? 'block' : 'none';
+  }
+
+  // ── Jam Indicator ──────────────────────────────────────────
+  const jamEl = document.getElementById('jam-indicator');
+
+  function showJam(active) {
+    if (!jamEl) return;
+    jamEl.style.display = active ? 'block' : 'none';
+  }
+
   return {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
@@ -294,5 +363,6 @@ const HUD = (() => {
     showHeadshot, notifyPickup,
     announceWave, announceStage,
     addKill, showHitDirection, updateMinimap,
+    updateCompass, showStreak, showBleed, showProne, showJam,
   };
 })();

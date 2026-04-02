@@ -87,6 +87,35 @@ const AudioSystem = (function () {
     gain.connect(masterGain);
   }
 
+  function playFlashbang() {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    // High-pitched burst + ringing
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(4000, now);
+    osc.frequency.exponentialRampToValueAtTime(2000, now + 0.5);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 0.8);
+    // Tinnitus ring
+    var ring = ctx.createOscillator();
+    var ringGain = ctx.createGain();
+    ring.type = 'sine';
+    ring.frequency.value = 3200;
+    ringGain.gain.setValueAtTime(0.1, now + 0.1);
+    ringGain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
+    ring.connect(ringGain);
+    ringGain.connect(masterGain);
+    ring.start(now + 0.1);
+    ring.stop(now + 2.0);
+  }
+
   function playHit() {
     if (!enabled || !ctx) return;
     resume();
@@ -360,6 +389,14 @@ const AudioSystem = (function () {
     }
   }
 
+  function setMusicIntensity(intensity) {
+    // intensity: 0.0 (calm) to 1.0 (maximum combat)
+    if (!_musicPlaying || !_musicGain) return;
+    // Scale music volume: base volume at 0 intensity, 2x at full
+    var targetVol = _musicVolume * (0.5 + intensity * 1.5);
+    _musicGain.gain.value = Math.min(1.0, targetVol);
+  }
+
   function stopMusic() {
     _musicPlaying = false;
     if (_musicBeatInterval) {
@@ -403,6 +440,8 @@ const AudioSystem = (function () {
     playMusic: playMusic,
     stopMusic: stopMusic,
     setMusicVolume: setMusicVolume,
+    setMusicIntensity: setMusicIntensity,
+    playFlashbang: playFlashbang,
     isMusicPlaying: isMusicPlaying,
     setVolume: setVolume,
     toggle: toggle,
