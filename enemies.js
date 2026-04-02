@@ -82,6 +82,7 @@ const Enemies = (() => {
       attackRate:  1.2,
       scoreValue:  100,
       dropChance:  0.30,
+      range: 15, rangedDmg: 5, rangedRate: 1.5, accuracy: 0.3,
     },
     STORMER: {
       name:        'STORMER',
@@ -98,6 +99,7 @@ const Enemies = (() => {
       attackRate:  0.7,
       scoreValue:  150,
       dropChance:  0.20,
+      range: 10, rangedDmg: 4, rangedRate: 0.8, accuracy: 0.2,
     },
     ARMORED: {
       name:        'ARMORED',
@@ -114,6 +116,7 @@ const Enemies = (() => {
       attackRate:  1.8,
       scoreValue:  350,
       dropChance:  0.85,
+      range: 12, rangedDmg: 8, rangedRate: 2.0, accuracy: 0.4,
     },
     MEDIC: {
       name:        'MEDIC',
@@ -131,6 +134,7 @@ const Enemies = (() => {
       scoreValue:  200,
       dropChance:  0.50,
       role:        'medic',
+      range: 0, rangedDmg: 0, rangedRate: 0, accuracy: 0,
     },
     OFFICER: {
       name:        'OFFICER',
@@ -148,6 +152,7 @@ const Enemies = (() => {
       scoreValue:  500,
       dropChance:  0.60,
       role:        'officer',
+      range: 20, rangedDmg: 10, rangedRate: 1.2, accuracy: 0.5,
     },
     SNIPER: {
       name:        'SNIPER',
@@ -165,6 +170,7 @@ const Enemies = (() => {
       scoreValue:  400,
       dropChance:  0.55,
       role:        'sniper',
+      range: 40, rangedDmg: 25, rangedRate: 3.0, accuracy: 0.7,
     },
     ENGINEER: {
       name:        'ENGINEER',
@@ -182,6 +188,7 @@ const Enemies = (() => {
       scoreValue:  300,
       dropChance:  0.65,
       role:        'engineer',
+      range: 8, rangedDmg: 6, rangedRate: 1.0, accuracy: 0.25,
     },
     DRONE_OP: {
       name:        'DRONE_OP',
@@ -199,6 +206,7 @@ const Enemies = (() => {
       scoreValue:  350,
       dropChance:  0.45,
       role:        'drone_op',
+      range: 18, rangedDmg: 7, rangedRate: 1.4, accuracy: 0.35,
     },
     FLAMETHROWER: {
       name:        'FLAMETHROWER',
@@ -216,6 +224,7 @@ const Enemies = (() => {
       scoreValue:  450,
       dropChance:  0.70,
       role:        'flamethrower',
+      range: 8, rangedDmg: 12, rangedRate: 0.5, accuracy: 0.6,
     },
     SABOTEUR: {
       name:        'SABOTEUR',
@@ -233,6 +242,7 @@ const Enemies = (() => {
       scoreValue:  500,
       dropChance:  0.40,
       role:        'saboteur',
+      range: 12, rangedDmg: 15, rangedRate: 0.8, accuracy: 0.45,
     },
   };
 
@@ -1043,6 +1053,32 @@ const Enemies = (() => {
           }
         }
         continue;
+      }
+
+      // ── Combat: ranged attack on player if spotted ──
+      if (e.playerSpotted && !targetIsNPC && e.typeCfg.range > 0) {
+        if (distToPlayer < e.typeCfg.range && distToPlayer > 2.5) {
+          if (!e._rangedTimer) e._rangedTimer = 0;
+          e._rangedTimer -= delta;
+          if (e._rangedTimer <= 0) {
+            e._rangedTimer = e.typeCfg.rangedRate;
+            // Accuracy check - affected by distance
+            var hitChance = Math.max(0, e.typeCfg.accuracy * (1 - distToPlayer / (e.typeCfg.range * 1.5)));
+            if (Math.random() < hitChance) {
+              onPlayerHit(e.typeCfg.rangedDmg, e.mesh.position);
+            }
+            // Spawn tracer toward player
+            if (typeof Tracers !== 'undefined' && Tracers.spawnTracer) {
+              var origin = e.mesh.position.clone();
+              origin.y += 1.2;
+              var dir = new THREE.Vector3().subVectors(
+                new THREE.Vector3(playerPos.x, playerPos.y + 0.8, playerPos.z),
+                origin
+              ).normalize();
+              Tracers.spawnTracer(origin, dir, 0xff4400, 80);
+            }
+          }
+        }
       }
 
       // ── Combat: melee attack on player if spotted and close ──
