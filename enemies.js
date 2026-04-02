@@ -200,6 +200,40 @@ const Enemies = (() => {
       dropChance:  0.45,
       role:        'drone_op',
     },
+    FLAMETHROWER: {
+      name:        'FLAMETHROWER',
+      hpBase:      90,
+      speedBase:   1.4,
+      scale:       1.2,
+      camoVariant: 'dark',
+      bodyColor:   0x2a2a1a,
+      headColor:   0xd0b090,
+      limbColor:   0x1a2a0a,
+      helmetColor: 0x1a1a10,
+      eyeColor:    0xff4400,
+      attackDmg:   18,
+      attackRate:  0.8,
+      scoreValue:  450,
+      dropChance:  0.70,
+      role:        'flamethrower',
+    },
+    SABOTEUR: {
+      name:        'SABOTEUR',
+      hpBase:      25,
+      speedBase:   5.0,
+      scale:       0.9,
+      camoVariant: 'dark',
+      bodyColor:   0x1a2a0a,
+      headColor:   0xb09070,
+      limbColor:   0x0a1a0a,
+      helmetColor: 0x0a0a0a,
+      eyeColor:    0xcc00ff,
+      attackDmg:   20,
+      attackRate:  0.5,
+      scoreValue:  500,
+      dropChance:  0.40,
+      role:        'saboteur',
+    },
   };
 
   // ── Enemy Roles for Assault Groups ──────────────────────
@@ -311,8 +345,10 @@ const Enemies = (() => {
   function pickTypeForWave(w) {
     const r = Math.random();
     // Late waves: introduce specialists and heavy units
+    if (w >= 7 && r < 0.05) return 'SABOTEUR';
     if (w >= 7 && r < 0.08) return 'DRONE_OP';
     if (w >= 6 && r < 0.12) return 'SNIPER';
+    if (w >= 6 && r < 0.16) return 'FLAMETHROWER';
     if (w >= 5 && r < 0.18) return 'ENGINEER';
     if (w >= 5 && r < 0.30) return 'ARMORED';
     if (w >= 3 && r < 0.50) return 'STORMER';
@@ -662,6 +698,8 @@ const Enemies = (() => {
       npcTarget:   null,        // reference to friendly NPC being targeted
       wounded:     false,       // wounded, needs medic
       retreating:  false,       // falling back
+      surrendered: false,
+      _surrenderClaimed: false,
     });
     return idx;
   }
@@ -975,6 +1013,35 @@ const Enemies = (() => {
         const parts = e.mesh.userData.parts;
         if (parts[3]) parts[3].rotation.x =  e.legAngle;
         if (parts[4]) parts[4].rotation.x = -e.legAngle;
+      }
+
+      // ── Surrender system: low-HP enemies may surrender ──
+      if (!e.surrendered && e.hp < e.maxHp * 0.15 && e.hp > 0) {
+        // 2% chance per frame to surrender when below 15% HP
+        if (Math.random() < 0.02 * delta * 10) {
+          e.surrendered = true;
+          e.speed = 0;
+          // Raise arms visual: tilt mesh
+          e.mesh.rotation.x = -0.3;
+          // White flag: change helmet to white
+          e.mesh.traverse(function(child) {
+            if (child.material && child.userData && child.userData.isHelmet) {
+              child.material.color.setHex(0xffffff);
+            }
+          });
+        }
+      }
+      // Surrendered enemies don't attack — give bonus score if player walks close
+      if (e.surrendered) {
+        e.attackTimer = 999;
+        if (playerPos) {
+          const surrenderDist = e.mesh.position.distanceTo(playerPos);
+          if (surrenderDist < 3 && !e._surrenderClaimed) {
+            e._surrenderClaimed = true;
+            e.scoreValue += 200; // Bonus for POW capture
+          }
+        }
+        continue;
       }
 
       // ── Combat: melee attack on player if spotted and close ──
@@ -1304,6 +1371,10 @@ const Enemies = (() => {
   // ── Get assault groups info ───────────────────────────────
   function getAssaultGroups() { return assaultGroups; }
 
+  function getSurrenderCount() {
+    return enemies.filter(e => e.alive && e.surrendered).length;
+  }
+
   return {
     startWave,
     update,
@@ -1317,6 +1388,7 @@ const Enemies = (() => {
     getAll,
     getAssaultGroups,
     setPlayerStealth,
+    getSurrenderCount,
     spawnSingle: function (typeName, pos) { spawnOne(typeName, -1, pos); },
     RANKS,
     UNITS,
