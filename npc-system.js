@@ -764,13 +764,16 @@ const NPCSystem = (function () {
       }
       // No enemy in range — actively patrol toward center / known battle areas
       if (!npc.target && npc.job !== JOB.REST && npc.job !== JOB.MEDIC) {
-        const huntAngle = Math.random() * Math.PI * 2;
-        const huntDist = 5 + Math.random() * 15;
-        npc.target = new THREE.Vector3(
-          Math.cos(huntAngle) * huntDist,
+        // Move toward center (0,0,0) where battles happen, with some randomness
+        const toCenter = new THREE.Vector3(-npc.position.x, 0, -npc.position.z).normalize();
+        const randomOffset = new THREE.Vector3(
+          (Math.random() - 0.5) * 10,
           0,
-          Math.sin(huntAngle) * huntDist
+          (Math.random() - 0.5) * 10
         );
+        const huntTarget = npc.position.clone().add(toCenter.multiplyScalar(5 + Math.random() * 10)).add(randomOffset);
+        huntTarget.y = 0;
+        npc.target = huntTarget;
       }
     }
 
@@ -854,14 +857,16 @@ const NPCSystem = (function () {
 
     // Wander if idle — patrol toward battle areas, not random
     if (npc.job === JOB.IDLE && !npc.target) {
-      // Prefer moving toward the center where enemies likely are
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 4 + Math.random() * 12;
-      npc.target = new THREE.Vector3(
-        Math.cos(angle) * dist,
+      // Move toward center where enemies likely are, with randomness
+      const toCenter = new THREE.Vector3(-npc.position.x, 0, -npc.position.z).normalize();
+      const idleOffset = new THREE.Vector3(
+        (Math.random() - 0.5) * 8,
         0,
-        Math.sin(angle) * dist
+        (Math.random() - 0.5) * 8
       );
+      const idleTarget = npc.position.clone().add(toCenter.multiplyScalar(3 + Math.random() * 8)).add(idleOffset);
+      idleTarget.y = 0;
+      npc.target = idleTarget;
     }
   }
 
