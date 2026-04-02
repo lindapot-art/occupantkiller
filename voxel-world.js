@@ -1916,7 +1916,7 @@ const VoxelWorld = (function () {
       // Sandbag wall around pit
       for (let dx = -3; dx <= 3; dx++) {
         for (let dz = -3; dz <= 3; dz++) {
-          var d = dx * dx + dz * dz;
+          const d = dx * dx + dz * dz;
           if (d >= 7 && d <= 10) {
             setBlock(gx + dx, surfH + 1, gz + dz, BLOCK.SANDBAG);
           }
