@@ -1981,6 +1981,336 @@ const VoxelWorld = (function () {
     }
   }
 
+  /* ── Military Structure Generators ────────────────────────────── */
+
+  function generateBunker(cx, cz) {
+    const surfH = getTerrainHeight(cx, cz);
+    // Dig out 6x6 underground room, 4 blocks deep
+    for (let x = 0; x < 6; x++) {
+      for (let z = 0; z < 6; z++) {
+        for (let d = 1; d <= 4; d++) {
+          setBlock(cx + x, surfH - d, cz + z, BLOCK.AIR);
+        }
+        // Concrete walls (perimeter only)
+        if (x === 0 || x === 5 || z === 0 || z === 5) {
+          for (let d = 1; d <= 4; d++) {
+            setBlock(cx + x, surfH - d, cz + z, BLOCK.CONCRETE);
+          }
+        }
+        // Concrete floor
+        setBlock(cx + x, surfH - 4, cz + z, BLOCK.CONCRETE);
+        // Reinforced roof at surface level
+        setBlock(cx + x, surfH, cz + z, BLOCK.REINFORCED);
+      }
+    }
+    // Entry ramp on the south side (z=0), dirt steps going down
+    for (let s = 0; s < 4; s++) {
+      setBlock(cx + 2, surfH - s, cz - 1 - s, BLOCK.DIRT);
+      setBlock(cx + 3, surfH - s, cz - 1 - s, BLOCK.DIRT);
+      setBlock(cx + 2, surfH - s + 1, cz - 1 - s, BLOCK.AIR);
+      setBlock(cx + 3, surfH - s + 1, cz - 1 - s, BLOCK.AIR);
+    }
+    // Interior: crate for ammo, metal table
+    setBlock(cx + 2, surfH - 3, cz + 2, BLOCK.CRATE);
+    setBlock(cx + 3, surfH - 3, cz + 4, BLOCK.METAL);
+  }
+
+  function generateMGNest(cx, cz) {
+    const surfH = getTerrainHeight(cx, cz);
+    // Concrete floor 5x3
+    for (let x = -2; x <= 2; x++) {
+      for (let z = -1; z <= 1; z++) {
+        setBlock(cx + x, surfH, cz + z, BLOCK.CONCRETE);
+      }
+    }
+    // Semi-circle of sandbags on the front and sides, 3 blocks tall
+    for (let angle = -Math.PI / 2; angle <= Math.PI / 2; angle += 0.35) {
+      const bx = cx + Math.round(Math.cos(angle) * 2.5);
+      const bz = cz + Math.round(Math.sin(angle) * 2.5);
+      for (let y = 1; y <= 3; y++) {
+        setBlock(bx, surfH + y, bz, BLOCK.SANDBAG);
+      }
+    }
+    // Metal "gun" in center: metal on metal
+    setBlock(cx, surfH + 1, cz, BLOCK.METAL);
+    setBlock(cx, surfH + 2, cz, BLOCK.METAL);
+  }
+
+  function generateFoxhole(cx, cz) {
+    const surfH = getTerrainHeight(cx, cz);
+    // 2x2 hole, 2 blocks deep
+    for (let x = 0; x < 2; x++) {
+      for (let z = 0; z < 2; z++) {
+        setBlock(cx + x, surfH, cz + z, BLOCK.AIR);
+        setBlock(cx + x, surfH - 1, cz + z, BLOCK.AIR);
+        setBlock(cx + x, surfH - 2, cz + z, BLOCK.DIRT);
+      }
+    }
+    // Sandbag rim on 3 sides (north, east, west — south open as entrance)
+    for (let x = -1; x <= 2; x++) {
+      setBlock(cx + x, surfH, cz + 2, BLOCK.SANDBAG);
+      setBlock(cx + x, surfH + 1, cz + 2, BLOCK.SANDBAG);
+    }
+    for (let z = -1; z <= 2; z++) {
+      setBlock(cx - 1, surfH, cz + z, BLOCK.SANDBAG);
+      setBlock(cx + 2, surfH, cz + z, BLOCK.SANDBAG);
+      setBlock(cx - 1, surfH + 1, cz + z, BLOCK.SANDBAG);
+      setBlock(cx + 2, surfH + 1, cz + z, BLOCK.SANDBAG);
+    }
+  }
+
+  function generateMinefield(cx, cz) {
+    const surfH = getTerrainHeight(cx, cz);
+    // 8x8 dirt area with scattered mine markers (FUEL_BARREL)
+    for (let x = 0; x < 8; x++) {
+      for (let z = 0; z < 8; z++) {
+        setBlock(cx + x, surfH, cz + z, BLOCK.DIRT);
+        // Scatter mines roughly every 3rd cell with some randomness
+        if ((x + z) % 3 === 0 && Math.random() > 0.4) {
+          setBlock(cx + x, surfH + 1, cz + z, BLOCK.FUEL_BARREL);
+        }
+      }
+    }
+    // Warning sign: FENCE post with CRATE on top at corner
+    setBlock(cx - 1, surfH + 1, cz - 1, BLOCK.FENCE);
+    setBlock(cx - 1, surfH + 2, cz - 1, BLOCK.FENCE);
+    setBlock(cx - 1, surfH + 3, cz - 1, BLOCK.CRATE);
+  }
+
+  function generateFieldHospitalTent(cx, cz) {
+    const surfH = getTerrainHeight(cx, cz);
+    // 6x4 wood frame
+    for (let x = 0; x < 6; x++) {
+      for (let z = 0; z < 4; z++) {
+        setBlock(cx + x, surfH, cz + z, BLOCK.CONCRETE);
+      }
+    }
+    // Corner posts
+    for (let y = 1; y <= 3; y++) {
+      setBlock(cx, surfH + y, cz, BLOCK.WOOD);
+      setBlock(cx + 5, surfH + y, cz, BLOCK.WOOD);
+      setBlock(cx, surfH + y, cz + 3, BLOCK.WOOD);
+      setBlock(cx + 5, surfH + y, cz + 3, BLOCK.WOOD);
+    }
+    // GLASS "tent" roof
+    for (let x = 0; x < 6; x++) {
+      for (let z = 0; z < 4; z++) {
+        setBlock(cx + x, surfH + 3, cz + z, BLOCK.GLASS);
+      }
+    }
+    // Interior: 2 CRATE beds
+    setBlock(cx + 1, surfH + 1, cz + 1, BLOCK.CRATE);
+    setBlock(cx + 2, surfH + 1, cz + 1, BLOCK.CRATE);
+    setBlock(cx + 1, surfH + 1, cz + 2, BLOCK.CRATE);
+    setBlock(cx + 2, surfH + 1, cz + 2, BLOCK.CRATE);
+    // ELECTRONICS medical equipment
+    setBlock(cx + 4, surfH + 1, cz + 1, BLOCK.ELECTRONICS);
+    setBlock(cx + 4, surfH + 1, cz + 2, BLOCK.ELECTRONICS);
+    // Red cross on front wall using BRICK blocks (cross pattern)
+    setBlock(cx + 3, surfH + 2, cz, BLOCK.BRICK);
+    setBlock(cx + 2, surfH + 1, cz, BLOCK.BRICK);
+    setBlock(cx + 3, surfH + 1, cz, BLOCK.BRICK);
+    setBlock(cx + 4, surfH + 1, cz, BLOCK.BRICK);
+  }
+
+  function generateCommandPost(cx, cz) {
+    const surfH = getTerrainHeight(cx, cz);
+    // 5x5 reinforced walls, 3 high
+    for (let x = 0; x < 5; x++) {
+      for (let z = 0; z < 5; z++) {
+        if (x === 0 || x === 4 || z === 0 || z === 4) {
+          for (let y = 1; y <= 3; y++) {
+            setBlock(cx + x, surfH + y, cz + z, BLOCK.REINFORCED);
+          }
+        }
+        // Flat concrete roof
+        setBlock(cx + x, surfH + 4, cz + z, BLOCK.CONCRETE);
+      }
+    }
+    // Door
+    setBlock(cx + 2, surfH + 1, cz, BLOCK.AIR);
+    setBlock(cx + 2, surfH + 2, cz, BLOCK.AIR);
+    // Antenna: metal pole 3 high on roof
+    for (let y = 5; y <= 7; y++) {
+      setBlock(cx + 2, surfH + y, cz + 2, BLOCK.METAL);
+    }
+    // Interior: ELECTRONICS (radio), CRATE (maps table)
+    setBlock(cx + 1, surfH + 1, cz + 3, BLOCK.ELECTRONICS);
+    setBlock(cx + 3, surfH + 1, cz + 3, BLOCK.CRATE);
+    // Sandbag perimeter 2 blocks out
+    for (let x = -2; x <= 6; x++) {
+      setBlock(cx + x, surfH, cz - 2, BLOCK.SANDBAG);
+      setBlock(cx + x, surfH + 1, cz - 2, BLOCK.SANDBAG);
+      setBlock(cx + x, surfH, cz + 6, BLOCK.SANDBAG);
+      setBlock(cx + x, surfH + 1, cz + 6, BLOCK.SANDBAG);
+    }
+    for (let z = -1; z <= 5; z++) {
+      setBlock(cx - 2, surfH, cz + z, BLOCK.SANDBAG);
+      setBlock(cx - 2, surfH + 1, cz + z, BLOCK.SANDBAG);
+      setBlock(cx + 6, surfH, cz + z, BLOCK.SANDBAG);
+      setBlock(cx + 6, surfH + 1, cz + z, BLOCK.SANDBAG);
+    }
+  }
+
+  function generateAntiAirPosition(cx, cz) {
+    const surfH = getTerrainHeight(cx, cz);
+    // Circular sandbag wall (radius 3)
+    for (let angle = 0; angle < Math.PI * 2; angle += 0.35) {
+      const bx = cx + Math.round(Math.cos(angle) * 3);
+      const bz = cz + Math.round(Math.sin(angle) * 3);
+      setBlock(bx, surfH + 1, bz, BLOCK.SANDBAG);
+      setBlock(bx, surfH + 2, bz, BLOCK.SANDBAG);
+    }
+    // Central metal pedestal 2 high
+    setBlock(cx, surfH + 1, cz, BLOCK.METAL);
+    setBlock(cx, surfH + 2, cz, BLOCK.METAL);
+    // "Gun barrel" = metal blocks extending up and out at angle
+    setBlock(cx, surfH + 3, cz, BLOCK.METAL);
+    setBlock(cx, surfH + 4, cz - 1, BLOCK.METAL);
+    setBlock(cx, surfH + 5, cz - 2, BLOCK.METAL);
+  }
+
+  function generateAmmoDumpBerm(cx, cz) {
+    const surfH = getTerrainHeight(cx, cz);
+    // 4x4 earthen berm: dirt walls 2 high around
+    for (let x = 0; x < 4; x++) {
+      for (let z = 0; z < 4; z++) {
+        if (x === 0 || x === 3 || z === 0 || z === 3) {
+          setBlock(cx + x, surfH + 1, cz + z, BLOCK.DIRT);
+          setBlock(cx + x, surfH + 2, cz + z, BLOCK.DIRT);
+        }
+      }
+    }
+    // Interior filled with CRATE blocks
+    for (let x = 1; x <= 2; x++) {
+      for (let z = 1; z <= 2; z++) {
+        setBlock(cx + x, surfH + 1, cz + z, BLOCK.CRATE);
+        setBlock(cx + x, surfH + 2, cz + z, BLOCK.CRATE);
+      }
+    }
+    // METAL roof
+    for (let x = 0; x < 4; x++) {
+      for (let z = 0; z < 4; z++) {
+        setBlock(cx + x, surfH + 3, cz + z, BLOCK.METAL);
+      }
+    }
+  }
+
+  function generateObservationPost(cx, cz) {
+    const surfH = getTerrainHeight(cx, cz);
+    // 4 WOOD corner posts going up 8 blocks
+    for (let y = 1; y <= 8; y++) {
+      setBlock(cx, surfH + y, cz, BLOCK.WOOD);
+      setBlock(cx + 2, surfH + y, cz, BLOCK.WOOD);
+      setBlock(cx, surfH + y, cz + 2, BLOCK.WOOD);
+      setBlock(cx + 2, surfH + y, cz + 2, BLOCK.WOOD);
+    }
+    // Platform at top (wood floor 3x3)
+    for (let x = 0; x <= 2; x++) {
+      for (let z = 0; z <= 2; z++) {
+        setBlock(cx + x, surfH + 8, cz + z, BLOCK.WOOD);
+      }
+    }
+    // FENCE railing
+    for (let x = 0; x <= 2; x++) {
+      setBlock(cx + x, surfH + 9, cz, BLOCK.FENCE);
+      setBlock(cx + x, surfH + 9, cz + 2, BLOCK.FENCE);
+    }
+    for (let z = 0; z <= 2; z++) {
+      setBlock(cx, surfH + 9, cz + z, BLOCK.FENCE);
+      setBlock(cx + 2, surfH + 9, cz + z, BLOCK.FENCE);
+    }
+    // Ladder: METAL blocks on one side going up
+    for (let y = 1; y <= 8; y++) {
+      setBlock(cx - 1, surfH + y, cz, BLOCK.METAL);
+    }
+  }
+
+  function generateDestroyedTank(cx, cz) {
+    const surfH = getTerrainHeight(cx, cz);
+    // 5x3x2 hull of METAL blocks
+    for (let x = 0; x < 5; x++) {
+      for (let z = 0; z < 3; z++) {
+        setBlock(cx + x, surfH + 1, cz + z, BLOCK.METAL);
+        setBlock(cx + x, surfH + 2, cz + z, BLOCK.METAL);
+      }
+    }
+    // Turret: 2x2 METAL on top
+    setBlock(cx + 2, surfH + 3, cz, BLOCK.METAL);
+    setBlock(cx + 3, surfH + 3, cz, BLOCK.METAL);
+    setBlock(cx + 2, surfH + 3, cz + 1, BLOCK.METAL);
+    setBlock(cx + 3, surfH + 3, cz + 1, BLOCK.METAL);
+    // Angled "barrel" extending forward
+    setBlock(cx + 4, surfH + 3, cz, BLOCK.METAL);
+    setBlock(cx + 5, surfH + 4, cz, BLOCK.METAL);
+    // Damaged: remove random blocks from hull
+    for (let i = 0; i < 3; i++) {
+      const rx = cx + Math.floor(Math.random() * 5);
+      const rz = cz + Math.floor(Math.random() * 3);
+      setBlock(rx, surfH + 2, rz, BLOCK.AIR);
+    }
+    // Add RUBBLE around
+    for (let i = 0; i < 6; i++) {
+      const rx = cx - 1 + Math.floor(Math.random() * 7);
+      const rz = cz - 1 + Math.floor(Math.random() * 5);
+      setBlock(rx, surfH, rz, BLOCK.RUBBLE);
+    }
+    // Burning: FUEL_BARREL block inside
+    setBlock(cx + 2, surfH + 2, cz + 1, BLOCK.FUEL_BARREL);
+  }
+
+  function generateTrenchNetwork(cx, cz) {
+    const surfH = getTerrainHeight(cx, cz);
+    // Z-shaped trench, 2 blocks deep, 2 wide
+    // Segment 1: east-west
+    for (let x = 0; x < 8; x++) {
+      for (let w = 0; w < 2; w++) {
+        setBlock(cx + x, surfH, cz + w, BLOCK.AIR);
+        setBlock(cx + x, surfH - 1, cz + w, BLOCK.AIR);
+        setBlock(cx + x, surfH - 2, cz + w, BLOCK.DIRT);
+        // Occasional wooden duckboard floor
+        if (x % 3 === 0) setBlock(cx + x, surfH - 2, cz + w, BLOCK.WOOD);
+      }
+      // Sandbag parapets on top edges
+      setBlock(cx + x, surfH + 1, cz - 1, BLOCK.SANDBAG);
+      setBlock(cx + x, surfH + 1, cz + 2, BLOCK.SANDBAG);
+    }
+    // Segment 2: diagonal connector (north-south)
+    for (let z = 2; z < 8; z++) {
+      for (let w = 0; w < 2; w++) {
+        setBlock(cx + 7 + w, surfH, cz + z, BLOCK.AIR);
+        setBlock(cx + 7 + w, surfH - 1, cz + z, BLOCK.AIR);
+        setBlock(cx + 7 + w, surfH - 2, cz + z, BLOCK.DIRT);
+        if (z % 3 === 0) setBlock(cx + 7 + w, surfH - 2, cz + z, BLOCK.WOOD);
+      }
+      setBlock(cx + 6, surfH + 1, cz + z, BLOCK.SANDBAG);
+      setBlock(cx + 9, surfH + 1, cz + z, BLOCK.SANDBAG);
+    }
+    // Segment 3: east-west return
+    for (let x = 0; x < 8; x++) {
+      for (let w = 0; w < 2; w++) {
+        setBlock(cx + x, surfH, cz + 8 + w, BLOCK.AIR);
+        setBlock(cx + x, surfH - 1, cz + 8 + w, BLOCK.AIR);
+        setBlock(cx + x, surfH - 2, cz + 8 + w, BLOCK.DIRT);
+        if (x % 3 === 0) setBlock(cx + x, surfH - 2, cz + 8 + w, BLOCK.WOOD);
+      }
+      setBlock(cx + x, surfH + 1, cz + 7, BLOCK.SANDBAG);
+      setBlock(cx + x, surfH + 1, cz + 10, BLOCK.SANDBAG);
+    }
+  }
+
+  function generateRazorWireField(cx, cz) {
+    const surfH = getTerrainHeight(cx, cz);
+    // 10x3 area of FENCE blocks at ground+1 level, spaced every other block
+    for (let x = 0; x < 10; x++) {
+      for (let z = 0; z < 3; z++) {
+        if ((x + z) % 2 === 0) {
+          setBlock(cx + x, surfH + 1, cz + z, BLOCK.FENCE);
+        }
+      }
+    }
+  }
+
   /* ── Level Generation ──────────────────────────────────────────── */
   function generateLevel(index) {
     const level = getLevelDef(index);
@@ -2049,6 +2379,11 @@ const VoxelWorld = (function () {
         generateUndergroundTunnel(-20, -5, 10); // NEW R2: tunnel under runway
         generateFuelDepot(20, -15);             // NEW R2: airport fuel storage
         generateRadarTower(-30, 5);             // NEW R2: radar tower
+        generateBunker(20, 20);                     // NEW R3: underground bunker
+        generateMGNest(-15, 25);                    // NEW R3: MG nest position
+        generateFoxhole(30, -10);                   // NEW R3: fighting position
+        generateFieldHospitalTent(-25, -20);        // NEW R3: medical tent
+        generateObservationPost(35, 15);            // NEW R3: lookout tower
         scatterResources(BLOCK.WOOD, 0.003);
         break;
 
@@ -2118,6 +2453,11 @@ const VoxelWorld = (function () {
         generateFuelDepot(-25, -30);             // NEW R2: fuel depot
         generateArtilleryBattery(30, 30);        // NEW R2: artillery position
         generateRadarTower(-35, 20);             // NEW R2: radar tower
+        generateBunker(-20, 15);                    // NEW R3: underground bunker
+        generateCommandPost(25, -20);               // NEW R3: fortified command center
+        generateAmmoDumpBerm(-30, 10);              // NEW R3: ammo storage berm
+        generateDestroyedTank(15, 30);              // NEW R3: wrecked tank hull
+        generateTrenchNetwork(-10, -25);            // NEW R3: zig-zag trench system
         // Heavy rubble scatter (coking plant battle damage)
         for (let rb = 0; rb < 80; rb++) {
           const rx = randInWorld(), rz = randInWorld();
@@ -2200,6 +2540,11 @@ const VoxelWorld = (function () {
         generateFuelDepot(20, -25);              // NEW R2: fuel storage
         generateArtilleryBattery(-30, 30);       // NEW R2: artillery battery
         generateRadarTower(30, 30);              // NEW R2: radar installation
+        generateBunker(10, -30);                    // NEW R3: underground bunker
+        generateMGNest(25, 20);                     // NEW R3: MG nest position
+        generateAntiAirPosition(-20, -15);          // NEW R3: AA emplacement
+        generateRazorWireField(30, -25);            // NEW R3: razor wire obstacle
+        generateFieldHospitalTent(-30, 25);         // NEW R3: medical tent
         // Extra rubble — city is total devastation
         for (let rb2 = 0; rb2 < 100; rb2++) {
           const rx2 = randInWorld(), rz2 = randInWorld();
@@ -2276,6 +2621,11 @@ const VoxelWorld = (function () {
         generateFuelDepot(-30, -10);             // NEW R2: fuel depot
         generateArtilleryBattery(20, -25);       // NEW R2: artillery battery
         generateRadarTower(-25, 30);             // NEW R2: radar tower
+        generateCommandPost(20, -20);               // NEW R3: fortified command center
+        generateObservationPost(-25, 15);           // NEW R3: lookout tower
+        generateMinefield(30, 25);                  // NEW R3: buried mines area
+        generateDestroyedTank(-15, -30);            // NEW R3: wrecked tank hull
+        generateMGNest(10, 35);                     // NEW R3: MG nest position
         scatterResources(BLOCK.WOOD, 0.003);    // More vegetation than Bakhmut
         break;
 
@@ -2316,6 +2666,10 @@ const VoxelWorld = (function () {
         if (Math.random() > 0.5) generateFuelDepot(randInWorld(), randInWorld());
         if (Math.random() > 0.6) generateArtilleryBattery(randInWorld(), randInWorld());
         if (Math.random() > 0.6) generateRadarTower(randInWorld(), randInWorld());
+        // NEW R3: military structure generators
+        if (Math.random() > 0.4) generateBunker(randInWorld(), randInWorld());
+        if (Math.random() > 0.5) generateMGNest(randInWorld(), randInWorld());
+        if (Math.random() > 0.5) generateDestroyedTank(randInWorld(), randInWorld());
         // Procedural road network
         _roadWaypoints.length = 0;
         generateRoadNetwork([
