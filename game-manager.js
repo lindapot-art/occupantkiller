@@ -37,6 +37,13 @@ const GameManager = (function () {
     stealth:    false,        // invisibility toggle
     role:       'lonewolf',   // 'brigade' or 'lonewolf'
     godMode: false,       // God Mode: all weapons, invincible, invisible
+    prone:      false,        // prone stance for accuracy
+    bleeding:   false,        // bleed DOT status
+    bleedTimer: 0,            // time remaining on bleed
+    killStreak: 0,            // consecutive rapid kills
+    streakTimer: 0,           // time since last kill (resets streak)
+    dogTags:    0,            // collected dog tags
+    airdropCooldown: 0,       // cooldown for airdrop beacon
   };
 
   /* ── Wave State ──────────────────────────────────────────────────── */
@@ -54,6 +61,9 @@ const GameManager = (function () {
     { id: 'ARMOR_PUSH',    label: '🛡 ENEMY ARMOR PUSH!',      color: '#cc0000', chance: 0.07 },
     { id: 'AIR_SUPPORT',   label: '✈ FRIENDLY AIR SUPPORT!',   color: '#00aaff', chance: 0.08 },
     { id: 'DRONE_SWARM',   label: '🤖 ENEMY DRONE SWARM!',     color: '#ff4488', chance: 0.07 },
+    { id: 'CHEMICAL',       label: '☣ CHEMICAL ATTACK!',       color: '#aaff00', chance: 0.05 },
+    { id: 'EMP',            label: '⚡ EMP BLAST!',             color: '#4400ff', chance: 0.04 },
+    { id: 'TUNNEL_BREACH',  label: '🕳 TUNNEL BREACH!',        color: '#884400', chance: 0.06 },
   ];
 
   function triggerBattlefieldEvent() {
@@ -157,6 +167,38 @@ const GameManager = (function () {
           const dz = player.position.z + (Math.random() - 0.5) * 10;
           const dh = VoxelWorld.getTerrainHeight(dx, dz) + 8;
           DroneSystem.spawn(dx, dh, dz, i === 0 ? 'fpv_attack' : 'bomb');
+        }
+        break;
+      case 'CHEMICAL':
+        // Chemical attack: slow damage to all enemies in area + player warning
+        for (let i = 0; i < 8; i++) {
+          const cx = player.position.x + (Math.random() - 0.5) * 20;
+          const cz = player.position.z + (Math.random() - 0.5) * 20;
+          const ch = VoxelWorld.getTerrainHeight(cx, cz);
+          Enemies.damageInRadius(new THREE.Vector3(cx, ch, cz), 4, 25);
+        }
+        // Player takes minor damage if not stealth
+        if (!player.stealth) {
+          player.hp = Math.max(1, player.hp - 10);
+          HUD.setHealth(player.hp, player.maxHp);
+        }
+        break;
+      case 'EMP':
+        // EMP: disables enemy drones temporarily, damages drone ops
+        Enemies.getAll().forEach(function (e) {
+          if (e.typeName === 'DRONE_OP') Enemies.damage(e, 30);
+        });
+        break;
+      case 'TUNNEL_BREACH':
+        // Enemies emerge from underground behind the player
+        for (let i = 0; i < 4; i++) {
+          const ta = Math.PI + (Math.random() - 0.5) * 1.0; // behind player
+          const yaw = CameraSystem.getYaw();
+          const td = 5 + Math.random() * 5;
+          Enemies.spawnSingle('STORMER', new THREE.Vector3(
+            player.position.x + Math.cos(yaw + ta) * td, 0,
+            player.position.z + Math.sin(yaw + ta) * td
+          ));
         }
         break;
     }
@@ -458,6 +500,49 @@ const GameManager = (function () {
         // Stealth / invisibility toggle
         if (e.code === 'KeyI') {
           toggleStealth();
+        }
+
+        // Prone toggle
+        if (e.code === 'KeyZ') {
+          player.prone = !player.prone;
+          player.height = player.prone ? 0.6 : 1.7;
+          if (HUD.showProne) HUD.showProne(player.prone);
+          HUD.notifyPickup(player.prone ? '🔽 PRONE' : '🔼 STANDING', player.prone ? '#888' : '#fff');
+        }
+
+        // Bandage (stop bleeding)
+        if (e.code === 'KeyX') {
+          if (player.bleeding) {
+            player.bleeding = false;
+            player.bleedTimer = 0;
+            if (HUD.showBleed) HUD.showBleed(false);
+            HUD.notifyPickup('🩹 BANDAGE APPLIED', '#22ff55');
+          }
+        }
+
+        // Airdrop beacon
+        if (e.code === 'KeyN' && player.airdropCooldown <= 0) {
+          player.airdropCooldown = 45; // 45 second cooldown
+          HUD.notifyPickup('📦 AIRDROP BEACON DEPLOYED!', '#44ff88');
+          setTimeout(function () {
+            // Drop 6 pickups near player after 3s delay
+            for (var ai = 0; ai < 6; ai++) {
+              var ax = player.position.x + (Math.random() - 0.5) * 10;
+              var az = player.position.z + (Math.random() - 0.5) * 10;
+              var ah = VoxelWorld.getTerrainHeight(ax, az);
+              var types = ['HEALTH', 'AMMO', 'ARMOR', 'MEDKIT', 'GRENADE', 'STIM'];
+              Pickups.spawn(new THREE.Vector3(ax, ah, az), types[Math.floor(Math.random() * types.length)]);
+            }
+            AudioSystem.playExplosion();
+            HUD.notifyPickup('📦 AIRDROP ARRIVED!', '#44ff88');
+          }, 3000);
+        }
+
+        // Clear weapon jam
+        if (e.code === 'KeyR' && Weapons.isJammed && Weapons.isJammed()) {
+          Weapons.clearJam();
+          AudioSystem.playReload();
+          HUD.notifyPickup('🔧 JAM CLEARED!', '#ffcc00');
         }
 
         // Music toggle
@@ -1072,7 +1157,7 @@ const GameManager = (function () {
     if (isMoving) {
       moveDir.normalize();
       player.sprinting = !!keys['ShiftLeft'] || touch.sprinting;
-      let speed = MOVE_SPEED * (player.sprinting ? SPRINT_MULT : 1);
+      let speed = MOVE_SPEED * (player.sprinting ? SPRINT_MULT : 1) * (player.prone ? 0.3 : 1);
       // Stim boost: +60% speed while active
       if (player._stimTimer && player._stimTimer > 0) speed *= 1.6;
       moveDir.multiplyScalar(speed * delta);
@@ -1221,6 +1306,25 @@ const GameManager = (function () {
       RankSystem.onKill(isHeadshot);
       HUD.addKill(Weapons.getCurrentName(), enemy.typeCfg ? enemy.typeCfg.name : 'ENEMY', isHeadshot);
 
+      // Kill streak tracking
+      player.killStreak++;
+      player.streakTimer = 4.0; // 4 seconds to chain another kill
+      var streakMult = 1.0 + Math.min(player.killStreak - 1, 10) * 0.2; // up to 3.0x at 11+ streak
+      var streakBonus = Math.floor(enemy.scoreValue * (streakMult - 1));
+      if (streakBonus > 0) {
+        player.score += streakBonus;
+        HUD.setScore(player.score);
+      }
+      if (HUD.showStreak) HUD.showStreak(player.killStreak, streakMult);
+
+      // Dog tag collection (every kill drops a dog tag)
+      player.dogTags++;
+      if (player.dogTags % 10 === 0) {
+        player.score += 500;
+        HUD.setScore(player.score);
+        HUD.notifyPickup('🏷 10 DOG TAGS! +500 SCORE', '#ffaa00');
+      }
+
       // Pickup spawn — expanded loot table
       if (Math.random() < enemy.dropChance) {
         const lootRoll = Math.random();
@@ -1256,6 +1360,14 @@ const GameManager = (function () {
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
+
+    // Heavy hits cause bleeding (25% chance on hits > 15 dmg)
+    if (dmg > 15 && Math.random() < 0.25 && !player.bleeding) {
+      player.bleeding = true;
+      player.bleedTimer = 6.0; // 6 seconds of bleed
+      if (HUD.showBleed) HUD.showBleed(true);
+      HUD.notifyPickup('🩸 BLEEDING! Press X to bandage', '#ff2222');
+    }
 
     // Hit direction indicator
     if (attackerPos && HUD.showHitDirection) {
@@ -1295,6 +1407,46 @@ const GameManager = (function () {
       WeatherSystem.update(delta);
       MLSystem.trackFPS(delta);
       updatePlayer(delta);
+
+      // Bleed DOT
+      if (player.bleeding && player.bleedTimer > 0) {
+        player.bleedTimer -= delta;
+        player.hp = Math.max(1, player.hp - 3 * delta); // 3 HP/sec bleed
+        HUD.setHealth(player.hp, player.maxHp);
+        if (player.bleedTimer <= 0) {
+          player.bleeding = false;
+          if (HUD.showBleed) HUD.showBleed(false);
+        }
+      }
+
+      // Kill streak decay
+      if (player.streakTimer > 0) {
+        player.streakTimer -= delta;
+        if (player.streakTimer <= 0) {
+          player.killStreak = 0;
+          if (HUD.showStreak) HUD.showStreak(0, 1.0);
+        }
+      }
+
+      // Airdrop cooldown
+      if (player.airdropCooldown > 0) player.airdropCooldown -= delta;
+
+      // Compass update
+      if (HUD.updateCompass) HUD.updateCompass(CameraSystem.getYaw());
+
+      // Weapon jam indicator
+      if (HUD.showJam && Weapons.isJammed) HUD.showJam(Weapons.isJammed());
+
+      // Dynamic music intensity based on nearby enemies
+      if (AudioSystem.setMusicIntensity && AudioSystem.isMusicPlaying()) {
+        var nearEnemies = 0;
+        var allEn = Enemies.getAll();
+        for (var mei = 0; mei < allEn.length; mei++) {
+          if (allEn[mei].mesh && allEn[mei].mesh.position.distanceTo(player.position) < 25) nearEnemies++;
+        }
+        AudioSystem.setMusicIntensity(Math.min(1.0, nearEnemies / 8));
+      }
+
       updateCombat(delta);
 
       Weapons.update(delta);

@@ -123,6 +123,22 @@ const Weapons = (() => {
       fireRate: 0.3, clipSize: 2, maxReserve: 24, reloadTime: 2.0,
       spread: 0.12, auto: false, type: 'SHOTGUN', recoilY: 0.035, recoilX: 0.015,
     },
+    // ── 3 new special weapons ──────────────────────────────
+    {
+      id: 'CLAYMORE', name: 'M18 Claymore Mine', damage: 300,
+      fireRate: 1.5, clipSize: 1, maxReserve: 3, reloadTime: 2.0,
+      spread: 0, auto: false, type: 'MINE', blastRadius: 5, recoilY: 0, recoilX: 0,
+    },
+    {
+      id: 'SMOKE', name: 'Smoke Grenade', damage: 0,
+      fireRate: 1.0, clipSize: 1, maxReserve: 4, reloadTime: 1.5,
+      spread: 0.02, auto: false, type: 'SMOKE', blastRadius: 6, recoilY: 0.005, recoilX: 0.002,
+    },
+    {
+      id: 'FLASHBANG', name: 'M84 Flashbang', damage: 5,
+      fireRate: 1.2, clipSize: 1, maxReserve: 3, reloadTime: 1.5,
+      spread: 0.02, auto: false, type: 'FLASHBANG', blastRadius: 8, recoilY: 0.005, recoilX: 0.002,
+    },
   ];
 
   // ── Per-weapon mutable state ───────────────────────────────
@@ -130,11 +146,12 @@ const Weapons = (() => {
     return {
       clip: cfg.clipSize, reserve: cfg.maxReserve,
       reloading: false, reloadTimer: 0, fireCooldown: 0,
+      jammed: false, shotsSinceClean: 0,
     };
   }
   let states     = WEAPONS.map(makeState);
   let currentIdx = 0;
-  let unlocked   = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
+  let unlocked   = WEAPONS.map(() => true);
 
   function cur()      { return WEAPONS[currentIdx]; }
   function curState() { return states[currentIdx]; }
@@ -1247,6 +1264,19 @@ const Weapons = (() => {
     if (!wep.auto && !newPress) return;
     st.fireCooldown = wep.fireRate;
     _firedThisFrame = true;
+
+    // ── Weapon jamming system ────────────────────────────
+    if (wep.type !== 'MELEE' && wep.type !== 'MINE' && wep.type !== 'SMOKE' && wep.type !== 'FLASHBANG') {
+      st.shotsSinceClean++;
+      // Jam chance increases with sustained fire (0.1% per shot after 60 shots)
+      if (st.shotsSinceClean > 60 && Math.random() < (st.shotsSinceClean - 60) * 0.001) {
+        st.jammed = true;
+        _firedThisFrame = false;
+        return;
+      }
+    }
+    if (st.jammed) { _firedThisFrame = false; return; }
+
     applyRecoil();
 
     // ── Melee: shovel ───────────────────────────────────
@@ -1267,6 +1297,37 @@ const Weapons = (() => {
           VoxelWorld.setBlock(ray.hit.x, ray.hit.y, ray.hit.z, 0);
         }
       }
+      return;
+    }
+
+    // ── Mine: place claymore at feet ──────────────────────
+    if (wep.type === 'MINE') {
+      if (st.clip <= 0) { startReload(); _firedThisFrame = false; return; }
+      st.clip--;
+      HUD.setAmmo(st.clip, st.reserve);
+      // Mine is placed as a projectile that lands and waits
+      spawnProjectile(camera, wep);
+      if (st.clip === 0 && st.reserve > 0) startReload();
+      return;
+    }
+
+    // ── Smoke grenade: launch smoke projectile ────────────
+    if (wep.type === 'SMOKE') {
+      if (st.clip <= 0) { startReload(); _firedThisFrame = false; return; }
+      st.clip--;
+      HUD.setAmmo(st.clip, st.reserve);
+      spawnProjectile(camera, wep);
+      if (st.clip === 0 && st.reserve > 0) startReload();
+      return;
+    }
+
+    // ── Flashbang: launch flash projectile ────────────────
+    if (wep.type === 'FLASHBANG') {
+      if (st.clip <= 0) { startReload(); _firedThisFrame = false; return; }
+      st.clip--;
+      HUD.setAmmo(st.clip, st.reserve);
+      spawnProjectile(camera, wep);
+      if (st.clip === 0 && st.reserve > 0) startReload();
       return;
     }
 
@@ -1420,7 +1481,7 @@ const Weapons = (() => {
   function reset() {
     states     = WEAPONS.map(makeState);
     currentIdx = 0;
-    unlocked   = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
+    unlocked   = WEAPONS.map(() => true);
     if (zoomed) exitZoom();
     recoilOffset = 0;
     recoilOffsetY = 0;
@@ -1447,6 +1508,16 @@ const Weapons = (() => {
   }
 
   function forceReload() { startReload(); }
+
+  function clearJam() {
+    const st = curState();
+    if (st.jammed) {
+      st.jammed = false;
+      st.shotsSinceClean = 0;
+    }
+  }
+  function isJammed() { return curState().jammed; }
+
   function isReloading() { return curState().reloading; }
   function getClip()     { return cur().type === 'MELEE' ? '∞' : curState().clip; }
   function getReserve()  { return cur().type === 'MELEE' ? '—' : curState().reserve; }
@@ -1488,6 +1559,8 @@ const Weapons = (() => {
     isUnlocked:     function (i) { return !!unlocked[i]; },
     didFire:        function () { return _firedThisFrame; },
     applyRecoil:    applyRecoil,
+    clearJam:       clearJam,
+    isJammed:       isJammed,
     getBlastRadius: function () { return cur().blastRadius || 0; },
   };
 })();
