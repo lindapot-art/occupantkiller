@@ -191,6 +191,11 @@ const VehicleSystem = (function () {
   function hijack(vehicleId) {
     const v = vehicles.find(v => v.id === vehicleId && v.alive);
     if (!v || v.seats <= 0) return false;
+    // Clean up prior state
+    if (v.occupiedByNPC) {
+      v.occupiedByNPC = false;
+      v.npcGunner = null;
+    }
     v.faction = 'friendly';
     v.occupied = true;
     _occupiedVehicle = v;
@@ -227,6 +232,8 @@ const VehicleSystem = (function () {
         _occupiedVehicle.npcGunner = null;
       }
       _occupiedVehicle = null;
+      // Clear vehicle camera target so FPS camera doesn't stay locked to vehicle
+      CameraSystem.setVehicleTarget(null);
       CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
       return exitPos;
     }
@@ -406,18 +413,38 @@ const VehicleSystem = (function () {
       if (v.waypointTimer <= 0) pickWaypoint(v);
     }
 
-    // ── Find nearest enemy ──
+    // ── Find nearest target (depends on vehicle faction) ──
     let nearestEnemy = null;
     let nearestDist = COMBAT_ENGAGE_RANGE;
-    if (typeof Enemies !== 'undefined') {
-      const enemies = Enemies.getAll ? Enemies.getAll() : [];
-      for (let i = 0; i < enemies.length; i++) {
-        const e = enemies[i];
-        if (!e.alive || !e.mesh) continue;
-        const d = v.position.distanceTo(e.mesh.position);
-        if (d < nearestDist) {
-          nearestDist = d;
-          nearestEnemy = e;
+
+    if (v.faction === 'enemy') {
+      // Enemy vehicles target friendly NPCs and the player
+      if (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) {
+        var friendlies = NPCSystem.getAll();
+        for (var fi = 0; fi < friendlies.length; fi++) {
+          var npc = friendlies[fi];
+          if (!npc.alive) continue;
+          var nd = v.position.distanceTo(npc.position);
+          if (nd < nearestDist) {
+            nearestDist = nd;
+            nearestEnemy = { alive: true, mesh: { position: npc.position } };
+          }
+        }
+      }
+      // Also fire at player if closer (via onPlayerHit callback not available here,
+      // so just drive toward player position for aggression)
+    } else {
+      // Friendly vehicles target occupant enemies
+      if (typeof Enemies !== 'undefined') {
+        const enemies = Enemies.getAll ? Enemies.getAll() : [];
+        for (let i = 0; i < enemies.length; i++) {
+          const e = enemies[i];
+          if (!e.alive || !e.mesh) continue;
+          const d = v.position.distanceTo(e.mesh.position);
+          if (d < nearestDist) {
+            nearestDist = d;
+            nearestEnemy = e;
+          }
         }
       }
     }

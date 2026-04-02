@@ -137,8 +137,8 @@ const CameraSystem = (function () {
       var vPos = _vehicleObj.position.clone();
       vPos.y += 2.0; // Hatch view height
       _camera.position.copy(vPos);
-      var euler = new THREE.Euler(pitch, yaw, 0, 'YXZ');
-      _camera.quaternion.setFromEuler(euler);
+      var vEuler = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+      _camera.quaternion.setFromEuler(vEuler);
       return;
     }
 

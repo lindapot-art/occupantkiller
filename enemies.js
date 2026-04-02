@@ -521,7 +521,7 @@ const Enemies = (() => {
                                vest, canteen, radio, belt, eyeL, eyeR];
     // Add boots and knee pads from the group's children
     group.children.forEach(function (child) {
-      if (group.userData.parts.indexOf(child) === -1) {
+      if (group.userData.parts.indexOf(child) < 0) {
         group.userData.parts.push(child);
       }
     });
