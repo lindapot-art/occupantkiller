@@ -537,6 +537,72 @@ canvas {
   pointer-events: auto;
 }
 
+/* ── Minimap ──────────────────────────────────────────────── */
+#minimap-canvas {
+  position: fixed;
+  bottom: 120px;
+  right: 12px;
+  width: 180px;
+  height: 180px;
+  border: 2px solid rgba(0,255,0,0.4);
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  z-index: 100;
+  pointer-events: none;
+}
+
+/* ── Kill Feed ────────────────────────────────────────────── */
+#kill-feed {
+  position: fixed;
+  top: 70px;
+  right: 12px;
+  width: 260px;
+  z-index: 100;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.kill-entry {
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  border-left: 3px solid #ff4444;
+  animation: killFadeIn 0.2s ease-out, killFadeOut 0.5s ease-in 3.5s forwards;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.kill-entry.headshot { border-left-color: #ffcc00; color: #ffcc00; }
+@keyframes killFadeIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes killFadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+/* ── Hit Direction Indicator ──────────────────────────────── */
+#hit-direction {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 200px;
+  height: 200px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 90;
+}
+.hit-arc {
+  position: absolute;
+  width: 80px;
+  height: 18px;
+  top: 0;
+  left: 50%;
+  transform-origin: 50% 100px;
+  background: radial-gradient(ellipse, rgba(255,0,0,0.7) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: hitArcFade 0.8s ease-out forwards;
+}
+@keyframes hitArcFade { from { opacity: 1; } to { opacity: 0; } }
+
 /* ── Responsive adjustments ─────────────────────────────── */
 @media (max-width: 768px) {
   #top-bar { font-size: 2.5vw; padding: 4px 8px; gap: 12px; }
