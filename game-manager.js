@@ -1242,7 +1242,7 @@ const GameManager = (function () {
       var dx = attackerPos.x - player.position.x;
       var dz = attackerPos.z - player.position.z;
       var worldAngle = Math.atan2(dx, dz);
-      var relAngle = worldAngle - CameraSystem.getYaw();
+      var relAngle = CameraSystem.getYaw() - worldAngle + Math.PI;
       HUD.showHitDirection(relAngle);
     }
 

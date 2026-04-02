@@ -547,7 +547,7 @@ canvas {
   border: 2px solid rgba(0,255,0,0.4);
   border-radius: 50%;
   background: rgba(0,0,0,0.6);
-  z-index: 100;
+  z-index: 5;
   pointer-events: none;
 }
 
@@ -557,7 +557,7 @@ canvas {
   top: 70px;
   right: 12px;
   width: 260px;
-  z-index: 100;
+  z-index: 5;
   pointer-events: none;
   display: flex;
   flex-direction: column;
@@ -587,7 +587,7 @@ canvas {
   height: 200px;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  z-index: 90;
+  z-index: 5;
 }
 .hit-arc {
   position: absolute;

@@ -951,8 +951,10 @@ const Weapons = (() => {
       CameraSystem.setPitch(CameraSystem.getPitch() + w.recoilY * recoilMod);
       CameraSystem.setYaw(CameraSystem.getYaw() + (Math.random() - 0.5) * w.recoilX * 2 * recoilMod);
     }
-    recoilOffsetZ = -0.04;
-    recoilOffsetY = 0.02;
+    // Scale visual kick with weapon recoil intensity
+    var intensity = Math.min(1, (w.recoilY || 0) / 0.04);
+    recoilOffsetZ = -0.02 - intensity * 0.04;
+    recoilOffsetY = 0.01 + intensity * 0.02;
   }
 
   // ── Weapon switching ──────────────────────────────────────
@@ -1287,7 +1289,7 @@ const Weapons = (() => {
     if (recoilOffset > 0) recoilOffset = Math.max(0, recoilOffset - delta * 0.3);
     if (mesh) {
       mesh.position.z = recoilOffsetZ + recoilOffset;
-      mesh.position.y += recoilOffsetY;
+      mesh.position.y = recoilOffsetY;
     }
 
     // Shovel swing animation
