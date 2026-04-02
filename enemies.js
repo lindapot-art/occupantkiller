@@ -1018,7 +1018,8 @@ const Enemies = (() => {
       // ── Surrender system: low-HP enemies may surrender ──
       if (!e.surrendered && e.hp < e.maxHp * 0.15 && e.hp > 0) {
         // 2% chance per frame to surrender when below 15% HP
-        if (Math.random() < 0.02 * delta * 10) {
+        // ~20% chance per second to surrender (0.2 * delta)
+        if (Math.random() < 0.2 * delta) {
           e.surrendered = true;
           e.speed = 0;
           // Raise arms visual: tilt mesh
