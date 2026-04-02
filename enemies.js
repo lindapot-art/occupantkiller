@@ -983,7 +983,7 @@ const Enemies = (() => {
         if (distToPlayer < meleeRange) {
           e.attackTimer -= delta;
           if (e.attackTimer <= 0) {
-            onPlayerHit(e.attackDmg);
+            onPlayerHit(e.attackDmg, e.mesh.position);
             e.attackTimer = e.attackRate;
           }
         }

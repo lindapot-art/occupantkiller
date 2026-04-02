@@ -124,6 +124,15 @@
 
     <!-- Role indicator -->
     <div id="role-indicator" style="position:fixed;top:52px;right:12px;color:#aaa;font-size:12px;z-index:200;pointer-events:none"></div>
+
+    <!-- Kill feed (top-right scrolling list) -->
+    <div id="kill-feed"></div>
+
+    <!-- Hit direction indicator -->
+    <div id="hit-direction"></div>
+
+    <!-- Minimap radar -->
+    <canvas id="minimap-canvas" width="180" height="180"></canvas>
   </div>
 
   <!-- Start screen -->
@@ -273,6 +282,7 @@
 <script src="audio-system.js"></script>
 <script src="weather-system.js"></script>
 <script src="ml-system.js"></script>
+<script src="tracers.js"></script>
 <script src="game-manager.js"></script>
 
 <!-- Boot -->

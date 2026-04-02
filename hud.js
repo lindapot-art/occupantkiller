@@ -128,6 +128,164 @@ const HUD = (() => {
     setTimeout(() => el.waveAnn.classList.remove('visible'), 3000);
   }
 
+  // ── Kill Feed ──────────────────────────────────────────────
+  const killFeedEl = document.getElementById('kill-feed');
+
+  function addKill(weaponName, enemyType, isHeadshot) {
+    if (!killFeedEl) return;
+    const entry = document.createElement('div');
+    entry.className = 'kill-entry' + (isHeadshot ? ' headshot' : '');
+    entry.textContent = (isHeadshot ? '💀 HEADSHOT ' : '☠ ') + weaponName + ' → ' + (enemyType || 'ENEMY');
+    killFeedEl.appendChild(entry);
+    // Keep max 6 entries
+    while (killFeedEl.children.length > 6) killFeedEl.removeChild(killFeedEl.firstChild);
+    // Auto-remove after 4s
+    setTimeout(function () { if (entry.parentNode) entry.parentNode.removeChild(entry); }, 4000);
+  }
+
+  // ── Hit Direction Indicator ────────────────────────────────
+  const hitDirEl = document.getElementById('hit-direction');
+
+  function showHitDirection(angle) {
+    if (!hitDirEl) return;
+    const arc = document.createElement('div');
+    arc.className = 'hit-arc';
+    const deg = (angle * 180 / Math.PI);
+    arc.style.transform = 'translate(-50%, 0) rotate(' + deg + 'deg)';
+    hitDirEl.appendChild(arc);
+    setTimeout(function () { if (arc.parentNode) arc.parentNode.removeChild(arc); }, 800);
+  }
+
+  // ── Minimap / Radar ────────────────────────────────────────
+  const minimapCanvas = document.getElementById('minimap-canvas');
+  const minimapCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
+  const MM_SIZE = 180;
+  const MM_HALF = MM_SIZE / 2;
+  const MM_SCALE = 2.5;
+
+  function updateMinimap(px, pz, pyaw, enemies, npcs, vehicles, drones) {
+    if (!minimapCtx) return;
+    const ctx = minimapCtx;
+    ctx.clearRect(0, 0, MM_SIZE, MM_SIZE);
+    ctx.save();
+
+    // Clip to circle
+    ctx.beginPath();
+    ctx.arc(MM_HALF, MM_HALF, MM_HALF - 2, 0, Math.PI * 2);
+    ctx.clip();
+
+    // Background
+    ctx.fillStyle = 'rgba(10,15,10,0.85)';
+    ctx.fillRect(0, 0, MM_SIZE, MM_SIZE);
+
+    // Grid (rotates with player)
+    ctx.save();
+    ctx.translate(MM_HALF, MM_HALF);
+    ctx.rotate(-pyaw);
+    ctx.strokeStyle = 'rgba(0,255,0,0.1)';
+    ctx.lineWidth = 0.5;
+    for (let g = -80; g <= 80; g += 20) {
+      ctx.beginPath(); ctx.moveTo(g * MM_SCALE, -MM_HALF); ctx.lineTo(g * MM_SCALE, MM_HALF); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-MM_HALF, g * MM_SCALE); ctx.lineTo(MM_HALF, g * MM_SCALE); ctx.stroke();
+    }
+    ctx.restore();
+
+    // Helper: world pos to minimap pos
+    function toMM(wx, wz) {
+      var dx = wx - px;
+      var dz = wz - pz;
+      var cos = Math.cos(-pyaw);
+      var sin = Math.sin(-pyaw);
+      return {
+        x: MM_HALF + (dx * cos - dz * sin) * MM_SCALE,
+        y: MM_HALF + (dx * sin + dz * cos) * MM_SCALE,
+      };
+    }
+
+    // Enemies - red dots
+    if (enemies) {
+      ctx.fillStyle = '#ff3333';
+      for (var i = 0; i < enemies.length; i++) {
+        var e = enemies[i];
+        if (!e.alive) continue;
+        var ep = e.mesh ? e.mesh.position : e.position;
+        if (!ep) continue;
+        var mp = toMM(ep.x, ep.z);
+        if (Math.abs(mp.x - MM_HALF) < MM_HALF && Math.abs(mp.y - MM_HALF) < MM_HALF) {
+          ctx.beginPath(); ctx.arc(mp.x, mp.y, 2.5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+
+    // NPCs - blue dots
+    if (npcs) {
+      ctx.fillStyle = '#4488ff';
+      for (var j = 0; j < npcs.length; j++) {
+        var n = npcs[j];
+        if (!n.alive || !n.position) continue;
+        var np = toMM(n.position.x, n.position.z);
+        if (Math.abs(np.x - MM_HALF) < MM_HALF && Math.abs(np.y - MM_HALF) < MM_HALF) {
+          ctx.beginPath(); ctx.arc(np.x, np.y, 2.5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+
+    // Vehicles - yellow squares
+    if (vehicles) {
+      ctx.fillStyle = '#ffcc00';
+      for (var k = 0; k < vehicles.length; k++) {
+        var v = vehicles[k];
+        var vpos = v.mesh ? v.mesh.position : v.position;
+        if (!vpos) continue;
+        var vp = toMM(vpos.x, vpos.z);
+        if (Math.abs(vp.x - MM_HALF) < MM_HALF && Math.abs(vp.y - MM_HALF) < MM_HALF) {
+          ctx.fillRect(vp.x - 3, vp.y - 3, 6, 6);
+        }
+      }
+    }
+
+    // Drones - cyan diamonds
+    if (drones) {
+      ctx.fillStyle = '#00ffcc';
+      for (var d = 0; d < drones.length; d++) {
+        var dr = drones[d];
+        var dpos = dr.mesh ? dr.mesh.position : dr.position;
+        if (!dpos) continue;
+        var dp = toMM(dpos.x, dpos.z);
+        if (Math.abs(dp.x - MM_HALF) < MM_HALF && Math.abs(dp.y - MM_HALF) < MM_HALF) {
+          ctx.save();
+          ctx.translate(dp.x, dp.y);
+          ctx.rotate(Math.PI / 4);
+          ctx.fillRect(-2.5, -2.5, 5, 5);
+          ctx.restore();
+        }
+      }
+    }
+
+    // Player - green triangle at center
+    ctx.fillStyle = '#00ff44';
+    ctx.beginPath();
+    ctx.moveTo(MM_HALF, MM_HALF - 6);
+    ctx.lineTo(MM_HALF - 4, MM_HALF + 4);
+    ctx.lineTo(MM_HALF + 4, MM_HALF + 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Compass labels (rotate with player)
+    ctx.fillStyle = 'rgba(0,255,0,0.6)';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    var dirs = [{label:'N', a:0}, {label:'E', a:Math.PI/2}, {label:'S', a:Math.PI}, {label:'W', a:-Math.PI/2}];
+    for (var ci = 0; ci < dirs.length; ci++) {
+      var ca = dirs[ci].a - pyaw;
+      var cx = MM_HALF + Math.sin(ca) * (MM_HALF - 10);
+      var cy = MM_HALF - Math.cos(ca) * (MM_HALF - 10);
+      ctx.fillText(dirs[ci].label, cx, cy + 3);
+    }
+
+    ctx.restore();
+  }
+
   return {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
@@ -135,5 +293,6 @@ const HUD = (() => {
     flashHit, flashDamage,
     showHeadshot, notifyPickup,
     announceWave, announceStage,
+    addKill, showHitDirection, updateMinimap,
   };
 })();

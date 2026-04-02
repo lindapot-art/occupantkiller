@@ -10,118 +10,118 @@ const Weapons = (() => {
     {
       id: 'SHOVEL', name: 'Army Shovel (МПЛ-50)', damage: 35,
       fireRate: 0.4, clipSize: 0, maxReserve: 0, reloadTime: 0,
-      spread: 0, auto: false, type: 'MELEE',
+      spread: 0, auto: false, type: 'MELEE', recoilY: 0, recoilX: 0,
     },
     {
       id: 'MAKAROV', name: 'Makarov PM', damage: 15,
       fireRate: 0.15, clipSize: 8, maxReserve: 40, reloadTime: 1.5,
-      spread: 0.03, auto: false, type: 'PISTOL',
+      spread: 0.03, auto: false, type: 'PISTOL', recoilY: 0.008, recoilX: 0.003,
     },
     {
       id: 'AK74', name: 'AK-74M', damage: 28,
       fireRate: 0.10, clipSize: 30, maxReserve: 120, reloadTime: 2.2,
-      spread: 0.022, auto: true, type: 'ASSAULT',
+      spread: 0.022, auto: true, type: 'ASSAULT', recoilY: 0.015, recoilX: 0.006,
     },
     {
       id: 'RPK74', name: 'RPK-74', damage: 22,
       fireRate: 0.08, clipSize: 45, maxReserve: 180, reloadTime: 3.5,
-      spread: 0.035, auto: true, type: 'LMG',
+      spread: 0.035, auto: true, type: 'LMG', recoilY: 0.020, recoilX: 0.010,
     },
     {
       id: 'SVD', name: 'SVD Dragunov', damage: 115,
       fireRate: 0.85, clipSize: 10, maxReserve: 40, reloadTime: 3.5,
-      spread: 0.004, auto: false, type: 'SNIPER', hasScope: true,
+      spread: 0.004, auto: false, type: 'SNIPER', hasScope: true, recoilY: 0.040, recoilX: 0.010,
     },
     {
       id: 'PKM', name: 'PKM', damage: 18,
       fireRate: 0.07, clipSize: 100, maxReserve: 250, reloadTime: 4.5,
-      spread: 0.048, auto: true, type: 'HMG',
+      spread: 0.048, auto: true, type: 'HMG', recoilY: 0.025, recoilX: 0.012,
     },
     {
       id: 'NLAW', name: 'NLAW', damage: 500,
       fireRate: 2.0, clipSize: 1, maxReserve: 3, reloadTime: 4.0,
-      spread: 0, auto: false, type: 'AT', blastRadius: 4,
+      spread: 0, auto: false, type: 'AT', blastRadius: 4, recoilY: 0.060, recoilX: 0.020,
     },
     {
       id: 'STUGNA', name: 'Stugna-P', damage: 800,
       fireRate: 3.0, clipSize: 1, maxReserve: 2, reloadTime: 5.0,
-      spread: 0, auto: false, type: 'ATGM', hasScope: true, blastRadius: 5,
+      spread: 0, auto: false, type: 'ATGM', hasScope: true, blastRadius: 5, recoilY: 0.050, recoilX: 0.015,
     },
     {
       id: 'M4A1', name: 'M4A1', damage: 30,
       fireRate: 0.09, clipSize: 30, maxReserve: 120, reloadTime: 2.0,
-      spread: 0.018, auto: true, type: 'NATO',
+      spread: 0.018, auto: true, type: 'NATO', recoilY: 0.013, recoilX: 0.005,
     },
     {
       id: 'JAVELIN', name: 'FGM-148 Javelin', damage: 1200,
       fireRate: 4.0, clipSize: 1, maxReserve: 2, reloadTime: 6.0,
-      spread: 0, auto: false, type: 'AT_HEAVY', hasScope: true, blastRadius: 6,
+      spread: 0, auto: false, type: 'AT_HEAVY', hasScope: true, blastRadius: 6, recoilY: 0.060, recoilX: 0.020,
     },
     {
       id: 'RPG7', name: 'RPG-7', damage: 350,
       fireRate: 2.5, clipSize: 1, maxReserve: 4, reloadTime: 3.5,
-      spread: 0.01, auto: false, type: 'AT_LIGHT', blastRadius: 3.5,
+      spread: 0.01, auto: false, type: 'AT_LIGHT', blastRadius: 3.5, recoilY: 0.055, recoilX: 0.018,
     },
     {
       id: 'IGLA', name: 'Igla MANPADS', damage: 600,
       fireRate: 3.5, clipSize: 1, maxReserve: 2, reloadTime: 5.0,
-      spread: 0, auto: false, type: 'AA', blastRadius: 4,
+      spread: 0, auto: false, type: 'AA', blastRadius: 4, recoilY: 0.050, recoilX: 0.015,
     },
     {
       id: 'GP25', name: 'GP-25 Grenade Launcher', damage: 150,
       fireRate: 1.5, clipSize: 1, maxReserve: 8, reloadTime: 2.5,
-      spread: 0.015, auto: false, type: 'GRENADE', blastRadius: 3,
+      spread: 0.015, auto: false, type: 'GRENADE', blastRadius: 3, recoilY: 0.035, recoilX: 0.012,
     },
     {
       id: 'SCARH', name: 'FN SCAR-H', damage: 35,
       fireRate: 0.085, clipSize: 20, maxReserve: 100, reloadTime: 2.3,
-      spread: 0.016, auto: true, type: 'NATO_HEAVY',
+      spread: 0.016, auto: true, type: 'NATO_HEAVY', recoilY: 0.018, recoilX: 0.007,
     },
     {
       id: 'DSHK', name: 'DShK', damage: 45,
       fireRate: 0.10, clipSize: 50, maxReserve: 150, reloadTime: 5.0,
-      spread: 0.05, auto: true, type: 'HMG_HEAVY',
+      spread: 0.05, auto: true, type: 'HMG_HEAVY', recoilY: 0.028, recoilX: 0.014,
     },
     {
       id: 'MOLOTOV', name: 'Molotov Cocktail', damage: 80,
       fireRate: 1.0, clipSize: 1, maxReserve: 5, reloadTime: 0.5,
-      spread: 0.02, auto: false, type: 'INCENDIARY', blastRadius: 3,
+      spread: 0.02, auto: false, type: 'INCENDIARY', blastRadius: 3, recoilY: 0.010, recoilX: 0.005,
     },
     // ── 7 new weapons ──────────────────────────────────────
     {
       id: 'MG3', name: 'MG3 Machine Gun', damage: 32,
       fireRate: 0.05, clipSize: 120, maxReserve: 360, reloadTime: 5.5,
-      spread: 0.055, auto: true, type: 'MACHINEGUN',
+      spread: 0.055, auto: true, type: 'MACHINEGUN', recoilY: 0.022, recoilX: 0.011,
     },
     {
       id: 'MP5', name: 'MP5 SMG', damage: 18,
       fireRate: 0.06, clipSize: 30, maxReserve: 150, reloadTime: 2.0,
-      spread: 0.04, auto: true, type: 'SMG',
+      spread: 0.04, auto: true, type: 'SMG', recoilY: 0.010, recoilX: 0.005,
     },
     {
       id: 'BARRETTM82', name: 'Barrett M82', damage: 250,
       fireRate: 1.5, clipSize: 10, maxReserve: 30, reloadTime: 4.0,
-      spread: 0.002, auto: false, type: 'AMR', hasScope: true,
+      spread: 0.002, auto: false, type: 'AMR', hasScope: true, recoilY: 0.045, recoilX: 0.012,
     },
     {
       id: 'MINIGUN', name: 'M134 Minigun', damage: 12,
       fireRate: 0.02, clipSize: 500, maxReserve: 1000, reloadTime: 8.0,
-      spread: 0.08, auto: true, type: 'MINIGUN',
+      spread: 0.08, auto: true, type: 'MINIGUN', recoilY: 0.012, recoilX: 0.008,
     },
     {
       id: 'CROSSBOW', name: 'Tactical Crossbow', damage: 65,
       fireRate: 1.2, clipSize: 1, maxReserve: 15, reloadTime: 1.8,
-      spread: 0.006, auto: false, type: 'SILENT',
+      spread: 0.006, auto: false, type: 'SILENT', recoilY: 0, recoilX: 0,
     },
     {
       id: 'FLAMETHROWER', name: 'RPO-A Shmel', damage: 200,
       fireRate: 2.0, clipSize: 1, maxReserve: 3, reloadTime: 3.5,
-      spread: 0.03, auto: false, type: 'THERMOBARIC', blastRadius: 5,
+      spread: 0.03, auto: false, type: 'THERMOBARIC', blastRadius: 5, recoilY: 0.060, recoilX: 0.020,
     },
     {
       id: 'DOUBLEBARREL', name: 'IZH-43 Shotgun', damage: 120,
       fireRate: 0.3, clipSize: 2, maxReserve: 24, reloadTime: 2.0,
-      spread: 0.12, auto: false, type: 'SHOTGUN',
+      spread: 0.12, auto: false, type: 'SHOTGUN', recoilY: 0.035, recoilX: 0.015,
     },
   ];
 
@@ -938,7 +938,24 @@ const Weapons = (() => {
 
   // ── Recoil / reload animation state ───────────────────────
   let recoilOffset = 0;
+  let recoilOffsetY = 0;
+  let recoilOffsetZ = 0;
   let reloadAnimAngle = 0;
+
+  function applyRecoil() {
+    const w = cur();
+    if (!w.recoilY && !w.recoilX) return;
+    const recoilMod = (typeof SkillSystem !== 'undefined' && typeof SkillSystem.getRecoilMod === 'function')
+      ? SkillSystem.getRecoilMod() : 1.0;
+    if (typeof CameraSystem !== 'undefined') {
+      CameraSystem.setPitch(CameraSystem.getPitch() + w.recoilY * recoilMod);
+      CameraSystem.setYaw(CameraSystem.getYaw() + (Math.random() - 0.5) * w.recoilX * 2 * recoilMod);
+    }
+    // Scale visual kick with weapon recoil intensity
+    const intensity = Math.min(1, (w.recoilY || 0) / 0.04);
+    recoilOffsetZ = -0.02 - intensity * 0.04;
+    recoilOffsetY = 0.01 + intensity * 0.02;
+  }
 
   // ── Weapon switching ──────────────────────────────────────
   function switchTo(idx) {
@@ -949,6 +966,8 @@ const Weapons = (() => {
     currentIdx = idx;
     if (gunMeshes[currentIdx]) gunMeshes[currentIdx].visible = true;
     recoilOffset = 0;
+    recoilOffsetY = 0;
+    recoilOffsetZ = 0;
     reloadAnimAngle = 0;
     const st = curState();
     HUD.setWeapon(cur().name, currentIdx);
@@ -1163,6 +1182,7 @@ const Weapons = (() => {
     if (!wep.auto && !newPress) return;
     st.fireCooldown = wep.fireRate;
     _firedThisFrame = true;
+    applyRecoil();
 
     // ── Melee: shovel ───────────────────────────────────
     if (wep.type === 'MELEE') {
@@ -1262,15 +1282,14 @@ const Weapons = (() => {
     // Projectiles
     updateProjectiles(delta);
 
-    // Recoil recovery
+    // Recoil recovery (visual gun kick)
     const mesh = gunMeshes[currentIdx];
+    if (recoilOffsetZ < 0) recoilOffsetZ = Math.min(0, recoilOffsetZ + delta * 12 * 0.04);
+    if (recoilOffsetY > 0) recoilOffsetY = Math.max(0, recoilOffsetY - delta * 12 * 0.02);
+    if (recoilOffset > 0) recoilOffset = Math.max(0, recoilOffset - delta * 0.3);
     if (mesh) {
-      if (recoilOffset > 0) {
-        recoilOffset = Math.max(0, recoilOffset - delta * 0.3);
-        mesh.position.z = recoilOffset;
-      } else {
-        mesh.position.z = 0;
-      }
+      mesh.position.z = recoilOffsetZ + recoilOffset;
+      mesh.position.y = recoilOffsetY;
     }
 
     // Shovel swing animation
@@ -1315,6 +1334,8 @@ const Weapons = (() => {
     unlocked   = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
     if (zoomed) exitZoom();
     recoilOffset = 0;
+    recoilOffsetY = 0;
+    recoilOffsetZ = 0;
     reloadAnimAngle = 0;
     swingTimer = 0;
     // Remove lingering projectiles
@@ -1377,5 +1398,7 @@ const Weapons = (() => {
     },
     isUnlocked:     function (i) { return !!unlocked[i]; },
     didFire:        function () { return _firedThisFrame; },
+    applyRecoil:    applyRecoil,
+    getBlastRadius: function () { return cur().blastRadius || 0; },
   };
 })();

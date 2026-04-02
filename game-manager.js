@@ -304,6 +304,9 @@ const GameManager = (function () {
     Automation.init();
     Pickups.init(_scene);
 
+    // Tracers system
+    if (typeof Tracers !== 'undefined') Tracers.init(_scene);
+
     // Audio, Weather & ML systems
     AudioSystem.init();
     WeatherSystem.init(_scene, _camera);
@@ -777,6 +780,7 @@ const GameManager = (function () {
     Pickups.clear();
     VehicleSystem.clear();
     DroneSystem.clear();
+    if (typeof Tracers !== 'undefined') Tracers.clear();
 
     // Respawn vehicle fleet on roads for first stage
     var _rwps = (VoxelWorld.getRoadWaypoints ? VoxelWorld.getRoadWaypoints() : []);
@@ -1151,6 +1155,17 @@ const GameManager = (function () {
       if (Weapons.didFire()) {
         AudioSystem.playGunshot(audioMap[weaponType] || 'rifle');
         MLSystem.onShot(weaponId);
+        // Spawn bullet tracer
+        if (typeof Tracers !== 'undefined' && weaponType !== 'MELEE') {
+          var tOrigin = _camera.position.clone();
+          var tDir = new THREE.Vector3();
+          _camera.getWorldDirection(tDir);
+          var isHeavy = ['HMG', 'HMG_HEAVY', 'MACHINEGUN', 'MINIGUN'].indexOf(weaponType) >= 0;
+          var isExplosive = ['AT', 'ATGM', 'AT_HEAVY', 'AT_LIGHT', 'AA', 'GRENADE', 'INCENDIARY', 'THERMOBARIC'].indexOf(weaponType) >= 0;
+          if (!isExplosive) {
+            Tracers.spawnTracer(tOrigin.clone().addScaledVector(tDir, 0.5), tDir, isHeavy ? 0xff4400 : 0xffcc44, 120);
+          }
+        }
       }
       mouseNewPress = false;
     }
@@ -1184,6 +1199,7 @@ const GameManager = (function () {
       HUD.setScore(player.score);
       HUD.setKills(player.kills);
       RankSystem.onKill(isHeadshot);
+      HUD.addKill(Weapons.getCurrentName(), enemy.typeCfg ? enemy.typeCfg.name : 'ENEMY', isHeadshot);
 
       // Pickup spawn — expanded loot table
       if (Math.random() < enemy.dropChance) {
@@ -1214,12 +1230,21 @@ const GameManager = (function () {
     }
   }
 
-  function onPlayerHit(dmg) {
+  function onPlayerHit(dmg, attackerPos) {
     if (player.godMode) return; // God mode: immune to damage
     MLSystem.onDamageTaken(dmg);
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
+
+    // Hit direction indicator
+    if (attackerPos && HUD.showHitDirection) {
+      var dx = attackerPos.x - player.position.x;
+      var dz = attackerPos.z - player.position.z;
+      var worldAngle = Math.atan2(dx, dz);
+      var relAngle = CameraSystem.getYaw() - worldAngle + Math.PI;
+      HUD.showHitDirection(relAngle);
+    }
 
     if (player.hp <= 0) {
       gameState = STATE.DEAD;
@@ -1332,6 +1357,18 @@ const GameManager = (function () {
 
       // Update extended HUD
       updateExtendedHUD();
+
+      // Update minimap
+      if (HUD.updateMinimap) {
+        var mmEnemies = Enemies.getAll();
+        var mmNPCs = (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) ? NPCSystem.getAll() : [];
+        var mmVehicles = (typeof VehicleSystem !== 'undefined' && VehicleSystem.getAll) ? VehicleSystem.getAll() : [];
+        var mmDrones = (typeof DroneSystem !== 'undefined' && DroneSystem.getAll) ? DroneSystem.getAll() : [];
+        HUD.updateMinimap(player.position.x, player.position.z, CameraSystem.getYaw(), mmEnemies, mmNPCs, mmVehicles, mmDrones);
+      }
+
+      // Update tracers
+      if (typeof Tracers !== 'undefined') Tracers.update(delta);
 
       // Sync stealth state to enemy detection system
       Enemies.setPlayerStealth(player.stealth);
