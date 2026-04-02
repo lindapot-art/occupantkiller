@@ -271,6 +271,27 @@ var MLSystem = (function () {
     { id: 'TIME_CYCLE',         cat: 'world',     desc: 'Day/night cycle with time-based NPC behavior' },
     { id: 'TRACERS',            cat: 'visual',    desc: 'Bullet tracers and smoke effects' },
     { id: 'RECOIL',             cat: 'weapons',   desc: 'Per-weapon recoil with visual gun kick and camera shake' },
+    // ── Round 2 features ─────────────────────────────────────
+    { id: 'WEAPON_CLAYMORE',    cat: 'weapons',   desc: 'M18 Claymore placeable proximity mine' },
+    { id: 'WEAPON_SMOKE',       cat: 'weapons',   desc: 'Smoke grenade for concealment' },
+    { id: 'WEAPON_FLASHBANG',   cat: 'weapons',   desc: 'M84 Flashbang stun grenade' },
+    { id: 'WEAPON_JAMMING',     cat: 'weapons',   desc: 'Weapons jam after sustained fire, R to clear' },
+    { id: 'KILL_STREAK',        cat: 'gameplay',  desc: 'Rapid kill combo system with score multiplier up to 3x' },
+    { id: 'PRONE_STANCE',       cat: 'gameplay',  desc: 'Z key prone stance: 0.3x speed, harder to detect' },
+    { id: 'BLEED_BANDAGE',      cat: 'gameplay',  desc: 'Heavy hits cause bleed DOT, X key bandage to stop' },
+    { id: 'DOG_TAGS',           cat: 'gameplay',  desc: 'Collect dog tags from kills, bonus score every 10' },
+    { id: 'AIRDROP_BEACON',     cat: 'gameplay',  desc: 'N key calls supply airdrop with 45s cooldown' },
+    { id: 'TACTICAL_COMPASS',   cat: 'ui',        desc: 'Compass bar at top of screen with cardinal directions' },
+    { id: 'ENEMY_SURRENDER',    cat: 'enemies',   desc: 'Low-HP enemies surrender, bonus score for POW capture' },
+    { id: 'ENEMY_FLAMETHROWER', cat: 'enemies',   desc: 'Flamethrower enemy type: AOE fire attacker' },
+    { id: 'ENEMY_SABOTEUR',     cat: 'enemies',   desc: 'Saboteur enemy: fast stealthy flanker' },
+    { id: 'TERRAIN_TUNNEL',     cat: 'world',     desc: 'Underground tunnel terrain with timber supports' },
+    { id: 'TERRAIN_COLLAPSED_BRIDGE', cat: 'world', desc: 'Collapsed bridge with rubble and rebar' },
+    { id: 'TERRAIN_FUEL_DEPOT', cat: 'world',     desc: 'Fuel depot with barrel clusters under metal roof' },
+    { id: 'TERRAIN_ARTILLERY',  cat: 'world',     desc: 'Artillery battery with 3 gun emplacements' },
+    { id: 'TERRAIN_RADAR',      cat: 'world',     desc: 'Radar tower with electronics dish and platform' },
+    { id: 'DYNAMIC_MUSIC',      cat: 'audio',     desc: 'Music intensity scales with combat proximity' },
+    { id: 'BATTLE_EVENTS_R2',   cat: 'gameplay',  desc: 'New events: Chemical attack, EMP blast, Tunnel breach' },
   ];
 
   function getFeatureRegistry() { return FEATURE_REGISTRY; }

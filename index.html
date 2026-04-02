@@ -79,6 +79,9 @@
           <span class="wslot" id="wslot-20">Xbow</span>
           <span class="wslot" id="wslot-21">Shmel</span>
           <span class="wslot" id="wslot-22">IZH-43</span>
+          <span class="wslot" id="wslot-23">Clay</span>
+          <span class="wslot" id="wslot-24">Smoke</span>
+          <span class="wslot" id="wslot-25">Flash</span>
         </div>
       </div>
     </div>
@@ -117,12 +120,30 @@
       <div>I · Stealth Mode</div>
       <div>M · Toggle Music</div>
       <div>TAB · Inventory</div>
+      <div>Z · Prone</div>
+      <div>X · Bandage</div>
+      <div>N · Airdrop</div>
       <div>4-7 · Time Speed</div>
       <div>P · Pause Time</div>
     </div>
 
     <!-- Stealth indicator -->
     <div id="stealth-indicator" style="display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(0,255,100,0.15);border:1px solid #00ff66;color:#00ff66;padding:4px 18px;border-radius:4px;font-size:13px;z-index:200;pointer-events:none">👻 STEALTH ACTIVE</div>
+
+    <!-- Tactical compass bar -->
+    <div id="tactical-compass" style="position:fixed;top:0;left:50%;transform:translateX(-50%);width:300px;height:24px;background:rgba(0,0,0,0.5);border-bottom:1px solid rgba(0,255,0,0.2);z-index:200;pointer-events:none;overflow:hidden;font-family:monospace"></div>
+
+    <!-- Kill streak display -->
+    <div id="streak-display" style="display:none;position:fixed;top:28px;left:50%;transform:translateX(-50%);font-size:16px;font-weight:bold;font-family:monospace;z-index:200;pointer-events:none;text-shadow:0 0 8px rgba(255,100,0,0.6)"></div>
+
+    <!-- Bleed indicator -->
+    <div id="bleed-indicator" style="display:none;position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:rgba(255,0,0,0.2);border:1px solid #ff2222;color:#ff4444;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">🩸 BLEEDING — Press X</div>
+
+    <!-- Prone indicator -->
+    <div id="prone-indicator" style="display:none;position:fixed;bottom:95px;left:50%;transform:translateX(-50%);background:rgba(100,100,100,0.2);border:1px solid #888;color:#aaa;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">🔽 PRONE</div>
+
+    <!-- Weapon jam indicator -->
+    <div id="jam-indicator" style="display:none;position:fixed;bottom:145px;left:50%;transform:translateX(-50%);background:rgba(255,200,0,0.2);border:1px solid #ffcc00;color:#ffcc00;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace;animation:blink 0.5s infinite">🔧 JAMMED — Press R</div>
 
     <!-- Role indicator -->
     <div id="role-indicator" style="position:fixed;top:52px;right:12px;color:#aaa;font-size:12px;z-index:200;pointer-events:none"></div>
