@@ -460,6 +460,33 @@ const GameManager = (function () {
           toggleStealth();
         }
 
+        // Music toggle
+        if (e.code === 'KeyM') {
+          if (AudioSystem.isMusicPlaying && AudioSystem.isMusicPlaying()) {
+            AudioSystem.stopMusic();
+            HUD.notifyPickup('🔇 MUSIC OFF', '#888888');
+          } else {
+            AudioSystem.playMusic('battle');
+            HUD.notifyPickup('🎵 MUSIC ON', '#00ff88');
+          }
+        }
+
+        // Inventory/Tab toggle
+        if (e.code === 'Tab') {
+          e.preventDefault();
+          var invOverlay = document.getElementById('overlay-inventory');
+          if (invOverlay) {
+            if (invOverlay.style.display === 'none' || !invOverlay.style.display) {
+              invOverlay.style.display = 'flex';
+              gameState = STATE.PAUSED;
+            } else {
+              invOverlay.style.display = 'none';
+              gameState = STATE.PLAYING;
+              requestPointerLock();
+            }
+          }
+        }
+
         // Weapon switching (1-9 = weapons 0-8, 0 = weapon 9)
         if (e.code === 'Digit1') Weapons.switchTo(0);
         if (e.code === 'Digit2') Weapons.switchTo(1);
@@ -750,6 +777,8 @@ const GameManager = (function () {
   /* ── Start Game ──────────────────────────────────────────────────── */
   function startGame() {
     AudioSystem.resume();
+    // Start battle music
+    if (AudioSystem.playMusic) AudioSystem.playMusic('battle');
     gameState = STATE.PLAYING;
     player.hp = player.maxHp;
     player.score = 0;
@@ -978,6 +1007,7 @@ const GameManager = (function () {
       if (currentStage >= STAGES.length - 1) {
         // Final stage cleared — win!
         gameState = STATE.WIN;
+        if (AudioSystem.playMusic) AudioSystem.playMusic('victory');
         showOverlay('win');
         document.getElementById('win-score').textContent = player.score;
         document.getElementById('win-kills').textContent = player.kills;
@@ -1248,6 +1278,7 @@ const GameManager = (function () {
 
     if (player.hp <= 0) {
       gameState = STATE.DEAD;
+      if (AudioSystem.stopMusic) AudioSystem.stopMusic();
       Weapons.exitZoom();
       MLSystem.onDeath();
       showOverlay('dead');

@@ -228,6 +228,161 @@ const AudioSystem = (function () {
     if (masterGain) masterGain.gain.value = volume;
   }
 
+  // ── Background Music System (procedural) ──────────────
+  let _musicPlaying = false;
+  let _musicNodes = [];
+  let _musicGain = null;
+  let _musicVolume = 0.18;
+  let _musicBeatInterval = null;
+
+  function playMusic(style) {
+    // style: 'battle', 'ambient', 'victory'
+    if (!enabled || !ctx) return;
+    stopMusic();
+    resume();
+
+    _musicGain = ctx.createGain();
+    _musicGain.gain.value = _musicVolume;
+    _musicGain.connect(masterGain);
+    _musicPlaying = true;
+
+    if (style === 'battle' || !style) {
+      // Procedural war drums + bass pulse
+      var bpm = 110;
+      var beatTime = 60 / bpm;
+      var beat = 0;
+
+      _musicBeatInterval = setInterval(function () {
+        if (!enabled || !ctx || !_musicPlaying) return;
+        var now = ctx.currentTime;
+
+        // Kick drum (low thump)
+        if (beat % 4 === 0) {
+          var kickOsc = ctx.createOscillator();
+          var kickGain = ctx.createGain();
+          kickOsc.type = 'sine';
+          kickOsc.frequency.setValueAtTime(120, now);
+          kickOsc.frequency.exponentialRampToValueAtTime(40, now + 0.12);
+          kickGain.gain.setValueAtTime(0.5, now);
+          kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+          kickOsc.connect(kickGain);
+          kickGain.connect(_musicGain);
+          kickOsc.start(now);
+          kickOsc.stop(now + 0.2);
+        }
+
+        // Snare hit (noise burst)
+        if (beat % 4 === 2) {
+          var snareNoise = createNoise(0.08);
+          var snareGain = ctx.createGain();
+          var snareFilter = ctx.createBiquadFilter();
+          snareFilter.type = 'highpass';
+          snareFilter.frequency.value = 2000;
+          snareGain.gain.setValueAtTime(0.25, now);
+          snareGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          snareNoise.connect(snareFilter);
+          snareFilter.connect(snareGain);
+          snareGain.connect(_musicGain);
+        }
+
+        // Hi-hat (fast noise tick)
+        var hhNoise = createNoise(0.02);
+        var hhGain = ctx.createGain();
+        var hhFilter = ctx.createBiquadFilter();
+        hhFilter.type = 'highpass';
+        hhFilter.frequency.value = 6000;
+        hhGain.gain.setValueAtTime(beat % 2 === 0 ? 0.12 : 0.06, now);
+        hhGain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+        hhNoise.connect(hhFilter);
+        hhFilter.connect(hhGain);
+        hhGain.connect(_musicGain);
+
+        // Bass line (low drone pulse every 8 beats)
+        if (beat % 8 === 0) {
+          var bassOsc = ctx.createOscillator();
+          var bassGain = ctx.createGain();
+          bassOsc.type = 'sawtooth';
+          var bassNotes = [55, 65, 55, 73]; // Am pentatonic bass
+          bassOsc.frequency.value = bassNotes[Math.floor(beat / 8) % bassNotes.length];
+          bassGain.gain.setValueAtTime(0.15, now);
+          bassGain.gain.exponentialRampToValueAtTime(0.001, now + beatTime * 3);
+          var bassFilter = ctx.createBiquadFilter();
+          bassFilter.type = 'lowpass';
+          bassFilter.frequency.value = 200;
+          bassOsc.connect(bassFilter);
+          bassFilter.connect(bassGain);
+          bassGain.connect(_musicGain);
+          bassOsc.start(now);
+          bassOsc.stop(now + beatTime * 4);
+        }
+
+        beat++;
+      }, beatTime * 1000);
+
+    } else if (style === 'ambient') {
+      // Soft ambient pad
+      var padOsc = ctx.createOscillator();
+      var padOsc2 = ctx.createOscillator();
+      var padGain = ctx.createGain();
+      var padFilter = ctx.createBiquadFilter();
+      padOsc.type = 'sine';
+      padOsc2.type = 'sine';
+      padOsc.frequency.value = 220;
+      padOsc2.frequency.value = 330;
+      padGain.gain.value = 0.06;
+      padFilter.type = 'lowpass';
+      padFilter.frequency.value = 600;
+      padOsc.connect(padFilter);
+      padOsc2.connect(padFilter);
+      padFilter.connect(padGain);
+      padGain.connect(_musicGain);
+      padOsc.start();
+      padOsc2.start();
+      _musicNodes.push(padOsc, padOsc2);
+
+    } else if (style === 'victory') {
+      // Triumphant fanfare
+      var now = ctx.currentTime;
+      var notes = [440, 554, 659, 880];
+      notes.forEach(function (freq, i) {
+        var osc = ctx.createOscillator();
+        var g = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        g.gain.setValueAtTime(0, now + i * 0.3);
+        g.gain.linearRampToValueAtTime(0.15, now + i * 0.3 + 0.1);
+        g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.3 + 0.8);
+        osc.connect(g);
+        g.connect(_musicGain);
+        osc.start(now + i * 0.3);
+        osc.stop(now + i * 0.3 + 0.8);
+      });
+    }
+  }
+
+  function stopMusic() {
+    _musicPlaying = false;
+    if (_musicBeatInterval) {
+      clearInterval(_musicBeatInterval);
+      _musicBeatInterval = null;
+    }
+    _musicNodes.forEach(function (n) {
+      try { n.stop(); } catch (e) { /* already stopped */ }
+    });
+    _musicNodes = [];
+    if (_musicGain) {
+      try { _musicGain.disconnect(); } catch (e) { /* ok */ }
+      _musicGain = null;
+    }
+  }
+
+  function setMusicVolume(v) {
+    _musicVolume = Math.max(0, Math.min(1, v));
+    if (_musicGain) _musicGain.gain.value = _musicVolume;
+  }
+
+  function isMusicPlaying() { return _musicPlaying; }
+
   function toggle() {
     enabled = !enabled;
     return enabled;
@@ -245,6 +400,10 @@ const AudioSystem = (function () {
     playFootstep: playFootstep,
     playAmbientWind: playAmbientWind,
     playWaveStart: playWaveStart,
+    playMusic: playMusic,
+    stopMusic: stopMusic,
+    setMusicVolume: setMusicVolume,
+    isMusicPlaying: isMusicPlaying,
     setVolume: setVolume,
     toggle: toggle,
     isEnabled: function () { return enabled; },

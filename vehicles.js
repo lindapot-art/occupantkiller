@@ -291,10 +291,24 @@ const VehicleSystem = (function () {
       // Apply velocity
       v.position.add(v.velocity.clone().multiplyScalar(delta));
 
-      // Ground collision for non-flying
-      if (!v.flying || !v.occupied) {
+      // Gravity for non-flying vehicles — prevent going airborne
+      if (!v.flying) {
+        v.velocity.y -= 20 * delta; // gravity
         const terrainH = VoxelWorld.getTerrainHeight(v.position.x, v.position.z);
-        if (v.position.y < terrainH) v.position.y = terrainH;
+        if (v.position.y <= terrainH) {
+          v.position.y = terrainH;
+          if (v.velocity.y < 0) v.velocity.y = 0;
+        }
+        // Clamp any upward velocity to prevent launches
+        if (v.velocity.y > 2) v.velocity.y = 2;
+      } else if (!v.occupied) {
+        // Unoccupied flying vehicles settle to ground
+        const terrainH = VoxelWorld.getTerrainHeight(v.position.x, v.position.z);
+        v.velocity.y -= 5 * delta;
+        if (v.position.y < terrainH + 2) {
+          v.position.y = terrainH + 2;
+          v.velocity.y = 0;
+        }
       }
 
       // Keep within world bounds
@@ -334,6 +348,9 @@ const VehicleSystem = (function () {
     if (v.flying) {
       if (_vKeys.up) v.velocity.y += accel * delta * 0.5;
       if (_vKeys.down) v.velocity.y -= accel * delta * 0.5;
+    } else {
+      // Ground vehicles cannot have vertical input — zero out any Y velocity from movement
+      v.velocity.y = Math.min(v.velocity.y, 0);
     }
 
     // Speed cap

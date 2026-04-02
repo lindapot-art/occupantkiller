@@ -233,6 +233,50 @@ var MLSystem = (function () {
     return data.projectMemory.facts;
   }
 
+  /* ── Feature Registry — tracks all implemented features ──────── */
+  var FEATURE_REGISTRY = [
+    { id: 'WEAPON_SHOVEL',       cat: 'weapons',   desc: 'Army Shovel melee weapon with auto-mine (hold to dig)' },
+    { id: 'WEAPON_23_ARSENAL',   cat: 'weapons',   desc: '23 weapons: pistol, rifles, LMGs, snipers, AT, grenades, shotgun, minigun, crossbow' },
+    { id: 'WEAPON_FULL_AUTO',    cat: 'weapons',   desc: 'Full-auto fire for AK74, RPK74, PKM, M4A1, SCAR, DShK, MG3, MP5, Minigun' },
+    { id: 'WEAPON_SWITCHER',     cat: 'weapons',   desc: 'In-game weapon switcher: keys 1-0, Q/E cycle, scroll wheel, HUD slots' },
+    { id: 'TERRAIN_DESTRUCTION', cat: 'world',     desc: 'Bullets/explosions/shovel destroy terrain blocks (create holes)' },
+    { id: 'VOXEL_WORLD',        cat: 'world',     desc: 'Chunk-based voxel world with 19 block types, Perlin noise terrain' },
+    { id: 'ENEMY_8_TYPES',      cat: 'enemies',   desc: '8 enemy types: Conscript, Stormer, Armored, Medic, Officer, Sniper, Engineer, Drone_Op' },
+    { id: 'ENEMY_HITBOXES',     cat: 'enemies',   desc: 'Full hitbox system with all mesh parts for raycaster detection' },
+    { id: 'ENEMY_ASSAULT_GROUPS', cat: 'enemies',  desc: '5 assault groups with state machine (forming/advancing/assaulting/retreating)' },
+    { id: 'NPC_SIMS',           cat: 'npcs',      desc: 'Ukrainian friendly NPCs with needs (health/hunger/fatigue/morale/stress), jobs, skills' },
+    { id: 'NPC_COMBAT',         cat: 'npcs',      desc: 'NPCs actively seek and fight enemies with rank-based weapons' },
+    { id: 'NPC_WEAPONS',        cat: 'npcs',      desc: 'NPC weapon assignment by rank: Trainee=PM, Infantry=AK74, Specialist=RPK74, Veteran=PKM, Elite=M4A1' },
+    { id: 'NPC_ASSAULT_GROUPS', cat: 'npcs',      desc: '4 friendly assault groups with staging/advancing/engaging/defending/retreating/regrouping' },
+    { id: 'VEHICLES_GROUND',    cat: 'vehicles',  desc: 'Ground vehicles with gravity, ground clamping, patrol AI' },
+    { id: 'VEHICLES_AIR',       cat: 'vehicles',  desc: 'Helicopter and plane with flying controls' },
+    { id: 'VEHICLES_TURRET',    cat: 'vehicles',  desc: 'Turret combat system for player and AI vehicles' },
+    { id: 'DRONES',             cat: 'vehicles',  desc: 'Recon, FPV attack, and bomb drones with possession system' },
+    { id: 'BUILDING_SYSTEM',    cat: 'building',  desc: '6 structure templates: Barracks, Factory, Turret, Drone Hangar, Command Center, Wall' },
+    { id: 'MATERIAL_INVENTORY', cat: 'economy',   desc: '6 resources: wood, metal, electronics, fuel, stone, food + currency' },
+    { id: 'ECONOMY_TRADING',    cat: 'economy',   desc: 'Market trading with fluctuating prices, production buildings' },
+    { id: 'MUSIC_SYSTEM',       cat: 'audio',     desc: 'Procedural music: battle drums, ambient pads, victory fanfare' },
+    { id: 'AUDIO_SFX',          cat: 'audio',     desc: 'Procedural SFX: gunshots, explosions, hits, reload, pickup, death, footstep, wind, wave alarm' },
+    { id: 'HUD_FULL',           cat: 'ui',        desc: 'HUD: health bar, ammo, weapon slots, kill feed, minimap, hit direction, crosshair' },
+    { id: 'WAVE_SYSTEM',        cat: 'gameplay',  desc: '4 stages x 7 waves with progressive enemy types and battlefield events' },
+    { id: 'STEALTH',            cat: 'gameplay',  desc: 'Stealth toggle with enemy detection changes' },
+    { id: 'PICKUPS',            cat: 'gameplay',  desc: '6 pickup types: Health, Ammo, Armor, Grenade, Medkit, Stim' },
+    { id: 'RANKS',              cat: 'gameplay',  desc: 'Player rank progression system' },
+    { id: 'SKILLS',             cat: 'gameplay',  desc: 'Player skill system affecting recoil, reload, accuracy' },
+    { id: 'MISSIONS',           cat: 'gameplay',  desc: 'Mission system with objectives' },
+    { id: 'ML_DIFFICULTY',      cat: 'ml',        desc: 'Adaptive difficulty (0.5-2.0x) based on player accuracy, survival, death rate' },
+    { id: 'ML_PERFORMANCE',     cat: 'ml',        desc: 'FPS tracking with auto-quality recommendations' },
+    { id: 'ML_PERSISTENCE',     cat: 'ml',        desc: 'LocalStorage player profile with weapon stats, level attempts, project memory' },
+    { id: 'WEATHER',            cat: 'world',     desc: 'Weather system affecting gameplay' },
+    { id: 'TIME_CYCLE',         cat: 'world',     desc: 'Day/night cycle with time-based NPC behavior' },
+    { id: 'TRACERS',            cat: 'visual',    desc: 'Bullet tracers and smoke effects' },
+    { id: 'RECOIL',             cat: 'weapons',   desc: 'Per-weapon recoil with visual gun kick and camera shake' },
+  ];
+
+  function getFeatureRegistry() { return FEATURE_REGISTRY; }
+  function getFeatureCount() { return FEATURE_REGISTRY.length; }
+  function getFeaturesByCategory(cat) { return FEATURE_REGISTRY.filter(function(f) { return f.cat === cat; }); }
+
   /* ── Persistence ────────────────────────────────────────── */
   function save() {
     try {
@@ -309,6 +353,11 @@ var MLSystem = (function () {
     // Project memory
     storeProjectFact: storeProjectFact,
     getProjectFacts: getProjectFacts,
+
+    // Feature registry
+    getFeatureRegistry: getFeatureRegistry,
+    getFeatureCount: getFeatureCount,
+    getFeaturesByCategory: getFeaturesByCategory,
 
     save: save,
     load: load,
