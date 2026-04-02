@@ -10,14 +10,24 @@ const DroneSystem = (function () {
     FPV_ATTACK:   'fpv_attack',
     BOMB:         'bomb',
     SURVEILLANCE: 'surveillance',
+    ENEMY_BOMBER: 'enemy_bomber',
+    ENEMY_FPV:    'enemy_fpv',
   });
 
   const DRONE_STATS = {
-    recon:        { speed: 12, health: 30,  battery: 120, damage: 0,   range: 80 },
-    fpv_attack:   { speed: 18, health: 15,  battery: 45,  damage: 80,  range: 50 },
-    bomb:         { speed: 8,  health: 40,  battery: 90,  damage: 200, range: 60 },
-    surveillance: { speed: 6,  health: 50,  battery: 300, damage: 0,   range: 100 },
+    recon:         { speed: 12, health: 30,  battery: 120, damage: 0,   range: 80 },
+    fpv_attack:    { speed: 18, health: 15,  battery: 45,  damage: 80,  range: 50 },
+    bomb:          { speed: 8,  health: 40,  battery: 90,  damage: 200, range: 60 },
+    surveillance:  { speed: 6,  health: 50,  battery: 300, damage: 0,   range: 100 },
+    enemy_bomber:  { speed: 7,  health: 35,  battery: 80,  damage: 150, range: 50 },
+    enemy_fpv:     { speed: 22, health: 10,  battery: 30,  damage: 100, range: 40 },
   };
+
+  /* ── Faction helpers ────────────────────────────────────────────── */
+  function factionForType(type) {
+    if (type === DRONE_TYPE.ENEMY_BOMBER || type === DRONE_TYPE.ENEMY_FPV) return 'russian';
+    return 'ukrainian';
+  }
 
   /* ── State ───────────────────────────────────────────────────────── */
   const drones = [];
@@ -27,19 +37,41 @@ const DroneSystem = (function () {
   let _possessedDrone = null;
 
   /* ── Create Drone Mesh ───────────────────────────────────────────── */
+  function addRussianFlag(group) {
+    const stripeGeo = new THREE.BoxGeometry(0.3, 0.02, 0.05);
+    const white = new THREE.Mesh(stripeGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }));
+    white.position.set(0, 0.095, -0.05);
+    group.add(white);
+    const blue = new THREE.Mesh(stripeGeo.clone(), new THREE.MeshLambertMaterial({ color: 0x0039A6 }));
+    blue.position.set(0, 0.095, 0);
+    group.add(blue);
+    const red = new THREE.Mesh(stripeGeo.clone(), new THREE.MeshLambertMaterial({ color: 0xD52B1E }));
+    red.position.set(0, 0.095, 0.05);
+    group.add(red);
+  }
+
   function buildDroneMesh(type) {
     const group = new THREE.Group();
     const stats = DRONE_STATS[type];
+    const faction = factionForType(type);
 
-    // Body
+    // Body color by faction and type
+    let bodyColor;
+    if (faction === 'russian') {
+      bodyColor = type === DRONE_TYPE.ENEMY_BOMBER ? 0x3a3a2a : 0x8B0000;
+    } else {
+      bodyColor = 0x0057B8; // Ukrainian blue for all friendly drones
+    }
+
     const bodyGeo = new THREE.BoxGeometry(0.5, 0.15, 0.5);
-    const bodyMat = new THREE.MeshLambertMaterial({
-      color: type === DRONE_TYPE.FPV_ATTACK ? 0xFF4444 :
-             type === DRONE_TYPE.BOMB ? 0x444444 :
-             type === DRONE_TYPE.SURVEILLANCE ? 0x4488FF : 0x44FF44
-    });
+    const bodyMat = new THREE.MeshLambertMaterial({ color: bodyColor });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     group.add(body);
+
+    // Russian flag stripe on enemy drones
+    if (faction === 'russian') {
+      addRussianFlag(group);
+    }
 
     // 4 Arms + rotors
     const armPositions = [
@@ -104,6 +136,7 @@ const DroneSystem = (function () {
     const drone = {
       id: nextId++,
       type,
+      faction: factionForType(type),
       position: new THREE.Vector3(x, y, z),
       velocity: new THREE.Vector3(),
       rotation: new THREE.Euler(0, 0, 0, 'YXZ'),
@@ -116,7 +149,7 @@ const DroneSystem = (function () {
       mesh:     null,
       alive:    true,
       active:   true,  // powered on
-      hasPayload: type === DRONE_TYPE.BOMB,
+      hasPayload: type === DRONE_TYPE.BOMB || type === DRONE_TYPE.ENEMY_BOMBER,
 
       // AI patrol (for surveillance drones)
       patrolPoints: [],
