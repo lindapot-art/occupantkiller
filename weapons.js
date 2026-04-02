@@ -945,14 +945,14 @@ const Weapons = (() => {
   function applyRecoil() {
     const w = cur();
     if (!w.recoilY && !w.recoilX) return;
-    const recoilMod = (typeof SkillSystem !== 'undefined' && SkillSystem.getRecoilMod)
+    const recoilMod = (typeof SkillSystem !== 'undefined' && typeof SkillSystem.getRecoilMod === 'function')
       ? SkillSystem.getRecoilMod() : 1.0;
     if (typeof CameraSystem !== 'undefined') {
       CameraSystem.setPitch(CameraSystem.getPitch() + w.recoilY * recoilMod);
       CameraSystem.setYaw(CameraSystem.getYaw() + (Math.random() - 0.5) * w.recoilX * 2 * recoilMod);
     }
     // Scale visual kick with weapon recoil intensity
-    var intensity = Math.min(1, (w.recoilY || 0) / 0.04);
+    const intensity = Math.min(1, (w.recoilY || 0) / 0.04);
     recoilOffsetZ = -0.02 - intensity * 0.04;
     recoilOffsetY = 0.01 + intensity * 0.02;
   }
