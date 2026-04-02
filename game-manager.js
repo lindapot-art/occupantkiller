@@ -1059,6 +1059,44 @@ const GameManager = (function () {
       var evy2 = VoxelWorld.getTerrainHeight(evx2, evz2);
       VehicleSystem.spawnEnemy(evx2, evy2, evz2, 'transport');
     }
+
+    // Spawn enemy drones
+    if (w >= 2 && typeof DroneSystem !== 'undefined' && DroneSystem.spawnEnemyDrone) {
+      var droneSpawnH = 20 + Math.random() * 10;
+      var droneAngle = Math.random() * Math.PI * 2;
+      var droneDist = 30 + Math.random() * 15;
+      
+      // FPV drone
+      var fpvX = player.position.x + Math.cos(droneAngle) * droneDist;
+      var fpvZ = player.position.z + Math.sin(droneAngle) * droneDist;
+      DroneSystem.spawnEnemyDrone(fpvX, droneSpawnH, fpvZ, 'enemy_fpv');
+      
+      if (w >= 4) {
+        // Bomber drone
+        var bomberAngle = droneAngle + Math.PI * 0.5;
+        var bomberX = player.position.x + Math.cos(bomberAngle) * droneDist;
+        var bomberZ = player.position.z + Math.sin(bomberAngle) * droneDist;
+        DroneSystem.spawnEnemyDrone(bomberX, droneSpawnH + 5, bomberZ, 'enemy_bomber');
+        
+        // Extra FPV
+        var fpv2Angle = droneAngle + Math.PI;
+        var fpv2X = player.position.x + Math.cos(fpv2Angle) * droneDist;
+        var fpv2Z = player.position.z + Math.sin(fpv2Angle) * droneDist;
+        DroneSystem.spawnEnemyDrone(fpv2X, droneSpawnH, fpv2Z, 'enemy_fpv');
+      }
+      
+      if (w >= 6) {
+        // Additional bombers and FPVs
+        for (var ei = 0; ei < 2; ei++) {
+          var extraAngle = Math.random() * Math.PI * 2;
+          var exX = player.position.x + Math.cos(extraAngle) * (droneDist + 10);
+          var exZ = player.position.z + Math.sin(extraAngle) * (droneDist + 10);
+          DroneSystem.spawnEnemyDrone(exX, droneSpawnH + ei * 3, exZ, ei === 0 ? 'enemy_bomber' : 'enemy_fpv');
+        }
+      }
+      
+      HUD.notifyPickup('⚠ ENEMY DRONES DETECTED!', '#ff4488');
+    }
   }
 
   function onWaveComplete() {
@@ -1540,6 +1578,21 @@ const GameManager = (function () {
         var mmVehicles = (typeof VehicleSystem !== 'undefined' && VehicleSystem.getAll) ? VehicleSystem.getAll() : [];
         var mmDrones = (typeof DroneSystem !== 'undefined' && DroneSystem.getAll) ? DroneSystem.getAll() : [];
         HUD.updateMinimap(player.position.x, player.position.z, CameraSystem.getYaw(), mmEnemies, mmNPCs, mmVehicles, mmDrones);
+      }
+
+      // Enemy drone proximity warning
+      if (typeof DroneSystem !== 'undefined' && DroneSystem.getAll) {
+        var allDrones = DroneSystem.getAll();
+        for (var di = 0; di < allDrones.length; di++) {
+          var dr = allDrones[di];
+          if (dr.faction === 'enemy' && dr.alive !== false && dr.position) {
+            var ddist = player.position.distanceTo(dr.position);
+            if (ddist < 20) {
+              HUD.notifyPickup('⚠ ENEMY DRONE NEARBY!', '#ff4488');
+              break;
+            }
+          }
+        }
       }
 
       // Update tracers
