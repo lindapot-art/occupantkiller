@@ -1791,6 +1791,196 @@ const VoxelWorld = (function () {
     setBlock(ox - 1, surfH + 1, oz + 1, BLOCK.CRATE);
   }
 
+  // ── ROUND 2: New Terrain Generators ──────────────────────────
+
+  function generateUndergroundTunnel(ox, oz, length) {
+    // Dig a tunnel 2 blocks below surface, length blocks long
+    const surfH = getTerrainHeight(ox, oz);
+    const tunnelY = surfH - 2;
+    const dir = Math.random() > 0.5; // true=X, false=Z
+    for (let i = 0; i < (length || 12); i++) {
+      const tx = dir ? ox + i : ox;
+      const tz = dir ? oz : oz + i;
+      // Tunnel bore: 2 wide, 2 tall
+      for (let dx = 0; dx < 2; dx++) {
+        setBlock(tx + (dir ? 0 : dx), tunnelY, tz + (dir ? dx : 0), BLOCK.AIR);
+        setBlock(tx + (dir ? 0 : dx), tunnelY + 1, tz + (dir ? dx : 0), BLOCK.AIR);
+      }
+      // Timber supports every 3 blocks
+      if (i % 3 === 0) {
+        setBlock(tx, tunnelY - 1, tz, BLOCK.WOOD);
+        setBlock(tx, tunnelY + 2, tz, BLOCK.WOOD);
+        setBlock(tx + (dir ? 0 : 1), tunnelY + 2, tz + (dir ? 1 : 0), BLOCK.WOOD);
+      }
+    }
+    // Entrance: open hole in surface with sandbag cover
+    setBlock(ox, surfH, oz, BLOCK.AIR);
+    setBlock(ox, surfH - 1, oz, BLOCK.AIR);
+    setBlock(ox - 1, surfH, oz, BLOCK.SANDBAG);
+    setBlock(ox + 1, surfH, oz, BLOCK.SANDBAG);
+    setBlock(ox, surfH, oz - 1, BLOCK.SANDBAG);
+    setBlock(ox, surfH, oz + 1, BLOCK.SANDBAG);
+    // Exit hole at far end
+    const ex = dir ? ox + (length || 12) : ox;
+    const ez = dir ? oz : oz + (length || 12);
+    setBlock(ex, getTerrainHeight(ex, ez), ez, BLOCK.AIR);
+    setBlock(ex, getTerrainHeight(ex, ez) - 1, ez, BLOCK.AIR);
+  }
+
+  function generateCollapsedBridge(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Two intact bridge supports (concrete pillars)
+    for (let y = 0; y < 6; y++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        setBlock(ox - 6, surfH + y, oz + dz, BLOCK.CONCRETE);
+        setBlock(ox + 6, surfH + y, oz + dz, BLOCK.CONCRETE);
+      }
+    }
+    // Collapsed middle section — rubble spanning the gap
+    for (let x = -5; x <= 5; x++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        // Sagging middle: higher near supports, lower in center
+        const height = Math.max(1, 5 - Math.abs(x) * 0.6);
+        for (let y = 0; y < height; y++) {
+          const block = y === 0 ? BLOCK.RUBBLE : (Math.random() < 0.4 ? BLOCK.RUBBLE : BLOCK.CONCRETE);
+          setBlock(ox + x, surfH + y, oz + dz, block);
+        }
+      }
+    }
+    // Rebar sticking out (metal blocks)
+    setBlock(ox - 3, surfH + 3, oz, BLOCK.METAL);
+    setBlock(ox + 2, surfH + 4, oz, BLOCK.METAL);
+    setBlock(ox, surfH + 2, oz - 1, BLOCK.METAL);
+    // Debris around base
+    for (let i = 0; i < 6; i++) {
+      const rx = ox + Math.floor((Math.random() - 0.5) * 14);
+      const rz = oz + Math.floor((Math.random() - 0.5) * 6);
+      const rh = getTerrainHeight(rx, rz);
+      setBlock(rx, rh + 1, rz, BLOCK.RUBBLE);
+    }
+  }
+
+  function generateFuelDepot(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Concrete pad
+    for (let x = -3; x <= 3; x++) {
+      for (let z = -2; z <= 2; z++) {
+        setBlock(ox + x, surfH, oz + z, BLOCK.CONCRETE);
+      }
+    }
+    // Fuel barrel clusters (orange blocks)
+    for (let x = -2; x <= 2; x += 2) {
+      for (let z = -1; z <= 1; z++) {
+        setBlock(ox + x, surfH + 1, oz + z, BLOCK.FUEL_BARREL);
+        if (Math.random() < 0.5) setBlock(ox + x, surfH + 2, oz + z, BLOCK.FUEL_BARREL);
+      }
+    }
+    // Metal roof cover
+    for (let x = -3; x <= 3; x++) {
+      for (let z = -2; z <= 2; z++) {
+        setBlock(ox + x, surfH + 4, oz + z, BLOCK.METAL);
+      }
+    }
+    // Support pillars
+    setBlock(ox - 3, surfH + 1, oz - 2, BLOCK.METAL);
+    setBlock(ox - 3, surfH + 2, oz - 2, BLOCK.METAL);
+    setBlock(ox - 3, surfH + 3, oz - 2, BLOCK.METAL);
+    setBlock(ox + 3, surfH + 1, oz + 2, BLOCK.METAL);
+    setBlock(ox + 3, surfH + 2, oz + 2, BLOCK.METAL);
+    setBlock(ox + 3, surfH + 3, oz + 2, BLOCK.METAL);
+    setBlock(ox + 3, surfH + 1, oz - 2, BLOCK.METAL);
+    setBlock(ox + 3, surfH + 2, oz - 2, BLOCK.METAL);
+    setBlock(ox + 3, surfH + 3, oz - 2, BLOCK.METAL);
+    setBlock(ox - 3, surfH + 1, oz + 2, BLOCK.METAL);
+    setBlock(ox - 3, surfH + 2, oz + 2, BLOCK.METAL);
+    setBlock(ox - 3, surfH + 3, oz + 2, BLOCK.METAL);
+    // Warning sign (fence block)
+    setBlock(ox, surfH + 1, oz - 3, BLOCK.FENCE);
+    setBlock(ox, surfH + 2, oz - 3, BLOCK.FENCE);
+  }
+
+  function generateArtilleryBattery(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // 3 gun emplacements in a line
+    for (let gun = 0; gun < 3; gun++) {
+      const gx = ox + gun * 6;
+      const gz = oz;
+      // Circular pit
+      for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+          if (dx * dx + dz * dz <= 5) {
+            setBlock(gx + dx, surfH, gz + dz, BLOCK.DIRT);
+          }
+        }
+      }
+      // Sandbag wall around pit
+      for (let dx = -3; dx <= 3; dx++) {
+        for (let dz = -3; dz <= 3; dz++) {
+          var d = dx * dx + dz * dz;
+          if (d >= 7 && d <= 10) {
+            setBlock(gx + dx, surfH + 1, gz + dz, BLOCK.SANDBAG);
+          }
+        }
+      }
+      // Gun barrel (metal stack)
+      setBlock(gx, surfH + 1, gz, BLOCK.METAL);
+      setBlock(gx, surfH + 2, gz, BLOCK.METAL);
+      setBlock(gx + 1, surfH + 2, gz, BLOCK.METAL);
+      setBlock(gx + 2, surfH + 2, gz, BLOCK.METAL);
+    }
+    // Ammo crates behind guns
+    for (let c = 0; c < 3; c++) {
+      setBlock(ox + c * 6, surfH + 1, oz + 4, BLOCK.CRATE);
+      setBlock(ox + c * 6 + 1, surfH + 1, oz + 4, BLOCK.CRATE);
+    }
+  }
+
+  function generateRadarTower(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Square concrete base
+    for (let x = -2; x <= 2; x++) {
+      for (let z = -2; z <= 2; z++) {
+        setBlock(ox + x, surfH + 1, oz + z, BLOCK.CONCRETE);
+      }
+    }
+    // Steel tower (4 legs)
+    for (let y = 2; y < 12; y++) {
+      setBlock(ox - 1, surfH + y, oz - 1, BLOCK.METAL);
+      setBlock(ox + 1, surfH + y, oz - 1, BLOCK.METAL);
+      setBlock(ox - 1, surfH + y, oz + 1, BLOCK.METAL);
+      setBlock(ox + 1, surfH + y, oz + 1, BLOCK.METAL);
+    }
+    // Cross-bracing every 3 levels
+    for (let y = 4; y < 12; y += 3) {
+      setBlock(ox, surfH + y, oz - 1, BLOCK.METAL);
+      setBlock(ox, surfH + y, oz + 1, BLOCK.METAL);
+      setBlock(ox - 1, surfH + y, oz, BLOCK.METAL);
+      setBlock(ox + 1, surfH + y, oz, BLOCK.METAL);
+    }
+    // Radar platform at top
+    for (let x = -2; x <= 2; x++) {
+      for (let z = -2; z <= 2; z++) {
+        setBlock(ox + x, surfH + 12, oz + z, BLOCK.METAL);
+      }
+    }
+    // Radar dish (electronics blocks)
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        setBlock(ox + dx, surfH + 13, oz + dz, BLOCK.ELECTRONICS);
+      }
+    }
+    setBlock(ox, surfH + 14, oz, BLOCK.ELECTRONICS);
+    // Railing
+    for (let x = -2; x <= 2; x++) {
+      setBlock(ox + x, surfH + 13, oz - 2, BLOCK.FENCE);
+      setBlock(ox + x, surfH + 13, oz + 2, BLOCK.FENCE);
+    }
+    for (let z = -2; z <= 2; z++) {
+      setBlock(ox - 2, surfH + 13, oz + z, BLOCK.FENCE);
+      setBlock(ox + 2, surfH + 13, oz + z, BLOCK.FENCE);
+    }
+  }
+
   /* ── Level Generation ──────────────────────────────────────────── */
   function generateLevel(index) {
     const level = getLevelDef(index);
@@ -1856,6 +2046,9 @@ const VoxelWorld = (function () {
         generateAmmoCache(-28, 12);         // NEW: ammo crate storage
         generateSupplyTent(25, 18);         // NEW: supply tent
         generateRazorWireMaze(-35, -10, 4); // NEW: razor wire obstacle
+        generateUndergroundTunnel(-20, -5, 10); // NEW R2: tunnel under runway
+        generateFuelDepot(20, -15);             // NEW R2: airport fuel storage
+        generateRadarTower(-30, 5);             // NEW R2: radar tower
         scatterResources(BLOCK.WOOD, 0.003);
         break;
 
@@ -1920,6 +2113,11 @@ const VoxelWorld = (function () {
         generateAmmoCache(25, -25);           // NEW: second ammo cache
         generateSupplyTent(-35, -5);          // NEW: supply tent
         generateRazorWireMaze(-15, 25, 6);    // NEW: razor wire defensive maze
+        generateUndergroundTunnel(-30, -10, 14); // NEW R2: underground tunnel
+        generateCollapsedBridge(0, -35);         // NEW R2: collapsed overpass
+        generateFuelDepot(-25, -30);             // NEW R2: fuel depot
+        generateArtilleryBattery(30, 30);        // NEW R2: artillery position
+        generateRadarTower(-35, 20);             // NEW R2: radar tower
         // Heavy rubble scatter (coking plant battle damage)
         for (let rb = 0; rb < 80; rb++) {
           const rx = randInWorld(), rz = randInWorld();
@@ -1996,6 +2194,12 @@ const VoxelWorld = (function () {
         generateSupplyTent(30, -20);            // NEW: supply tent
         generateRazorWireMaze(-10, -35, 8);     // NEW: heavy razor wire maze
         generateRazorWireMaze(15, 25, 5);       // NEW: more razor wire
+        generateUndergroundTunnel(-20, -20, 16); // NEW R2: tunnel system
+        generateUndergroundTunnel(10, 15, 12);   // NEW R2: second tunnel
+        generateCollapsedBridge(-25, 0);         // NEW R2: collapsed bridge
+        generateFuelDepot(20, -25);              // NEW R2: fuel storage
+        generateArtilleryBattery(-30, 30);       // NEW R2: artillery battery
+        generateRadarTower(30, 30);              // NEW R2: radar installation
         // Extra rubble — city is total devastation
         for (let rb2 = 0; rb2 < 100; rb2++) {
           const rx2 = randInWorld(), rz2 = randInWorld();
@@ -2067,6 +2271,11 @@ const VoxelWorld = (function () {
         generateAmmoCache(-20, 20);             // NEW: ammo cache at checkpoint
         generateSupplyTent(-10, -25);           // NEW: supply tent
         generateRazorWireMaze(10, 10, 5);       // NEW: razor wire near bridge
+        generateUndergroundTunnel(-15, -10, 12); // NEW R2: tunnel under road
+        generateCollapsedBridge(15, 20);         // NEW R2: collapsed bridge
+        generateFuelDepot(-30, -10);             // NEW R2: fuel depot
+        generateArtilleryBattery(20, -25);       // NEW R2: artillery battery
+        generateRadarTower(-25, 30);             // NEW R2: radar tower
         scatterResources(BLOCK.WOOD, 0.003);    // More vegetation than Bakhmut
         break;
 
@@ -2102,6 +2311,11 @@ const VoxelWorld = (function () {
         if (Math.random() > 0.5) generateBurningRuin(randInWorld(), randInWorld());
         if (Math.random() > 0.5) generateFieldHospital(randInWorld(), randInWorld());
         if (Math.random() > 0.6) generateCommTower(randInWorld(), randInWorld());
+        if (Math.random() > 0.4) generateUndergroundTunnel(randInWorld(), randInWorld(), 8 + Math.floor(Math.random() * 8));
+        if (Math.random() > 0.5) generateCollapsedBridge(randInWorld(), randInWorld());
+        if (Math.random() > 0.5) generateFuelDepot(randInWorld(), randInWorld());
+        if (Math.random() > 0.6) generateArtilleryBattery(randInWorld(), randInWorld());
+        if (Math.random() > 0.6) generateRadarTower(randInWorld(), randInWorld());
         // Procedural road network
         _roadWaypoints.length = 0;
         generateRoadNetwork([
