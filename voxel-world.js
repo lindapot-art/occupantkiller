@@ -29,7 +29,7 @@ const VoxelWorld = (function () {
 
   const BLOCK_COLORS = {
     [BLOCK.DIRT]:        0x8B6914,
-    [BLOCK.GRASS]:       0x4A7C2E,
+    [BLOCK.GRASS]:       0x0057B8, // Ukrainian blue theme
     [BLOCK.STONE]:       0x808080,
     [BLOCK.WOOD]:        0xA0724A,
     [BLOCK.METAL]:       0x909698,

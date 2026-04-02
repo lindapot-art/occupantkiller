@@ -303,19 +303,19 @@ const GameManager = (function () {
     _renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.getElementById('game-container').appendChild(_renderer.domElement);
 
-    // Create scene
+    // Create scene — Ukrainian theme (golden sky)
     _scene = new THREE.Scene();
-    _scene.background = new THREE.Color(0x3a3028);
-    _scene.fog = new THREE.Fog(0x3a3028, 14, 80);
+    _scene.background = new THREE.Color(0xFFD700);
+    _scene.fog = new THREE.Fog(0xFFD700, 14, 80);
 
     // Create camera
     _camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
 
-    // Lighting
-    ambLight = new THREE.AmbientLight(0x4a3c2a, 1.0);
+    // Lighting — Ukrainian theme
+    ambLight = new THREE.AmbientLight(0x888866, 0.8);
     _scene.add(ambLight);
 
-    sunLight = new THREE.DirectionalLight(0xff8833, 0.85);
+    sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
     sunLight.position.set(20, 30, 10);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.set(2048, 2048);
@@ -327,7 +327,7 @@ const GameManager = (function () {
     sunLight.shadow.camera.bottom = -50;
     _scene.add(sunLight);
 
-    hemiLight = new THREE.HemisphereLight(0x3a2a18, 0x101008, 0.5);
+    hemiLight = new THREE.HemisphereLight(0xFFD700, 0x0057B8, 0.6);
     _scene.add(hemiLight);
 
     // ── Init all sub-systems ─────────────────────────────────
@@ -626,16 +626,14 @@ const GameManager = (function () {
       if (e.code === 'Escape') {
         if (gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE) {
           gameState = STATE.PAUSED;
-          const invOv = document.getElementById('inventory-overlay');
+          var invOv = document.getElementById('inventory-overlay');
           if (invOv) {
             showInventory();
             invOv.style.display = 'flex';
-          } else {
-            showOverlay('pause');
           }
         } else if (gameState === STATE.PAUSED) {
           gameState = STATE.PLAYING;
-          const invOv = document.getElementById('inventory-overlay');
+          var invOv = document.getElementById('inventory-overlay');
           if (invOv) invOv.style.display = 'none';
           hideOverlays();
           requestPointerLock();
@@ -851,6 +849,7 @@ const GameManager = (function () {
 
   /* ── Start Game ──────────────────────────────────────────────────── */
   function startGame() {
+    try {
     AudioSystem.resume();
     // Start battle music
     if (AudioSystem.playMusic) AudioSystem.playMusic('battle');
@@ -927,6 +926,9 @@ const GameManager = (function () {
 
     // Generate an initial mission
     MissionSystem.generateRandom();
+    } catch (err) {
+      console.error('Failed to initialize game:', err);
+    }
   }
 
   /* ── Stage Management ───────────────────────────────────────────── */
