@@ -575,7 +575,7 @@ const GameManager = (function () {
         if (e.code === 'Digit0') Weapons.switchTo(9);
         if (e.code === 'KeyQ')   Weapons.switchPrev();
         if (e.code === 'KeyE' && gameState === STATE.PLAYING) Weapons.switchNext();
-        if (e.code === 'KeyR')   { Weapons.forceReload(); AudioSystem.playReload(); MLSystem.onReload(); }
+        if (e.code === 'KeyR')   { Weapons.forceReload(); AudioSystem.playReload(); MLSystem.onReload(); MLSystem.trackReload(); }
 
         // Build mode: template selection
         if (gameState === STATE.BUILD_MODE) {
@@ -1036,10 +1036,45 @@ const GameManager = (function () {
     currentWave = w;
     const stageDef = STAGES[currentStage];
     const mlDiff = MLSystem.getDifficultyMult();
-    Enemies.startWave(w, _scene, stageDef.difficulty * mlDiff);
+
+    // AI Smart Learning: classify combat style each wave and pass counter-strategy
+    MLSystem.classifyCombatStyle();
+    var aiStrategy = MLSystem.generateCounterStrategy();
+
+    // Show AI adaptation notification
+    if (aiStrategy.adaptationLevel > 0 && HUD.notifyPickup) {
+      HUD.notifyPickup(aiStrategy.adaptationMessage, '#ff00ff');
+    }
+
+    // Pass AI strategy to enemies for adaptive behavior
+    Enemies.startWave(w, _scene, stageDef.difficulty * mlDiff, aiStrategy);
     AudioSystem.playWaveStart();
     HUD.setWave(w, stageDef.wavesPerStage);
     HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage);
+
+    // AI Smart Learning: update NPC assist strategy
+    if (typeof NPCSystem !== 'undefined' && NPCSystem.setMLStrategy) {
+      NPCSystem.setMLStrategy(MLSystem.getNPCAssistStrategy());
+    }
+
+    // Update AI learning indicator on HUD
+    updateAIIndicator(aiStrategy);
+
+    // AI Anti-camping: if player was camping, send flush squad
+    if (aiStrategy.antiCampFlush) {
+      var campPos = MLSystem.getCampingPosition();
+      if (campPos) {
+        HUD.notifyPickup('⚠ ENEMIES TARGETING YOUR POSITION!', '#ff2222');
+        // Spawn stormers aimed at camping position from multiple angles
+        for (var fi = 0; fi < 3; fi++) {
+          var flushAngle = (fi / 3) * Math.PI * 2 + Math.random() * 0.5;
+          var flushDist = 20 + Math.random() * 10;
+          var flushX = campPos.x + Math.cos(flushAngle) * flushDist;
+          var flushZ = campPos.z + Math.sin(flushAngle) * flushDist;
+          Enemies.spawnSingle('STORMER');
+        }
+      }
+    }
 
     // Spawn enemy vehicles on later waves (Russian armored assault)
     if (w >= 3) {
@@ -1322,6 +1357,13 @@ const GameManager = (function () {
 
     AudioSystem.playHit();
     MLSystem.onHit(Weapons.getCurrentId());
+    // AI Smart Learning: track weapon engagement range
+    var engageRange = enemy.mesh.position.distanceTo(player.position);
+    MLSystem.trackWeaponUse(Weapons.getCurrentId(), engageRange);
+    MLSystem.trackWeaponType(Weapons.getCurrentType());
+    // Track if player is being aggressive (moving toward enemies)
+    MLSystem.trackCombatEngagement(engageRange < 10);
+
     const isHeadshot = hit.object === enemy.mesh.userData.headMesh;
     const baseDmg = Weapons.getDamage();
     const dmg = isHeadshot ? baseDmg * 2 : baseDmg;
@@ -1339,6 +1381,7 @@ const GameManager = (function () {
     if (remaining <= 0) {
       AudioSystem.playDeath();
       MLSystem.onKill(Weapons.getCurrentId());
+      MLSystem.trackKillTiming(); // AI Smart Learning: track kill timing patterns
       player.score += enemy.scoreValue;
       player.kills++;
       HUD.setScore(player.score);
@@ -1401,6 +1444,15 @@ const GameManager = (function () {
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
 
+    // AI Smart Learning: track directional vulnerability
+    if (attackerPos) {
+      MLSystem.trackHitDirection(
+        attackerPos.x, attackerPos.z,
+        player.position.x, player.position.z,
+        CameraSystem.getYaw()
+      );
+    }
+
     // Heavy hits cause bleeding (25% chance on hits > 15 dmg)
     if (dmg > 15 && Math.random() < 0.25 && !player.bleeding) {
       player.bleeding = true;
@@ -1423,6 +1475,14 @@ const GameManager = (function () {
       if (AudioSystem.stopMusic) AudioSystem.stopMusic();
       Weapons.exitZoom();
       MLSystem.onDeath();
+      // AI Smart Learning: classify combat style on death and track death context
+      MLSystem.classifyCombatStyle();
+      if (attackerPos) {
+        var deathDist = player.position.distanceTo(attackerPos);
+        var deathType = deathDist < 5 ? 'rush' : (deathDist > 25 ? 'sniper' : 'flank');
+        var deathAngle = Math.atan2(attackerPos.x - player.position.x, attackerPos.z - player.position.z);
+        MLSystem.trackDeathContext(deathType, deathAngle);
+      }
       showOverlay('dead');
       document.getElementById('dead-stage').textContent = STAGES[currentStage].id;
       document.getElementById('dead-score').textContent = player.score;
@@ -1446,6 +1506,8 @@ const GameManager = (function () {
       TimeSystem.update(delta);
       WeatherSystem.update(delta);
       MLSystem.trackFPS(delta);
+      // AI Smart Learning: track player position for behavior profiling
+      MLSystem.trackPlayerPosition(player.position.x, player.position.z, delta);
       updatePlayer(delta);
 
       // Bleed DOT
@@ -1613,6 +1675,23 @@ const GameManager = (function () {
   }
 
   /* ── Extended HUD Updates ────────────────────────────────────────── */
+  function updateAIIndicator(strategy) {
+    var aiEl = document.getElementById('ai-learning-indicator');
+    if (!aiEl) return;
+    if (!strategy) {
+      aiEl.style.display = 'none';
+      return;
+    }
+    aiEl.style.display = 'block';
+    var levels = ['📡 LEARNING', '🔄 ADAPTING', '🧠 COUNTERING'];
+    var colors = ['#888888', '#ffaa00', '#ff00ff'];
+    var summary = MLSystem.getBehaviorSummary();
+    aiEl.textContent = levels[strategy.adaptationLevel] + ' | Style: ' +
+      summary.style.toUpperCase() + ' (' + Math.round(summary.confidence * 100) + '%)';
+    aiEl.style.color = colors[strategy.adaptationLevel];
+    aiEl.style.borderColor = colors[strategy.adaptationLevel];
+  }
+
   function updateExtendedHUD() {
     const timeEl = document.getElementById('hud-time');
     if (timeEl) {

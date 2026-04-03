@@ -75,6 +75,7 @@ const NPCSystem = (function () {
   const npcs = [];
   let _scene = null;
   let nextId = 1;
+  let _mlAssistStrategy = null; // ML-guided NPC assistance strategy
 
   /* ── Rank-based Weapon Assignment ────────────────────────────────── */
   // Maps NPC rank to weapon: name, damage, fire rate, range, sound type
@@ -764,16 +765,36 @@ const NPCSystem = (function () {
       }
       // No enemy in range — actively patrol toward center / known battle areas
       if (!npc.target && npc.job !== JOB.REST && npc.job !== JOB.MEDIC) {
-        // Move toward center (0,0,0) where battles happen, with some randomness
-        const toCenter = new THREE.Vector3(-npc.position.x, 0, -npc.position.z).normalize();
-        const randomOffset = new THREE.Vector3(
-          (Math.random() - 0.5) * 10,
-          0,
-          (Math.random() - 0.5) * 10
-        );
-        const huntTarget = npc.position.clone().add(toCenter.multiplyScalar(5 + Math.random() * 10)).add(randomOffset);
-        huntTarget.y = 0;
-        npc.target = huntTarget;
+        // AI Smart Learning: NPCs cover player's vulnerable direction
+        if (_mlAssistStrategy && _mlAssistStrategy.coverDirection >= 0) {
+          var coverAngle = _mlAssistStrategy.coverDirection;
+          var coverDist = _mlAssistStrategy.followDistance || 8;
+          // Position NPC at player's vulnerable side using GameManager player position
+          var playerPos = (typeof GameManager !== 'undefined' && GameManager.getPlayer) ? GameManager.getPlayer().position : null;
+          if (playerPos) {
+            var playerYaw = (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) ? CameraSystem.getYaw() : 0;
+            var worldCoverAngle = playerYaw + coverAngle;
+            var coverTarget = new THREE.Vector3(
+              playerPos.x + Math.sin(worldCoverAngle) * coverDist + (Math.random() - 0.5) * 3,
+              0,
+              playerPos.z + Math.cos(worldCoverAngle) * coverDist + (Math.random() - 0.5) * 3
+            );
+            coverTarget.y = 0;
+            npc.target = coverTarget;
+          }
+        }
+        if (!npc.target) {
+          // Default: Move toward center (0,0,0) where battles happen, with some randomness
+          const toCenter = new THREE.Vector3(-npc.position.x, 0, -npc.position.z).normalize();
+          const randomOffset = new THREE.Vector3(
+            (Math.random() - 0.5) * 10,
+            0,
+            (Math.random() - 0.5) * 10
+          );
+          const huntTarget = npc.position.clone().add(toCenter.multiplyScalar(5 + Math.random() * 10)).add(randomOffset);
+          huntTarget.y = 0;
+          npc.target = huntTarget;
+        }
       }
     }
 
@@ -1074,5 +1095,6 @@ const NPCSystem = (function () {
     spawnAssaultGroups,
     assignGuardPositions,
     getFriendlyGroups: function () { return friendlyGroups; },
+    setMLStrategy: function (strategy) { _mlAssistStrategy = strategy; },
   };
 })();
