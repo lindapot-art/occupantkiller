@@ -520,6 +520,14 @@ const GameManager = (function () {
     if (typeof Feedback !== 'undefined') Feedback.init();
     if (typeof Progression !== 'undefined') Progression.init();
 
+    // ── Additional feature systems (44 new features) ──────────
+    if (typeof AdvancedSystems !== 'undefined') AdvancedSystems.init();
+    if (typeof EnvironmentalHazards !== 'undefined') EnvironmentalHazards.init();
+    if (typeof StealthSystem !== 'undefined') StealthSystem.init();
+    if (typeof AdvancedAI !== 'undefined') AdvancedAI.init();
+    if (typeof CustomizationSystem !== 'undefined') CustomizationSystem.init();
+    if (typeof SurvivalMechanics !== 'undefined') SurvivalMechanics.init();
+
     // Create weapons
     Weapons.createGunMesh(_camera);
     Weapons.createMuzzleFlash(_scene, _camera);
@@ -2814,6 +2822,67 @@ const GameManager = (function () {
         if (prestigeInd && Progression.getPrestigeLevel() > 0) {
           prestigeInd.textContent = Progression.getPrestigeIcon() + ' P' + Progression.getPrestigeLevel();
         }
+      }
+
+      // ── Additional systems update (44 new features) ────────
+      if (typeof AdvancedSystems !== 'undefined') {
+        AdvancedSystems.update(delta, {
+          player: player,
+          enemies: Enemies.getAll(),
+          npcs: NPCSystem.getAll(),
+          drones: DroneSystem.getAll()
+        });
+      }
+
+      if (typeof EnvironmentalHazards !== 'undefined') {
+        EnvironmentalHazards.update(delta, {
+          player: player,
+          enemies: Enemies.getAll(),
+          npcs: NPCSystem.getAll(),
+          voxelWorld: VoxelWorld,
+          buildings: BuildingSystem.getAll()
+        });
+      }
+
+      if (typeof StealthSystem !== 'undefined') {
+        StealthSystem.update(delta, {
+          player: player,
+          enemies: Enemies.getAll(),
+          timeOfDay: TimeSystem.getTime()
+        });
+      }
+
+      if (typeof AdvancedAI !== 'undefined') {
+        AdvancedAI.update(delta, {
+          player: player,
+          enemies: Enemies.getAll()
+        });
+      }
+
+      if (typeof CustomizationSystem !== 'undefined') {
+        CustomizationSystem.update(delta, {
+          level: typeof RankSystem !== 'undefined' ? RankSystem.getLevel() : 1,
+          prestige: typeof Progression !== 'undefined' ? Progression.getPrestigeLevel() : 0,
+          headshots: player.totalHeadshots || 0,
+          wavesCompleted: currentWave || 0,
+          totalDamage: player.totalDamageDealt || 0
+        });
+      }
+
+      if (typeof SurvivalMechanics !== 'undefined') {
+        SurvivalMechanics.update(delta, {
+          player: player,
+          environmentTemp: 20, // Default temp, could be from WeatherSystem
+          timeOfDay: TimeSystem.getTime(),
+          npcs: NPCSystem.getAll(),
+          enemiesNearby: Enemies.getAll().filter(function(e) { 
+            var dx = e.x - player.position.x;
+            var dz = e.z - player.position.z;
+            return Math.sqrt(dx*dx + dz*dz) < 20;
+          }).length,
+          inDarkness: TimeSystem.getTime() >= 20 || TimeSystem.getTime() <= 6,
+          alone: NPCSystem.getAll().length === 0
+        });
       }
 
       // Sync stealth state to enemy detection system
