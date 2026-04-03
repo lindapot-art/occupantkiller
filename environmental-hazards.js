@@ -268,8 +268,8 @@ const EnvironmentalHazards = (() => {
 
       // Random block destruction
       if (Math.random() < this.magnitude * 0.01 * dt && voxelWorld) {
-        const x = Math.floor(player.x + (Math.random() - 0.5) * 30);
-        const z = Math.floor(player.z + (Math.random() - 0.5) * 30);
+        const x = Math.floor(player.position.x + (Math.random() - 0.5) * 30);
+        const z = Math.floor(player.position.z + (Math.random() - 0.5) * 30);
         const y = Math.floor(Math.random() * 20);
         
         // Signal to destroy this block
@@ -332,8 +332,8 @@ const EnvironmentalHazards = (() => {
         // Warning phase
         if (elapsed < collapse.warningDuration && !collapse.warned) {
           // Check if player is inside
-          const inX = Math.abs(player.x - collapse.x) < collapse.width / 2;
-          const inZ = Math.abs(player.z - collapse.z) < collapse.depth / 2;
+          const inX = Math.abs(player.position.x - collapse.x) < collapse.width / 2;
+          const inZ = Math.abs(player.position.z - collapse.z) < collapse.depth / 2;
           
           if (inX && inZ) {
             player.collapseWarning = true;
@@ -348,10 +348,10 @@ const EnvironmentalHazards = (() => {
           collapse.currentLayer = collapse.height - layersToDrop;
 
           // Check if player is crushed
-          const inX = Math.abs(player.x - collapse.x) < collapse.width / 2;
-          const inZ = Math.abs(player.z - collapse.z) < collapse.depth / 2;
+          const inX = Math.abs(player.position.x - collapse.x) < collapse.width / 2;
+          const inZ = Math.abs(player.position.z - collapse.z) < collapse.depth / 2;
           
-          if (inX && inZ && player.y < collapse.currentLayer + 2) {
+          if (inX && inZ && player.position.y < collapse.currentLayer + 2) {
             player.crushDamage = (player.crushDamage || 0) + 50 * dt;
           }
         }
@@ -524,13 +524,18 @@ const EnvironmentalHazards = (() => {
 
     update(dt, gameState) {
       const { player, enemies, npcs, voxelWorld, buildings } = gameState;
-      const allEntities = [player, ...enemies, ...npcs];
+      
+      // Add null checks for safety
+      const safeEnemies = enemies || [];
+      const safeNpcs = npcs || [];
+      const safeBuildings = buildings || [];
+      const allEntities = [player, ...safeEnemies, ...safeNpcs];
       
       ToxicGas.update(dt, allEntities);
       Flooding.update(dt, allEntities, voxelWorld);
-      Sandstorm.update(dt, player, enemies);
-      Blizzard.update(dt, player, npcs);
-      Earthquake.update(dt, player, voxelWorld, buildings);
+      Sandstorm.update(dt, player, safeEnemies);
+      Blizzard.update(dt, player, safeNpcs);
+      Earthquake.update(dt, player, voxelWorld, safeBuildings);
       CollapsingBuildings.update(dt, player, voxelWorld);
       ElectrifiedWater.update(dt, allEntities);
       ToxicBarrels.update(dt, allEntities);

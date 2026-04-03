@@ -139,8 +139,8 @@ const AdvancedAI = (() => {
         squad.formation = 'CIRCLE';
       } else {
         const distToPlayer = Math.sqrt(
-          Math.pow(squad.leader.x - player.x, 2) + 
-          Math.pow(squad.leader.z - player.z, 2)
+          Math.pow(squad.leader.x - player.position.x, 2) + 
+          Math.pow(squad.leader.z - player.position.z, 2)
         );
 
         if (distToPlayer > 20) {
@@ -355,14 +355,14 @@ const AdvancedAI = (() => {
           return enemy.hp < (enemy.maxHP || 100) * 0.3;
 
         case 'CAN_SEE_ENEMY':
-          const dx = player.x - enemy.x;
-          const dz = player.z - enemy.z;
+          const dx = player.position.x - enemy.x;
+          const dz = player.position.z - enemy.z;
           const dist = Math.sqrt(dx*dx + dz*dz);
           return dist < (enemy.visionRange || 40);
 
         case 'IN_RANGE':
-          const dx2 = player.x - enemy.x;
-          const dz2 = player.z - enemy.z;
+          const dx2 = player.position.x - enemy.x;
+          const dz2 = player.position.z - enemy.z;
           const dist2 = Math.sqrt(dx2*dx2 + dz2*dz2);
           return dist2 < (enemy.attackRange || 20);
 
@@ -461,14 +461,14 @@ const AdvancedAI = (() => {
       if (this.flankingEnemies.has(enemy)) return false;
 
       // Calculate flank position (90 degrees to player's facing)
-      const playerYaw = player.yaw || 0;
+      const playerYaw = player.position.yaw || 0;
       const flankDirection = enemy.id % 2 === 0 ? Math.PI/2 : -Math.PI/2;
       const flankAngle = playerYaw + flankDirection;
       const flankDist = 15;
 
       enemy.flankTarget = {
-        x: player.x + Math.cos(flankAngle) * flankDist,
-        z: player.z + Math.sin(flankAngle) * flankDist
+        x: player.position.x + Math.cos(flankAngle) * flankDist,
+        z: player.position.z + Math.sin(flankAngle) * flankDist
       };
 
       enemy.flanking = true;
@@ -501,8 +501,8 @@ const AdvancedAI = (() => {
       // Randomly assign flanking to enemies
       enemies.forEach(e => {
         if (!e.flanking && !this.flankingEnemies.has(e) && Math.random() < 0.01 * dt) {
-          const dx = e.x - player.x;
-          const dz = e.z - player.z;
+          const dx = e.x - player.position.x;
+          const dz = e.z - player.position.z;
           const dist = Math.sqrt(dx*dx + dz*dz);
           
           if (dist > 10 && dist < 30) {
@@ -544,8 +544,8 @@ const AdvancedAI = (() => {
         enemy.suppressionAmmo = Math.max(0, enemy.suppressionAmmo - roundsThisFrame);
 
         // Create suppression zone around target
-        const dx = player.x - enemy.x;
-        const dz = player.z - enemy.z;
+        const dx = player.position.x - enemy.x;
+        const dz = player.position.z - enemy.z;
         const dist = Math.sqrt(dx*dx + dz*dz);
 
         if (dist < 25) {
@@ -588,11 +588,14 @@ const AdvancedAI = (() => {
     update(dt, gameState) {
       const { player, enemies } = gameState;
       
+      // Add null checks for safety
+      const safeEnemies = enemies || [];
+      
       SquadTactics.update(dt, player);
       DynamicDifficulty.update(dt);
-      BehaviorTrees.update(dt, enemies, player);
-      FormationMovement.update(dt, enemies);
-      FlankingAI.update(dt, enemies, player);
+      BehaviorTrees.update(dt, safeEnemies, player);
+      FormationMovement.update(dt, safeEnemies);
+      FlankingAI.update(dt, safeEnemies, player);
       SuppressionFire.update(dt, player);
     },
 

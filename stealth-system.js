@@ -44,8 +44,8 @@ const StealthSystem = (() => {
       let shadowDarkness = 0;
 
       this.shadowZones.forEach(zone => {
-        const dx = player.x - zone.x;
-        const dz = player.z - zone.z;
+        const dx = player.position.x - zone.x;
+        const dz = player.position.z - zone.z;
         const dist = Math.sqrt(dx*dx + dz*dz);
         
         if (dist < zone.radius) {
@@ -279,8 +279,8 @@ const StealthSystem = (() => {
       // Check if disguise is compromised
       if (!this.currentDisguise.compromised) {
         enemies.forEach(e => {
-          const dx = e.x - player.x;
-          const dz = e.z - player.z;
+          const dx = e.x - player.position.x;
+          const dz = e.z - player.position.z;
           const dist = Math.sqrt(dx*dx + dz*dz);
           
           // Close inspection can blow cover
@@ -322,8 +322,8 @@ const StealthSystem = (() => {
 
     initiateTakedown(player, enemy) {
       // Check if behind enemy and in range
-      const dx = enemy.x - player.x;
-      const dz = enemy.z - player.z;
+      const dx = enemy.x - player.position.x;
+      const dz = enemy.z - player.position.z;
       const dist = Math.sqrt(dx*dx + dz*dz);
       
       if (dist > 2.5) return false;
@@ -346,8 +346,8 @@ const StealthSystem = (() => {
       if (!this.inProgress || !this.target) return;
 
       // Check if still in range
-      const dx = this.target.x - player.x;
-      const dz = this.target.z - player.z;
+      const dx = this.target.x - player.position.x;
+      const dz = this.target.z - player.position.z;
       const dist = Math.sqrt(dx*dx + dz*dz);
       
       if (dist > 3) {
@@ -399,8 +399,8 @@ const StealthSystem = (() => {
     },
 
     startDrag(player, body) {
-      const dx = body.x - player.x;
-      const dz = body.z - player.z;
+      const dx = body.x - player.position.x;
+      const dz = body.z - player.position.z;
       const dist = Math.sqrt(dx*dx + dz*dz);
       
       if (dist > 2) return false;
@@ -432,10 +432,12 @@ const StealthSystem = (() => {
       if (this.draggedBody) {
         // Body follows player at offset
         const offsetDist = 1.5;
-        const angle = player.yaw + Math.PI; // Behind player
+        // Note: player.yaw doesn't exist - would need CameraSystem.getYaw()
+        // For now use a default angle or pass yaw from gameState
+        const angle = (player.cameraYaw || 0) + Math.PI; // Behind player
         
-        this.draggedBody.x = player.x + Math.cos(angle) * offsetDist;
-        this.draggedBody.z = player.z + Math.sin(angle) * offsetDist;
+        this.draggedBody.x = player.position.x + Math.cos(angle) * offsetDist;
+        this.draggedBody.z = player.position.z + Math.sin(angle) * offsetDist;
         
         // Slow down player
         player.dragSlowdown = 0.5; // 50% speed reduction
@@ -484,12 +486,15 @@ const StealthSystem = (() => {
     update(dt, gameState) {
       const { player, enemies, timeOfDay } = gameState;
       
-      ShadowDetection.update(dt, player, enemies, timeOfDay);
-      NoiseSystem.update(dt, enemies);
-      DistractionItems.update(dt, enemies);
-      DisguiseSystem.update(dt, player, enemies);
+      // Add null checks for safety
+      const safeEnemies = enemies || [];
+      
+      ShadowDetection.update(dt, player, safeEnemies, timeOfDay);
+      NoiseSystem.update(dt, safeEnemies);
+      DistractionItems.update(dt, safeEnemies);
+      DisguiseSystem.update(dt, player, safeEnemies);
       SilentTakedown.update(dt, player);
-      BodyDragging.update(dt, player, enemies);
+      BodyDragging.update(dt, player, safeEnemies);
     },
 
     // Expose subsystems

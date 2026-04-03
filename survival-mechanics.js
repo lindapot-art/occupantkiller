@@ -459,8 +459,8 @@ const SurvivalMechanics = (() => {
         // Contagion
         if (disease.contagious && npcs) {
           npcs.forEach(npc => {
-            const dx = npc.x - player.x;
-            const dz = npc.z - player.z;
+            const dx = npc.x - player.position.x;
+            const dz = npc.z - player.position.z;
             const dist = Math.sqrt(dx*dx + dz*dz);
             
             if (dist < 3 && Math.random() < 0.01 * dt) {
@@ -510,7 +510,7 @@ const SurvivalMechanics = (() => {
       }
 
       // Low health increases stress
-      if (player.hp < player.maxHP * 0.3) {
+      if (player.hp < player.maxHp * 0.3) {
         this.stress = Math.min(100, this.stress + 3 * dt);
       }
 

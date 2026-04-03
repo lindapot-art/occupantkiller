@@ -27,7 +27,7 @@ const AdvancedSystems = (() => {
 
       const cmd = {
         type, // 'ATTACK', 'DEFEND', 'RETREAT', 'FLANK', 'SUPPRESSING_FIRE'
-        position: { x: player.x, y: player.y, z: player.z },
+        position: { x: player.position.x, y: player.position.y, z: player.position.z },
         duration: 20,
         startTime: now,
         radius: this.commandRadius
@@ -113,8 +113,8 @@ const AdvancedSystems = (() => {
         }
 
         // Player in depot range = auto-resupply
-        const dx = player.x - depot.x;
-        const dz = player.z - depot.z;
+        const dx = player.position.x - depot.x;
+        const dz = player.position.z - depot.z;
         const dist = Math.sqrt(dx*dx + dz*dz);
         
         if (dist < depot.radius && depot.supplies > 0) {
@@ -285,8 +285,8 @@ const AdvancedSystems = (() => {
 
         // Watchtower vision bonus
         if (s.type === 'WATCHTOWER') {
-          const dx = player.x - s.x;
-          const dz = player.z - s.z;
+          const dx = player.position.x - s.x;
+          const dz = player.position.z - s.z;
           const dist = Math.sqrt(dx*dx + dz*dz);
           if (dist < 15) {
             player.visionBonus = s.visionBonus;
@@ -706,8 +706,8 @@ const AdvancedSystems = (() => {
         });
 
         // Distribute to player if nearby
-        const dx = player.x - hub.x;
-        const dz = player.z - hub.z;
+        const dx = player.position.x - hub.x;
+        const dz = player.position.z - hub.z;
         const dist = Math.sqrt(dx*dx + dz*dz);
         
         if (dist < 10) {
@@ -801,14 +801,19 @@ const AdvancedSystems = (() => {
     update(dt, gameState) {
       const { player, enemies, npcs, drones } = gameState;
       
-      TacticalCommand.update(dt, npcs);
+      // Add null checks for safety
+      const safeEnemies = enemies || [];
+      const safeNpcs = npcs || [];
+      const safeDrones = drones || [];
+      
+      TacticalCommand.update(dt, safeNpcs);
       SupplyLines.update(dt, player);
-      MoraleSystem.update(dt, player, npcs);
-      Fortifications.update(dt, enemies, player);
-      ArtillerySystem.update(dt, enemies);
-      ReconNetwork.update(dt, enemies);
-      ElectronicWarfare.update(dt, enemies, drones);
-      MedicalSystem.update(dt, npcs);
+      MoraleSystem.update(dt, player, safeNpcs);
+      Fortifications.update(dt, safeEnemies, player);
+      ArtillerySystem.update(dt, safeEnemies);
+      ReconNetwork.update(dt, safeEnemies);
+      ElectronicWarfare.update(dt, safeEnemies, safeDrones);
+      MedicalSystem.update(dt, safeNpcs);
       LogisticsHub.update(dt, player);
     },
 
