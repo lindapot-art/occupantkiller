@@ -119,21 +119,14 @@
       <div>G · Enter Vehicle</div>
       <div>` · Stealth Mode</div>
       <div>, · Toggle Music</div>
-      <div>TAB · Inventory</div>
+      <div>I / TAB · Inventory</div>
       <div>J · Marketplace</div>
       <div>Z · Prone</div>
       <div>X · Bandage</div>
       <div>N · Airdrop</div>
       <div>L · Night Vision</div>
-      <div>4-7 · Time Speed</div>
-      <div>P · Pause Time</div>
-      <div>H · Dual Wield</div>
-      <div>Y · Ammo Type</div>
-      <div>I · Inspect Weapon</div>
-      <div>M · Tactical Map</div>
-      <div>F1 · Focus Mode</div>
-      <div>C · Slide</div>
-      <div>0(Num) · Supply</div>
+      <div>LMB+Shovel · Mine</div>
+      <div>RMB+Shovel · Build</div>
     </div>
 
     <!-- Stealth indicator -->
@@ -213,6 +206,16 @@
 
     <!-- Shield active indicator -->
     <div id="shield-indicator" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:188;box-shadow:inset 0 0 40px 15px rgba(255,215,0,0.15);border:2px solid rgba(255,215,0,0.2)"></div>
+
+    <!-- Inventory Button (always visible) -->
+    <button id="inventory-btn" style="position:fixed;top:8px;right:12px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:4px 12px;border-radius:4px;font-size:12px;font-family:monospace;z-index:210;cursor:pointer" title="Open Inventory (I key)">📦 INVENTORY</button>
+
+    <!-- Build Materials HUD (shown when holding shovel) -->
+    <div id="build-materials-hud" style="display:none;position:fixed;bottom:85px;right:12px;background:rgba(0,0,0,0.6);border:1px solid rgba(139,105,20,0.4);padding:6px 10px;border-radius:4px;font-size:10px;font-family:monospace;z-index:200;pointer-events:none;color:#ccc">
+      <div style="color:#8B6914;font-weight:bold;margin-bottom:3px">⛏ MATERIALS</div>
+      <div id="build-mat-list"></div>
+      <div style="color:#888;font-size:9px;margin-top:3px">RMB to place</div>
+    </div>
 
     <!-- Armor bar (Feature 6) -->
     <div id="armor-bar-container" style="position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:120px;height:6px;background:rgba(0,0,0,0.4);border:1px solid rgba(68,136,255,0.3);border-radius:3px;z-index:200;pointer-events:none;overflow:hidden">
@@ -575,6 +578,11 @@
   // ── Stealth toggle (pause menu) ────────────────────────
   document.getElementById('stealth-toggle-btn').addEventListener('click', function () {
     GameManager.toggleStealth();
+  });
+
+  // ── Inventory Button (in-game HUD) ────────────────────────
+  document.getElementById('inventory-btn').addEventListener('click', function () {
+    GameManager.toggleInventory();
   });
 
   // ── God Mode toggle ────────────────────────────────────

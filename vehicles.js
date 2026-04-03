@@ -415,14 +415,23 @@ const VehicleSystem = (function () {
 
       // Gravity for non-flying vehicles — prevent going airborne
       if (!v.flying) {
-        v.velocity.y -= 20 * delta; // gravity
+        v.velocity.y -= 25 * delta; // stronger gravity
         const terrainH = VoxelWorld.getTerrainHeight(v.position.x, v.position.z);
         if (v.position.y <= terrainH) {
           v.position.y = terrainH;
           if (v.velocity.y < 0) v.velocity.y = 0;
         }
         // Clamp any upward velocity to prevent launches
-        if (v.velocity.y > 2) v.velocity.y = 2;
+        if (v.velocity.y > 1) v.velocity.y = 1;
+        // Hard speed cap for AI vehicles to prevent erratic movement
+        if (v !== _occupiedVehicle) {
+          var hSpd = Math.sqrt(v.velocity.x * v.velocity.x + v.velocity.z * v.velocity.z);
+          var maxSpd = v.speed * 0.7;
+          if (hSpd > maxSpd) {
+            v.velocity.x *= maxSpd / hSpd;
+            v.velocity.z *= maxSpd / hSpd;
+          }
+        }
       } else if (!v.occupied) {
         // Unoccupied flying vehicles settle to ground
         const terrainH = VoxelWorld.getTerrainHeight(v.position.x, v.position.z);
@@ -447,8 +456,8 @@ const VehicleSystem = (function () {
         if (child.userData.isWheel) child.rotation.x += delta * v.velocity.length() * 2;
       });
 
-      // Friction
-      v.velocity.multiplyScalar(0.95);
+      // Friction (higher for ground vehicles, lower for flying)
+      v.velocity.multiplyScalar(v.flying ? 0.95 : 0.90);
     }
 
     // Update turret projectiles
