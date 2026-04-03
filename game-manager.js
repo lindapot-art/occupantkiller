@@ -464,7 +464,11 @@ const GameManager = (function () {
 
         // Vehicle enter/exit/hijack
         if (e.code === 'KeyG') {
-          if (VehicleSystem.isInVehicle()) {
+          if (VehicleSystem.isHijacking()) {
+            // Cancel hijack if pressing G again during hijack
+            VehicleSystem.cancelHijack();
+            HUD.notifyPickup('❌ HIJACK CANCELLED', '#ff4444');
+          } else if (VehicleSystem.isInVehicle()) {
             const exitPos = VehicleSystem.exit();
             if (exitPos) {
               player.position.copy(exitPos);
@@ -475,13 +479,13 @@ const GameManager = (function () {
             if (nearby.length > 0) {
               var targetVehicle = nearby[0];
               if (targetVehicle.faction === 'enemy') {
-                // Hijack enemy vehicle — steal it
-                VehicleSystem.hijack(targetVehicle.id);
-                HUD.notifyPickup('🚗 VEHICLE HIJACKED!', '#ff4444');
+                // Start animated hijack of enemy vehicle
+                VehicleSystem.startHijack(targetVehicle.id);
+                HUD.notifyPickup('🚗 HIJACKING… Hold steady!', '#ff4444');
               } else if (targetVehicle.occupied) {
-                // Hijack friendly vehicle if already occupied
-                VehicleSystem.hijack(targetVehicle.id);
-                HUD.notifyPickup('🚗 VEHICLE COMMANDEERED!', '#ffaa00');
+                // Commandeer friendly vehicle (faster)
+                VehicleSystem.startHijack(targetVehicle.id);
+                HUD.notifyPickup('🚗 COMMANDEERING…', '#ffaa00');
               } else {
                 VehicleSystem.enter(targetVehicle.id);
                 HUD.notifyPickup('🚗 ENTERED VEHICLE', '#44ff44');
