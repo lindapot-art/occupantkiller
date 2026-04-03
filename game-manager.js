@@ -54,6 +54,10 @@ const GameManager = (function () {
   let currentWave = 0;
   const SCORE_WAVE_BONUS = 500;
 
+  /* ── Stamina Config ──────────────────────────────────────────────── */
+  const STAMINA_DRAIN_RATE = 0.15;  // per second while sprinting
+  const STAMINA_REGEN_RATE = 0.08;  // per second while not sprinting
+
   /* ── Battlefield Events ─────────────────────────────────────────── */
   const BATTLE_EVENTS = [
     { id: 'ARTILLERY',     label: '💥 ARTILLERY BARRAGE!',      color: '#ff4444', chance: 0.20 },
@@ -1259,7 +1263,7 @@ const GameManager = (function () {
 
       // Stamina drain on sprint
       if (player.sprinting && player.stamina > 0) {
-        player.stamina = Math.max(0, player.stamina - 0.15 * delta);
+        player.stamina = Math.max(0, player.stamina - STAMINA_DRAIN_RATE * delta);
         if (player.stamina <= 0) {
           player.sprinting = false; // exhausted
         }
@@ -1268,7 +1272,7 @@ const GameManager = (function () {
       if (player.sprinting) SkillSystem.onSprint();
     } else {
       // Stamina regen when not sprinting
-      player.stamina = Math.min(1.0, player.stamina + 0.08 * delta);
+      player.stamina = Math.min(1.0, player.stamina + STAMINA_REGEN_RATE * delta);
     }
 
     // Decay stim timer
@@ -1593,11 +1597,6 @@ const GameManager = (function () {
 
       // Stamina HUD
       if (HUD.updateStamina) HUD.updateStamina(player.stamina);
-
-      // Stamina regen when idle (not sprinting) — covers non-moving too
-      if (!player.sprinting) {
-        player.stamina = Math.min(1.0, player.stamina + 0.08 * delta);
-      }
 
       // Weather indicator
       if (HUD.updateWeatherDisplay && WeatherSystem.getModifiers) {
