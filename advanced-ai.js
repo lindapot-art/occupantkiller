@@ -461,7 +461,7 @@ const AdvancedAI = (() => {
       if (this.flankingEnemies.has(enemy)) return false;
 
       // Calculate flank position (90 degrees to player's facing)
-      const playerYaw = player.position.yaw || 0;
+      const playerYaw = player.cameraYaw || 0;
       const flankDirection = enemy.id % 2 === 0 ? Math.PI/2 : -Math.PI/2;
       const flankAngle = playerYaw + flankDirection;
       const flankDist = 15;

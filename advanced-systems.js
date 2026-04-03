@@ -182,7 +182,7 @@ const AdvancedSystems = (() => {
       }
 
       // Low health penalty
-      if (player.hp < player.maxHP * 0.3) {
+      if (player.hp < player.maxHp * 0.3) {
         this.adjustMorale(this.factors.lowHealth * dt, 'lowHealth');
       }
 
