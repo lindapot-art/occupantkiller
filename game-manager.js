@@ -1161,6 +1161,12 @@ const GameManager = (function () {
     RankSystem.onWaveComplete(currentWave);
     MissionSystem.onWaveCompleted();
 
+    // Play-to-Earn: OKC for wave clear
+    if (typeof Marketplace !== 'undefined') {
+      Marketplace.onWaveClear();
+      HUD.updateOKC(Marketplace.getOKC());
+    }
+
     // Trigger a random battlefield event between waves (from wave 2+)
     if (currentWave >= 2) {
       setTimeout(triggerBattlefieldEvent, 1500);
@@ -1171,8 +1177,15 @@ const GameManager = (function () {
     // Check if all waves in this stage are done
     if (currentWave >= stageDef.wavesPerStage) {
       // Stage clear!
+      // Stage clear bonus
       player.score += 1000; // Stage clear bonus
       HUD.setScore(player.score);
+
+      // Play-to-Earn: OKC for stage clear
+      if (typeof Marketplace !== 'undefined') {
+        Marketplace.onStageClear();
+        HUD.updateOKC(Marketplace.getOKC());
+      }
 
       if (currentStage >= STAGES.length - 1) {
         // Final stage cleared — win!
@@ -1457,6 +1470,15 @@ const GameManager = (function () {
         player.score += 500;
         HUD.setScore(player.score);
         HUD.notifyPickup('🏷 10 DOG TAGS! +500 SCORE', '#ffaa00');
+      }
+
+      // Play-to-Earn: award OKC for kills
+      if (typeof Marketplace !== 'undefined') {
+        Marketplace.onKill(isHeadshot);
+        if (player.killStreak === 3 || player.killStreak === 5 || player.killStreak >= 10) {
+          Marketplace.onStreak(player.killStreak);
+        }
+        HUD.updateOKC(Marketplace.getOKC());
       }
 
       // Pickup spawn — expanded loot table
@@ -2182,6 +2204,276 @@ const GameManager = (function () {
     _renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
+  /* ── Marketplace UI Builder ─────────────────────────────────────── */
+  function refreshMarketplaceUI(tab) {
+    /* Update OKC display everywhere */
+    var okc = typeof Marketplace !== 'undefined' ? Marketplace.getOKC() : 0;
+    var okcEl = document.getElementById('inv-okc-display');
+    if (okcEl) okcEl.textContent = '🪙 ' + okc + ' OKC';
+    var hudOkc = document.getElementById('hud-okc');
+    if (hudOkc) hudOkc.textContent = '🪙 ' + okc + ' OKC';
+
+    /* Premium tag */
+    var premTag = document.getElementById('hud-premium-tag');
+    if (premTag && typeof Marketplace !== 'undefined' && Marketplace.isPremium()) {
+      var pi = Marketplace.getPremiumInfo();
+      premTag.textContent = pi.name + ' (' + pi.daysLeft + 'd)';
+      premTag.style.display = 'inline';
+    } else if (premTag) {
+      premTag.style.display = 'none';
+    }
+
+    if (tab === 'shop') { buildShopUI(); }
+    else if (tab === 'sell') { buildSellUI(); }
+    else if (tab === 'premium') { buildPremiumUI(); }
+    else if (tab === 'assets') { buildAssetsUI(); }
+  }
+
+  function buildShopUI() {
+    var grid = document.getElementById('shop-items-grid');
+    if (!grid || typeof Marketplace === 'undefined') return;
+    grid.innerHTML = '';
+    var items = Marketplace.getShopItems();
+    for (var i = 0; i < items.length; i++) {
+      (function (idx) {
+        var it = items[idx];
+        var cell = document.createElement('div');
+        cell.style.cssText = 'background:rgba(255,215,0,0.05);border:1px solid #555;border-radius:6px;padding:8px;text-align:center';
+        var discOkc = Marketplace.getDiscountedPrice(it.okcCost);
+        cell.innerHTML =
+          '<div style="color:#fff;font-weight:bold;font-size:12px">' + it.name + '</div>' +
+          '<div style="font-size:10px;color:#ffd700;margin:4px 0">🪙 ' + discOkc + ' OKC | 💎 ' + it.polCost + ' POL</div>';
+        var btnOkc = document.createElement('button');
+        btnOkc.className = 'btn';
+        btnOkc.style.cssText = 'font-size:10px;padding:2px 8px;border-color:#ffd700;color:#ffd700;margin:2px';
+        btnOkc.textContent = 'Buy (OKC)';
+        btnOkc.addEventListener('click', function () {
+          var result = Marketplace.buyItemWithOKC(idx);
+          if (result) {
+            applyShopItem(result);
+            HUD.notifyPickup('✅ ' + result.name, '#ffd700');
+            refreshMarketplaceUI('shop');
+          } else {
+            HUD.notifyPickup('❌ Not enough OKC', '#ff4444');
+          }
+        });
+        cell.appendChild(btnOkc);
+
+        var btnPol = document.createElement('button');
+        btnPol.className = 'btn';
+        btnPol.style.cssText = 'font-size:10px;padding:2px 8px;border-color:#8247e5;color:#8247e5;margin:2px';
+        btnPol.textContent = 'Buy (POL)';
+        btnPol.addEventListener('click', function () {
+          Marketplace.buyItemWithPOL(idx).then(function (result) {
+            if (result) {
+              applyShopItem(result);
+              HUD.notifyPickup('✅ ' + result.name + ' (POL)', '#8247e5');
+              refreshMarketplaceUI('shop');
+            } else {
+              HUD.notifyPickup('❌ Transaction failed', '#ff4444');
+            }
+          });
+        });
+        cell.appendChild(btnPol);
+        grid.appendChild(cell);
+      })(i);
+    }
+  }
+
+  function applyShopItem(item) {
+    if (item.type === 'ammo') { Weapons.addAmmo(item.value); }
+    else if (item.type === 'health') {
+      player.hp = Math.min(player.maxHp, player.hp + item.value);
+      HUD.setHealth(player.hp, player.maxHp);
+    } else if (item.type === 'armor') {
+      player.maxHp += item.value;
+      player.hp += item.value;
+      HUD.setHealth(player.hp, player.maxHp);
+    } else if (item.type === 'grenade') {
+      Weapons.addAmmo(item.value);
+    }
+  }
+
+  function buildSellUI() {
+    var grid = document.getElementById('sell-weapons-grid');
+    var ammoGrid = document.getElementById('sell-ammo-grid');
+    if (!grid || typeof Marketplace === 'undefined') return;
+    grid.innerHTML = '';
+    if (ammoGrid) ammoGrid.innerHTML = '';
+    var count = Weapons.getWeaponCount();
+    for (var i = 0; i < count; i++) {
+      (function (idx) {
+        var info = Weapons.getWeaponInfo(idx);
+        if (!info) return;
+        var priceOkc = Marketplace.getWeaponPriceOKC(info.id || Weapons.getWeaponId(idx));
+        var pricePol = Marketplace.getWeaponPricePOL(info.id || Weapons.getWeaponId(idx));
+        if (priceOkc <= 0) return;
+        if (!Weapons.isUnlocked(idx)) return;
+
+        var cell = document.createElement('div');
+        cell.style.cssText = 'background:rgba(255,136,68,0.05);border:1px solid #555;border-radius:6px;padding:6px;text-align:center';
+        cell.innerHTML =
+          '<div style="color:#fff;font-size:11px;font-weight:bold">' + info.name + '</div>' +
+          '<div style="font-size:10px;color:#ff8844;margin:2px 0">🪙 ' + priceOkc + ' OKC | 💎 ' + pricePol + ' POL</div>';
+
+        var sellBtn = document.createElement('button');
+        sellBtn.className = 'btn';
+        sellBtn.style.cssText = 'font-size:10px;padding:2px 8px;border-color:#ff8844;color:#ff8844;margin:2px';
+        sellBtn.textContent = 'Sell (OKC)';
+        sellBtn.addEventListener('click', function () {
+          var earned = Marketplace.sellWeaponForOKC(idx);
+          if (earned > 0) {
+            HUD.notifyPickup('💰 Sold for ' + earned + ' OKC', '#ffd700');
+            refreshMarketplaceUI('sell');
+          }
+        });
+        cell.appendChild(sellBtn);
+        grid.appendChild(cell);
+
+        /* Ammo sell option */
+        var state = Weapons.getWeaponState(idx);
+        if (state && state.reserve > 0 && ammoGrid) {
+          var aCell = document.createElement('div');
+          aCell.style.cssText = 'background:rgba(255,136,68,0.05);border:1px solid #444;border-radius:6px;padding:6px;text-align:center';
+          var sellAmt = Math.min(state.reserve, 50);
+          var ammoVal = sellAmt * 2;
+          aCell.innerHTML =
+            '<div style="color:#ccc;font-size:10px">' + info.name + ' ammo (' + state.reserve + ')</div>' +
+            '<div style="font-size:10px;color:#ffd700">Sell ' + sellAmt + ' → 🪙 ' + ammoVal + ' OKC</div>';
+          var aSellBtn = document.createElement('button');
+          aSellBtn.className = 'btn';
+          aSellBtn.style.cssText = 'font-size:9px;padding:2px 6px;border-color:#ff8844;color:#ff8844;margin:2px';
+          aSellBtn.textContent = 'Sell Ammo';
+          aSellBtn.addEventListener('click', function () {
+            var earned = Marketplace.sellAmmoForOKC(idx, sellAmt);
+            if (earned > 0) {
+              HUD.notifyPickup('💰 Sold ammo for ' + earned + ' OKC', '#ffd700');
+              refreshMarketplaceUI('sell');
+            }
+          });
+          aCell.appendChild(aSellBtn);
+          ammoGrid.appendChild(aCell);
+        }
+      })(i);
+    }
+  }
+
+  function buildPremiumUI() {
+    var grid = document.getElementById('premium-tiers-grid');
+    var status = document.getElementById('premium-status');
+    if (!grid || typeof Marketplace === 'undefined') return;
+    grid.innerHTML = '';
+
+    if (Marketplace.isPremium()) {
+      var pi = Marketplace.getPremiumInfo();
+      if (status) {
+        status.style.display = 'block';
+        status.innerHTML = '✅ Active: <b>' + pi.name + '</b> — ' + pi.daysLeft + ' days remaining';
+      }
+    } else if (status) {
+      status.style.display = 'none';
+    }
+
+    var tiers = Marketplace.getPremiumTiers();
+    for (var i = 0; i < tiers.length; i++) {
+      (function (idx) {
+        var tier = tiers[idx];
+        var cell = document.createElement('div');
+        cell.style.cssText = 'background:rgba(130,71,229,0.08);border:1px solid #8247e5;border-radius:8px;padding:10px;text-align:center';
+        var perksHtml = tier.perks.map(function (p) { return '<div style="font-size:9px;color:#aaa">• ' + p + '</div>'; }).join('');
+        cell.innerHTML =
+          '<div style="color:#fff;font-weight:bold;font-size:13px">' + tier.name + '</div>' +
+          '<div style="font-size:11px;color:#8247e5;margin:4px 0">' + tier.duration + ' days</div>' +
+          perksHtml +
+          '<div style="font-size:11px;color:#ffd700;margin:6px 0">🪙 ' + tier.okcCost + ' OKC | 💎 ' + tier.polCost + ' POL</div>';
+
+        var btnOkc = document.createElement('button');
+        btnOkc.className = 'btn';
+        btnOkc.style.cssText = 'font-size:10px;padding:3px 8px;border-color:#ffd700;color:#ffd700;margin:2px';
+        btnOkc.textContent = 'Buy (OKC)';
+        btnOkc.addEventListener('click', function () {
+          if (Marketplace.buyPremiumWithOKC(idx)) {
+            HUD.notifyPickup('⭐ ' + tier.name + ' activated!', '#8247e5');
+            refreshMarketplaceUI('premium');
+          } else {
+            HUD.notifyPickup('❌ Not enough OKC', '#ff4444');
+          }
+        });
+        cell.appendChild(btnOkc);
+
+        var btnPol = document.createElement('button');
+        btnPol.className = 'btn';
+        btnPol.style.cssText = 'font-size:10px;padding:3px 8px;border-color:#8247e5;color:#8247e5;margin:2px';
+        btnPol.textContent = 'Buy (POL)';
+        btnPol.addEventListener('click', function () {
+          Marketplace.buyPremiumWithPOL(idx).then(function (ok) {
+            if (ok) {
+              HUD.notifyPickup('⭐ ' + tier.name + ' activated! (POL)', '#8247e5');
+              refreshMarketplaceUI('premium');
+            } else {
+              HUD.notifyPickup('❌ Transaction failed', '#ff4444');
+            }
+          });
+        });
+        cell.appendChild(btnPol);
+        grid.appendChild(cell);
+      })(i);
+    }
+  }
+
+  function buildAssetsUI() {
+    var grid = document.getElementById('assets-grid');
+    if (!grid || typeof Marketplace === 'undefined') return;
+    grid.innerHTML = '';
+    var assets = Marketplace.getGameAssets();
+    for (var i = 0; i < assets.length; i++) {
+      (function (idx) {
+        var asset = assets[idx];
+        var owned = Marketplace.ownsAsset(asset.id);
+        var cell = document.createElement('div');
+        cell.style.cssText = 'background:rgba(0,255,204,0.05);border:1px solid ' + (owned ? '#0f6' : '#555') + ';border-radius:6px;padding:8px;text-align:center';
+        cell.innerHTML =
+          '<div style="color:#fff;font-weight:bold;font-size:11px">' + asset.name + '</div>' +
+          '<div style="font-size:9px;color:#aaa;margin:2px 0">' + asset.type.toUpperCase() + '</div>' +
+          (owned ? '<div style="color:#0f6;font-size:10px">✅ OWNED</div>'
+            : '<div style="font-size:10px;color:#ffd700;margin:4px 0">🪙 ' + asset.okcCost + ' OKC | 💎 ' + asset.polCost + ' POL</div>');
+
+        if (!owned) {
+          var btnOkc = document.createElement('button');
+          btnOkc.className = 'btn';
+          btnOkc.style.cssText = 'font-size:9px;padding:2px 6px;border-color:#ffd700;color:#ffd700;margin:2px';
+          btnOkc.textContent = 'Buy (OKC)';
+          btnOkc.addEventListener('click', function () {
+            if (Marketplace.buyAssetWithOKC(idx)) {
+              HUD.notifyPickup('🎨 ' + asset.name + ' unlocked!', '#00ffcc');
+              refreshMarketplaceUI('assets');
+            } else {
+              HUD.notifyPickup('❌ Not enough OKC', '#ff4444');
+            }
+          });
+          cell.appendChild(btnOkc);
+
+          var btnPol = document.createElement('button');
+          btnPol.className = 'btn';
+          btnPol.style.cssText = 'font-size:9px;padding:2px 6px;border-color:#8247e5;color:#8247e5;margin:2px';
+          btnPol.textContent = 'Buy (POL)';
+          btnPol.addEventListener('click', function () {
+            Marketplace.buyAssetWithPOL(idx).then(function (ok) {
+              if (ok) {
+                HUD.notifyPickup('🎨 ' + asset.name + ' unlocked! (POL)', '#00ffcc');
+                refreshMarketplaceUI('assets');
+              } else {
+                HUD.notifyPickup('❌ Transaction failed', '#ff4444');
+              }
+            });
+          });
+          cell.appendChild(btnPol);
+        }
+        grid.appendChild(cell);
+      })(i);
+    }
+  }
+
   /* ── Public API ──────────────────────────────────────────────────── */
   return {
     STATE,
@@ -2202,6 +2494,7 @@ const GameManager = (function () {
     isGodMode,
     populateWeaponsGrid,
     updateRoleIndicator,
+    refreshMarketplaceUI,
     getState:        function () { return gameState; },
     setState:        function (s) { gameState = s; },
     getPlayer:       function () { return player; },
