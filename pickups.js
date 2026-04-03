@@ -94,5 +94,5 @@ const Pickups = (() => {
     time    = 0;
   }
 
-  return { init, spawn, update, clear };
+  return { init, spawn, update, clear, getAll: function () { return pickups; } };
 })();

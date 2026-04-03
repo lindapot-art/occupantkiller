@@ -48,6 +48,26 @@ const GameManager = (function () {
     nightVision: false,       // night vision toggle
     shieldTimer: 0,           // temporary shield timer
     intelTimer: 0,            // intel reveal timer
+    armor:      0,            // armor points (0-100), reduces damage
+    lastDamageTime: 0,        // time since last damage (for health regen)
+    // ── Loot & Building ──
+    lootParticles: [],        // active loot particles in world
+    buildMaterials: { wood: 0, stone: 0, metal: 0, dirt: 0, sand: 0, brick: 0 },
+    // ── Stats Tracking ──
+    totalShots: 0,
+    totalHits: 0,
+    totalHeadshots: 0,
+    totalDamageTaken: 0,
+    waveStartTime: 0,
+    bestStreak: 0,
+    waveKills: 0,
+    waveShots: 0,
+    waveHits: 0,
+    waveHeadshots: 0,
+    waveDamageTaken: 0,
+    distanceWalked: 0,
+    _lastPos: null,
+    playStartTime: 0,
   };
 
   /* ── Wave State ──────────────────────────────────────────────────── */
@@ -212,6 +232,134 @@ const GameManager = (function () {
     }
   }
 
+  /* ── Loot Particle System (Sonic-style gold rings from terrain) ── */
+  const _lootParticles = [];
+  const LOOT_CONFIG = {
+    VALUE: 5,             // gold per loot particle collected
+    COLLECT_RANGE: 2.5,   // distance to auto-collect
+    LIFETIME: 15,         // seconds before despawn
+    MAGNET_RANGE: 5,      // auto-attract within this range
+  };
+
+  function spawnLootParticle(worldPos, count) {
+    if (!_scene) return;
+    for (var i = 0; i < (count || 1); i++) {
+      var geo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+      var mat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0xaa8800 });
+      var mesh = new THREE.Mesh(geo, mat);
+      // Scatter slightly from source
+      mesh.position.set(
+        worldPos.x + (Math.random() - 0.5) * 1.5,
+        worldPos.y + 0.5 + Math.random() * 1.0,
+        worldPos.z + (Math.random() - 0.5) * 1.5
+      );
+      mesh.userData.vy = 3 + Math.random() * 2; // bounce up velocity
+      mesh.userData.age = 0;
+      mesh.userData.baseY = worldPos.y;
+      _scene.add(mesh);
+      _lootParticles.push(mesh);
+    }
+  }
+
+  function updateLootParticles(delta) {
+    for (var i = _lootParticles.length - 1; i >= 0; i--) {
+      var lp = _lootParticles[i];
+      lp.userData.age += delta;
+      // Gravity + bounce
+      lp.userData.vy -= 12 * delta;
+      lp.position.y += lp.userData.vy * delta;
+      var groundH = VoxelWorld.getTerrainHeight(lp.position.x, lp.position.z) + 0.15;
+      if (lp.position.y < groundH) {
+        lp.position.y = groundH;
+        lp.userData.vy = Math.abs(lp.userData.vy) * 0.4; // bounce
+        if (Math.abs(lp.userData.vy) < 0.5) lp.userData.vy = 0;
+      }
+      // Spin
+      lp.rotation.y += delta * 5;
+      // Magnet toward player
+      var dist = lp.position.distanceTo(player.position);
+      if (dist < LOOT_CONFIG.MAGNET_RANGE) {
+        var pullDir = player.position.clone().sub(lp.position).normalize();
+        var pullSpeed = (1 - dist / LOOT_CONFIG.MAGNET_RANGE) * 12;
+        lp.position.add(pullDir.multiplyScalar(pullSpeed * delta));
+      }
+      // Collect
+      if (dist < LOOT_CONFIG.COLLECT_RANGE) {
+        Economy.addCurrency(LOOT_CONFIG.VALUE);
+        player.score += LOOT_CONFIG.VALUE;
+        HUD.setScore(player.score);
+        if (HUD.addCombatLog) HUD.addCombatLog('+' + LOOT_CONFIG.VALUE + ' gold (loot)', '#ffd700');
+        _scene.remove(lp);
+        lp.geometry.dispose();
+        lp.material.dispose();
+        _lootParticles.splice(i, 1);
+        AudioSystem.playPickup();
+        continue;
+      }
+      // Despawn after lifetime
+      if (lp.userData.age > LOOT_CONFIG.LIFETIME) {
+        // Blink before despawning
+        if (lp.userData.age > LOOT_CONFIG.LIFETIME - 3) {
+          lp.visible = Math.floor(lp.userData.age * 6) % 2 === 0;
+        }
+        if (lp.userData.age > LOOT_CONFIG.LIFETIME) {
+          _scene.remove(lp);
+          lp.geometry.dispose();
+          lp.material.dispose();
+          _lootParticles.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  /* ── Block-to-Material Mapping (Minecraft style) ────────────────── */
+  function blockToMaterialName(blockType) {
+    var B = VoxelWorld.BLOCK;
+    if (blockType === B.WOOD || blockType === B.LOG) return 'wood';
+    if (blockType === B.STONE || blockType === B.REINFORCED) return 'stone';
+    if (blockType === B.METAL || blockType === B.ELECTRONICS) return 'metal';
+    if (blockType === B.DIRT || blockType === B.GRASS) return 'dirt';
+    if (blockType === B.SAND || blockType === B.SANDBAG) return 'sand';
+    if (blockType === B.BRICK || blockType === B.CONCRETE || blockType === B.ASPHALT) return 'brick';
+    return 'dirt'; // fallback
+  }
+
+  function blockToEconomyResource(blockType) {
+    var B = VoxelWorld.BLOCK;
+    if (blockType === B.WOOD || blockType === B.LOG) return 'wood';
+    if (blockType === B.STONE || blockType === B.REINFORCED) return 'stone';
+    if (blockType === B.METAL || blockType === B.ELECTRONICS) return 'metal';
+    return null; // non-resource blocks just give gold loot
+  }
+
+  /* ── Terrain Destruction Loot Handler ───────────────────────────── */
+  function onTerrainDestroyed(x, y, z, blockType) {
+    if (!blockType || blockType === 0) return; // AIR, skip
+    var worldPos = new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5);
+    // Spawn 1-2 gold loot particles
+    spawnLootParticle(worldPos, 1 + Math.floor(Math.random() * 2));
+  }
+
+  /* ── Shovel Mining Handler (gives materials like Minecraft) ─────── */
+  function onShovelMine(x, y, z, blockType) {
+    if (!blockType || blockType === 0) return;
+    var matName = blockToMaterialName(blockType);
+    var ecoRes = blockToEconomyResource(blockType);
+    if (ecoRes) {
+      // Give actual building resource
+      Economy.add(ecoRes, 1);
+      player.buildMaterials[matName] = (player.buildMaterials[matName] || 0) + 1;
+      if (HUD.addCombatLog) HUD.addCombatLog('+1 ' + ecoRes + ' (mined)', '#8B6914');
+      HUD.notifyPickup('⛏ +1 ' + ecoRes.toUpperCase(), '#8B6914');
+    } else {
+      // Non-resource block: give gold loot instead
+      player.buildMaterials[matName] = (player.buildMaterials[matName] || 0) + 1;
+      var worldPos = new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5);
+      spawnLootParticle(worldPos, 1);
+      if (HUD.addCombatLog) HUD.addCombatLog('+1 ' + matName + ' (mined)', '#888');
+    }
+  }
+
   /* ── Stage Definitions ──────────────────────────────────────────── */
   const STAGES = [
     {
@@ -366,6 +514,14 @@ const GameManager = (function () {
     Weapons.createGunMesh(_camera);
     Weapons.createMuzzleFlash(_scene, _camera);
 
+    // Wire terrain destruction callbacks for loot & mining
+    Weapons.setOnTerrainDig(function (x, y, z, blockType) {
+      onShovelMine(x, y, z, blockType);
+    });
+    Weapons.setOnTerrainShot(function (x, y, z, blockType) {
+      onTerrainDestroyed(x, y, z, blockType);
+    });
+
     // Time system callbacks
     TimeSystem.onWeekChange(function () {
       Economy.weeklyUpdate();
@@ -519,9 +675,14 @@ const GameManager = (function () {
           HUD.notifyPickup(veh && veh.viewMode === 'first' ? '👁 FIRST PERSON VIEW' : '🎥 THIRD PERSON VIEW', '#00ccff');
         }
 
-        // Stealth / invisibility toggle
-        if (e.code === 'KeyI') {
+        // Stealth / invisibility toggle (moved to Backquote)
+        if (e.code === 'Backquote') {
           toggleStealth();
+        }
+
+        // Inventory toggle (I key)
+        if (e.code === 'KeyI') {
+          toggleInventory();
         }
 
         // Prone toggle
@@ -567,8 +728,8 @@ const GameManager = (function () {
           HUD.notifyPickup('🔧 JAM CLEARED!', '#ffcc00');
         }
 
-        // Music toggle
-        if (e.code === 'KeyM') {
+        // Music toggle (Comma key)
+        if (e.code === 'Comma') {
           if (AudioSystem.isMusicPlaying && AudioSystem.isMusicPlaying()) {
             AudioSystem.stopMusic();
             HUD.notifyPickup('🔇 MUSIC OFF', '#888888');
@@ -726,7 +887,12 @@ const GameManager = (function () {
         handleBuildRemove();
       }
       if (e.button === 2 && gameState === STATE.PLAYING) {
-        Weapons.handleRightDown();
+        // Minecraft-style building: right-click with shovel places a block
+        if (Weapons.getCurrentType() === 'MELEE') {
+          handleMinecraftPlace();
+        } else {
+          Weapons.handleRightDown();
+        }
       }
     });
 
@@ -864,6 +1030,46 @@ const GameManager = (function () {
     }
   }
 
+  /* ── Minecraft-style block placement (right-click with shovel) ──── */
+  function handleMinecraftPlace() {
+    var ray = VoxelWorld.raycastBlock(_camera, 6);
+    if (!ray) return;
+    var p = ray.place;
+    // Determine which material to place based on resources
+    // Priority: wood > stone > brick > dirt > sand
+    var B = VoxelWorld.BLOCK;
+    var placeType = null;
+    var resType = null;
+    if (Economy.getResources().wood > 0) { placeType = B.WOOD; resType = 'wood'; }
+    else if (Economy.getResources().stone > 0) { placeType = B.STONE; resType = 'stone'; }
+    else if (Economy.getResources().metal > 0) { placeType = B.METAL; resType = 'metal'; }
+    else {
+      // Use build materials from mining
+      if (player.buildMaterials.wood > 0) { placeType = B.WOOD; player.buildMaterials.wood--; }
+      else if (player.buildMaterials.stone > 0) { placeType = B.STONE; player.buildMaterials.stone--; }
+      else if (player.buildMaterials.brick > 0) { placeType = B.BRICK; player.buildMaterials.brick--; }
+      else if (player.buildMaterials.dirt > 0) { placeType = B.DIRT; player.buildMaterials.dirt--; }
+      else if (player.buildMaterials.sand > 0) { placeType = B.SAND; player.buildMaterials.sand--; }
+      else if (player.buildMaterials.metal > 0) { placeType = B.METAL; player.buildMaterials.metal--; }
+      if (placeType) {
+        VoxelWorld.setBlock(p.x, p.y, p.z, placeType);
+        HUD.notifyPickup('🧱 BLOCK PLACED', '#8B6914');
+        if (HUD.addCombatLog) HUD.addCombatLog('Placed block', '#8B6914');
+        return;
+      }
+      HUD.notifyPickup('No materials! Mine with shovel (LMB)', '#ff4444');
+      return;
+    }
+    // Spend economy resource
+    if (resType && Economy.spend(resType, 1)) {
+      VoxelWorld.setBlock(p.x, p.y, p.z, placeType);
+      HUD.notifyPickup('🧱 BLOCK PLACED (-1 ' + resType + ')', '#8B6914');
+      if (HUD.addCombatLog) HUD.addCombatLog('Placed ' + resType + ' block', '#8B6914');
+    } else {
+      HUD.notifyPickup('No materials! Mine with shovel (LMB)', '#ff4444');
+    }
+  }
+
   /* ── Pointer lock helpers ────────────────────────────────────────── */
   function requestPointerLock() {
     if (isMobile) return;   // Touch controls replace pointer lock on mobile
@@ -894,6 +1100,29 @@ const GameManager = (function () {
     currentWave = 0;
     currentStage = 0;
     player.velocity.set(0, 0, 0);
+    player.armor = 0;
+    player.lastDamageTime = 10; // Start high so health regen kicks in immediately at game start
+    player.totalShots = 0;
+    player.totalHits = 0;
+    player.totalHeadshots = 0;
+    player.totalDamageTaken = 0;
+    player.bestStreak = 0;
+    player.waveKills = 0;
+    player.waveShots = 0;
+    player.waveHits = 0;
+    player.waveHeadshots = 0;
+    player.waveDamageTaken = 0;
+    player.distanceWalked = 0;
+    player._lastPos = null;
+    player.playStartTime = performance.now();
+    player.buildMaterials = { wood: 0, stone: 0, metal: 0, dirt: 0, sand: 0, brick: 0 };
+    // Clear loot particles
+    for (var li = _lootParticles.length - 1; li >= 0; li--) {
+      if (_scene) _scene.remove(_lootParticles[li]);
+      _lootParticles[li].geometry.dispose();
+      _lootParticles[li].material.dispose();
+    }
+    _lootParticles.length = 0;
 
     // Reset god mode effects on game start
     if (player.godMode) {
@@ -1068,6 +1297,7 @@ const GameManager = (function () {
   /* ── Wave Management ─────────────────────────────────────────────── */
   function beginWave(w) {
     currentWave = w;
+    player.waveStartTime = performance.now();
     const stageDef = STAGES[currentStage];
     const mlDiff = MLSystem.getDifficultyMult();
 
@@ -1174,6 +1404,27 @@ const GameManager = (function () {
     MLSystem.onWaveComplete(currentWave, currentStage, player.hp / player.maxHp);
     RankSystem.onWaveComplete(currentWave);
     MissionSystem.onWaveCompleted();
+
+    // Show wave stats (Feature 50)
+    if (HUD.showWaveStats) {
+      var elapsed = ((performance.now() - player.waveStartTime) / 1000);
+      var mins = Math.floor(elapsed / 60);
+      var secs = Math.floor(elapsed % 60);
+      HUD.showWaveStats({
+        kills: player.waveKills,
+        accuracy: player.waveShots > 0 ? Math.round((player.waveHits / player.waveShots) * 100) : 0,
+        headshots: player.waveHeadshots,
+        time: mins + 'm ' + secs + 's',
+        damageTaken: Math.round(player.waveDamageTaken),
+        bestStreak: player.bestStreak,
+      });
+    }
+    // Reset wave stats
+    player.waveKills = 0;
+    player.waveShots = 0;
+    player.waveHits = 0;
+    player.waveHeadshots = 0;
+    player.waveDamageTaken = 0;
 
     // Play-to-Earn: OKC for wave clear
     if (typeof Marketplace !== 'undefined') {
@@ -1386,17 +1637,39 @@ const GameManager = (function () {
 
     if (mouseDown || touch.firing) {
       const targets = Enemies.getEnemyMeshes();
+      // Add vehicle meshes as targets so player can damage/destroy vehicles
+      var allVehicles = VehicleSystem.getAll();
+      for (var vi = 0; vi < allVehicles.length; vi++) {
+        var veh = allVehicles[vi];
+        if (veh.mesh && veh !== VehicleSystem.getOccupied()) {
+          targets.push(veh.mesh);
+        }
+      }
       const weaponType = Weapons.getCurrentType();
       const weaponId = Weapons.getCurrentId();
       // Map weapon type to audio sound type
       const audioMap = { MELEE: 'melee', PISTOL: 'pistol', ASSAULT: 'rifle', LMG: 'rifle', SNIPER: 'sniper', HMG: 'hmg', AT: 'launcher', ATGM: 'launcher', NATO: 'rifle', AT_HEAVY: 'launcher', AT_LIGHT: 'launcher', AA: 'launcher', GRENADE: 'launcher', NATO_HEAVY: 'rifle', HMG_HEAVY: 'hmg', INCENDIARY: 'launcher', MACHINEGUN: 'hmg', SMG: 'pistol', AMR: 'sniper', MINIGUN: 'hmg', SILENT: 'pistol', THERMOBARIC: 'launcher', SHOTGUN: 'rifle' };
       Weapons.tryFire(_camera, targets, delta, function (hit) {
-        onEnemyHit(hit);
+        // Check if hit a vehicle mesh
+        var hitVehicle = null;
+        for (var hvi = 0; hvi < allVehicles.length; hvi++) {
+          if (allVehicles[hvi].mesh === hit.object || (hit.object.parent && allVehicles[hvi].mesh === hit.object.parent)) {
+            hitVehicle = allVehicles[hvi];
+            break;
+          }
+        }
+        if (hitVehicle) {
+          onVehicleHit(hitVehicle, Weapons.getDamage());
+        } else {
+          onEnemyHit(hit);
+        }
       }, mouseNewPress);
       // Play sound on every actual shot (auto-fire included), not just first click
       if (Weapons.didFire()) {
         AudioSystem.playGunshot(audioMap[weaponType] || 'rifle');
         MLSystem.onShot(weaponId);
+        player.totalShots++;
+        player.waveShots++;
         // Spawn bullet tracer
         if (typeof Tracers !== 'undefined' && weaponType !== 'MELEE') {
           var tOrigin = _camera.position.clone();
@@ -1446,10 +1719,14 @@ const GameManager = (function () {
 
     SkillSystem.onShoot(true, isHeadshot);
     HUD.flashHit(isHeadshot);
+    player.totalHits++;
+    player.waveHits++;
 
     if (isHeadshot) {
       HUD.showHeadshot();
       player.score += 50;
+      player.totalHeadshots++;
+      player.waveHeadshots++;
     }
 
     if (remaining <= 0) {
@@ -1462,6 +1739,7 @@ const GameManager = (function () {
       MLSystem.trackKillTiming(); // AI Smart Learning: track kill timing patterns
       player.score += enemy.scoreValue;
       player.kills++;
+      player.waveKills++;
       HUD.setScore(player.score);
       HUD.setKills(player.kills);
       RankSystem.onKill(isHeadshot);
@@ -1469,6 +1747,7 @@ const GameManager = (function () {
 
       // Kill streak tracking
       player.killStreak++;
+      if (player.killStreak > player.bestStreak) player.bestStreak = player.killStreak;
       player.streakTimer = 4.0; // 4 seconds to chain another kill
       var streakMult = 1.0 + Math.min(player.killStreak - 1, 10) * 0.2; // up to 3.0x at 11+ streak
       var streakBonus = Math.floor(enemy.scoreValue * (streakMult - 1));
@@ -1526,6 +1805,30 @@ const GameManager = (function () {
     }
   }
 
+  function onVehicleHit(vehicle, dmg) {
+    if (!vehicle || !vehicle.alive) return;
+    VehicleSystem.damageVehicle(vehicle.id, dmg);
+    AudioSystem.playHit();
+    if (HUD.addCombatLog) HUD.addCombatLog('Hit vehicle (-' + dmg + ')', '#ff8800');
+    // Spawn sparks on vehicle hit
+    if (typeof Tracers !== 'undefined' && Tracers.spawnMuzzleFlash) {
+      Tracers.spawnMuzzleFlash(vehicle.position, new THREE.Vector3(0, 1, 0));
+    }
+    // Check if destroyed
+    if (vehicle.health <= 0) {
+      player.score += 200;
+      HUD.setScore(player.score);
+      HUD.notifyPickup('🚗 VEHICLE DESTROYED! +200', '#ff8800');
+      if (HUD.addCombatLog) HUD.addCombatLog('Vehicle destroyed! +200 score', '#ff4400');
+      // Spawn loot from destroyed vehicle
+      spawnLootParticle(vehicle.position, 5 + Math.floor(Math.random() * 5));
+      // Explosion effect
+      if (typeof Tracers !== 'undefined' && Tracers.spawnExplosion) {
+        Tracers.spawnExplosion(vehicle.position, 3);
+      }
+    }
+  }
+
   function onPlayerHit(dmg, attackerPos) {
     if (player.godMode) return; // God mode: immune to damage
     // Shield absorbs damage
@@ -1533,6 +1836,16 @@ const GameManager = (function () {
       HUD.notifyPickup('🛡 SHIELDED!', '#ffd700');
       return;
     }
+    // Armor absorbs up to 50% of incoming damage, capped by available armor points
+    if (player.armor > 0) {
+      var absorbed = Math.min(player.armor, dmg * 0.5);
+      player.armor = Math.max(0, player.armor - absorbed);
+      dmg = dmg - absorbed;
+      if (HUD.updateArmor) HUD.updateArmor(player.armor / 100);
+    }
+    player.lastDamageTime = 0; // reset health regen timer
+    player.totalDamageTaken += dmg;
+    player.waveDamageTaken += dmg;
     MLSystem.onDamageTaken(dmg);
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
@@ -1586,6 +1899,19 @@ const GameManager = (function () {
       document.getElementById('dead-score').textContent = player.score;
       document.getElementById('dead-kills').textContent = player.kills;
       document.getElementById('dead-wave').textContent = currentWave;
+      // Death statistics (Feature 43)
+      if (HUD.showDeathStats) {
+        var playTime = Math.floor((performance.now() - player.playStartTime) / 1000);
+        var pm = Math.floor(playTime / 60);
+        var ps = playTime % 60;
+        HUD.showDeathStats({
+          accuracy: player.totalShots > 0 ? Math.round((player.totalHits / player.totalShots) * 100) : 0,
+          headshotPct: player.totalHits > 0 ? Math.round((player.totalHeadshots / player.totalHits) * 100) : 0,
+          favWeapon: Weapons.getCurrentName(),
+          playtime: pm + 'm ' + ps + 's',
+          distance: Math.round(player.distanceWalked),
+        });
+      }
     }
   }
 
@@ -1678,6 +2004,28 @@ const GameManager = (function () {
       // Weapon jam indicator
       if (HUD.showJam && Weapons.isJammed) HUD.showJam(Weapons.isJammed());
 
+      // Build materials HUD (show when holding shovel)
+      var buildMatHud = document.getElementById('build-materials-hud');
+      if (buildMatHud) {
+        if (Weapons.getCurrentType() === 'MELEE') {
+          buildMatHud.style.display = 'block';
+          var matList = document.getElementById('build-mat-list');
+          if (matList) {
+            var mats = player.buildMaterials;
+            var eco = Economy.getResources();
+            matList.innerHTML =
+              '🪵 Wood: ' + ((mats.wood || 0) + (eco.wood || 0)) + '<br>' +
+              '🪨 Stone: ' + ((mats.stone || 0) + (eco.stone || 0)) + '<br>' +
+              '🔩 Metal: ' + ((mats.metal || 0) + (eco.metal || 0)) + '<br>' +
+              '🟫 Dirt: ' + (mats.dirt || 0) + '<br>' +
+              '🏖 Sand: ' + (mats.sand || 0) + '<br>' +
+              '🧱 Brick: ' + (mats.brick || 0);
+          }
+        } else {
+          buildMatHud.style.display = 'none';
+        }
+      }
+
       // Dynamic music intensity based on nearby enemies
       if (AudioSystem.setMusicIntensity && AudioSystem.isMusicPlaying()) {
         var nearEnemies = 0;
@@ -1705,8 +2053,8 @@ const GameManager = (function () {
           Weapons.addAmmo(30);
           HUD.notifyPickup('+30 AMMO', '#ffcc00');
         } else if (type === 'ARMOR') {
-          player.hp = Math.min(player.maxHp + 50, player.hp + 50);
-          HUD.setHealth(player.hp, player.maxHp);
+          player.armor = Math.min(100, player.armor + 50);
+          if (HUD.updateArmor) HUD.updateArmor(player.armor / 100);
           HUD.notifyPickup('+50 ARMOR', '#4488ff');
         } else if (type === 'GRENADE') {
           // Area damage around player pickup spot
@@ -1765,6 +2113,30 @@ const GameManager = (function () {
 
       // Voxel chunk rebuilds
       VoxelWorld.updateDirtyChunks();
+
+      // Update loot particles
+      updateLootParticles(delta);
+
+      // Minecraft-style building: right-click with shovel to place blocks
+      // (handled in mousedown handler below)
+
+      // Health regen: slow recovery (2hp/s) after 5s without damage, capped at 50% max HP for gameplay balance
+      player.lastDamageTime += delta;
+      if (player.lastDamageTime > 5 && player.hp < player.maxHp * 0.5 && player.hp > 0) {
+        player.hp = Math.min(player.maxHp * 0.5, player.hp + 2 * delta);
+        HUD.setHealth(player.hp, player.maxHp);
+      }
+
+      // Armor HUD
+      if (HUD.updateArmor) HUD.updateArmor(player.armor / 100);
+
+      // Distance tracking
+      if (player._lastPos) {
+        var dx = player.position.x - player._lastPos.x;
+        var dz = player.position.z - player._lastPos.z;
+        player.distanceWalked += Math.sqrt(dx * dx + dz * dz);
+      }
+      player._lastPos = player.position.clone();
 
       // Build mode ghost update
       if (gameState === STATE.BUILD_MODE && Building.getSelectedTemplate()) {

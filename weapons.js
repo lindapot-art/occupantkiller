@@ -156,6 +156,26 @@ const Weapons = (() => {
   function cur()      { return WEAPONS[currentIdx]; }
   function curState() { return states[currentIdx]; }
 
+  // ── Terrain dig callbacks ────────────────────────────────
+  let _onTerrainDig = null;    // called when shovel mines a block
+  let _onTerrainShot = null;   // called when bullet/explosion destroys a block
+
+  function setOnTerrainDig(fn) { _onTerrainDig = fn; }
+  function setOnTerrainShot(fn) { _onTerrainShot = fn; }
+
+  // Helper: destroy a block and notify
+  function destroyBlock(x, y, z, isShovel) {
+    if (typeof VoxelWorld === 'undefined') return;
+    var blockType = VoxelWorld.getBlock(x, y, z);
+    if (!blockType || blockType === 0) return; // already air
+    VoxelWorld.setBlock(x, y, z, 0);
+    if (isShovel && _onTerrainDig) {
+      _onTerrainDig(x, y, z, blockType);
+    } else if (!isShovel && _onTerrainShot) {
+      _onTerrainShot(x, y, z, blockType);
+    }
+  }
+
   // ── Scope zoom state ──────────────────────────────────────
   let _camera      = null;
   let _scene       = null;
@@ -1260,7 +1280,7 @@ const Weapons = (() => {
             for (let by = -blastR; by <= blastR; by++) {
               for (let bz = -blastR; bz <= blastR; bz++) {
                 if (bx * bx + by * by + bz * bz <= blastR * blastR) {
-                  VoxelWorld.setBlock(cx + bx, cy + by, cz + bz, 0);
+                  destroyBlock(cx + bx, cy + by, cz + bz, false);
                 }
               }
             }
@@ -1382,10 +1402,10 @@ const Weapons = (() => {
       if (hits.length > 0) {
         onHit(hits[0], wep.damage);
       } else if (typeof VoxelWorld !== 'undefined') {
-        // Dig terrain
+        // Dig terrain (shovel)
         const ray = VoxelWorld.raycastBlock(camera, 3);
         if (ray) {
-          VoxelWorld.setBlock(ray.hit.x, ray.hit.y, ray.hit.z, 0);
+          destroyBlock(ray.hit.x, ray.hit.y, ray.hit.z, true);
         }
       }
       return;
@@ -1462,7 +1482,7 @@ const Weapons = (() => {
             getWorldDirection: function(v) { return v.copy(pelletDir); },
           };
           const pRay = VoxelWorld.raycastBlock(pelletCam, 25);
-          if (pRay) VoxelWorld.setBlock(pRay.hit.x, pRay.hit.y, pRay.hit.z, 0);
+          if (pRay) destroyBlock(pRay.hit.x, pRay.hit.y, pRay.hit.z, false);
         }
       }
       if (st.clip === 0 && st.reserve > 0) startReload();
@@ -1495,7 +1515,7 @@ const Weapons = (() => {
       };
       const bRay = VoxelWorld.raycastBlock(bulletCam, 80);
       if (bRay) {
-        VoxelWorld.setBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z, 0);
+        destroyBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z, false);
       }
     }
     if (st.clip === 0 && st.reserve > 0) startReload();
@@ -1668,5 +1688,7 @@ const Weapons = (() => {
     clearJam:       clearJam,
     isJammed:       isJammed,
     getBlastRadius: function () { return cur().blastRadius || 0; },
+    setOnTerrainDig: setOnTerrainDig,
+    setOnTerrainShot: setOnTerrainShot,
   };
 })();

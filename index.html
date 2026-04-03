@@ -117,16 +117,16 @@
       <div>B · Build Mode</div>
       <div>F · Possess Drone</div>
       <div>G · Enter Vehicle</div>
-      <div>I · Stealth Mode</div>
-      <div>M · Toggle Music</div>
-      <div>TAB · Inventory</div>
+      <div>` · Stealth Mode</div>
+      <div>, · Toggle Music</div>
+      <div>I / TAB · Inventory</div>
       <div>J · Marketplace</div>
       <div>Z · Prone</div>
       <div>X · Bandage</div>
       <div>N · Airdrop</div>
       <div>L · Night Vision</div>
-      <div>4-7 · Time Speed</div>
-      <div>P · Pause Time</div>
+      <div>LMB+Shovel · Mine</div>
+      <div>RMB+Shovel · Build</div>
     </div>
 
     <!-- Stealth indicator -->
@@ -206,6 +206,95 @@
 
     <!-- Shield active indicator -->
     <div id="shield-indicator" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:188;box-shadow:inset 0 0 40px 15px rgba(255,215,0,0.15);border:2px solid rgba(255,215,0,0.2)"></div>
+
+    <!-- Inventory Button (always visible) -->
+    <button id="inventory-btn" style="position:fixed;top:8px;right:12px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:4px 12px;border-radius:4px;font-size:12px;font-family:monospace;z-index:210;cursor:pointer" title="Open Inventory (I key)">📦 INVENTORY</button>
+
+    <!-- Build Materials HUD (shown when holding shovel) -->
+    <div id="build-materials-hud" style="display:none;position:fixed;bottom:85px;right:12px;background:rgba(0,0,0,0.6);border:1px solid rgba(139,105,20,0.4);padding:6px 10px;border-radius:4px;font-size:10px;font-family:monospace;z-index:200;pointer-events:none;color:#ccc">
+      <div style="color:#8B6914;font-weight:bold;margin-bottom:3px">⛏ MATERIALS</div>
+      <div id="build-mat-list"></div>
+      <div style="color:#888;font-size:9px;margin-top:3px">RMB to place</div>
+    </div>
+
+    <!-- Armor bar (Feature 6) -->
+    <div id="armor-bar-container" style="position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:120px;height:6px;background:rgba(0,0,0,0.4);border:1px solid rgba(68,136,255,0.3);border-radius:3px;z-index:200;pointer-events:none;overflow:hidden">
+      <div id="armor-bar" style="width:0%;height:100%;background:linear-gradient(90deg,#4488ff,#66aaff);border-radius:3px;transition:width 0.15s"></div>
+    </div>
+
+    <!-- Slide indicator (Feature 3) -->
+    <div id="slide-indicator" style="display:none;position:fixed;bottom:170px;left:50%;transform:translateX(-50%);background:rgba(0,150,255,0.2);border:1px solid #0088ff;color:#00aaff;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">⚡ SLIDING</div>
+
+    <!-- Focus mode indicator (Feature 9) -->
+    <div id="focus-indicator" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);border:2px solid rgba(0,255,255,0.3);border-radius:50%;width:200px;height:200px;z-index:195;pointer-events:none;box-shadow:0 0 40px rgba(0,255,255,0.15) inset"></div>
+
+    <!-- Revenge marker (Feature 10) -->
+    <div id="revenge-marker" style="display:none;position:fixed;top:50%;right:30px;transform:translateY(-50%);color:#ff4444;font-size:14px;font-family:monospace;z-index:200;pointer-events:none;text-shadow:0 0 8px rgba(255,0,0,0.6)">⚠ REVENGE →</div>
+
+    <!-- Dual wield indicator (Feature 11) -->
+    <div id="dual-wield-indicator" style="display:none;position:fixed;bottom:195px;left:50%;transform:translateX(-50%);background:rgba(255,200,0,0.2);border:1px solid #ffcc00;color:#ffcc00;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">🔫🔫 DUAL WIELD</div>
+
+    <!-- Weapon heat bar (Feature 15) -->
+    <div id="heat-bar-container" style="position:fixed;bottom:56px;left:50%;transform:translateX(-50%);width:120px;height:4px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,100,0,0.3);border-radius:2px;z-index:200;pointer-events:none;overflow:hidden">
+      <div id="heat-bar" style="width:0%;height:100%;background:linear-gradient(90deg,#ff6600,#ff0000);border-radius:2px;transition:width 0.1s"></div>
+    </div>
+
+    <!-- Ammo type indicator (Feature 20) -->
+    <div id="ammo-type-indicator" style="position:fixed;bottom:42px;left:50%;transform:translateX(-50%);color:#aaa;font-size:10px;font-family:monospace;z-index:200;pointer-events:none">STANDARD</div>
+
+    <!-- Last stand indicator (Feature 8) -->
+    <div id="laststand-indicator" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff0000;font-size:20px;font-weight:bold;font-family:monospace;z-index:200;pointer-events:none;text-shadow:0 0 15px rgba(255,0,0,0.8);animation:blink 0.5s infinite">💀 LAST STAND — GET A KILL!</div>
+
+    <!-- Combat log (Feature 42) -->
+    <div id="combat-log" style="position:fixed;bottom:130px;left:12px;width:280px;max-height:140px;overflow:hidden;font-size:10px;font-family:monospace;z-index:200;pointer-events:none;color:#aaa"></div>
+
+    <!-- Tactical map overlay (Feature 45) -->
+    <div id="tactical-map" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:250;pointer-events:none">
+      <canvas id="tactical-map-canvas" width="400" height="400" style="border:2px solid rgba(0,255,0,0.3);border-radius:8px;background:rgba(0,10,0,0.9)"></canvas>
+      <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);color:#00ff44;font-size:12px;font-family:monospace">TACTICAL MAP [M]</div>
+    </div>
+
+    <!-- Supply request menu (Feature 46) -->
+    <div id="supply-menu" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);border:1px solid #44ff88;padding:20px;border-radius:8px;z-index:260;font-family:monospace;color:#fff;text-align:center;pointer-events:auto">
+      <div style="color:#44ff88;font-size:14px;margin-bottom:12px">📦 SUPPLY REQUEST</div>
+      <button class="supply-btn" data-type="AMMO" style="display:block;width:100%;margin:4px 0;padding:6px;background:rgba(255,200,0,0.1);border:1px solid #ffcc00;color:#ffcc00;cursor:pointer;font-family:monospace;border-radius:4px">[1] AMMO CRATE</button>
+      <button class="supply-btn" data-type="HEALTH" style="display:block;width:100%;margin:4px 0;padding:6px;background:rgba(0,255,50,0.1);border:1px solid #22ff55;color:#22ff55;cursor:pointer;font-family:monospace;border-radius:4px">[2] MEDICAL SUPPLIES</button>
+      <button class="supply-btn" data-type="ARMOR" style="display:block;width:100%;margin:4px 0;padding:6px;background:rgba(68,136,255,0.1);border:1px solid #4488ff;color:#4488ff;cursor:pointer;font-family:monospace;border-radius:4px">[3] ARMOR PLATES</button>
+      <div style="color:#888;font-size:10px;margin-top:8px">60s cooldown | ESC to close</div>
+    </div>
+
+    <!-- Field promotion popup (Feature 47) -->
+    <div id="field-promotion" style="display:none;position:fixed;top:30%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.9);border:2px solid #ffd700;padding:20px;border-radius:8px;z-index:260;font-family:monospace;color:#ffd700;text-align:center;pointer-events:auto">
+      <div style="font-size:16px;margin-bottom:10px">⭐ FIELD PROMOTION!</div>
+      <div style="color:#aaa;font-size:11px;margin-bottom:12px">Choose your bonus:</div>
+      <button class="promo-btn" data-perk="damage" style="display:block;width:100%;margin:4px 0;padding:6px;background:rgba(255,0,0,0.1);border:1px solid #ff4444;color:#ff4444;cursor:pointer;font-family:monospace;border-radius:4px">⚔ +10% DAMAGE</button>
+      <button class="promo-btn" data-perk="speed" style="display:block;width:100%;margin:4px 0;padding:6px;background:rgba(0,200,255,0.1);border:1px solid #00ccff;color:#00ccff;cursor:pointer;font-family:monospace;border-radius:4px">🏃 +10% SPEED</button>
+      <button class="promo-btn" data-perk="armor" style="display:block;width:100%;margin:4px 0;padding:6px;background:rgba(68,136,255,0.1);border:1px solid #4488ff;color:#4488ff;cursor:pointer;font-family:monospace;border-radius:4px">🛡 +10% ARMOR</button>
+    </div>
+
+    <!-- Achievement popup (Feature 44) -->
+    <div id="achievement-popup" style="display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);border:2px solid #ffd700;padding:10px 24px;border-radius:6px;z-index:260;font-family:monospace;text-align:center;pointer-events:none">
+      <div style="color:#ffd700;font-size:13px">🏆 ACHIEVEMENT UNLOCKED</div>
+      <div id="achievement-name" style="color:#fff;font-size:15px;font-weight:bold;margin-top:4px"></div>
+    </div>
+
+    <!-- Wave stats screen (Feature 50) -->
+    <div id="wave-stats" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);border:1px solid #ffcc00;padding:20px 30px;border-radius:8px;z-index:255;font-family:monospace;color:#fff;text-align:center;pointer-events:none">
+      <div style="color:#ffcc00;font-size:16px;margin-bottom:10px">📊 WAVE STATS</div>
+      <div id="wave-stats-content" style="font-size:12px;line-height:1.8;text-align:left"></div>
+    </div>
+
+    <!-- Fog of war overlay (Feature 35) -->
+    <div id="fog-of-war" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle at 50% 50%, transparent 30%, rgba(0,0,0,0.5) 70%, rgba(0,0,0,0.8) 100%);z-index:193;pointer-events:none"></div>
+
+    <!-- Radiation warning (Feature 37) -->
+    <div id="radiation-warning" style="display:none;position:fixed;top:50%;right:15px;transform:translateY(-50%);color:#00ff00;font-size:12px;font-family:monospace;z-index:200;pointer-events:none;text-shadow:0 0 6px rgba(0,255,0,0.6)">☢ RADIATION</div>
+
+    <!-- Wall run indicator (Feature 2) -->
+    <div id="wallrun-indicator" style="display:none;position:fixed;bottom:220px;left:50%;transform:translateX(-50%);background:rgba(0,200,200,0.2);border:1px solid #00cccc;color:#00ffff;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">🏃 WALL RUN</div>
+
+    <!-- Tactical sprint indicator (Feature 7) -->
+    <div id="tacsprint-indicator" style="display:none;position:fixed;bottom:245px;left:50%;transform:translateX(-50%);background:rgba(255,100,0,0.2);border:1px solid #ff6600;color:#ff8800;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">⚡ TAC SPRINT</div>
   </div>
 
   <!-- Start screen -->
@@ -243,6 +332,7 @@
     <p class="stat">SCORE: <span id="dead-score">0</span></p>
     <p class="stat">KILLS: <span id="dead-kills">0</span></p>
     <p class="stat">WAVES: <span id="dead-wave">0</span></p>
+    <div id="dead-statistics" style="margin-top:12px;font-size:11px;color:#aaa;line-height:1.6"></div>
     <button class="btn" id="restart-btn">↺ TRY AGAIN</button>
   </div>
 
@@ -488,6 +578,11 @@
   // ── Stealth toggle (pause menu) ────────────────────────
   document.getElementById('stealth-toggle-btn').addEventListener('click', function () {
     GameManager.toggleStealth();
+  });
+
+  // ── Inventory Button (in-game HUD) ────────────────────────
+  document.getElementById('inventory-btn').addEventListener('click', function () {
+    GameManager.toggleInventory();
   });
 
   // ── God Mode toggle ────────────────────────────────────

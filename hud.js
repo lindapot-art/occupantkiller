@@ -480,6 +480,194 @@ const HUD = (() => {
     if (shieldEl) shieldEl.style.display = active ? 'block' : 'none';
   }
 
+  // ── Feature 6: Armor Bar ─────────────────────────────────────────
+  const armorBarEl = document.getElementById('armor-bar');
+  function updateArmor(pct) {
+    if (armorBarEl) armorBarEl.style.width = (pct * 100) + '%';
+  }
+
+  // ── Feature 3: Slide Indicator ───────────────────────────────────
+  const slideEl = document.getElementById('slide-indicator');
+  function showSlide(active) { if (slideEl) slideEl.style.display = active ? 'block' : 'none'; }
+
+  // ── Feature 2: Wall Run Indicator ────────────────────────────────
+  const wallrunEl = document.getElementById('wallrun-indicator');
+  function showWallRun(active) { if (wallrunEl) wallrunEl.style.display = active ? 'block' : 'none'; }
+
+  // ── Feature 7: Tactical Sprint Indicator ─────────────────────────
+  const tacSprintEl = document.getElementById('tacsprint-indicator');
+  function showTacSprint(active) { if (tacSprintEl) tacSprintEl.style.display = active ? 'block' : 'none'; }
+
+  // ── Feature 8: Last Stand Indicator ──────────────────────────────
+  const lastStandEl = document.getElementById('laststand-indicator');
+  function showLastStand(active) { if (lastStandEl) lastStandEl.style.display = active ? 'block' : 'none'; }
+
+  // ── Feature 9: Focus Mode ────────────────────────────────────────
+  const focusEl = document.getElementById('focus-indicator');
+  function showFocus(active) { if (focusEl) focusEl.style.display = active ? 'block' : 'none'; }
+
+  // ── Feature 10: Revenge Marker ───────────────────────────────────
+  const revengeEl = document.getElementById('revenge-marker');
+  function showRevenge(active, label) {
+    if (!revengeEl) return;
+    revengeEl.style.display = active ? 'block' : 'none';
+    if (label) revengeEl.textContent = label;
+  }
+
+  // ── Feature 11: Dual Wield ───────────────────────────────────────
+  const dualWieldEl = document.getElementById('dual-wield-indicator');
+  function showDualWield(active) { if (dualWieldEl) dualWieldEl.style.display = active ? 'block' : 'none'; }
+
+  // ── Feature 15: Weapon Heat ──────────────────────────────────────
+  const heatBarEl = document.getElementById('heat-bar');
+  function updateHeat(pct) { if (heatBarEl) heatBarEl.style.width = (pct * 100) + '%'; }
+
+  // ── Feature 20: Ammo Type ────────────────────────────────────────
+  const ammoTypeEl = document.getElementById('ammo-type-indicator');
+  function updateAmmoType(label) { if (ammoTypeEl) ammoTypeEl.textContent = label; }
+
+  // ── Feature 35: Fog of War ───────────────────────────────────────
+  const fogEl = document.getElementById('fog-of-war');
+  function showFogOfWar(active) { if (fogEl) fogEl.style.display = active ? 'block' : 'none'; }
+
+  // ── Feature 37: Radiation Warning ────────────────────────────────
+  const radEl = document.getElementById('radiation-warning');
+  function showRadiation(active) { if (radEl) radEl.style.display = active ? 'block' : 'none'; }
+
+  // ── Feature 42: Combat Log ───────────────────────────────────────
+  const combatLogEl = document.getElementById('combat-log');
+  function addCombatLog(text, color) {
+    if (!combatLogEl) return;
+    var entry = document.createElement('div');
+    entry.style.color = color || '#aaa';
+    entry.style.marginBottom = '2px';
+    entry.style.opacity = '1';
+    entry.textContent = text;
+    combatLogEl.appendChild(entry);
+    while (combatLogEl.children.length > 8) combatLogEl.removeChild(combatLogEl.firstChild);
+    setTimeout(function () {
+      entry.style.transition = 'opacity 1s';
+      entry.style.opacity = '0';
+      setTimeout(function () { if (entry.parentNode) entry.parentNode.removeChild(entry); }, 1000);
+    }, 6000);
+  }
+
+  // ── Feature 44: Achievement Popup ────────────────────────────────
+  const achievePopup = document.getElementById('achievement-popup');
+  const achieveName = document.getElementById('achievement-name');
+  let _achieveTimer = null;
+  function showAchievement(name) {
+    if (!achievePopup || !achieveName) return;
+    achieveName.textContent = name;
+    achievePopup.style.display = 'block';
+    clearTimeout(_achieveTimer);
+    _achieveTimer = setTimeout(function () { achievePopup.style.display = 'none'; }, 3000);
+  }
+
+  // ── Feature 45: Tactical Map ─────────────────────────────────────
+  const tacMapEl = document.getElementById('tactical-map');
+  const tacMapCanvas = document.getElementById('tactical-map-canvas');
+  const tacMapCtx = tacMapCanvas ? tacMapCanvas.getContext('2d') : null;
+  function showTacticalMap(active) { if (tacMapEl) tacMapEl.style.display = active ? 'block' : 'none'; }
+  function isTacticalMapVisible() { return tacMapEl && tacMapEl.style.display !== 'none'; }
+  function updateTacticalMap(px, pz, pyaw, enemies, npcs, pickups) {
+    if (!tacMapCtx) return;
+    var W = 400, H = 400, cx = W / 2, cy = H / 2, sc = 1.8;
+    tacMapCtx.clearRect(0, 0, W, H);
+    tacMapCtx.fillStyle = 'rgba(0,10,0,0.95)';
+    tacMapCtx.fillRect(0, 0, W, H);
+    // Grid
+    tacMapCtx.strokeStyle = 'rgba(0,255,0,0.08)';
+    tacMapCtx.lineWidth = 0.5;
+    for (var g = -100; g <= 100; g += 10) {
+      tacMapCtx.beginPath(); tacMapCtx.moveTo(cx + g * sc, 0); tacMapCtx.lineTo(cx + g * sc, H); tacMapCtx.stroke();
+      tacMapCtx.beginPath(); tacMapCtx.moveTo(0, cy + g * sc); tacMapCtx.lineTo(W, cy + g * sc); tacMapCtx.stroke();
+    }
+    function toMap(wx, wz) { return { x: cx + (wx - px) * sc, y: cy + (wz - pz) * sc }; }
+    // Enemies
+    if (enemies) {
+      tacMapCtx.fillStyle = '#ff3333';
+      for (var i = 0; i < enemies.length; i++) {
+        var e = enemies[i]; if (!e.alive || !e.mesh) continue;
+        var mp = toMap(e.mesh.position.x, e.mesh.position.z);
+        if (mp.x > 0 && mp.x < W && mp.y > 0 && mp.y < H) {
+          tacMapCtx.beginPath(); tacMapCtx.arc(mp.x, mp.y, 3, 0, Math.PI * 2); tacMapCtx.fill();
+        }
+      }
+    }
+    // NPCs
+    if (npcs) {
+      tacMapCtx.fillStyle = '#4488ff';
+      for (var j = 0; j < npcs.length; j++) {
+        var n = npcs[j]; if (!n.alive || !n.position) continue;
+        var np = toMap(n.position.x, n.position.z);
+        if (np.x > 0 && np.x < W && np.y > 0 && np.y < H) {
+          tacMapCtx.beginPath(); tacMapCtx.arc(np.x, np.y, 3, 0, Math.PI * 2); tacMapCtx.fill();
+        }
+      }
+    }
+    // Pickups
+    if (pickups) {
+      tacMapCtx.fillStyle = '#ffcc00';
+      for (var k = 0; k < pickups.length; k++) {
+        var p = pickups[k]; if (!p.mesh) continue;
+        var pp = toMap(p.mesh.position.x, p.mesh.position.z);
+        if (pp.x > 0 && pp.x < W && pp.y > 0 && pp.y < H) {
+          tacMapCtx.fillRect(pp.x - 2, pp.y - 2, 4, 4);
+        }
+      }
+    }
+    // Player
+    tacMapCtx.fillStyle = '#00ff44';
+    tacMapCtx.save();
+    tacMapCtx.translate(cx, cy);
+    tacMapCtx.rotate(-pyaw);
+    tacMapCtx.beginPath(); tacMapCtx.moveTo(0, -8); tacMapCtx.lineTo(-5, 6); tacMapCtx.lineTo(5, 6); tacMapCtx.closePath(); tacMapCtx.fill();
+    tacMapCtx.restore();
+  }
+
+  // ── Feature 46: Supply Menu ──────────────────────────────────────
+  const supplyMenuEl = document.getElementById('supply-menu');
+  function showSupplyMenu(active) { if (supplyMenuEl) supplyMenuEl.style.display = active ? 'block' : 'none'; }
+
+  // ── Feature 47: Field Promotion ──────────────────────────────────
+  const promoEl = document.getElementById('field-promotion');
+  function showFieldPromotion(active) { if (promoEl) promoEl.style.display = active ? 'block' : 'none'; }
+
+  // ── Feature 50: Wave Stats ───────────────────────────────────────
+  const waveStatsEl = document.getElementById('wave-stats');
+  const waveStatsContent = document.getElementById('wave-stats-content');
+  function showWaveStats(stats) {
+    if (!waveStatsEl || !waveStatsContent) return;
+    waveStatsContent.innerHTML =
+      '💀 Kills: <b>' + (stats.kills || 0) + '</b><br>' +
+      '🎯 Accuracy: <b>' + (stats.accuracy || 0) + '%</b><br>' +
+      '💀 Headshots: <b>' + (stats.headshots || 0) + '</b><br>' +
+      '⏱ Time: <b>' + (stats.time || '0s') + '</b><br>' +
+      '❤ Damage Taken: <b>' + (stats.damageTaken || 0) + '</b><br>' +
+      '🔥 Best Streak: <b>' + (stats.bestStreak || 0) + '</b>';
+    waveStatsEl.style.display = 'block';
+    setTimeout(function () { waveStatsEl.style.display = 'none'; }, 5000);
+  }
+
+  // ── Feature 43: Death Statistics ─────────────────────────────────
+  function showDeathStats(stats) {
+    var el = document.getElementById('dead-statistics');
+    if (!el) return;
+    el.innerHTML =
+      '🎯 Accuracy: ' + (stats.accuracy || 0) + '% | ' +
+      '💀 Headshot%: ' + (stats.headshotPct || 0) + '%<br>' +
+      '🔫 Favorite: ' + (stats.favWeapon || 'N/A') + ' | ' +
+      '⏱ Playtime: ' + (stats.playtime || '0s') + '<br>' +
+      '📏 Distance: ' + (stats.distance || 0) + 'm';
+  }
+
+  // ── OKC HUD Update ──────────────────────────────────────────────
+  function updateOKC(val) {
+    var el = document.getElementById('hud-okc');
+    if (el) el.textContent = '🪙 ' + val + ' OKC';
+  }
+
   return {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
@@ -493,5 +681,14 @@ const HUD = (() => {
     updateStamina, showNightVision, updateWeatherDisplay,
     showInteractionPrompt, hideInteractionPrompt,
     showLowHP, showShield,
+    // ── New Feature HUD Functions ──
+    updateArmor, showSlide, showWallRun, showTacSprint,
+    showLastStand, showFocus, showRevenge,
+    showDualWield, updateHeat, updateAmmoType,
+    showFogOfWar, showRadiation,
+    addCombatLog, showAchievement,
+    showTacticalMap, isTacticalMapVisible, updateTacticalMap,
+    showSupplyMenu, showFieldPromotion, showWaveStats,
+    showDeathStats, updateOKC,
   };
 })();
