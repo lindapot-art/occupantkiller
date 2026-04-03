@@ -355,6 +355,71 @@ const HUD = (() => {
     jamEl.style.display = active ? 'block' : 'none';
   }
 
+  // ── Vehicle HUD ──────────────────────────────────────────────────
+  const vehicleHudEl = document.getElementById('vehicle-hud');
+  const vhTypeEl = document.getElementById('vehicle-hud-type');
+  const vhHealthBar = document.getElementById('vehicle-health-bar');
+  const vhHealthVal = document.getElementById('vehicle-health-val');
+  const vhSpeedEl = document.getElementById('vehicle-hud-speed');
+  const vhControlsEl = document.getElementById('vehicle-hud-controls');
+  const vhHijackBar = document.getElementById('vehicle-hijack-bar');
+  const vhHijackFill = document.getElementById('vehicle-hijack-fill');
+
+  const VEHICLE_ICONS = {
+    transport: '🚛', combat: '🪖', logistics: '📦',
+    helicopter: '🚁', plane: '✈️', turret_rover: '🤖'
+  };
+
+  function showVehicleHUD(vehicle) {
+    if (!vehicleHudEl || !vehicle) return;
+    vehicleHudEl.style.display = 'block';
+    var icon = VEHICLE_ICONS[vehicle.type] || '🚗';
+    vhTypeEl.textContent = icon + ' ' + vehicle.type.toUpperCase().replace('_', ' ');
+    if (vehicle.flying) {
+      vhControlsEl.textContent = 'WASD · Fly | SPACE · Ascend | SHIFT · Descend | G · Exit | T · View | LMB · Fire';
+    } else if (vehicle.damage > 0) {
+      vhControlsEl.textContent = 'WASD · Drive | G · Exit | T · View | LMB · Fire Turret';
+    } else {
+      vhControlsEl.textContent = 'WASD · Drive | G · Exit | T · View';
+    }
+  }
+
+  function hideVehicleHUD() {
+    if (vehicleHudEl) vehicleHudEl.style.display = 'none';
+  }
+
+  function updateVehicleHUD(vehicle) {
+    if (!vehicleHudEl || !vehicle) return;
+    // Health bar
+    var hpPct = Math.max(0, vehicle.health / vehicle.maxHealth) * 100;
+    if (vhHealthBar) {
+      vhHealthBar.style.width = hpPct + '%';
+      if (hpPct > 50) {
+        vhHealthBar.style.background = 'linear-gradient(90deg, #00ff44, #44ff88)';
+      } else if (hpPct > 25) {
+        vhHealthBar.style.background = 'linear-gradient(90deg, #ff8800, #ffcc00)';
+      } else {
+        vhHealthBar.style.background = 'linear-gradient(90deg, #ff0000, #ff4444)';
+      }
+    }
+    if (vhHealthVal) vhHealthVal.textContent = Math.ceil(vehicle.health) + '/' + vehicle.maxHealth;
+    // Speed
+    if (vhSpeedEl) {
+      var speed = vehicle.velocity ? Math.round(vehicle.velocity.length() * 3.6) : 0;
+      vhSpeedEl.textContent = speed + ' km/h';
+    }
+  }
+
+  function showHijackProgress(progress) {
+    if (!vhHijackBar) return;
+    if (progress <= 0 || progress >= 1) {
+      vhHijackBar.style.display = 'none';
+      return;
+    }
+    vhHijackBar.style.display = 'block';
+    if (vhHijackFill) vhHijackFill.style.width = (progress * 100) + '%';
+  }
+
   return {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
@@ -364,5 +429,6 @@ const HUD = (() => {
     announceWave, announceStage,
     addKill, showHitDirection, updateMinimap,
     updateCompass, showStreak, showBleed, showProne, showJam,
+    showVehicleHUD, hideVehicleHUD, updateVehicleHUD, showHijackProgress,
   };
 })();

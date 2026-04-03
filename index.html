@@ -159,6 +159,22 @@
 
     <!-- Minimap radar -->
     <canvas id="minimap-canvas" width="180" height="180"></canvas>
+
+    <!-- Vehicle HUD overlay (shown when in vehicle) -->
+    <div id="vehicle-hud" style="display:none">
+      <div id="vehicle-hud-type">🚗 TRANSPORT</div>
+      <div id="vehicle-hud-health-row">
+        <span>HULL</span>
+        <div id="vehicle-health-bar-bg"><div id="vehicle-health-bar"></div></div>
+        <span id="vehicle-health-val">200/200</span>
+      </div>
+      <div id="vehicle-hud-speed">0 km/h</div>
+      <div id="vehicle-hud-controls">WASD · Drive | SPACE · Up | SHIFT · Down | G · Exit | T · View | LMB · Fire</div>
+      <div id="vehicle-hijack-bar" style="display:none">
+        <div id="vehicle-hijack-fill"></div>
+        <span id="vehicle-hijack-text">HIJACKING…</span>
+      </div>
+    </div>
   </div>
 
   <!-- Start screen -->
