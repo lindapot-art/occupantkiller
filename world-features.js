@@ -59,29 +59,23 @@ const WorldFeatures = (function () {
     clear();
   }
 
+  function _disposeMesh(obj) {
+    if (obj.mesh) {
+      _scene.remove(obj.mesh);
+      if (obj.mesh.geometry) obj.mesh.geometry.dispose();
+      if (obj.mesh.material) obj.mesh.material.dispose();
+    }
+    if (obj.light) _scene.remove(obj.light);
+  }
+
   function clear() {
-    fires.forEach(f => {
-      if (f.mesh) { _scene.remove(f.mesh); if (f.mesh.geometry) f.mesh.geometry.dispose(); if (f.mesh.material) f.mesh.material.dispose(); }
-      if (f.light) _scene.remove(f.light);
-    });
-    trees.forEach(t => {
-      if (t.mesh) { _scene.remove(t.mesh); if (t.mesh.geometry) t.mesh.geometry.dispose(); if (t.mesh.material) t.mesh.material.dispose(); }
-    });
-    airdrops.forEach(a => {
-      if (a.mesh) { _scene.remove(a.mesh); if (a.mesh.geometry) a.mesh.geometry.dispose(); if (a.mesh.material) a.mesh.material.dispose(); }
-    });
-    landmines.forEach(m => {
-      if (m.mesh) { _scene.remove(m.mesh); if (m.mesh.geometry) m.mesh.geometry.dispose(); if (m.mesh.material) m.mesh.material.dispose(); }
-    });
-    barbedWire.forEach(w => {
-      if (w.mesh) { _scene.remove(w.mesh); if (w.mesh.geometry) w.mesh.geometry.dispose(); if (w.mesh.material) w.mesh.material.dispose(); }
-    });
-    sandbags.forEach(s => {
-      if (s.mesh) { _scene.remove(s.mesh); if (s.mesh.geometry) s.mesh.geometry.dispose(); if (s.mesh.material) s.mesh.material.dispose(); }
-    });
-    smokeZones.forEach(s => {
-      if (s.mesh) { _scene.remove(s.mesh); if (s.mesh.geometry) s.mesh.geometry.dispose(); if (s.mesh.material) s.mesh.material.dispose(); }
-    });
+    fires.forEach(_disposeMesh);
+    trees.forEach(_disposeMesh);
+    airdrops.forEach(_disposeMesh);
+    landmines.forEach(_disposeMesh);
+    barbedWire.forEach(_disposeMesh);
+    sandbags.forEach(_disposeMesh);
+    smokeZones.forEach(_disposeMesh);
     fires = []; trees = []; radiationZones = []; airdrops = [];
     landmines = []; barbedWire = []; sandbags = []; smokeZones = [];
   }
