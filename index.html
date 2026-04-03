@@ -756,6 +756,30 @@
   GameManager.populateWeaponsGrid('pause-weapons-grid');
   GameManager.updateRoleIndicator();
 
+  // ── Challenge Mode selection wiring ────────────────────
+  var challengeBtns = document.querySelectorAll('.challenge-btn');
+  var challengeDesc = document.getElementById('challenge-desc');
+  for (var ci = 0; ci < challengeBtns.length; ci++) {
+    challengeBtns[ci].addEventListener('click', function () {
+      var mode = this.getAttribute('data-mode');
+      // Reset all button highlights
+      for (var j = 0; j < challengeBtns.length; j++) {
+        challengeBtns[j].style.background = 'transparent';
+      }
+      this.style.background = 'rgba(255,255,255,0.1)';
+      if (typeof Progression !== 'undefined') {
+        if (mode) {
+          Progression.setChallenge(mode);
+          var cm = Progression.getChallengeMode();
+          if (challengeDesc && cm) challengeDesc.textContent = cm.desc;
+        } else {
+          Progression.clearChallenge();
+          if (challengeDesc) challengeDesc.textContent = 'Standard gameplay - no modifiers.';
+        }
+      }
+    });
+  }
+
   // ── Wallet Connect wiring ─────────────────────────────
   function updateWalletUI() {
     var startStatus = document.getElementById('start-wallet-status');

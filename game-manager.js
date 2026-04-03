@@ -1296,6 +1296,25 @@ const GameManager = (function () {
       player.stealth = true;
     }
 
+    // ═══ NEW: Apply challenge mode modifiers ═══
+    if (typeof Progression !== 'undefined') {
+      var chalMods = Progression.getChallengeModifiers();
+      if (chalMods.hpMult) {
+        player.maxHp = Math.round(player.maxHp * chalMods.hpMult);
+        player.hp = player.maxHp;
+      }
+    }
+    // Reset new feature systems on game start
+    if (typeof CombatExtras !== 'undefined') CombatExtras.reset();
+    if (typeof Traversal !== 'undefined') Traversal.reset();
+    if (typeof WorldFeatures !== 'undefined') WorldFeatures.clear();
+    if (typeof Perks !== 'undefined') Perks.reset();
+    if (typeof MissionTypes !== 'undefined') MissionTypes.clear();
+    if (typeof Feedback !== 'undefined') Feedback.clear();
+    if (typeof Progression !== 'undefined') {
+      Progression.refreshDailies();
+    }
+
     // Apply first stage
     applyStage(0);
 
@@ -1557,6 +1576,48 @@ const GameManager = (function () {
       
       HUD.notifyPickup('⚠ ENEMY DRONES DETECTED!', '#ff4488');
     }
+
+    // ═══ NEW: Wave-begin integrations for 59 features ═══
+    // Generate bounties for this wave
+    if (typeof Progression !== 'undefined') {
+      Progression.generateBounties(w);
+      Progression.trackStat('wavesCleared', 0); // track at begin; increment at complete
+    }
+    // Spawn a random mission type every 3 waves
+    if (w % 3 === 0 && typeof MissionTypes !== 'undefined') {
+      var mTypes = Object.keys(MissionTypes.TYPES);
+      var mType = mTypes[Math.floor(Math.random() * mTypes.length)];
+      MissionTypes.startMission(mType, player.position.x + (Math.random() - 0.5) * 40, player.position.z + (Math.random() - 0.5) * 40);
+      HUD.notifyPickup('📍 NEW MISSION: ' + MissionTypes.TYPES[mType].name, '#ffcc00');
+    }
+    // Spawn supply airdrop every 4 waves
+    if (w % 4 === 0 && typeof WorldFeatures !== 'undefined') {
+      var adX = player.position.x + (Math.random() - 0.5) * 30;
+      var adZ = player.position.z + (Math.random() - 0.5) * 30;
+      var adY = VoxelWorld.getTerrainHeight(adX, adZ);
+      WorldFeatures.spawnAirdrop(adX, adZ, adY);
+      HUD.notifyPickup('📦 SUPPLY DROP INCOMING!', '#44ff88');
+    }
+    // Place enemy landmines on later waves
+    if (w >= 4 && typeof WorldFeatures !== 'undefined') {
+      for (var lmi = 0; lmi < Math.min(w, 8); lmi++) {
+        var lmAngle = Math.random() * Math.PI * 2;
+        var lmDist = 10 + Math.random() * 20;
+        var lmX = player.position.x + Math.cos(lmAngle) * lmDist;
+        var lmZ = player.position.z + Math.sin(lmAngle) * lmDist;
+        var lmY = VoxelWorld.getTerrainHeight(lmX, lmZ);
+        WorldFeatures.placeMine(lmX, lmY, lmZ, 'enemy');
+      }
+    }
+    // Spawn radiation zones on wave 6+
+    if (w === 6 && typeof WorldFeatures !== 'undefined') {
+      WorldFeatures.addRadiationZone(player.position.x + 30, player.position.z + 30, 8);
+      HUD.notifyPickup('☢ RADIATION ZONE DETECTED!', '#00ff00');
+    }
+    // Reset combat extras per wave
+    if (typeof CombatExtras !== 'undefined') {
+      CombatExtras.reset();
+    }
   }
 
   function onWaveComplete() {
@@ -1591,6 +1652,36 @@ const GameManager = (function () {
     if (typeof Marketplace !== 'undefined') {
       Marketplace.onWaveClear();
       HUD.updateOKC(Marketplace.getOKC());
+    }
+
+    // ═══ NEW: Wave-complete integrations for 59 features ═══
+    // Progression stats
+    if (typeof Progression !== 'undefined') {
+      Progression.trackStat('wavesCleared', 1);
+      // Check flawless wave
+      if (player.waveDamageTaken === 0) {
+        Progression.trackStat('flawlessWaves', 1);
+      }
+      // Speed wave bounty
+      var waveTime = (performance.now() - player.waveStartTime) / 1000;
+      Progression.updateBounty('speed_wave', 1);
+      Progression.updateBounty('survive', 1);
+      Progression.updateBounty('low_damage', Math.round(player.waveDamageTaken));
+      Progression.save();
+    }
+    // Achievement checks
+    if (typeof Feedback !== 'undefined') {
+      if (currentWave >= 5) Feedback.unlockAchievement('SURVIVOR');
+      if (currentWave >= 10) Feedback.unlockAchievement('WAVE_10');
+      if (player.waveDamageTaken === 0) Feedback.unlockAchievement('NO_DAMAGE');
+      var waveElapsed = (performance.now() - player.waveStartTime) / 1000;
+      if (waveElapsed < 30) Feedback.unlockAchievement('SPEED_RUN');
+    }
+    // Journal unlocks by wave
+    if (typeof Progression !== 'undefined') {
+      if (currentWave >= 3) Progression.unlockJournalEntry('entry_flanking');
+      if (currentWave >= 5) Progression.unlockJournalEntry('entry_shield');
+      if (currentWave >= 7) Progression.unlockJournalEntry('entry_mortar');
     }
 
     // Trigger a random battlefield event between waves (from wave 2+)
@@ -1873,10 +1964,41 @@ const GameManager = (function () {
     MLSystem.trackCombatEngagement(engageRange < 10);
 
     const isHeadshot = hit.object === enemy.mesh.userData.headMesh;
-    const baseDmg = Weapons.getDamage();
+    let baseDmg = Weapons.getDamage();
+
+    // ═══ NEW: Apply ammo type and perk damage modifiers ═══
+    if (typeof CombatExtras !== 'undefined') {
+      var ammoMods = CombatExtras.getAmmoModifiers();
+      baseDmg = Math.round(baseDmg * ammoMods.dmgMult);
+      // Register shot for maintenance tracking
+      CombatExtras.registerShot();
+      // Add heat for auto weapons
+      var weaponType = Weapons.getCurrentType();
+      var isAuto = ['AR', 'LMG', 'HMG', 'SMG', 'HMG_HEAVY', 'MACHINEGUN', 'MINIGUN'].indexOf(weaponType) >= 0;
+      CombatExtras.addHeat(isAuto);
+    }
+    // Dead eye crit check
+    if (typeof Perks !== 'undefined' && Perks.isDeadEyeShot()) {
+      baseDmg = Math.round(baseDmg * Perks.getDeadEyeMult());
+      HUD.notifyPickup('🎯 DEAD EYE CRIT!', '#ff4400');
+    }
+    // Prestige damage bonus
+    if (typeof Progression !== 'undefined') {
+      var pBonuses = Progression.getPrestigeBonuses();
+      baseDmg = Math.round(baseDmg * pBonuses.damageMult);
+    }
     const dmg = isHeadshot ? baseDmg * 2 : baseDmg;
 
     const remaining = Enemies.damage(enemy, dmg);
+
+    // Floating damage number on hit (not just kill)
+    if (typeof Feedback !== 'undefined') {
+      Feedback.spawnDamageNumber(
+        window.innerWidth / 2 + (Math.random() - 0.5) * 40,
+        window.innerHeight / 2 - 20 + (Math.random() - 0.5) * 30,
+        dmg, isHeadshot, false
+      );
+    }
 
     SkillSystem.onShoot(true, isHeadshot);
     HUD.flashHit(isHeadshot);
@@ -3374,6 +3496,116 @@ const GameManager = (function () {
     }
   }
 
+  /* ── 59 Features: Helper Functions ──────────────────────────────── */
+
+  /** Open perks selection menu */
+  function _openPerksMenu() {
+    if (typeof Perks === 'undefined') return;
+    var grid = document.getElementById('perks-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    var allPerks = Object.values(Perks.PERK_LIST);
+    for (var i = 0; i < allPerks.length; i++) {
+      (function (perk) {
+        var cell = document.createElement('div');
+        var equipped = Perks.hasPerk(perk.id);
+        cell.style.cssText = 'padding:10px;border:1px solid ' + (equipped ? '#44ff44' : '#555') + ';border-radius:6px;cursor:pointer;background:rgba(' + (equipped ? '0,100,0' : '50,50,50') + ',0.3)';
+        cell.innerHTML = '<div style="font-size:20px">' + perk.icon + '</div><div style="color:#ffcc00;font-weight:bold;font-size:12px">' + perk.name + '</div><div style="color:#aaa;font-size:10px;margin-top:4px">' + perk.desc + '</div>' + (equipped ? '<div style="color:#44ff44;font-size:10px;margin-top:4px">✅ EQUIPPED</div>' : '');
+        cell.addEventListener('click', function () {
+          if (equipped) {
+            Perks.unequipPerk(perk.id);
+          } else {
+            if (!Perks.equipPerk(perk.id)) {
+              HUD.notifyPickup('⚠ Max 3 perks equipped!', '#ff4444');
+              return;
+            }
+          }
+          _openPerksMenu(); // refresh
+          _updatePerkDisplay();
+        });
+        grid.appendChild(cell);
+      })(allPerks[i]);
+    }
+  }
+
+  /** Update perk display slots in HUD */
+  function _updatePerkDisplay() {
+    if (typeof Perks === 'undefined') return;
+    var equipped = Perks.getEquipped();
+    for (var i = 0; i < 3; i++) {
+      var slot = document.getElementById('perk-slot-' + (i + 1));
+      if (!slot) continue;
+      if (equipped[i]) {
+        slot.style.display = 'block';
+        slot.textContent = equipped[i].icon + ' ' + equipped[i].name;
+      } else {
+        slot.style.display = 'none';
+      }
+    }
+  }
+
+  /** Open war journal panel */
+  function _openJournal() {
+    if (typeof Progression === 'undefined') return;
+    var content = document.getElementById('journal-content');
+    if (!content) return;
+    var entries = Progression.getJournal();
+    if (entries.length === 0) {
+      content.innerHTML = '<div style="color:#888;text-align:center">No entries yet. Kill enemies and explore to unlock intel.</div>';
+      return;
+    }
+    var html = '';
+    var cats = Progression.JOURNAL_CATEGORIES;
+    for (var cat in cats) {
+      var catEntries = Progression.getJournalByCategory(cat);
+      if (catEntries.length === 0) continue;
+      html += '<div style="color:#8B6914;font-weight:bold;margin-top:12px;border-bottom:1px solid #444;padding-bottom:4px">' + cats[cat] + '</div>';
+      for (var j = 0; j < catEntries.length; j++) {
+        html += '<div style="margin:6px 0;padding:6px;background:rgba(139,105,20,0.1);border-radius:4px"><div style="color:#ddd;font-weight:bold">' + catEntries[j].title + '</div><div style="color:#aaa;font-size:11px">' + catEntries[j].text + '</div></div>';
+      }
+    }
+    content.innerHTML = html;
+  }
+
+  /** Activate a killstreak reward */
+  function _activateStreak(index) {
+    if (typeof Perks === 'undefined') return;
+    var streak = Perks.activateStreak(index);
+    if (!streak) return;
+    HUD.notifyPickup(streak.icon + ' ' + streak.name + ' ACTIVATED!', '#ff6600');
+    AudioSystem.playExplosion();
+    if (CameraSystem.shake) CameraSystem.shake(0.4, 0.5);
+
+    if (streak.id === 'ARTILLERY' || streak.id === 'AIRSTRIKE') {
+      // Damage enemies in area around player's aim point
+      var fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(_camera.quaternion);
+      var target = player.position.clone().add(fwd.multiplyScalar(30));
+      Enemies.damageInRadius(target, streak.radius || 15, streak.damage || 200);
+      if (typeof Tracers !== 'undefined') Tracers.spawnExplosion(target, (streak.radius || 15) * 0.3);
+    } else if (streak.id === 'NUKE') {
+      // Kill all enemies
+      var allEn = Enemies.getAll();
+      for (var i = 0; i < allEn.length; i++) {
+        if (allEn[i].alive) Enemies.damage(i, 99999, false);
+      }
+      if (typeof Tracers !== 'undefined') Tracers.spawnExplosion(player.position, 10);
+      HUD.notifyPickup('☢️ TACTICAL NUKE DEPLOYED!', '#ff0000');
+    } else if (streak.id === 'ORBITAL') {
+      // Massive area damage
+      Enemies.damageInRadius(player.position, streak.radius || 20, streak.damage || 500);
+      if (typeof Tracers !== 'undefined') Tracers.spawnExplosion(player.position, 8);
+    }
+    // Refresh killstreak panel
+    var ksList = document.getElementById('killstreak-list');
+    if (ksList) {
+      var avail = Perks.getAvailableStreaks();
+      if (avail.length === 0) {
+        document.getElementById('killstreak-panel').style.display = 'none';
+        ksList.innerHTML = '';
+      }
+    }
+  }
+
   /* ── Public API ──────────────────────────────────────────────────── */
   return {
     STATE,
@@ -3403,5 +3635,8 @@ const GameManager = (function () {
     getCurrentWave:  function () { return currentWave; },
     getCurrentStage: function () { return currentStage; },
     getStageInfo:    function () { return STAGES[currentStage]; },
+    _activateStreak: _activateStreak,
+    _openPerksMenu: _openPerksMenu,
+    _openJournal: _openJournal,
   };
 })();
