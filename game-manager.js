@@ -77,21 +77,22 @@ const GameManager = (function () {
   /* ── Stamina Config ──────────────────────────────────────────────── */
   const STAMINA_DRAIN_RATE = 0.15;  // per second while sprinting
   const STAMINA_REGEN_RATE = 0.08;  // per second while not sprinting
+  var _droneWarnCooldown = 0;       // cooldown timer for drone proximity warning
 
   /* ── Battlefield Events ─────────────────────────────────────────── */
   const BATTLE_EVENTS = [
-    { id: 'ARTILLERY',     label: '💥 ARTILLERY BARRAGE!',      color: '#ff4444', chance: 0.20 },
-    { id: 'SUPPLY_DROP',   label: '📦 SUPPLY DROP INCOMING!',   color: '#44ff88', chance: 0.18 },
-    { id: 'MORTAR',        label: '💣 MORTAR STRIKE!',          color: '#ff8800', chance: 0.12 },
-    { id: 'REINFORCEMENT', label: '🛡 ALLIED REINFORCEMENTS!',  color: '#4488ff', chance: 0.10 },
-    { id: 'AMBUSH',        label: '⚠ ENEMY AMBUSH!',           color: '#ff2222', chance: 0.10 },
-    { id: 'SNIPER_DUEL',   label: '🎯 SNIPER DUEL!',           color: '#ffaa00', chance: 0.08 },
-    { id: 'ARMOR_PUSH',    label: '🛡 ENEMY ARMOR PUSH!',      color: '#cc0000', chance: 0.07 },
-    { id: 'AIR_SUPPORT',   label: '✈ FRIENDLY AIR SUPPORT!',   color: '#00aaff', chance: 0.08 },
-    { id: 'DRONE_SWARM',   label: '🤖 ENEMY DRONE SWARM!',     color: '#ff4488', chance: 0.07 },
-    { id: 'CHEMICAL',       label: '☣ CHEMICAL ATTACK!',       color: '#aaff00', chance: 0.05 },
-    { id: 'EMP',            label: '⚡ EMP BLAST!',             color: '#4400ff', chance: 0.04 },
-    { id: 'TUNNEL_BREACH',  label: '🕳 TUNNEL BREACH!',        color: '#884400', chance: 0.06 },
+    { id: 'ARTILLERY',     label: '💥 ARTILLERY BARRAGE!',      color: '#ff4444', chance: 0.18 },
+    { id: 'SUPPLY_DROP',   label: '📦 SUPPLY DROP INCOMING!',   color: '#44ff88', chance: 0.16 },
+    { id: 'MORTAR',        label: '💣 MORTAR STRIKE!',          color: '#ff8800', chance: 0.10 },
+    { id: 'REINFORCEMENT', label: '🛡 ALLIED REINFORCEMENTS!',  color: '#4488ff', chance: 0.09 },
+    { id: 'AMBUSH',        label: '⚠ ENEMY AMBUSH!',           color: '#ff2222', chance: 0.09 },
+    { id: 'SNIPER_DUEL',   label: '🎯 SNIPER DUEL!',           color: '#ffaa00', chance: 0.07 },
+    { id: 'ARMOR_PUSH',    label: '🛡 ENEMY ARMOR PUSH!',      color: '#cc0000', chance: 0.06 },
+    { id: 'AIR_SUPPORT',   label: '✈ FRIENDLY AIR SUPPORT!',   color: '#00aaff', chance: 0.07 },
+    { id: 'DRONE_SWARM',   label: '🤖 ENEMY DRONE SWARM!',     color: '#ff4488', chance: 0.06 },
+    { id: 'CHEMICAL',       label: '☣ CHEMICAL ATTACK!',       color: '#aaff00', chance: 0.04 },
+    { id: 'EMP',            label: '⚡ EMP BLAST!',             color: '#4400ff', chance: 0.03 },
+    { id: 'TUNNEL_BREACH',  label: '🕳 TUNNEL BREACH!',        color: '#884400', chance: 0.05 },
   ];
 
   function triggerBattlefieldEvent() {
@@ -296,18 +297,16 @@ const GameManager = (function () {
         AudioSystem.playPickup();
         continue;
       }
+      // Blink before despawning (during last 3 seconds)
+      if (lp.userData.age > LOOT_CONFIG.LIFETIME - 3) {
+        lp.visible = Math.floor(lp.userData.age * 6) % 2 === 0;
+      }
       // Despawn after lifetime
       if (lp.userData.age > LOOT_CONFIG.LIFETIME) {
-        // Blink before despawning
-        if (lp.userData.age > LOOT_CONFIG.LIFETIME - 3) {
-          lp.visible = Math.floor(lp.userData.age * 6) % 2 === 0;
-        }
-        if (lp.userData.age > LOOT_CONFIG.LIFETIME) {
-          _scene.remove(lp);
-          lp.geometry.dispose();
-          lp.material.dispose();
-          _lootParticles.splice(i, 1);
-        }
+        _scene.remove(lp);
+        lp.geometry.dispose();
+        lp.material.dispose();
+        _lootParticles.splice(i, 1);
       }
     }
   }
@@ -617,7 +616,6 @@ const GameManager = (function () {
           if (e.code === 'Digit6') TimeSystem.setSpeed(5);
           if (e.code === 'Digit7') TimeSystem.setSpeed(10);
         }
-        if (e.code === 'KeyP')   TimeSystem.togglePause();
 
         // Camera mode toggle
         if (e.code === 'KeyV') CameraSystem.cycleMode();
@@ -642,7 +640,26 @@ const GameManager = (function () {
             DroneSystem.release();
           } else {
             const drones = DroneSystem.getAll();
-            if (drones.length > 0) DroneSystem.possess(drones[0].id);
+            if (drones.length > 0) {
+              DroneSystem.possess(drones[0].id);
+            } else if (typeof CombatExtras !== 'undefined') {
+              // Quick melee (F key when no drones available)
+              var qm = CombatExtras.tryQuickMelee();
+              if (qm) {
+                var enemies = Enemies.getAll();
+                for (var qi = 0; qi < enemies.length; qi++) {
+                  var qe = enemies[qi];
+                  if (!qe.alive) continue;
+                  var qdx = qe.mesh.position.x - player.position.x;
+                  var qdz = qe.mesh.position.z - player.position.z;
+                  if (qdx * qdx + qdz * qdz < qm.range * qm.range) {
+                    Enemies.damage(qe, qm.damage);
+                    break;
+                  }
+                }
+                HUD.notifyPickup('👊 QUICK MELEE!', '#ffcc00');
+              }
+            }
           }
         }
 
@@ -831,26 +848,6 @@ const GameManager = (function () {
             } else {
               journalPanel.style.display = 'none';
             }
-          }
-        }
-
-        // Quick melee (F key when not near drone)
-        if (e.code === 'KeyF' && !DroneSystem.isPossessing() && typeof CombatExtras !== 'undefined') {
-          var qm = CombatExtras.tryQuickMelee();
-          if (qm) {
-            // Deal quick melee damage to nearby enemies
-            var enemies = Enemies.getAll();
-            for (var qi = 0; qi < enemies.length; qi++) {
-              var qe = enemies[qi];
-              if (!qe.alive) continue;
-              var qdx = qe.mesh.position.x - player.position.x;
-              var qdz = qe.mesh.position.z - player.position.z;
-              if (qdx * qdx + qdz * qdz < qm.range * qm.range) {
-                Enemies.damage(qi, qm.damage, false);
-                break;
-              }
-            }
-            HUD.notifyPickup('👊 QUICK MELEE!', '#ffcc00');
           }
         }
 
@@ -1082,8 +1079,7 @@ const GameManager = (function () {
     document.addEventListener('pointerlockchange', function () {
       if (!document.pointerLockElement && gameState === STATE.PLAYING) {
         if (!isMobile) {
-          gameState = STATE.PAUSED;
-          showOverlay('pause');
+          toggleInventory();
         }
       }
     });
@@ -1641,12 +1637,8 @@ const GameManager = (function () {
         bestStreak: player.bestStreak,
       });
     }
-    // Reset wave stats
-    player.waveKills = 0;
-    player.waveShots = 0;
-    player.waveHits = 0;
-    player.waveHeadshots = 0;
-    player.waveDamageTaken = 0;
+    // Capture wave stats before reset (needed for flawless checks below)
+    var waveDmg = player.waveDamageTaken;
 
     // Play-to-Earn: OKC for wave clear
     if (typeof Marketplace !== 'undefined') {
@@ -1659,24 +1651,31 @@ const GameManager = (function () {
     if (typeof Progression !== 'undefined') {
       Progression.trackStat('wavesCleared', 1);
       // Check flawless wave
-      if (player.waveDamageTaken === 0) {
+      if (waveDmg === 0) {
         Progression.trackStat('flawlessWaves', 1);
       }
       // Speed wave bounty
       var waveTime = (performance.now() - player.waveStartTime) / 1000;
       Progression.updateBounty('speed_wave', 1);
       Progression.updateBounty('survive', 1);
-      Progression.updateBounty('low_damage', Math.round(player.waveDamageTaken));
+      Progression.updateBounty('low_damage', Math.round(waveDmg));
       Progression.save();
     }
     // Achievement checks
     if (typeof Feedback !== 'undefined') {
       if (currentWave >= 5) Feedback.unlockAchievement('SURVIVOR');
       if (currentWave >= 10) Feedback.unlockAchievement('WAVE_10');
-      if (player.waveDamageTaken === 0) Feedback.unlockAchievement('NO_DAMAGE');
+      if (waveDmg === 0) Feedback.unlockAchievement('NO_DAMAGE');
       var waveElapsed = (performance.now() - player.waveStartTime) / 1000;
       if (waveElapsed < 30) Feedback.unlockAchievement('SPEED_RUN');
     }
+
+    // Reset wave stats (after all checks that depend on them)
+    player.waveKills = 0;
+    player.waveShots = 0;
+    player.waveHits = 0;
+    player.waveHeadshots = 0;
+    player.waveDamageTaken = 0;
     // Journal unlocks by wave
     if (typeof Progression !== 'undefined') {
       if (currentWave >= 3) Progression.unlockJournalEntry('entry_flanking');
@@ -2529,8 +2528,9 @@ const GameManager = (function () {
         HUD.updateMinimap(player.position.x, player.position.z, CameraSystem.getYaw(), mmEnemies, mmNPCs, mmVehicles, mmDrones);
       }
 
-      // Enemy drone proximity warning
-      if (typeof DroneSystem !== 'undefined' && DroneSystem.getAll) {
+      // Enemy drone proximity warning (5s cooldown)
+      if (_droneWarnCooldown > 0) _droneWarnCooldown -= delta;
+      if (_droneWarnCooldown <= 0 && typeof DroneSystem !== 'undefined' && DroneSystem.getAll) {
         var allDrones = DroneSystem.getAll();
         for (var di = 0; di < allDrones.length; di++) {
           var dr = allDrones[di];
@@ -2538,6 +2538,7 @@ const GameManager = (function () {
             var ddist = player.position.distanceTo(dr.position);
             if (ddist < 20) {
               HUD.notifyPickup('⚠ ENEMY DRONE NEARBY!', '#ff4488');
+              _droneWarnCooldown = 5;
               break;
             }
           }
@@ -2574,7 +2575,7 @@ const GameManager = (function () {
             var bdx = be.mesh.position.x - player.position.x;
             var bdz = be.mesh.position.z - player.position.z;
             if (bdx * bdx + bdz * bdz < 4) {
-              Enemies.damage(bi, combatResult.bayonet.damage * delta * 2, false);
+              Enemies.damage(be, combatResult.bayonet.damage * delta * 2);
             }
           }
         }
@@ -2711,7 +2712,7 @@ const GameManager = (function () {
           var aliveEnemies = Enemies.getAll().filter(function (e) { return e.alive; });
           if (aliveEnemies.length > 0) {
             var targetIdx = Math.floor(Math.random() * aliveEnemies.length);
-            Enemies.damage(targetIdx, perkResult.gunshipDPS * delta, false);
+            Enemies.damage(aliveEnemies[targetIdx], perkResult.gunshipDPS * delta);
           }
         }
         // UAV indicator
@@ -3586,7 +3587,7 @@ const GameManager = (function () {
       // Kill all enemies
       var allEn = Enemies.getAll();
       for (var i = 0; i < allEn.length; i++) {
-        if (allEn[i].alive) Enemies.damage(i, 99999, false);
+        if (allEn[i].alive) Enemies.damage(allEn[i], 99999);
       }
       if (typeof Tracers !== 'undefined') Tracers.spawnExplosion(player.position, 10);
       HUD.notifyPickup('☢️ TACTICAL NUKE DEPLOYED!', '#ff0000');

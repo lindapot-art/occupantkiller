@@ -775,8 +775,8 @@ canvas {
   box-shadow: inset 0 0 60px rgba(255,100,0,0.1);
 }
 
-/* ── Blink Animation (already exists but ensure it's here) ──── */
-@keyframes blink {
+/* ── Blink Animation (soft) ──── */
+@keyframes blinkSoft {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
