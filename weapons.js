@@ -955,6 +955,96 @@ const Weapons = (() => {
     return g;
   }
 
+  // ── Claymore Mine mesh ──
+  function buildClaymoreMesh() {
+    const g = new THREE.Group();
+    // Curved body
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.08, 0.06),
+      new THREE.MeshLambertMaterial({ color: 0x4a5a3a })
+    );
+    body.position.set(0.17, -0.16, -0.22);
+    // Legs
+    const leg1 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.005, 0.005, 0.06, 4),
+      new THREE.MeshLambertMaterial({ color: 0x333333 })
+    );
+    leg1.position.set(0.13, -0.20, -0.22);
+    leg1.rotation.z = 0.3;
+    const leg2 = leg1.clone();
+    leg2.position.x = 0.21;
+    leg2.rotation.z = -0.3;
+    // "FRONT TOWARD ENEMY" label
+    const label = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.10, 0.03),
+      new THREE.MeshBasicMaterial({ color: 0xcccc88 })
+    );
+    label.position.set(0.17, -0.155, -0.249);
+    g.add(body, leg1, leg2, label);
+    return g;
+  }
+
+  // ── Smoke Grenade mesh ──
+  function buildSmokeMesh() {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.025, 0.10, 8),
+      new THREE.MeshLambertMaterial({ color: 0x556655 })
+    );
+    body.position.set(0.17, -0.14, -0.22);
+    // Top cap
+    const cap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.027, 0.027, 0.015, 8),
+      new THREE.MeshLambertMaterial({ color: 0x777777 })
+    );
+    cap.position.set(0.17, -0.088, -0.22);
+    // Spoon/lever
+    const spoon = new THREE.Mesh(
+      new THREE.BoxGeometry(0.008, 0.07, 0.015),
+      new THREE.MeshLambertMaterial({ color: 0x888888 })
+    );
+    spoon.position.set(0.185, -0.12, -0.22);
+    // Smoke band
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.026, 0.026, 0.02, 8),
+      new THREE.MeshLambertMaterial({ color: 0x88aa88 })
+    );
+    band.position.set(0.17, -0.14, -0.22);
+    g.add(body, cap, spoon, band);
+    return g;
+  }
+
+  // ── Flashbang mesh ──
+  function buildFlashbangMesh() {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.022, 0.08, 8),
+      new THREE.MeshPhongMaterial({ color: 0x444444, shininess: 60 })
+    );
+    body.position.set(0.17, -0.14, -0.22);
+    // Blue band (flash indicator)
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.023, 0.023, 0.015, 8),
+      new THREE.MeshLambertMaterial({ color: 0x3366cc })
+    );
+    band.position.set(0.17, -0.12, -0.22);
+    // Fuze/cap
+    const fuze = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.024, 0.02, 8),
+      new THREE.MeshLambertMaterial({ color: 0x666666 })
+    );
+    fuze.position.set(0.17, -0.098, -0.22);
+    // Pin ring
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.012, 0.003, 4, 8),
+      new THREE.MeshLambertMaterial({ color: 0xaaaa66 })
+    );
+    ring.position.set(0.19, -0.098, -0.22);
+    ring.rotation.y = Math.PI / 2;
+    g.add(body, band, fuze, ring);
+    return g;
+  }
+
   const meshBuilders = [
     buildShovelMesh, buildMakarovMesh, buildAkMesh, buildRpkMesh,
     buildSvdMesh, buildPkmMesh, buildNlawMesh, buildStugnaMesh, buildM4Mesh,
@@ -962,6 +1052,7 @@ const Weapons = (() => {
     buildScarHMesh, buildDshkMesh, buildMolotovMesh,
     buildMg3Mesh, buildMp5Mesh, buildBarrettMesh, buildMinigunMesh,
     buildCrossbowMesh, buildFlamethrowerMesh, buildDoubleBarrelMesh,
+    buildClaymoreMesh, buildSmokeMesh, buildFlashbangMesh,
   ];
 
   function createGunMesh(camera) {

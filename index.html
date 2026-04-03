@@ -211,21 +211,6 @@
     <button class="btn" id="next-stage-btn" style="border-color:#44ff88;color:#44ff88">NEXT STAGE →</button>
   </div>
 
-  <!-- Pause screen -->
-  <div id="overlay-pause" class="overlay" style="display:none">
-    <h1 style="color:#ffffff">PAUSED</h1>
-    <div id="pause-role-select" style="margin:8px 0">
-      <span style="color:#aaa;font-size:13px">ROLE:</span>
-      <button class="btn" id="role-brigade-btn" style="font-size:12px;padding:4px 12px;border-color:#0af;color:#0af;display:inline-block;margin:0 4px">🎖 ASSAULT BRIGADE</button>
-      <button class="btn" id="role-lonewolf-btn" style="font-size:12px;padding:4px 12px;border-color:#fa0;color:#fa0;display:inline-block;margin:0 4px">🐺 LONE WOLF</button>
-    </div>
-    <button class="btn" id="stealth-toggle-btn" style="border-color:#0f6;color:#0f6;margin-top:8px">👻 TOGGLE STEALTH</button>
-    <button class="btn" id="pause-god-mode-btn" style="font-size:12px;padding:4px 12px;border-color:#ff0;color:#ff0;display:inline-block;margin:4px 0;text-shadow:0 0 8px #ff0">⚡ GOD MODE</button>
-    <div id="pause-weapons-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:10px auto;max-width:500px;font-size:11px"></div>
-    <button class="btn" id="resume-btn" style="border-color:#fff;color:#fff">▶ RESUME</button>
-    <button class="btn" id="quit-btn" style="margin-top:12px;border-color:#888;color:#888">✕ QUIT TO MENU</button>
-  </div>
-
   <!-- Win screen -->
   <div id="overlay-win" class="overlay" style="display:none">
     <h1>VICTORY!</h1>
@@ -236,10 +221,17 @@
     <button class="btn" id="play-again-btn">PLAY AGAIN</button>
   </div>
 
-  <!-- Inventory / Pause overlay -->
+  <!-- Inventory / Pause overlay (unified) -->
   <div id="inventory-overlay" class="overlay" style="display:none">
     <div class="overlay-content" style="max-width:700px;max-height:90vh;overflow-y:auto">
-      <h1>⏸ INVENTORY</h1>
+      <h1>⏸ PAUSED / INVENTORY</h1>
+
+      <!-- Role Select -->
+      <div id="pause-role-select" style="margin:8px 0">
+        <span style="color:#aaa;font-size:13px">ROLE:</span>
+        <button class="btn" id="role-brigade-btn" style="font-size:12px;padding:4px 12px;border-color:#0af;color:#0af;display:inline-block;margin:0 4px">🎖 ASSAULT BRIGADE</button>
+        <button class="btn" id="role-lonewolf-btn" style="font-size:12px;padding:4px 12px;border-color:#fa0;color:#fa0;display:inline-block;margin:0 4px">🐺 LONE WOLF</button>
+      </div>
 
       <!-- Materials / Resources Section -->
       <div id="materials-section" style="background:rgba(0,0,0,0.4);border:1px solid #555;border-radius:6px;padding:10px;margin:10px 0">
@@ -251,11 +243,17 @@
       <!-- Weapon Switching Section -->
       <h3 style="margin:10px 0 6px 0;color:#ff8844;font-size:14px">🔫 WEAPONS (click to equip)</h3>
       <div id="inventory-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0;"></div>
+      <div id="pause-weapons-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:10px auto;max-width:500px;font-size:11px"></div>
 
       <!-- Player Stats -->
       <div id="player-stats" style="text-align:left;font-size:14px;margin:10px 0;background:rgba(0,0,0,0.3);padding:8px;border-radius:4px"></div>
+
+      <!-- Pause Controls -->
+      <button class="btn" id="stealth-toggle-btn" style="border-color:#0f6;color:#0f6;margin-top:8px">👻 TOGGLE STEALTH</button>
+      <button class="btn" id="pause-god-mode-btn" style="font-size:12px;padding:4px 12px;border-color:#ff0;color:#ff0;display:inline-block;margin:4px 0;text-shadow:0 0 8px #ff0">⚡ GOD MODE</button>
       <p style="color:#888;font-size:12px">Press ESC or tap ⏸ to resume</p>
-      <button class="btn" id="inv-resume-btn" style="border-color:#fff;color:#fff">▶ RESUME</button>
+      <button class="btn" id="resume-btn" style="border-color:#fff;color:#fff">▶ RESUME</button>
+      <button class="btn" id="quit-btn" style="margin-top:12px;border-color:#888;color:#888">✕ QUIT TO MENU</button>
     </div>
   </div>
 
@@ -335,12 +333,16 @@
   });
 
   document.getElementById('resume-btn').addEventListener('click', function () {
+    var invOv = document.getElementById('inventory-overlay');
+    if (invOv) invOv.style.display = 'none';
     GameManager.hideOverlays();
     GameManager.setState(GameManager.STATE.PLAYING);
     GameManager.requestPointerLock();
   });
 
   document.getElementById('quit-btn').addEventListener('click', function () {
+    var invOv = document.getElementById('inventory-overlay');
+    if (invOv) invOv.style.display = 'none';
     GameManager.hideOverlays();
     GameManager.showOverlay('start');
     GameManager.setState(GameManager.STATE.MENU);
@@ -348,10 +350,6 @@
 
   document.getElementById('play-again-btn').addEventListener('click', function () {
     GameManager.startGame();
-  });
-
-  document.getElementById('inv-resume-btn').addEventListener('click', function () {
-    GameManager.toggleInventory();
   });
 
   // ── Role selection ──────────────────────────────────────

@@ -401,6 +401,26 @@ const VehicleSystem = (function () {
         }
       }
     }
+    // Try to find road waypoint
+    var roadWPs = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getRoadWaypoints) ? VoxelWorld.getRoadWaypoints() : [];
+    if (roadWPs.length > 0) {
+      // Pick nearest road waypoint to current position
+      var bestRoad = null;
+      var bestDist = Infinity;
+      for (var ri = 0; ri < roadWPs.length; ri++) {
+        var rd = v.position.distanceTo(roadWPs[ri]);
+        // Pick a road point that's not too close (at least 8 units away) and not too far
+        if (rd > 8 && rd < 40 && rd < bestDist) {
+          bestDist = rd;
+          bestRoad = roadWPs[ri];
+        }
+      }
+      if (bestRoad) {
+        v._patrolTarget = bestRoad.clone();
+        v._patrolTarget.y = VoxelWorld.getTerrainHeight(bestRoad.x, bestRoad.z);
+      }
+    }
+
     // Fallback: Random point within PATROL_RADIUS of spawn
     v._onRoad = false;
     const home = v.spawnPos;

@@ -10,14 +10,24 @@ const DroneSystem = (function () {
     FPV_ATTACK:   'fpv_attack',
     BOMB:         'bomb',
     SURVEILLANCE: 'surveillance',
+    ENEMY_BOMBER: 'enemy_bomber',
+    ENEMY_FPV:    'enemy_fpv',
   });
 
   const DRONE_STATS = {
-    recon:        { speed: 12, health: 30,  battery: 120, damage: 0,   range: 80 },
-    fpv_attack:   { speed: 18, health: 15,  battery: 45,  damage: 80,  range: 50 },
-    bomb:         { speed: 8,  health: 40,  battery: 90,  damage: 200, range: 60 },
-    surveillance: { speed: 6,  health: 50,  battery: 300, damage: 0,   range: 100 },
+    recon:         { speed: 12, health: 30,  battery: 120, damage: 0,   range: 80 },
+    fpv_attack:    { speed: 18, health: 15,  battery: 45,  damage: 80,  range: 50 },
+    bomb:          { speed: 8,  health: 40,  battery: 90,  damage: 200, range: 60 },
+    surveillance:  { speed: 6,  health: 50,  battery: 300, damage: 0,   range: 100 },
+    enemy_bomber:  { speed: 7,  health: 35,  battery: 80,  damage: 150, range: 50 },
+    enemy_fpv:     { speed: 22, health: 10,  battery: 30,  damage: 100, range: 40 },
   };
+
+  /* ── Faction helpers ────────────────────────────────────────────── */
+  function factionForType(type) {
+    if (type === DRONE_TYPE.ENEMY_BOMBER || type === DRONE_TYPE.ENEMY_FPV) return 'russian';
+    return 'ukrainian';
+  }
 
   /* ── State ───────────────────────────────────────────────────────── */
   const drones = [];
@@ -27,19 +37,41 @@ const DroneSystem = (function () {
   let _possessedDrone = null;
 
   /* ── Create Drone Mesh ───────────────────────────────────────────── */
+  function addRussianFlag(group) {
+    const stripeGeo = new THREE.BoxGeometry(0.3, 0.02, 0.05);
+    const white = new THREE.Mesh(stripeGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }));
+    white.position.set(0, 0.095, -0.05);
+    group.add(white);
+    const blue = new THREE.Mesh(stripeGeo.clone(), new THREE.MeshLambertMaterial({ color: 0x0039A6 }));
+    blue.position.set(0, 0.095, 0);
+    group.add(blue);
+    const red = new THREE.Mesh(stripeGeo.clone(), new THREE.MeshLambertMaterial({ color: 0xD52B1E }));
+    red.position.set(0, 0.095, 0.05);
+    group.add(red);
+  }
+
   function buildDroneMesh(type) {
     const group = new THREE.Group();
     const stats = DRONE_STATS[type];
+    const faction = factionForType(type);
 
-    // Body
+    // Body color by faction and type
+    let bodyColor;
+    if (faction === 'russian') {
+      bodyColor = type === DRONE_TYPE.ENEMY_BOMBER ? 0x3a3a2a : 0x8B0000;
+    } else {
+      bodyColor = 0x0057B8; // Ukrainian blue for all friendly drones
+    }
+
     const bodyGeo = new THREE.BoxGeometry(0.5, 0.15, 0.5);
-    const bodyMat = new THREE.MeshLambertMaterial({
-      color: type === DRONE_TYPE.FPV_ATTACK ? 0xFF4444 :
-             type === DRONE_TYPE.BOMB ? 0x444444 :
-             type === DRONE_TYPE.SURVEILLANCE ? 0x4488FF : 0x44FF44
-    });
+    const bodyMat = new THREE.MeshLambertMaterial({ color: bodyColor });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     group.add(body);
+
+    // Russian flag stripe on enemy drones
+    if (faction === 'russian') {
+      addRussianFlag(group);
+    }
 
     // 4 Arms + rotors
     const armPositions = [
@@ -104,6 +136,7 @@ const DroneSystem = (function () {
     const drone = {
       id: nextId++,
       type,
+      faction: factionForType(type),
       position: new THREE.Vector3(x, y, z),
       velocity: new THREE.Vector3(),
       rotation: new THREE.Euler(0, 0, 0, 'YXZ'),
@@ -116,7 +149,7 @@ const DroneSystem = (function () {
       mesh:     null,
       alive:    true,
       active:   true,  // powered on
-      hasPayload: type === DRONE_TYPE.BOMB,
+      hasPayload: type === DRONE_TYPE.BOMB || type === DRONE_TYPE.ENEMY_BOMBER,
 
       // AI patrol (for surveillance drones)
       patrolPoints: [],
@@ -164,6 +197,119 @@ const DroneSystem = (function () {
     if (key in _droneKeys) _droneKeys[key] = pressed;
   }
 
+  /* ── Enemy Drone AI ───────────────────────────────────────────────── */
+  function updateEnemyDrone(drone, delta) {
+    // Get player position from GameManager
+    var gm = (typeof GameManager !== 'undefined') ? GameManager : null;
+    var playerPos = gm ? gm.getPlayer().position : new THREE.Vector3(0, 5, 0);
+
+    var dx = playerPos.x - drone.position.x;
+    var dz = playerPos.z - drone.position.z;
+    var distXZ = Math.sqrt(dx * dx + dz * dz);
+
+    if (drone.type === DRONE_TYPE.ENEMY_BOMBER) {
+      // Bomber: circle at altitude 18, drop bombs when close
+      var targetAlt = 18;
+      var altDiff = targetAlt - drone.position.y;
+      drone.velocity.y = altDiff * 2;
+
+      if (distXZ > 8) {
+        // Move toward player
+        var nx = dx / distXZ;
+        var nz = dz / distXZ;
+        drone.velocity.x = nx * drone.speed * 0.6;
+        drone.velocity.z = nz * drone.speed * 0.6;
+      } else {
+        // Circle around player
+        drone._circleAngle = (drone._circleAngle || Math.atan2(dz, dx)) + delta * 1.5;
+        var angle = drone._circleAngle;
+        drone.velocity.x = Math.cos(angle) * drone.speed * 0.4;
+        drone.velocity.z = Math.sin(angle) * drone.speed * 0.4;
+
+        // Drop bomb every 4 seconds
+        if (!drone._bombTimer) drone._bombTimer = 4;
+        drone._bombTimer -= delta;
+        if (drone._bombTimer <= 0 && distXZ < 12) {
+          drone._bombTimer = 4;
+          // Create explosion at ground below drone
+          var bombX = drone.position.x;
+          var bombZ = drone.position.z;
+          var bombY = VoxelWorld.getTerrainHeight(bombX, bombZ);
+          if (typeof Enemies !== 'undefined' && Enemies.damageInRadius) {
+            // Damage player via GameManager
+            var bombPos = new THREE.Vector3(bombX, bombY, bombZ);
+            var distToPlayer = bombPos.distanceTo(playerPos);
+            if (distToPlayer < 6 && gm) {
+              var dmg = Math.max(1, Math.floor(drone.damage * (1 - distToPlayer / 6)));
+              var p = gm.getPlayer();
+              p.hp -= dmg;
+            }
+          }
+          // Terrain destruction
+          if (VoxelWorld.setBlock) {
+            for (var rx = -2; rx <= 2; rx++) {
+              for (var rz = -2; rz <= 2; rz++) {
+                VoxelWorld.setBlock(Math.floor(bombX) + rx, Math.floor(bombY), Math.floor(bombZ) + rz, 0);
+              }
+            }
+          }
+          // Visual: spawn smoke
+          if (typeof Tracers !== 'undefined' && Tracers.spawnSmoke) {
+            Tracers.spawnSmoke(new THREE.Vector3(bombX, bombY, bombZ));
+          }
+        }
+      }
+    } else if (drone.type === DRONE_TYPE.ENEMY_FPV) {
+      // FPV kamikaze: dive directly at player at high speed
+      var targetY = playerPos.y + 1;
+      var dy = targetY - drone.position.y;
+      var dist3D = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      if (dist3D > 2) {
+        // Approach phase - dive toward player
+        var speed = drone.speed;
+        drone.velocity.x = (dx / dist3D) * speed;
+        drone.velocity.y = (dy / dist3D) * speed;
+        drone.velocity.z = (dz / dist3D) * speed;
+      } else {
+        // Impact! Explode and damage player
+        if (gm) {
+          var p = gm.getPlayer();
+          p.hp -= drone.damage;
+        }
+        // Terrain destruction at impact
+        var ix = Math.floor(drone.position.x);
+        var iy = Math.floor(drone.position.y);
+        var iz = Math.floor(drone.position.z);
+        if (VoxelWorld.setBlock) {
+          for (var bx = -1; bx <= 1; bx++) {
+            for (var bz = -1; bz <= 1; bz++) {
+              VoxelWorld.setBlock(ix + bx, iy, iz + bz, 0);
+            }
+          }
+        }
+        if (typeof Tracers !== 'undefined' && Tracers.spawnSmoke) {
+          Tracers.spawnSmoke(drone.position.clone());
+        }
+        destroyDrone(drone);
+        return;
+      }
+    }
+
+    // Face movement direction
+    if (drone.velocity.length() > 0.1) {
+      drone.rotation.y = Math.atan2(drone.velocity.x, drone.velocity.z);
+    }
+  }
+
+  /* ── Spawn Enemy Drone (convenience) ────────────────────────────── */
+  function spawnEnemyDrone(x, y, z, type) {
+    type = type || DRONE_TYPE.ENEMY_BOMBER;
+    var d = spawn(x, y, z, type);
+    d.aiControlled = true; // Enable AI processing
+    return d;
+  }
+
   /* ── Update All Drones ───────────────────────────────────────────── */
   function update(delta) {
     for (const drone of drones) {
@@ -181,6 +327,8 @@ const DroneSystem = (function () {
         updatePossessedDrone(drone, delta);
       } else if (drone.aiControlled) {
         updateAIDrone(drone, delta);
+      } else if (drone.faction === 'russian') {
+        updateEnemyDrone(drone, delta);
       }
 
       // Apply velocity
@@ -385,6 +533,9 @@ const DroneSystem = (function () {
     getActive,
     getById,
     getByType,
+    getEnemyDrones: function() { return drones.filter(function(d) { return d.alive && d.faction === 'russian'; }); },
+    getFriendlyDrones: function() { return drones.filter(function(d) { return d.alive && d.faction === 'ukrainian'; }); },
+    spawnEnemyDrone,
     clear,
   };
 })();
