@@ -257,7 +257,7 @@ const VehicleSystem = (function () {
     const v = vehicles.find(v => v.id === vehicleId && v.alive);
     if (!v || v.seats <= 0) return false;
     // Duration depends on faction: enemy takes longer
-    var duration = v.faction === 'enemy' ? 2.0 : 0.8;
+    const duration = v.faction === 'enemy' ? 2.0 : 0.8;
     _hijackState = { vehicle: v, timer: 0, duration: duration };
     if (typeof HUD !== 'undefined' && HUD.showHijackProgress) HUD.showHijackProgress(0.01);
     return true;
@@ -266,7 +266,7 @@ const VehicleSystem = (function () {
   /** Complete the hijack (called when timer finishes) */
   function completeHijack() {
     if (!_hijackState) return false;
-    var v = _hijackState.vehicle;
+    const v = _hijackState.vehicle;
     _hijackState = null;
     if (!v || !v.alive) return false;
     // Clean up prior state
@@ -382,7 +382,7 @@ const VehicleSystem = (function () {
     // Process hijack animation
     if (_hijackState) {
       _hijackState.timer += delta;
-      var progress = Math.min(1, _hijackState.timer / _hijackState.duration);
+      const progress = Math.min(1, _hijackState.timer / _hijackState.duration);
       if (typeof HUD !== 'undefined' && HUD.showHijackProgress) HUD.showHijackProgress(progress);
       if (progress >= 1) {
         completeHijack();

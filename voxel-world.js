@@ -2347,7 +2347,7 @@ const VoxelWorld = (function () {
       // Floor surface
       for (let x = 0; x < w; x++) {
         for (let z = 0; z < d; z++) {
-          var floorBlock = floor === 0 ? BLOCK.LINOLEUM : BLOCK.CARPET;
+          let floorBlock = floor === 0 ? BLOCK.LINOLEUM : BLOCK.CARPET;
           if (variant % 3 === 1 && floor > 0) floorBlock = BLOCK.WOOD;
           setBlock(ox + x, baseY, oz + z, floorBlock);
         }
@@ -2379,7 +2379,7 @@ const VoxelWorld = (function () {
         }
 
         // Interior partition wall (divides rooms)
-        var partX = Math.floor(w / 2);
+        const partX = Math.floor(w / 2);
         for (let z = 1; z < d - 1; z++) {
           if (z !== Math.floor(d / 2)) { // doorway gap
             setBlock(ox + partX, baseY + y, oz + z, BLOCK.PLASTER);
@@ -2415,24 +2415,24 @@ const VoxelWorld = (function () {
     }
 
     // Roof — pitched with rooftiles
-    var roofBaseY = surfH + 1 + floors * floorH;
+    const roofBaseY = surfH + 1 + floors * floorH;
     for (let x = 0; x < w; x++) {
       for (let z = 0; z < d; z++) {
         setBlock(ox + x, roofBaseY, oz + z, BLOCK.ROOFTILE);
       }
     }
     // Peaked ridge
-    var midZ = Math.floor(d / 2);
+    const midZ = Math.floor(d / 2);
     for (let x = 0; x < w; x++) {
       setBlock(ox + x, roofBaseY + 1, oz + midZ, BLOCK.SHINGLE);
     }
 
     // Battle damage — random holes in walls (war-torn effect)
-    var holeCount = 2 + (variant % 3);
+    const holeCount = 2 + (variant % 3);
     for (let h = 0; h < holeCount; h++) {
-      var hx = ox + 1 + Math.floor(Math.random() * (w - 2));
-      var hy = surfH + 2 + Math.floor(Math.random() * (floors * floorH - 2));
-      var hz = (Math.random() > 0.5) ? oz : oz + d - 1;
+      const hx = ox + 1 + Math.floor(Math.random() * (w - 2));
+      const hy = surfH + 2 + Math.floor(Math.random() * (floors * floorH - 2));
+      const hz = (Math.random() > 0.5) ? oz : oz + d - 1;
       setBlock(hx, hy, hz, BLOCK.AIR);
       if (Math.random() > 0.5) setBlock(hx + 1, hy, hz, BLOCK.AIR);
       // Rubble below
@@ -2483,7 +2483,7 @@ const VoxelWorld = (function () {
 
     // Entrances (3 double doors in front glass wall)
     for (let door = 0; door < 3; door++) {
-      var doorX = ox + 4 + door * 8;
+      const doorX = ox + 4 + door * 8;
       for (let dx = 0; dx < 2; dx++) {
         setBlock(doorX + dx, surfH + 2, oz, BLOCK.AIR);
         setBlock(doorX + dx, surfH + 3, oz, BLOCK.AIR);
@@ -2534,7 +2534,7 @@ const VoxelWorld = (function () {
 
     // Boarding bridges (2 jetways extending from back wall)
     for (let jw = 0; jw < 2; jw++) {
-      var jwX = ox + 6 + jw * 12;
+      const jwX = ox + 6 + jw * 12;
       for (let z = td; z < td + 6; z++) {
         setBlock(jwX, surfH + 3, oz + z, BLOCK.METAL);
         setBlock(jwX + 1, surfH + 3, oz + z, BLOCK.METAL);
@@ -2551,9 +2551,9 @@ const VoxelWorld = (function () {
 
     // Battle damage — shell holes in terminal
     for (let dmg = 0; dmg < 5; dmg++) {
-      var dmgX = ox + 2 + Math.floor(Math.random() * (tw - 4));
-      var dmgY = surfH + 2 + Math.floor(Math.random() * th);
-      var dmgZ = Math.random() > 0.5 ? oz : oz + td - 1;
+      const dmgX = ox + 2 + Math.floor(Math.random() * (tw - 4));
+      const dmgY = surfH + 2 + Math.floor(Math.random() * th);
+      const dmgZ = Math.random() > 0.5 ? oz : oz + td - 1;
       setBlock(dmgX, dmgY, dmgZ, BLOCK.AIR);
       setBlock(dmgX + 1, dmgY, dmgZ, BLOCK.AIR);
       // Rubble scatter
@@ -2569,7 +2569,7 @@ const VoxelWorld = (function () {
     // Parallel taxiway
     for (let x = ox - 35; x < ox + 35; x++) {
       for (let w = 0; w < 4; w++) {
-        var ty = getTerrainHeight(x, oz + 14);
+        const ty = getTerrainHeight(x, oz + 14);
         setBlock(x, ty, oz + 14 + w, BLOCK.ASPHALT);
       }
     }
@@ -2578,8 +2578,8 @@ const VoxelWorld = (function () {
     generateHostomelTerminal(ox - 12, oz + 20);
 
     // Control tower (tall, 8 floors)
-    var ctOx = ox + 16, ctOz = oz + 22;
-    var ctH = getTerrainHeight(ctOx, ctOz);
+    const ctOx = ox + 16, ctOz = oz + 22;
+    const ctH = getTerrainHeight(ctOx, ctOz);
     // Tower shaft
     for (let y = 1; y <= 12; y++) {
       for (let x = 0; x < 3; x++) {
@@ -2609,9 +2609,9 @@ const VoxelWorld = (function () {
 
     // Hangars (3 large)
     for (let hi = 0; hi < 3; hi++) {
-      var hx = ox - 30 + hi * 20;
-      var hz = oz - 8;
-      var hH = getTerrainHeight(hx, hz);
+      const hx = ox - 30 + hi * 20;
+      const hz = oz - 8;
+      const hH = getTerrainHeight(hx, hz);
       // Hangar building 10x8x6
       for (let y = 1; y <= 6; y++) {
         for (let x = 0; x < 10; x++) {
@@ -2647,7 +2647,7 @@ const VoxelWorld = (function () {
     // Apron/parking area (concrete pads between runway and terminal)
     for (let x = ox - 20; x < ox + 20; x++) {
       for (let z = oz + 8; z < oz + 18; z++) {
-        var apH = getTerrainHeight(x, z);
+        const apH = getTerrainHeight(x, z);
         setBlock(x, apH, z, BLOCK.CONCRETE);
       }
     }

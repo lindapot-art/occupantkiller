@@ -477,7 +477,7 @@ const GameManager = (function () {
           } else {
             const nearby = VehicleSystem.getNearby(player.position, 5);
             if (nearby.length > 0) {
-              var targetVehicle = nearby[0];
+              const targetVehicle = nearby[0];
               if (targetVehicle.faction === 'enemy') {
                 // Start animated hijack of enemy vehicle
                 VehicleSystem.startHijack(targetVehicle.id);

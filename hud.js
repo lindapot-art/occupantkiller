@@ -373,7 +373,7 @@ const HUD = (() => {
   function showVehicleHUD(vehicle) {
     if (!vehicleHudEl || !vehicle) return;
     vehicleHudEl.style.display = 'block';
-    var icon = VEHICLE_ICONS[vehicle.type] || '🚗';
+    const icon = VEHICLE_ICONS[vehicle.type] || '🚗';
     vhTypeEl.textContent = icon + ' ' + vehicle.type.toUpperCase().replace('_', ' ');
     if (vehicle.flying) {
       vhControlsEl.textContent = 'WASD · Fly | SPACE · Ascend | SHIFT · Descend | G · Exit | T · View | LMB · Fire';
@@ -391,7 +391,7 @@ const HUD = (() => {
   function updateVehicleHUD(vehicle) {
     if (!vehicleHudEl || !vehicle) return;
     // Health bar
-    var hpPct = Math.max(0, vehicle.health / vehicle.maxHealth) * 100;
+    const hpPct = Math.max(0, vehicle.health / vehicle.maxHealth) * 100;
     if (vhHealthBar) {
       vhHealthBar.style.width = hpPct + '%';
       if (hpPct > 50) {
@@ -405,7 +405,7 @@ const HUD = (() => {
     if (vhHealthVal) vhHealthVal.textContent = Math.ceil(vehicle.health) + '/' + vehicle.maxHealth;
     // Speed
     if (vhSpeedEl) {
-      var speed = vehicle.velocity ? Math.round(vehicle.velocity.length() * 3.6) : 0;
+      const speed = vehicle.velocity ? Math.round(vehicle.velocity.length() * 3.6) : 0;
       vhSpeedEl.textContent = speed + ' km/h';
     }
   }
