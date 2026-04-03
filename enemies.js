@@ -586,14 +586,16 @@ const Enemies = (() => {
   // ── Rank-based weapon visual for enemy mesh ───────────────
   // Adds a weapon mesh to the right arm based on enemy rank/type
   const ENEMY_WEAPON_VISUALS = {
-    CONSCRIPT:  { len: 0.22, color: 0x3a3a28, name: 'AK-74' },
-    STORMER:    { len: 0.16, color: 0x2a2a2a, name: 'PP-19 Vityaz' },
-    ARMORED:    { len: 0.30, color: 0x2a2a1a, name: 'PKP Pecheneg' },
-    MEDIC:      { len: 0.12, color: 0x333333, name: 'Makarov PM' },
-    OFFICER:    { len: 0.24, color: 0x2a2a2a, name: 'AK-12' },
-    SNIPER:     { len: 0.35, color: 0x3a3a2a, name: 'SV-98' },
-    ENGINEER:   { len: 0.20, color: 0x3a3a28, name: 'AKS-74U' },
-    DRONE_OP:   { len: 0.14, color: 0x2a2a2a, name: 'Makarov PM' },
+    CONSCRIPT:    { len: 0.22, color: 0x3a3a28, name: 'AK-74' },
+    STORMER:      { len: 0.16, color: 0x2a2a2a, name: 'PP-19 Vityaz' },
+    ARMORED:      { len: 0.30, color: 0x2a2a1a, name: 'PKP Pecheneg' },
+    MEDIC:        { len: 0.12, color: 0x333333, name: 'Makarov PM' },
+    OFFICER:      { len: 0.24, color: 0x2a2a2a, name: 'AK-12' },
+    SNIPER:       { len: 0.35, color: 0x3a3a2a, name: 'SV-98' },
+    ENGINEER:     { len: 0.20, color: 0x3a3a28, name: 'AKS-74U' },
+    DRONE_OP:     { len: 0.14, color: 0x2a2a2a, name: 'Makarov PM' },
+    FLAMETHROWER: { len: 0.28, color: 0x4a2a0a, name: 'RPO-A Shmel' },
+    SABOTEUR:     { len: 0.18, color: 0x1a1a1a, name: 'SR-2 Veresk' },
   };
 
   function attachWeaponVisual(mesh, typeCfg) {

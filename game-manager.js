@@ -429,6 +429,16 @@ const GameManager = (function () {
   }
 
   /* ── Input ───────────────────────────────────────────────────────── */
+  var _skipNextEsc = false;
+
+  // Detect fullscreen exit to prevent ESC from also toggling pause
+  document.addEventListener('fullscreenchange', function () {
+    if (!document.fullscreenElement) _skipNextEsc = true;
+  });
+  document.addEventListener('webkitfullscreenchange', function () {
+    if (!document.webkitFullscreenElement) _skipNextEsc = true;
+  });
+
   function setupInput() {
     document.addEventListener('keydown', function (e) {
       keys[e.code] = true;
@@ -642,8 +652,12 @@ const GameManager = (function () {
         }
       }
 
-      // Pause toggle
+      // Pause toggle — skip if we just exited fullscreen (browser ESC exits fullscreen first)
       if (e.code === 'Escape') {
+        if (document.fullscreenElement || document.webkitFullscreenElement || _skipNextEsc) {
+          _skipNextEsc = false;
+          return; // Let the browser handle fullscreen exit without toggling pause
+        }
         if (gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE) {
           gameState = STATE.PAUSED;
           var invOv = document.getElementById('inventory-overlay');

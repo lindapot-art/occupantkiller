@@ -461,9 +461,10 @@ const VehicleSystem = (function () {
   }
 
   function updatePlayerVehicle(v, delta) {
-    const yaw = CameraSystem.getYaw();
-    const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-    const right   = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+    // Use vehicle's own rotation for movement direction (not camera yaw)
+    // This prevents the vehicle from flying off based on where the camera looks
+    const vYaw = v.rotation.y;
+    const forward = new THREE.Vector3(-Math.sin(vYaw), 0, -Math.cos(vYaw));
 
     const accel = v.speed * 2;
 

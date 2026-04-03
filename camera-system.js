@@ -165,7 +165,10 @@ const CameraSystem = (function () {
       _camera.position.copy(vPos);
       _camera.position.x += shakeOffsetX;
       _camera.position.y += shakeOffsetY;
-      var vEuler = new THREE.Euler(pitch + shakeOffsetY * 0.5, yaw + shakeOffsetX * 0.5, 0, 'YXZ');
+      // Use vehicle yaw as base + allow limited freelook via mouse offset
+      var vehicleYaw = _vehicleObj.rotation.y;
+      var lookYaw = vehicleYaw + (yaw - vehicleYaw) * 1.0; // freelook from vehicle heading
+      var vEuler = new THREE.Euler(pitch + shakeOffsetY * 0.5, lookYaw + shakeOffsetX * 0.5, 0, 'YXZ');
       _camera.quaternion.setFromEuler(vEuler);
       return;
     }
@@ -252,10 +255,15 @@ const CameraSystem = (function () {
 
   function updateVehicle(delta) {
     if (!_vehicleObj) return;
-    // Follow behind vehicle (third person vehicle view)
-    const behind = new THREE.Vector3(0, 3, 8);
-    behind.applyQuaternion(_vehicleObj.quaternion);
-    _camera.position.copy(_vehicleObj.position).add(behind);
+    // Follow behind vehicle based on vehicle's own rotation
+    var vYaw = _vehicleObj.rotation.y;
+    // Smooth camera follow: offset behind vehicle
+    var behindDist = 8;
+    var aboveHeight = 3;
+    var cx = _vehicleObj.position.x + Math.sin(vYaw) * behindDist;
+    var cy = _vehicleObj.position.y + aboveHeight;
+    var cz = _vehicleObj.position.z + Math.cos(vYaw) * behindDist;
+    _camera.position.set(cx, cy, cz);
     _camera.lookAt(_vehicleObj.position);
   }
 

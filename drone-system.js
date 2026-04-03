@@ -315,12 +315,17 @@ const DroneSystem = (function () {
     for (const drone of drones) {
       if (!drone.alive || !drone.active) continue;
 
-      // Battery drain
-      drone.battery -= delta * 0.5;
-      if (drone.battery <= 0) {
-        drone.active = false;
-        // Drone falls
-        drone.velocity.y = -5;
+      // Battery drain (only when actively flying/possessed; idle friendly drones recharge)
+      if (drone === _possessedDrone || drone.aiControlled || drone.faction === 'russian') {
+        drone.battery -= delta * 0.5;
+        if (drone.battery <= 0) {
+          drone.active = false;
+          // Drone falls
+          drone.velocity.y = -5;
+        }
+      } else if (drone.faction === 'ukrainian' && drone.battery < drone.maxBattery) {
+        // Idle friendly drones auto-recharge
+        drone.battery = Math.min(drone.maxBattery, drone.battery + delta * 1.0);
       }
 
       if (drone === _possessedDrone) {
