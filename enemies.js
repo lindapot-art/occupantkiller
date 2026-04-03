@@ -345,6 +345,7 @@ const Enemies = (() => {
   let stageMult  = 1;    // stage difficulty multiplier
   let _playerPos = null; // cached player position for spawning
   let _playerStealth = false; // player stealth state
+  let _aiStrategy = null; // ML counter-strategy for this wave
 
   const ARENA_SIZE = 24;
   const DETECTION_RANGE = 14;   // enemies detect player within this range
@@ -353,6 +354,12 @@ const Enemies = (() => {
 
   // ── Choose a type appropriate for the current wave ────────
   function pickTypeForWave(w) {
+    // AI Smart Learning: ML system may override type selection
+    if (_aiStrategy && _aiStrategy.preferredTypes && _aiStrategy.preferredTypes.length > 0 &&
+        _aiStrategy.adaptationLevel > 0 && Math.random() < 0.3 * _aiStrategy.adaptationLevel) {
+      return _aiStrategy.preferredTypes[Math.floor(Math.random() * _aiStrategy.preferredTypes.length)];
+    }
+
     const r = Math.random();
     // Late waves: introduce specialists and heavy units
     if (w >= 7 && r < 0.05) return 'SABOTEUR';
@@ -681,6 +688,7 @@ const Enemies = (() => {
 
     const idx = enemies.length;
     enemies.push({
+      id:          idx,
       mesh,
       hpBar:       buildHpBar(),
       typeCfg,
@@ -716,9 +724,19 @@ const Enemies = (() => {
 
   // ── Spawn an assault group ─────────────────────────────────
   function spawnAssaultGroup(groupId, sc) {
-    const angle = (groupId / NUM_ASSAULT_GROUPS) * Math.PI * 2 + Math.random() * 0.5;
-    const dist = ARENA_SIZE * 0.44 + Math.random() * 6;
-    const center = new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+    // AI Smart Learning: bias spawn angle toward player's vulnerable direction
+    var baseAngle = (groupId / NUM_ASSAULT_GROUPS) * Math.PI * 2 + Math.random() * 0.5;
+    if (_aiStrategy && _aiStrategy.attackFromVulnerable && _aiStrategy.preferredSpawnAngle && groupId === 0) {
+      // First group spawns from vulnerable direction (convert player-relative to world-space)
+      var spawnYaw = 0;
+      if (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) {
+        spawnYaw = CameraSystem.getYaw();
+      }
+      baseAngle = spawnYaw + _aiStrategy.preferredSpawnAngle + (Math.random() - 0.5) * 0.5;
+    }
+    var spawnDistMod = (_aiStrategy && _aiStrategy.spawnDistanceMult) || 1.0;
+    const dist = (ARENA_SIZE * 0.44 + Math.random() * 6) * spawnDistMod;
+    const center = new THREE.Vector3(Math.cos(baseAngle) * dist, 0, Math.sin(baseAngle) * dist);
 
     const group = createAssaultGroup(groupId, center);
 
@@ -749,17 +767,28 @@ const Enemies = (() => {
   }
 
   // ── Initialise a wave ─────────────────────────────────────
-  function startWave(w, sc, stageMultiplier) {
+  function startWave(w, sc, stageMultiplier, aiStrategy) {
     wave      = w;
     scene     = sc;
     stageMult = stageMultiplier || 1;
     enemies   = [];
     allDead   = false;
     assaultGroups.length = 0;
+    _aiStrategy = aiStrategy || null;
+
+    // AI Smart Learning: adjust group spread based on strategy
+    var groupSpread = (_aiStrategy && _aiStrategy.groupSpreadFactor) || 1.0;
 
     // Spawn 5 enemy assault groups (Russian army штурмовые группы)
     for (let g = 0; g < NUM_ASSAULT_GROUPS; g++) {
       spawnAssaultGroup(g, sc);
+    }
+
+    // AI Smart Learning: adjust formation spread for all groups
+    if (groupSpread !== 1.0) {
+      for (var gi = 0; gi < assaultGroups.length; gi++) {
+        assaultGroups[gi].formationSpread *= groupSpread;
+      }
     }
 
     // Additional loose enemies spawn over time (stragglers, reinforcements)
@@ -974,13 +1003,62 @@ const Enemies = (() => {
       if (moveTarget && targetDist > 1.0) {
         const dir = new THREE.Vector3().subVectors(moveTarget, e.mesh.position).setY(0).normalize();
 
+        // ── AI Smart Learning: ML-guided flanking and tactical behavior ──
+        if (e.playerSpotted && !targetIsNPC && _aiStrategy) {
+          // Exploit player's vulnerable direction (convert from player-relative to world-space)
+          if (_aiStrategy.attackFromVulnerable && _aiStrategy.vulnerableSector >= 0 && targetDist > 8) {
+            var playerYaw = 0;
+            if (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) {
+              playerYaw = CameraSystem.getYaw();
+            }
+            var vulnAngle = playerYaw + _aiStrategy.vulnerableSector * (Math.PI * 0.25);
+            var vulnDir = new THREE.Vector3(Math.sin(vulnAngle), 0, Math.cos(vulnAngle));
+            var vulnWeight = 0.3 * _aiStrategy.adaptationLevel;
+            dir.addScaledVector(vulnDir, vulnWeight).normalize();
+          }
+
+          // ML-guided position prediction: intercept predicted position
+          if (typeof MLSystem !== 'undefined' && MLSystem.predictPlayerPosition && targetDist > 10) {
+            var predicted = MLSystem.predictPlayerPosition(2.0);
+            if (predicted) {
+              var predDir = new THREE.Vector3(predicted.x - e.mesh.position.x, 0, predicted.z - e.mesh.position.z);
+              if (predDir.lengthSq() > 1) {
+                predDir.normalize();
+                dir.lerp(predDir, 0.2 * _aiStrategy.adaptationLevel).normalize();
+              }
+            }
+          }
+
+          // ML-guided rush timing: coordinate attack during predicted reload
+          if (_aiStrategy.attackDuringReload && typeof MLSystem !== 'undefined') {
+            var mlBehav = MLSystem.getBehavior();
+            if (mlBehav && mlBehav.timingPatterns) {
+              var tSinceReload = (performance.now() - mlBehav.timingPatterns.lastReloadTime) / 1000;
+              var dynReloadWin = Math.max(0, mlBehav.timingPatterns.avgTimeBetweenReloads - tSinceReload);
+              if (dynReloadWin < 2 && dynReloadWin > 0) {
+                // Sprint toward player during their reload window
+                e.speed = e.typeCfg.speedBase * (1 + (wave - 1) * 0.06) * stageMult * 1.5;
+              }
+            }
+          }
+
+          // ML aggression override
+          var aggMod = _aiStrategy.overallAggression || 0.5;
+          if (aggMod > 0.7 && targetDist > 5) {
+            // More aggressive: close distance faster
+            e.speed = Math.max(e.speed, e.typeCfg.speedBase * 1.3 * stageMult);
+          }
+        }
+
         // ── Strategic flanking: stormers and officers approach from the side ──
         if (e.playerSpotted && !targetIsNPC && targetDist > 6 && targetDist < 25) {
           const typeName = e.typeCfg.name;
-          if (typeName === 'STORMER' || typeName === 'OFFICER') {
+          // AI Smart Learning: increase flank intensity based on ML strategy
+          var flankMod = (_aiStrategy && _aiStrategy.flankIntensity) || 0.3;
+          if (typeName === 'STORMER' || typeName === 'OFFICER' || typeName === 'SABOTEUR') {
             // Flank: perpendicular offset based on enemy ID (alternating L/R)
             const flankSign = (e.id % 2 === 0) ? 1 : -1;
-            const flankStrength = Math.min(1, (targetDist - 6) / 10) * 0.7;
+            const flankStrength = Math.min(1, (targetDist - 6) / 10) * Math.max(0.7, flankMod);
             const perp = new THREE.Vector3(-dir.z * flankSign, 0, dir.x * flankSign);
             dir.addScaledVector(perp, flankStrength).normalize();
           } else if (typeName === 'SNIPER') {
@@ -989,6 +1067,12 @@ const Enemies = (() => {
               const retreatStrength = (12 - targetDist) / 12 * 0.6;
               dir.multiplyScalar(-retreatStrength).normalize();
             }
+          } else if (flankMod > 0.5 && Math.random() < flankMod * 0.3) {
+            // ML: even regular troops get some flanking behavior when AI is adapting
+            const flankSign2 = (e.id % 2 === 0) ? 1 : -1;
+            const flankStr2 = Math.min(1, (targetDist - 6) / 15) * flankMod * 0.5;
+            const perp2 = new THREE.Vector3(-dir.z * flankSign2, 0, dir.x * flankSign2);
+            dir.addScaledVector(perp2, flankStr2).normalize();
           }
         }
 
@@ -1060,10 +1144,33 @@ const Enemies = (() => {
         if (distToPlayer < e.typeCfg.range && distToPlayer > 2.5) {
           if (!e._rangedTimer) e._rangedTimer = 0;
           e._rangedTimer -= delta;
+
+          // AI Smart Learning: faster fire rate during player's reload window
+          var fireRateMod = 1.0;
+          if (_aiStrategy && _aiStrategy.attackDuringReload && typeof MLSystem !== 'undefined') {
+            // Dynamically compute reload window instead of using stale strategy value
+            var mlBehavior = MLSystem.getBehavior();
+            if (mlBehavior && mlBehavior.timingPatterns) {
+              var timeSinceReload = (performance.now() - mlBehavior.timingPatterns.lastReloadTime) / 1000;
+              var dynamicReloadWindow = Math.max(0, mlBehavior.timingPatterns.avgTimeBetweenReloads - timeSinceReload);
+              if (dynamicReloadWindow < 1.5 && dynamicReloadWindow > 0) {
+                fireRateMod = 0.6; // 40% faster firing during reload
+              }
+            }
+          }
+          // AI Smart Learning: synchronized attacks when strategy calls for it
+          if (_aiStrategy && _aiStrategy.syncedAttack && e._rangedTimer < e.typeCfg.rangedRate * 0.3) {
+            fireRateMod = Math.min(fireRateMod, 0.7);
+          }
+
           if (e._rangedTimer <= 0) {
-            e._rangedTimer = e.typeCfg.rangedRate;
+            e._rangedTimer = e.typeCfg.rangedRate * fireRateMod;
             // Accuracy check - affected by distance
             var hitChance = Math.max(0, e.typeCfg.accuracy * (1 - distToPlayer / (e.typeCfg.range * 1.5)));
+            // AI Smart Learning: slight accuracy boost when countering
+            if (_aiStrategy && _aiStrategy.adaptationLevel >= 2) {
+              hitChance = Math.min(0.85, hitChance * 1.15);
+            }
             if (Math.random() < hitChance) {
               onPlayerHit(e.typeCfg.rangedDmg, e.mesh.position);
             }
@@ -1241,7 +1348,12 @@ const Enemies = (() => {
             }
           }
           if (grp.stateTimer <= 0) {
-            grp.state = grp.morale < 40 ? GROUP_STATE.RETREATING : GROUP_STATE.REGROUPING;
+            // AI Smart Learning: ML-guided retreat threshold
+            var retreatMoraleThreshold = 40;
+            if (_aiStrategy) {
+              retreatMoraleThreshold = Math.max(10, 40 * (1 - _aiStrategy.overallAggression * 0.5));
+            }
+            grp.state = grp.morale < retreatMoraleThreshold ? GROUP_STATE.RETREATING : GROUP_STATE.REGROUPING;
             grp.stateTimer = 10 + Math.random() * 15;
           }
           break;
@@ -1278,9 +1390,22 @@ const Enemies = (() => {
 
         case GROUP_STATE.REGROUPING:
           if (grp.stateTimer <= 0) {
-            // Pick new objective and re-advance
-            const oAngle = Math.random() * Math.PI * 2;
-            const oDist = 6 + Math.random() * 14;
+            // AI Smart Learning: set objective toward predicted player position
+            var oAngle, oDist;
+            if (_aiStrategy && _aiStrategy.adaptationLevel >= 1 && typeof MLSystem !== 'undefined' && MLSystem.predictPlayerPosition) {
+              var predicted = MLSystem.predictPlayerPosition(5.0);
+              if (predicted) {
+                oAngle = Math.atan2(predicted.z, predicted.x) + (Math.random() - 0.5) * 0.8;
+                oDist = Math.sqrt(predicted.x * predicted.x + predicted.z * predicted.z) * 0.6;
+                oDist = Math.max(6, Math.min(20, oDist));
+              } else {
+                oAngle = Math.random() * Math.PI * 2;
+                oDist = 6 + Math.random() * 14;
+              }
+            } else {
+              oAngle = Math.random() * Math.PI * 2;
+              oDist = 6 + Math.random() * 14;
+            }
             grp.objective.set(Math.cos(oAngle) * oDist, 0, Math.sin(oAngle) * oDist);
             grp.morale = Math.min(100, grp.morale + 15);
             grp.state = GROUP_STATE.ADVANCING;
