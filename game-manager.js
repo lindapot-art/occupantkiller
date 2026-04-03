@@ -510,6 +510,16 @@ const GameManager = (function () {
     WeatherSystem.init(_scene, _camera);
     MLSystem.init();
 
+    // ── New feature systems init ──────────────────────────
+    if (typeof CombatExtras !== 'undefined') CombatExtras.reset();
+    if (typeof Traversal !== 'undefined') Traversal.reset();
+    if (typeof EnemyTypes !== 'undefined') EnemyTypes.init();
+    if (typeof WorldFeatures !== 'undefined') WorldFeatures.init(_scene, THREE);
+    if (typeof Perks !== 'undefined') Perks.reset();
+    if (typeof MissionTypes !== 'undefined') MissionTypes.clear();
+    if (typeof Feedback !== 'undefined') Feedback.init();
+    if (typeof Progression !== 'undefined') Progression.init();
+
     // Create weapons
     Weapons.createGunMesh(_camera);
     Weapons.createMuzzleFlash(_scene, _camera);
@@ -747,6 +757,152 @@ const GameManager = (function () {
             player.nightVision ? '#00ff44' : '#888888');
         }
 
+        /* ═══ NEW FEATURE KEYBINDS (59 features) ═══ */
+
+        // Tactical lean (Q/E override when not switching weapons in non-build mode)
+        if (e.code === 'KeyQ' && !VehicleSystem.isInVehicle() && !DroneSystem.isPossessing() && keys['AltLeft']) {
+          if (typeof CombatExtras !== 'undefined') CombatExtras.setLean(-1);
+        }
+        if (e.code === 'KeyE' && !VehicleSystem.isInVehicle() && !DroneSystem.isPossessing() && keys['AltLeft']) {
+          if (typeof CombatExtras !== 'undefined') CombatExtras.setLean(1);
+        }
+
+        // Weapon inspect (hold V - only if not in vehicle)
+        if (e.code === 'KeyV' && !VehicleSystem.isInVehicle() && keys['ShiftLeft']) {
+          if (typeof CombatExtras !== 'undefined') CombatExtras.startInspect();
+        }
+
+        // Cycle ammo type (C key)
+        if (e.code === 'KeyC') {
+          if (typeof CombatExtras !== 'undefined') {
+            var ammoInfo = CombatExtras.cycleAmmoType();
+            HUD.notifyPickup('🔄 AMMO: ' + ammoInfo.name, '#' + ammoInfo.color.toString(16).padStart(6, '0'));
+            var ammoIndicator = document.getElementById('ammo-type-indicator');
+            if (ammoIndicator) ammoIndicator.textContent = ammoInfo.name.toUpperCase();
+          }
+        }
+
+        // Field bandage perk (H key)
+        if (e.code === 'KeyH') {
+          if (typeof Perks !== 'undefined' && Perks.useBandage()) {
+            HUD.notifyPickup('🩹 FIELD BANDAGE APPLIED!', '#22ff55');
+          }
+        }
+
+        // Killstreak activation (K key - toggles panel)
+        if (e.code === 'KeyK') {
+          var ksPanel = document.getElementById('killstreak-panel');
+          if (ksPanel) {
+            ksPanel.style.display = ksPanel.style.display === 'none' ? 'block' : 'none';
+          }
+        }
+
+        // Ping/mark system (M key)
+        if (e.code === 'KeyM' && gameState === STATE.PLAYING) {
+          if (typeof Feedback !== 'undefined') {
+            var pingPos = player.position.clone();
+            var fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(_camera.quaternion);
+            pingPos.add(fwd.multiplyScalar(20));
+            Feedback.addPing(pingPos.x, pingPos.y, pingPos.z, 'MARK', '#ffff00');
+            HUD.notifyPickup('📍 POSITION MARKED', '#ffff00');
+          }
+        }
+
+        // Perks menu (P key — override time pause in gameplay)
+        if (e.code === 'KeyP' && gameState === STATE.PLAYING) {
+          var perksMenu = document.getElementById('perks-menu');
+          if (perksMenu) {
+            if (perksMenu.style.display === 'none' || !perksMenu.style.display) {
+              _openPerksMenu();
+              perksMenu.style.display = 'block';
+            } else {
+              perksMenu.style.display = 'none';
+            }
+          }
+        }
+
+        // War journal (Y key)
+        if (e.code === 'KeyY') {
+          var journalPanel = document.getElementById('journal-panel');
+          if (journalPanel) {
+            if (journalPanel.style.display === 'none' || !journalPanel.style.display) {
+              _openJournal();
+              journalPanel.style.display = 'block';
+            } else {
+              journalPanel.style.display = 'none';
+            }
+          }
+        }
+
+        // Quick melee (F key when not near drone)
+        if (e.code === 'KeyF' && !DroneSystem.isPossessing() && typeof CombatExtras !== 'undefined') {
+          var qm = CombatExtras.tryQuickMelee();
+          if (qm) {
+            // Deal quick melee damage to nearby enemies
+            var enemies = Enemies.getAll();
+            for (var qi = 0; qi < enemies.length; qi++) {
+              var qe = enemies[qi];
+              if (!qe.alive) continue;
+              var qdx = qe.mesh.position.x - player.position.x;
+              var qdz = qe.mesh.position.z - player.position.z;
+              if (qdx * qdx + qdz * qdz < qm.range * qm.range) {
+                Enemies.damage(qi, qm.damage, false);
+                break;
+              }
+            }
+            HUD.notifyPickup('👊 QUICK MELEE!', '#ffcc00');
+          }
+        }
+
+        // Bayonet charge (B key while sprinting, only if not in build mode)
+        if (e.code === 'KeyB' && player.sprinting && gameState === STATE.PLAYING && typeof CombatExtras !== 'undefined') {
+          if (CombatExtras.startBayonetCharge()) {
+            HUD.notifyPickup('🔪 BAYONET CHARGE!', '#ff2222');
+          }
+        }
+
+        // Weapon maintenance (hold R + M)
+        if (e.code === 'KeyR' && keys['KeyM'] && typeof CombatExtras !== 'undefined') {
+          if (CombatExtras.startMaintenance()) {
+            HUD.notifyPickup('🔧 MAINTAINING WEAPON...', '#cccc00');
+          }
+        }
+
+        // Blind fire toggle (Alt + LMB mode toggle with KeyO)
+        if (e.code === 'KeyO' && typeof CombatExtras !== 'undefined') {
+          var blindOn = CombatExtras.toggleBlindFire();
+          HUD.notifyPickup(blindOn ? '🔫 BLIND FIRE ON' : '🔫 BLIND FIRE OFF', blindOn ? '#bbb' : '#fff');
+          var bfInd = document.getElementById('blindfire-indicator');
+          if (bfInd) bfInd.style.display = blindOn ? 'block' : 'none';
+        }
+
+        // Dolphin dive (Ctrl while sprinting)
+        if (e.code === 'ControlLeft' && player.sprinting && typeof Traversal !== 'undefined') {
+          var fwdDir = new THREE.Vector3(0, 0, -1).applyQuaternion(_camera.quaternion);
+          if (Traversal.tryDolphinDive({ x: fwdDir.x, z: fwdDir.z }, true)) {
+            HUD.notifyPickup('💨 DOLPHIN DIVE!', '#00aaff');
+          }
+        }
+
+        // Landmine placement (KeyU)
+        if (e.code === 'KeyU' && typeof WorldFeatures !== 'undefined') {
+          var mineY = VoxelWorld.getTerrainHeight(player.position.x, player.position.z);
+          if (WorldFeatures.placeMine(player.position.x, mineY, player.position.z, 'player')) {
+            HUD.notifyPickup('💣 LANDMINE PLACED!', '#44aa44');
+          }
+        }
+
+        // Sandbag quick-deploy (KeyJ + Shift)
+        if (e.code === 'KeyJ' && keys['ShiftLeft'] && typeof WorldFeatures !== 'undefined') {
+          var fwdSB = new THREE.Vector3(0, 0, -1).applyQuaternion(_camera.quaternion);
+          var sbX = player.position.x + fwdSB.x * 2;
+          var sbZ = player.position.z + fwdSB.z * 2;
+          var sbY = VoxelWorld.getTerrainHeight(sbX, sbZ);
+          if (WorldFeatures.startSandbagDeploy(sbX, sbY, sbZ)) {
+            HUD.notifyPickup('🏗️ DEPLOYING SANDBAG...', '#c2b280');
+          }
+        }
+
         // Inventory/Tab toggle
         if (e.code === 'Tab') {
           e.preventDefault();
@@ -838,6 +994,11 @@ const GameManager = (function () {
 
     document.addEventListener('keyup', function (e) {
       keys[e.code] = false;
+
+      // Reset lean on Q/E release
+      if ((e.code === 'KeyQ' || e.code === 'KeyE') && typeof CombatExtras !== 'undefined') {
+        CombatExtras.setLean(0);
+      }
 
       if (CameraSystem.getMode() === CameraSystem.MODE.STRATEGIC) {
         if (e.code === 'ArrowUp'    || e.code === 'KeyW') CameraSystem.setRTSKey('up', false);
@@ -1745,6 +1906,68 @@ const GameManager = (function () {
       RankSystem.onKill(isHeadshot);
       HUD.addKill(Weapons.getCurrentName(), enemy.typeCfg ? enemy.typeCfg.name : 'ENEMY', isHeadshot);
 
+      // ═══ NEW: Progression, Perks, Feedback tracking on kill ═══
+      // Kill feed entry
+      if (typeof Feedback !== 'undefined') {
+        Feedback.addKillFeedEntry('You', enemy.typeCfg ? enemy.typeCfg.name : 'Enemy', Weapons.getCurrentName(), isHeadshot);
+      }
+      // Floating damage number
+      if (typeof Feedback !== 'undefined') {
+        Feedback.spawnDamageNumber(window.innerWidth / 2, window.innerHeight / 2 - 30, dmg, isHeadshot, false);
+      }
+      // Perk: kill tracking & killstreaks
+      if (typeof Perks !== 'undefined') {
+        Perks.onKill();
+        // Scavenger auto-loot
+        var scavRange = Perks.getScavengerRange();
+        if (scavRange > 0) {
+          Weapons.addAmmo(Perks.getScavengerAmmo());
+          HUD.notifyPickup('🔄 SCAVENGER: +' + Perks.getScavengerAmmo() + ' ammo', '#88ff88');
+        }
+        // Update killstreak panel
+        var ksList = document.getElementById('killstreak-list');
+        if (ksList) {
+          var avail = Perks.getAvailableStreaks();
+          if (avail.length > 0) {
+            document.getElementById('killstreak-panel').style.display = 'block';
+            var ksHTML = '';
+            for (var ksi = 0; ksi < avail.length; ksi++) {
+              ksHTML += '<div style="margin:3px 0;cursor:pointer;padding:2px 4px;border:1px solid #ff6600;border-radius:3px" onclick="GameManager._activateStreak(' + ksi + ')">' + avail[ksi].icon + ' ' + avail[ksi].name + '</div>';
+            }
+            ksList.innerHTML = ksHTML;
+          }
+        }
+      }
+      // Progression: stats tracking
+      if (typeof Progression !== 'undefined') {
+        Progression.trackStat('totalKills', 1);
+        Progression.trackWeaponKill(Weapons.getCurrentName());
+        if (isHeadshot) Progression.trackStat('headshots', 1);
+        Progression.trackStat('totalDamageDealt', dmg);
+        // Check bounties
+        var completedBounties = Progression.updateBounty('weapon_kill', 1);
+        if (isHeadshot) Progression.updateBounty('headshot_wave', 1);
+        Progression.updateBounty('damage', dmg);
+        for (var cbi = 0; cbi < completedBounties.length; cbi++) {
+          HUD.notifyPickup('💰 BOUNTY COMPLETE! +' + completedBounties[cbi].reward + ' OKC', '#ffaa00');
+          if (typeof Marketplace !== 'undefined') Marketplace.addOKC(completedBounties[cbi].reward);
+        }
+        // Achievement checks
+        if (typeof Feedback !== 'undefined') {
+          if (player.kills === 1) Feedback.unlockAchievement('FIRST_BLOOD');
+          if (player.totalHeadshots >= 10) Feedback.unlockAchievement('SHARPSHOOTER');
+          if (player.killStreak >= 4) Feedback.unlockAchievement('MULTI_KILL');
+          if (Weapons.getCurrentId() === 0) {
+            Progression.trackStat('meleeKills', 1);
+            if (Progression.getStats().meleeKills >= 10) Feedback.unlockAchievement('MELEE_MASTER');
+          }
+        }
+        // Journal unlock by kills
+        if (player.kills >= 5) Progression.unlockJournalEntry('entry_conscript');
+        if (player.kills >= 10) Progression.unlockJournalEntry('entry_stormer');
+        if (player.kills >= 15) Progression.unlockJournalEntry('entry_armored');
+      }
+
       // Kill streak tracking
       player.killStreak++;
       if (player.killStreak > player.bestStreak) player.bestStreak = player.killStreak;
@@ -1836,6 +2059,15 @@ const GameManager = (function () {
       HUD.notifyPickup('🛡 SHIELDED!', '#ffd700');
       return;
     }
+    // Perk: Juggernaut reduces incoming damage
+    if (typeof Perks !== 'undefined') {
+      dmg = Math.round(dmg * Perks.getDamageTakenMult());
+    }
+    // Challenge mode: hardcore double damage
+    if (typeof Progression !== 'undefined') {
+      var chalMods = Progression.getChallengeModifiers();
+      if (chalMods.enemyDmgMult) dmg = Math.round(dmg * chalMods.enemyDmgMult);
+    }
     // Armor absorbs up to 50% of incoming damage, capped by available armor points
     if (player.armor > 0) {
       var absorbed = Math.min(player.armor, dmg * 0.5);
@@ -1886,6 +2118,19 @@ const GameManager = (function () {
       if (AudioSystem.stopMusic) AudioSystem.stopMusic();
       Weapons.exitZoom();
       MLSystem.onDeath();
+      // Track death in progression
+      if (typeof Progression !== 'undefined') {
+        Progression.trackStat('deathCount', 1);
+        Progression.trackStat('totalDamageTaken', player.totalDamageTaken);
+        var rank = Progression.submitScore('Player', player.score, currentWave, STAGES[currentStage].id, player.kills);
+        var deadLB = document.getElementById('dead-leaderboard');
+        if (deadLB) {
+          deadLB.textContent = '🏆 Leaderboard Rank: #' + rank;
+        }
+        Progression.save();
+      }
+      // Reset perk streak on death
+      if (typeof Perks !== 'undefined') Perks.resetStreak();
       // AI Smart Learning: classify combat style on death and track death context
       MLSystem.classifyCombatStyle();
       if (attackerPos) {
@@ -2179,6 +2424,275 @@ const GameManager = (function () {
 
       // Update tracers
       if (typeof Tracers !== 'undefined') Tracers.update(delta);
+
+      // ═══ NEW FEATURE SYSTEM UPDATES (59 features) ═══
+
+      // Combat extras update (lean, inspect, bayonet, heat, maintenance)
+      if (typeof CombatExtras !== 'undefined') {
+        var combatResult = CombatExtras.update(delta);
+
+        // Lean HUD indicator
+        var leanInd = document.getElementById('lean-indicator');
+        if (leanInd) leanInd.style.display = CombatExtras.isLeaning() ? 'block' : 'none';
+
+        // Inspect overlay
+        var inspInd = document.getElementById('inspect-overlay');
+        if (inspInd) inspInd.style.display = CombatExtras.isInspecting() ? 'block' : 'none';
+
+        // Bayonet indicator
+        var bayInd = document.getElementById('bayonet-indicator');
+        if (bayInd) bayInd.style.display = CombatExtras.isBayonetCharging() ? 'block' : 'none';
+
+        // Bayonet charge damage
+        if (combatResult.bayonet && combatResult.bayonet.active) {
+          var enemies = Enemies.getAll();
+          for (var bi = 0; bi < enemies.length; bi++) {
+            var be = enemies[bi];
+            if (!be.alive || !be.mesh) continue;
+            var bdx = be.mesh.position.x - player.position.x;
+            var bdz = be.mesh.position.z - player.position.z;
+            if (bdx * bdx + bdz * bdz < 4) {
+              Enemies.damage(bi, combatResult.bayonet.damage * delta * 2, false);
+            }
+          }
+        }
+
+        // Heat bar HUD
+        if (combatResult.heat) {
+          var heatBar = document.getElementById('heat-bar');
+          if (heatBar) heatBar.style.width = (combatResult.heat.heat * 100) + '%';
+          var ovhInd = document.getElementById('overheat-indicator');
+          if (ovhInd) ovhInd.style.display = combatResult.heat.overheated ? 'block' : 'none';
+        }
+
+        // Maintenance indicator
+        var maintInd = document.getElementById('maintenance-indicator');
+        if (maintInd) maintInd.style.display = CombatExtras.isMaintaining() ? 'block' : 'none';
+      }
+
+      // Traversal update (mantle, dive)
+      if (typeof Traversal !== 'undefined') {
+        var travResult = Traversal.update(delta);
+
+        // Swimming check
+        var blockUnderPlayer = VoxelWorld.getBlock(
+          Math.floor(player.position.x),
+          Math.floor(player.position.y - 1),
+          Math.floor(player.position.z)
+        );
+        var inWater = blockUnderPlayer === 8; // WATER
+        var swimResult = Traversal.updateSwimming(delta, inWater, player.stamina);
+        var swimInd = document.getElementById('swim-indicator');
+        var breathBar = document.getElementById('breath-bar-container');
+        if (swimResult && swimResult.active) {
+          if (swimInd) swimInd.style.display = 'block';
+          if (breathBar) {
+            breathBar.style.display = 'block';
+            var bBar = document.getElementById('breath-bar');
+            if (bBar) bBar.style.width = (swimResult.breath / 10 * 100) + '%';
+          }
+          if (swimResult.drowning) {
+            player.hp = Math.max(0, player.hp - swimResult.drownDmg);
+            HUD.setHealth(player.hp, player.maxHp);
+          }
+        } else {
+          if (swimInd) swimInd.style.display = 'none';
+          if (breathBar) breathBar.style.display = 'none';
+        }
+
+        // Mantle indicator
+        var mantleInd = document.getElementById('mantle-indicator');
+        if (mantleInd) mantleInd.style.display = Traversal.isMantling() ? 'block' : 'none';
+      }
+
+      // World features update (fires, trees, mines, airdrops, smoke)
+      if (typeof WorldFeatures !== 'undefined') {
+        var enemyPositions = [];
+        var allEn2 = Enemies.getAll();
+        for (var wei = 0; wei < allEn2.length; wei++) {
+          if (allEn2[wei].alive && allEn2[wei].mesh) {
+            enemyPositions.push({ x: allEn2[wei].mesh.position.x, z: allEn2[wei].mesh.position.z });
+          }
+        }
+        var wfResult = WorldFeatures.update(delta,
+          function (x, y, z) { return VoxelWorld.getBlock(x, y, z); },
+          function (x, y, z, b) { VoxelWorld.setBlock(x, y, z, b); },
+          player.position, enemyPositions
+        );
+
+        // Fire damage to player
+        if (wfResult.fireDmg) {
+          for (var fi = 0; fi < wfResult.fireDmg.length; fi++) {
+            var fz = wfResult.fireDmg[fi];
+            var fdx = player.position.x - fz.x;
+            var fdz = player.position.z - fz.z;
+            if (fdx * fdx + fdz * fdz < fz.radius * fz.radius) {
+              player.hp = Math.max(0, player.hp - fz.dps * delta);
+              HUD.setHealth(player.hp, player.maxHp);
+            }
+          }
+        }
+
+        // Mine explosions
+        if (wfResult.mineExplosions && wfResult.mineExplosions.length > 0) {
+          for (var mi = 0; mi < wfResult.mineExplosions.length; mi++) {
+            var me = wfResult.mineExplosions[mi];
+            AudioSystem.playExplosion();
+            if (typeof Tracers !== 'undefined') Tracers.spawnExplosion(new THREE.Vector3(me.x, me.y, me.z), me.radius * 0.5);
+            if (CameraSystem.shake) CameraSystem.shake(0.3, 0.5);
+            if (me.target === 'player') {
+              onPlayerHit(me.damage, new THREE.Vector3(me.x, me.y, me.z));
+            } else {
+              Enemies.damageInRadius(new THREE.Vector3(me.x, me.y, me.z), me.radius, me.damage);
+            }
+          }
+        }
+
+        // Airdrop collection
+        var airdropResult = WorldFeatures.collectAirdrop(player.position);
+        if (airdropResult) {
+          HUD.notifyPickup('📦 AIRDROP: ' + airdropResult + '!', '#44ff88');
+          AudioSystem.playPickup();
+          if (airdropResult === 'AMMO_CRATE') Weapons.addAmmo(100);
+          else if (airdropResult === 'MEDKIT') { player.hp = player.maxHp; HUD.setHealth(player.hp, player.maxHp); }
+          else if (airdropResult === 'ARMOR') { player.armor = 100; if (HUD.updateArmor) HUD.updateArmor(1); }
+        }
+
+        // Radiation zone check
+        var radCheck = WorldFeatures.checkRadiation(player.position.x, player.position.z);
+        var radWarn = document.getElementById('radiation-warning');
+        if (radCheck.inZone) {
+          if (radWarn) radWarn.style.display = 'block';
+          player.hp = Math.max(0, player.hp - radCheck.damage * delta);
+          HUD.setHealth(player.hp, player.maxHp);
+        } else {
+          if (radWarn) radWarn.style.display = 'none';
+        }
+
+        // Barbed wire check
+        var wireCheck = WorldFeatures.checkWire(player.position.x, player.position.z);
+        if (wireCheck.inWire) {
+          player.hp = Math.max(0, player.hp - wireCheck.tickDmg * delta);
+          HUD.setHealth(player.hp, player.maxHp);
+        }
+      }
+
+      // Perks update
+      if (typeof Perks !== 'undefined') {
+        var perkResult = Perks.update(delta);
+        if (perkResult.healThisTick > 0) {
+          player.hp = Math.min(player.maxHp, player.hp + perkResult.healThisTick);
+          HUD.setHealth(player.hp, player.maxHp);
+        }
+        // Gunship DPS to random enemy
+        if (perkResult.gunshipDPS > 0) {
+          var aliveEnemies = Enemies.getAll().filter(function (e) { return e.alive; });
+          if (aliveEnemies.length > 0) {
+            var targetIdx = Math.floor(Math.random() * aliveEnemies.length);
+            Enemies.damage(targetIdx, perkResult.gunshipDPS * delta, false);
+          }
+        }
+        // UAV indicator
+        var uavInd = document.getElementById('uav-indicator');
+        if (uavInd) uavInd.style.display = Perks.isUAVActive() ? 'block' : 'none';
+
+        // Adrenaline indicator
+        var adrInd = document.getElementById('adrenaline-indicator');
+        if (adrInd) adrInd.style.display = (Perks.getSpeedMult() > 1.1) ? 'block' : 'none';
+      }
+
+      // Mission types update
+      if (typeof MissionTypes !== 'undefined') {
+        var missionResult = MissionTypes.update(delta, player.position);
+        if (missionResult) {
+          var mTracker = document.getElementById('mission-tracker');
+          if (mTracker) {
+            if (missionResult.state === 'ACTIVE') {
+              mTracker.style.display = 'block';
+              var mTitle = document.getElementById('mission-tracker-title');
+              if (mTitle) mTitle.textContent = '📍 ' + (MissionTypes.getActive() ? MissionTypes.getActive().config.name : 'MISSION');
+              var mTimer = document.getElementById('mission-tracker-timer');
+              if (mTimer && missionResult.timeRemaining !== undefined) {
+                mTimer.textContent = '⏱ ' + Math.ceil(missionResult.timeRemaining) + 's';
+              }
+            } else if (missionResult.state === 'COMPLETE') {
+              var reward = MissionTypes.completeMission();
+              if (reward) {
+                HUD.notifyPickup('✅ MISSION COMPLETE! +' + reward.okc + ' OKC +' + reward.xp + ' XP', '#44ff88');
+                if (typeof Marketplace !== 'undefined') Marketplace.addOKC(reward.okc);
+                if (typeof RankSystem !== 'undefined') RankSystem.addXP(reward.xp);
+                if (typeof Progression !== 'undefined') Progression.trackStat('wavesCleared', 0); // mission tracking
+              }
+              mTracker.style.display = 'none';
+            } else if (missionResult.state === 'FAILED') {
+              HUD.notifyPickup('❌ MISSION FAILED: ' + (missionResult.reason || ''), '#ff4444');
+              mTracker.style.display = 'none';
+            }
+          }
+        }
+      }
+
+      // Feedback system update (damage numbers, kill feed, pings, compass)
+      if (typeof Feedback !== 'undefined') {
+        Feedback.update(delta, CameraSystem.getYaw());
+
+        // Dynamic crosshair update
+        var isMoving = player.velocity.length() > 0.1;
+        var isFiring = Weapons.didFire && Weapons.didFire();
+        var isADS = Weapons.isZoomed && Weapons.isZoomed();
+        Feedback.updateDynamicCrosshair(0, isMoving, isFiring, isADS);
+      }
+
+      // Progression tracking - play time
+      if (typeof Progression !== 'undefined') {
+        Progression.trackStat('totalPlayTime', delta);
+
+        // Daily challenges display
+        var dailyPanel = document.getElementById('daily-challenges');
+        if (dailyPanel) {
+          var dailies = Progression.getDailies();
+          if (dailies.length > 0) {
+            dailyPanel.style.display = 'block';
+            var dailyList = document.getElementById('daily-challenges-list');
+            if (dailyList) {
+              var dHTML = '';
+              for (var di2 = 0; di2 < dailies.length; di2++) {
+                var d = dailies[di2];
+                var pct = Math.min(100, Math.round((d.progress / d.target) * 100));
+                var color = d.completed ? '#44ff44' : '#ccc';
+                dHTML += '<div style="color:' + color + '">' + (d.completed ? '✅' : '⬜') + ' ' + d.name + ': ' + d.progress + '/' + d.target + ' (' + pct + '%)</div>';
+              }
+              dailyList.innerHTML = dHTML;
+            }
+          }
+        }
+
+        // Bounty display
+        var bountyPanel = document.getElementById('bounty-display');
+        if (bountyPanel) {
+          var bounties = Progression.getBounties();
+          if (bounties.length > 0) {
+            bountyPanel.style.display = 'block';
+            var bountyList = document.getElementById('bounty-list');
+            if (bountyList) {
+              var bHTML = '';
+              for (var bi2 = 0; bi2 < bounties.length; bi2++) {
+                var b = bounties[bi2];
+                var bpct = Math.min(100, Math.round((b.progress / b.target) * 100));
+                var bcolor = b.completed ? '#44ff44' : '#ffaa00';
+                bHTML += '<div style="color:' + bcolor + '">' + (b.completed ? '✅' : '💰') + ' ' + b.name + ': ' + b.progress + '/' + b.target + ' (+' + b.reward + ' OKC)</div>';
+              }
+              bountyList.innerHTML = bHTML;
+            }
+          }
+        }
+
+        // Prestige indicator
+        var prestigeInd = document.getElementById('prestige-indicator');
+        if (prestigeInd && Progression.getPrestigeLevel() > 0) {
+          prestigeInd.textContent = Progression.getPrestigeIcon() + ' P' + Progression.getPrestigeLevel();
+        }
+      }
 
       // Sync stealth state to enemy detection system
       Enemies.setPlayerStealth(player.stealth);
