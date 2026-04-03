@@ -688,6 +688,7 @@ const Enemies = (() => {
 
     const idx = enemies.length;
     enemies.push({
+      id:          idx,
       mesh,
       hpBar:       buildHpBar(),
       typeCfg,
@@ -726,8 +727,12 @@ const Enemies = (() => {
     // AI Smart Learning: bias spawn angle toward player's vulnerable direction
     var baseAngle = (groupId / NUM_ASSAULT_GROUPS) * Math.PI * 2 + Math.random() * 0.5;
     if (_aiStrategy && _aiStrategy.attackFromVulnerable && _aiStrategy.preferredSpawnAngle && groupId === 0) {
-      // First group spawns from vulnerable direction
-      baseAngle = _aiStrategy.preferredSpawnAngle + (Math.random() - 0.5) * 0.5;
+      // First group spawns from vulnerable direction (convert player-relative to world-space)
+      var spawnYaw = 0;
+      if (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) {
+        spawnYaw = CameraSystem.getYaw();
+      }
+      baseAngle = spawnYaw + _aiStrategy.preferredSpawnAngle + (Math.random() - 0.5) * 0.5;
     }
     var spawnDistMod = (_aiStrategy && _aiStrategy.spawnDistanceMult) || 1.0;
     const dist = (ARENA_SIZE * 0.44 + Math.random() * 6) * spawnDistMod;
@@ -1000,9 +1005,13 @@ const Enemies = (() => {
 
         // ── AI Smart Learning: ML-guided flanking and tactical behavior ──
         if (e.playerSpotted && !targetIsNPC && _aiStrategy) {
-          // Exploit player's vulnerable direction
+          // Exploit player's vulnerable direction (convert from player-relative to world-space)
           if (_aiStrategy.attackFromVulnerable && _aiStrategy.vulnerableSector >= 0 && targetDist > 8) {
-            var vulnAngle = _aiStrategy.vulnerableSector * (Math.PI * 0.25);
+            var playerYaw = 0;
+            if (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) {
+              playerYaw = CameraSystem.getYaw();
+            }
+            var vulnAngle = playerYaw + _aiStrategy.vulnerableSector * (Math.PI * 0.25);
             var vulnDir = new THREE.Vector3(Math.sin(vulnAngle), 0, Math.cos(vulnAngle));
             var vulnWeight = 0.3 * _aiStrategy.adaptationLevel;
             dir.addScaledVector(vulnDir, vulnWeight).normalize();
@@ -1021,9 +1030,16 @@ const Enemies = (() => {
           }
 
           // ML-guided rush timing: coordinate attack during predicted reload
-          if (_aiStrategy.attackDuringReload && _aiStrategy.predictedReloadWindow < 2 && _aiStrategy.predictedReloadWindow > 0) {
-            // Sprint toward player during their reload window
-            e.speed = e.typeCfg.speedBase * (1 + (wave - 1) * 0.06) * stageMult * 1.5;
+          if (_aiStrategy.attackDuringReload && typeof MLSystem !== 'undefined') {
+            var mlBehav = MLSystem.getBehavior();
+            if (mlBehav && mlBehav.timingPatterns) {
+              var tSinceReload = (performance.now() - mlBehav.timingPatterns.lastReloadTime) / 1000;
+              var dynReloadWin = Math.max(0, mlBehav.timingPatterns.avgTimeBetweenReloads - tSinceReload);
+              if (dynReloadWin < 2 && dynReloadWin > 0) {
+                // Sprint toward player during their reload window
+                e.speed = e.typeCfg.speedBase * (1 + (wave - 1) * 0.06) * stageMult * 1.5;
+              }
+            }
           }
 
           // ML aggression override
@@ -1131,8 +1147,16 @@ const Enemies = (() => {
 
           // AI Smart Learning: faster fire rate during player's reload window
           var fireRateMod = 1.0;
-          if (_aiStrategy && _aiStrategy.attackDuringReload && _aiStrategy.predictedReloadWindow < 1.5 && _aiStrategy.predictedReloadWindow > 0) {
-            fireRateMod = 0.6; // 40% faster firing during reload
+          if (_aiStrategy && _aiStrategy.attackDuringReload && typeof MLSystem !== 'undefined') {
+            // Dynamically compute reload window instead of using stale strategy value
+            var mlBehavior = MLSystem.getBehavior();
+            if (mlBehavior && mlBehavior.timingPatterns) {
+              var timeSinceReload = (performance.now() - mlBehavior.timingPatterns.lastReloadTime) / 1000;
+              var dynamicReloadWindow = Math.max(0, mlBehavior.timingPatterns.avgTimeBetweenReloads - timeSinceReload);
+              if (dynamicReloadWindow < 1.5 && dynamicReloadWindow > 0) {
+                fireRateMod = 0.6; // 40% faster firing during reload
+              }
+            }
           }
           // AI Smart Learning: synchronized attacks when strategy calls for it
           if (_aiStrategy && _aiStrategy.syncedAttack && e._rangedTimer < e.typeCfg.rangedRate * 0.3) {

@@ -1071,7 +1071,7 @@ const GameManager = (function () {
           var flushDist = 20 + Math.random() * 10;
           var flushX = campPos.x + Math.cos(flushAngle) * flushDist;
           var flushZ = campPos.z + Math.sin(flushAngle) * flushDist;
-          Enemies.spawnSingle('STORMER');
+          Enemies.spawnSingle('STORMER', new THREE.Vector3(flushX, 0, flushZ));
         }
       }
     }
