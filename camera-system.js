@@ -47,6 +47,12 @@ const CameraSystem = (function () {
   const BOB_AMP  = 0.038;
   const BOB_FREQ = 10;
 
+  /* ── Screen Shake ───────────────────────────────────────────────── */
+  let shakeIntensity = 0;
+  let shakeDecay     = 0;
+  let shakeOffsetX   = 0;
+  let shakeOffsetY   = 0;
+
   /* ── Init ────────────────────────────────────────────────────────── */
   function init(camera) {
     _camera = camera;
@@ -130,14 +136,36 @@ const CameraSystem = (function () {
     }
   }
 
+  /* ── Screen Shake API ─────────────────────────────────────────────── */
+  function shake(intensity, duration) {
+    shakeIntensity = Math.max(shakeIntensity, intensity);
+    shakeDecay = duration || 0.3;
+  }
+
+  function updateShake(delta) {
+    if (shakeIntensity > 0.001) {
+      shakeOffsetX = (Math.random() - 0.5) * shakeIntensity;
+      shakeOffsetY = (Math.random() - 0.5) * shakeIntensity;
+      shakeIntensity *= Math.max(0, 1 - delta / shakeDecay);
+    } else {
+      shakeOffsetX = 0;
+      shakeOffsetY = 0;
+      shakeIntensity = 0;
+    }
+  }
+
   /* ── FPS Camera ──────────────────────────────────────────────────── */
   function updateFPS(delta, playerPos, isMoving, isGrounded) {
+    updateShake(delta);
+
     // If we have a vehicle target (first-person vehicle mode), use vehicle pos
     if (_vehicleObj) {
       var vPos = _vehicleObj.position.clone();
       vPos.y += 2.0; // Hatch view height
       _camera.position.copy(vPos);
-      var vEuler = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+      _camera.position.x += shakeOffsetX;
+      _camera.position.y += shakeOffsetY;
+      var vEuler = new THREE.Euler(pitch + shakeOffsetY * 0.5, yaw + shakeOffsetX * 0.5, 0, 'YXZ');
       _camera.quaternion.setFromEuler(vEuler);
       return;
     }
@@ -152,9 +180,17 @@ const CameraSystem = (function () {
     }
     const bobOffset = Math.sin(bobPhase) * BOB_AMP * (bobActive ? 1 : 0);
 
-    _camera.position.set(playerPos.x, playerPos.y + bobOffset, playerPos.z);
+    _camera.position.set(
+      playerPos.x + shakeOffsetX,
+      playerPos.y + bobOffset + shakeOffsetY,
+      playerPos.z
+    );
 
-    const euler = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+    const euler = new THREE.Euler(
+      pitch + shakeOffsetY * 0.5,
+      yaw + shakeOffsetX * 0.5,
+      0, 'YXZ'
+    );
     _camera.quaternion.setFromEuler(euler);
   }
 
@@ -262,5 +298,6 @@ const CameraSystem = (function () {
     setPitch,
     getForwardDir,
     getMoveDir,
+    shake,
   };
 })();

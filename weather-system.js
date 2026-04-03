@@ -21,6 +21,8 @@ const WeatherSystem = (function () {
   var weatherTimer = 0;
   var weatherDuration = 120; // seconds between weather changes
   var targetFogDensity = 0;
+  var _lightningTimer = 0;
+  var _lightningFlash = null;
 
   function init(scene, camera) {
     _scene = scene;
@@ -141,6 +143,41 @@ const WeatherSystem = (function () {
       }
     }
 
+    // Lightning during heavy rain
+    if (currentWeather === WEATHER.HEAVY_RAIN) {
+      _lightningTimer -= delta;
+      if (_lightningTimer <= 0) {
+        _lightningTimer = 3 + Math.random() * 8; // every 3-11 seconds
+        // Flash the scene bright
+        if (!_lightningFlash) {
+          _lightningFlash = new THREE.PointLight(0xffffff, 0, 200);
+          _lightningFlash.position.set(0, 50, 0);
+          _scene.add(_lightningFlash);
+        }
+        _lightningFlash.intensity = 8;
+        _lightningFlash.position.set(
+          _camera.position.x + (Math.random() - 0.5) * 40,
+          40,
+          _camera.position.z + (Math.random() - 0.5) * 40
+        );
+        // Thunder sound
+        if (typeof AudioSystem !== 'undefined' && AudioSystem.playExplosion) {
+          setTimeout(function () { AudioSystem.playExplosion(); }, 300 + Math.random() * 1500);
+        }
+        // Screen shake
+        if (typeof CameraSystem !== 'undefined' && CameraSystem.shake) {
+          setTimeout(function () { CameraSystem.shake(0.015, 0.3); }, 300 + Math.random() * 1500);
+        }
+      }
+      // Decay lightning flash
+      if (_lightningFlash && _lightningFlash.intensity > 0) {
+        _lightningFlash.intensity *= Math.max(0, 1 - delta * 12);
+        if (_lightningFlash.intensity < 0.1) _lightningFlash.intensity = 0;
+      }
+    } else {
+      if (_lightningFlash) _lightningFlash.intensity = 0;
+    }
+
     // Update particles
     if (particles && particles.visible) {
       var positions = particles.geometry.attributes.position.array;
@@ -175,11 +212,30 @@ const WeatherSystem = (function () {
 
   function getWeather() { return currentWeather; }
 
+  /** Get gameplay modifiers based on current weather */
+  function getModifiers() {
+    switch (currentWeather) {
+      case WEATHER.RAIN:
+        return { accuracyMod: 0.9, speedMod: 1.0, visionRange: 0.85, label: '🌧 Rain' };
+      case WEATHER.HEAVY_RAIN:
+        return { accuracyMod: 0.75, speedMod: 0.95, visionRange: 0.65, label: '⛈ Storm' };
+      case WEATHER.SNOW:
+        return { accuracyMod: 0.95, speedMod: 0.85, visionRange: 0.75, label: '🌨 Snow' };
+      case WEATHER.FOG:
+        return { accuracyMod: 1.0, speedMod: 1.0, visionRange: 0.4, label: '🌫 Fog' };
+      case WEATHER.OVERCAST:
+        return { accuracyMod: 1.0, speedMod: 1.0, visionRange: 0.95, label: '☁ Overcast' };
+      default:
+        return { accuracyMod: 1.0, speedMod: 1.0, visionRange: 1.0, label: '☀ Clear' };
+    }
+  }
+
   return {
     WEATHER: WEATHER,
     init: init,
     update: update,
     setWeather: setWeather,
     getWeather: getWeather,
+    getModifiers: getModifiers,
   };
 })();

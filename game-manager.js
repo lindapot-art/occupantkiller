@@ -44,6 +44,10 @@ const GameManager = (function () {
     streakTimer: 0,           // time since last kill (resets streak)
     dogTags:    0,            // collected dog tags
     airdropCooldown: 0,       // cooldown for airdrop beacon
+    stamina:    1.0,          // 0-1, drains on sprint, regens on walk
+    nightVision: false,       // night vision toggle
+    shieldTimer: 0,           // temporary shield timer
+    intelTimer: 0,            // intel reveal timer
   };
 
   /* ── Wave State ──────────────────────────────────────────────────── */
@@ -558,6 +562,14 @@ const GameManager = (function () {
             AudioSystem.playMusic('battle');
             HUD.notifyPickup('🎵 MUSIC ON', '#00ff88');
           }
+        }
+
+        // Night vision toggle
+        if (e.code === 'KeyL') {
+          player.nightVision = !player.nightVision;
+          if (HUD.showNightVision) HUD.showNightVision(player.nightVision);
+          HUD.notifyPickup(player.nightVision ? '🔦 NIGHT VISION ON' : '🔦 NIGHT VISION OFF',
+            player.nightVision ? '#00ff44' : '#888888');
         }
 
         // Inventory/Tab toggle
@@ -1239,9 +1251,24 @@ const GameManager = (function () {
       let speed = MOVE_SPEED * (player.sprinting ? SPRINT_MULT : 1) * (player.prone ? 0.3 : 1);
       // Stim boost: +60% speed while active
       if (player._stimTimer && player._stimTimer > 0) speed *= 1.6;
+      // Weather speed modifier
+      if (typeof WeatherSystem !== 'undefined' && WeatherSystem.getModifiers) {
+        speed *= WeatherSystem.getModifiers().speedMod;
+      }
       moveDir.multiplyScalar(speed * delta);
 
+      // Stamina drain on sprint
+      if (player.sprinting && player.stamina > 0) {
+        player.stamina = Math.max(0, player.stamina - 0.15 * delta);
+        if (player.stamina <= 0) {
+          player.sprinting = false; // exhausted
+        }
+      }
+
       if (player.sprinting) SkillSystem.onSprint();
+    } else {
+      // Stamina regen when not sprinting
+      player.stamina = Math.min(1.0, player.stamina + 0.08 * delta);
     }
 
     // Decay stim timer
@@ -1349,6 +1376,14 @@ const GameManager = (function () {
           if (!isExplosive) {
             Tracers.spawnTracer(tOrigin.clone().addScaledVector(tDir, 0.5), tDir, isHeavy ? 0xff4400 : 0xffcc44, 120);
           }
+          // Muzzle flash on every shot
+          if (Tracers.spawnMuzzleFlash) {
+            Tracers.spawnMuzzleFlash(tOrigin, tDir);
+          }
+          // Screen shake for heavy weapons
+          if (isHeavy && CameraSystem.shake) {
+            CameraSystem.shake(0.02, 0.1);
+          }
         }
       }
       mouseNewPress = false;
@@ -1360,6 +1395,10 @@ const GameManager = (function () {
     if (!enemy || !enemy.alive) return;
 
     AudioSystem.playHit();
+    // Blood splatter on hit
+    if (typeof Tracers !== 'undefined' && Tracers.spawnBlood) {
+      Tracers.spawnBlood(hit.point || enemy.mesh.position);
+    }
     MLSystem.onHit(Weapons.getCurrentId());
     // AI Smart Learning: track weapon engagement range
     var engageRange = enemy.mesh.position.distanceTo(player.position);
@@ -1384,6 +1423,10 @@ const GameManager = (function () {
 
     if (remaining <= 0) {
       AudioSystem.playDeath();
+      // Death explosion effect
+      if (typeof Tracers !== 'undefined' && Tracers.spawnExplosion) {
+        Tracers.spawnExplosion(enemy.mesh.position, 1.5);
+      }
       MLSystem.onKill(Weapons.getCurrentId());
       MLSystem.trackKillTiming(); // AI Smart Learning: track kill timing patterns
       player.score += enemy.scoreValue;
@@ -1416,12 +1459,14 @@ const GameManager = (function () {
       if (Math.random() < enemy.dropChance) {
         const lootRoll = Math.random();
         let type;
-        if (lootRoll < 0.30)      type = 'HEALTH';
-        else if (lootRoll < 0.55) type = 'AMMO';
-        else if (lootRoll < 0.70) type = 'ARMOR';
-        else if (lootRoll < 0.82) type = 'GRENADE';
-        else if (lootRoll < 0.92) type = 'MEDKIT';
-        else                      type = 'STIM';
+        if (lootRoll < 0.25)      type = 'HEALTH';
+        else if (lootRoll < 0.45) type = 'AMMO';
+        else if (lootRoll < 0.58) type = 'ARMOR';
+        else if (lootRoll < 0.68) type = 'GRENADE';
+        else if (lootRoll < 0.77) type = 'MEDKIT';
+        else if (lootRoll < 0.85) type = 'STIM';
+        else if (lootRoll < 0.92) type = 'INTEL';
+        else                      type = 'SHIELD';
         Pickups.spawn(enemy.mesh.position, type);
       }
 
@@ -1443,10 +1488,19 @@ const GameManager = (function () {
 
   function onPlayerHit(dmg, attackerPos) {
     if (player.godMode) return; // God mode: immune to damage
+    // Shield absorbs damage
+    if (player.shieldTimer > 0) {
+      HUD.notifyPickup('🛡 SHIELDED!', '#ffd700');
+      return;
+    }
     MLSystem.onDamageTaken(dmg);
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
+    // Screen shake on hit
+    if (CameraSystem.shake) {
+      CameraSystem.shake(dmg * 0.004, 0.2);
+    }
 
     // AI Smart Learning: track directional vulnerability
     if (attackerPos) {
@@ -1537,6 +1591,52 @@ const GameManager = (function () {
       // Airdrop cooldown
       if (player.airdropCooldown > 0) player.airdropCooldown -= delta;
 
+      // Stamina HUD
+      if (HUD.updateStamina) HUD.updateStamina(player.stamina);
+
+      // Stamina regen when idle (not sprinting) — covers non-moving too
+      if (!player.sprinting) {
+        player.stamina = Math.min(1.0, player.stamina + 0.08 * delta);
+      }
+
+      // Weather indicator
+      if (HUD.updateWeatherDisplay && WeatherSystem.getModifiers) {
+        HUD.updateWeatherDisplay(WeatherSystem.getModifiers().label);
+      }
+
+      // Low HP vignette pulse
+      if (HUD.showLowHP) {
+        HUD.showLowHP(player.hp > 0 && player.hp <= player.maxHp * 0.25);
+      }
+
+      // Shield timer countdown
+      if (player.shieldTimer > 0) {
+        player.shieldTimer -= delta;
+        if (player.shieldTimer <= 0) {
+          if (HUD.showShield) HUD.showShield(false);
+        }
+      }
+
+      // Intel timer countdown
+      if (player.intelTimer > 0) {
+        player.intelTimer -= delta;
+      }
+
+      // Interaction prompts (vehicle/drone nearby)
+      if (!VehicleSystem.isInVehicle() && !DroneSystem.isPossessing()) {
+        const nearVeh = VehicleSystem.getNearby(player.position, 5);
+        if (nearVeh.length > 0 && HUD.showInteractionPrompt) {
+          const nv = nearVeh[0];
+          if (nv.faction === 'enemy') {
+            HUD.showInteractionPrompt('Press [G] to HIJACK ' + nv.type.toUpperCase());
+          } else {
+            HUD.showInteractionPrompt('Press [G] to enter ' + nv.type.toUpperCase());
+          }
+        } else if (HUD.hideInteractionPrompt) {
+          HUD.hideInteractionPrompt();
+        }
+      }
+
       // Compass update
       if (HUD.updateCompass) HUD.updateCompass(CameraSystem.getYaw());
 
@@ -1585,6 +1685,15 @@ const GameManager = (function () {
           // Temporary speed boost (handled via flag)
           player._stimTimer = 8.0;
           HUD.notifyPickup('STIM BOOST! 8s', '#cc44ff');
+        } else if (type === 'INTEL') {
+          // Reveal all enemies on minimap for 10 seconds
+          player.intelTimer = 10.0;
+          HUD.notifyPickup('📡 INTEL! Enemies revealed 10s', '#00ffff');
+        } else if (type === 'SHIELD') {
+          // Temporary invulnerability 5 seconds
+          player.shieldTimer = 5.0;
+          if (HUD.showShield) HUD.showShield(true);
+          HUD.notifyPickup('🛡 SHIELD ACTIVE! 5s', '#ffd700');
         }
       });
 

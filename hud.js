@@ -420,6 +420,66 @@ const HUD = (() => {
     if (vhHijackFill) vhHijackFill.style.width = (progress * 100) + '%';
   }
 
+  // ── Stamina Bar ──────────────────────────────────────────────────
+  const staminaBarEl = document.getElementById('stamina-bar');
+
+  function updateStamina(pct) {
+    if (!staminaBarEl) return;
+    staminaBarEl.style.width = (pct * 100) + '%';
+    if (pct < 0.25) {
+      staminaBarEl.style.background = 'linear-gradient(90deg, #ff4444, #ff6644)';
+    } else if (pct < 0.5) {
+      staminaBarEl.style.background = 'linear-gradient(90deg, #ff8800, #ffaa44)';
+    } else {
+      staminaBarEl.style.background = 'linear-gradient(90deg, #ffcc00, #ffee66)';
+    }
+  }
+
+  // ── Night Vision ─────────────────────────────────────────────────
+  const nightVisionEl = document.getElementById('night-vision-overlay');
+
+  function showNightVision(active) {
+    if (nightVisionEl) nightVisionEl.style.display = active ? 'block' : 'none';
+  }
+
+  // ── Weather Indicator ────────────────────────────────────────────
+  const weatherEl = document.getElementById('weather-indicator');
+
+  function updateWeatherDisplay(label) {
+    if (weatherEl) weatherEl.textContent = label;
+  }
+
+  // ── Interaction Prompt ───────────────────────────────────────────
+  const interactEl = document.getElementById('interaction-prompt');
+  let _interactTimer = null;
+
+  function showInteractionPrompt(text) {
+    if (!interactEl) return;
+    interactEl.textContent = text;
+    interactEl.style.display = 'block';
+    clearTimeout(_interactTimer);
+    _interactTimer = setTimeout(function () {
+      interactEl.style.display = 'none';
+    }, 2000);
+  }
+
+  function hideInteractionPrompt() {
+    if (interactEl) interactEl.style.display = 'none';
+    clearTimeout(_interactTimer);
+  }
+
+  // ── Low HP Effects ───────────────────────────────────────────────
+  const lowHpEl = document.getElementById('low-hp-vignette');
+  const shieldEl = document.getElementById('shield-indicator');
+
+  function showLowHP(active) {
+    if (lowHpEl) lowHpEl.style.display = active ? 'block' : 'none';
+  }
+
+  function showShield(active) {
+    if (shieldEl) shieldEl.style.display = active ? 'block' : 'none';
+  }
+
   return {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
@@ -430,5 +490,8 @@ const HUD = (() => {
     addKill, showHitDirection, updateMinimap,
     updateCompass, showStreak, showBleed, showProne, showJam,
     showVehicleHUD, hideVehicleHUD, updateVehicleHUD, showHijackProgress,
+    updateStamina, showNightVision, updateWeatherDisplay,
+    showInteractionPrompt, hideInteractionPrompt,
+    showLowHP, showShield,
   };
 })();
