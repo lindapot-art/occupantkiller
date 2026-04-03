@@ -234,10 +234,12 @@ const GameManager = (function () {
 
   /* ── Loot Particle System (Sonic-style gold rings from terrain) ── */
   const _lootParticles = [];
-  const LOOT_VALUE = 5; // gold per loot particle collected
-  const LOOT_COLLECT_RANGE = 2.5;
-  const LOOT_LIFETIME = 15; // seconds before despawn
-  const LOOT_MAGNET_RANGE = 5; // auto-attract within this range
+  const LOOT_CONFIG = {
+    VALUE: 5,             // gold per loot particle collected
+    COLLECT_RANGE: 2.5,   // distance to auto-collect
+    LIFETIME: 15,         // seconds before despawn
+    MAGNET_RANGE: 5,      // auto-attract within this range
+  };
 
   function spawnLootParticle(worldPos, count) {
     if (!_scene) return;
@@ -276,17 +278,17 @@ const GameManager = (function () {
       lp.rotation.y += delta * 5;
       // Magnet toward player
       var dist = lp.position.distanceTo(player.position);
-      if (dist < LOOT_MAGNET_RANGE) {
+      if (dist < LOOT_CONFIG.MAGNET_RANGE) {
         var pullDir = player.position.clone().sub(lp.position).normalize();
-        var pullSpeed = (1 - dist / LOOT_MAGNET_RANGE) * 12;
+        var pullSpeed = (1 - dist / LOOT_CONFIG.MAGNET_RANGE) * 12;
         lp.position.add(pullDir.multiplyScalar(pullSpeed * delta));
       }
       // Collect
-      if (dist < LOOT_COLLECT_RANGE) {
-        Economy.addCurrency(LOOT_VALUE);
-        player.score += LOOT_VALUE;
+      if (dist < LOOT_CONFIG.COLLECT_RANGE) {
+        Economy.addCurrency(LOOT_CONFIG.VALUE);
+        player.score += LOOT_CONFIG.VALUE;
         HUD.setScore(player.score);
-        if (HUD.addCombatLog) HUD.addCombatLog('+' + LOOT_VALUE + ' gold (loot)', '#ffd700');
+        if (HUD.addCombatLog) HUD.addCombatLog('+' + LOOT_CONFIG.VALUE + ' gold (loot)', '#ffd700');
         _scene.remove(lp);
         lp.geometry.dispose();
         lp.material.dispose();
@@ -295,12 +297,12 @@ const GameManager = (function () {
         continue;
       }
       // Despawn after lifetime
-      if (lp.userData.age > LOOT_LIFETIME) {
+      if (lp.userData.age > LOOT_CONFIG.LIFETIME) {
         // Blink before despawning
-        if (lp.userData.age > LOOT_LIFETIME - 3) {
+        if (lp.userData.age > LOOT_CONFIG.LIFETIME - 3) {
           lp.visible = Math.floor(lp.userData.age * 6) % 2 === 0;
         }
-        if (lp.userData.age > LOOT_LIFETIME) {
+        if (lp.userData.age > LOOT_CONFIG.LIFETIME) {
           _scene.remove(lp);
           lp.geometry.dispose();
           lp.material.dispose();
@@ -1099,7 +1101,7 @@ const GameManager = (function () {
     currentStage = 0;
     player.velocity.set(0, 0, 0);
     player.armor = 0;
-    player.lastDamageTime = 10;
+    player.lastDamageTime = 10; // Start high so health regen kicks in immediately at game start
     player.totalShots = 0;
     player.totalHits = 0;
     player.totalHeadshots = 0;
@@ -1834,7 +1836,7 @@ const GameManager = (function () {
       HUD.notifyPickup('🛡 SHIELDED!', '#ffd700');
       return;
     }
-    // Armor reduces damage
+    // Armor absorbs up to 50% of incoming damage, capped by available armor points
     if (player.armor > 0) {
       var absorbed = Math.min(player.armor, dmg * 0.5);
       player.armor = Math.max(0, player.armor - absorbed);
@@ -2118,7 +2120,7 @@ const GameManager = (function () {
       // Minecraft-style building: right-click with shovel to place blocks
       // (handled in mousedown handler below)
 
-      // Health regen: regen 2hp/s when no damage for 5s (up to 50% maxHp)
+      // Health regen: slow recovery (2hp/s) after 5s without damage, capped at 50% max HP for gameplay balance
       player.lastDamageTime += delta;
       if (player.lastDamageTime > 5 && player.hp < player.maxHp * 0.5 && player.hp > 0) {
         player.hp = Math.min(player.maxHp * 0.5, player.hp + 2 * delta);
