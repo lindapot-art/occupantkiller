@@ -1648,6 +1648,21 @@ const Weapons = (() => {
       return { name: WEAPONS[i].name, damage: WEAPONS[i].damage, clip: s.clip, reserve: s.reserve, type: WEAPONS[i].type };
     },
     isUnlocked:     function (i) { return !!unlocked[i]; },
+    lockWeapon:     function (i) {
+      if (i < 2) return;  // can't lock starter weapons
+      unlocked[i] = false;
+      if (currentIdx === i) switchTo(0);
+    },
+    getWeaponState: function (i) {
+      if (!states[i]) return null;
+      return { clip: states[i].clip, reserve: states[i].reserve };
+    },
+    removeAmmo:     function (idx, amount) {
+      if (!states[idx]) return;
+      states[idx].reserve = Math.max(0, states[idx].reserve - amount);
+      if (idx === currentIdx) HUD.setAmmo(states[idx].clip, states[idx].reserve);
+    },
+    getWeaponId:    function (i) { return WEAPONS[i] ? WEAPONS[i].id : ''; },
     didFire:        function () { return _firedThisFrame; },
     applyRecoil:    applyRecoil,
     clearJam:       clearJam,

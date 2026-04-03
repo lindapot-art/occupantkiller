@@ -111,7 +111,7 @@
       <div class="build-info">LMB · Place | RMB · Remove | B · Exit Build</div>
     </div>
 
-    <!-- ── Controls legend (top-right) ─────────────────────── -->
+    <!-- Controls legend (top-right) ─────────────────────── -->
     <div id="controls-legend">
       <div>V · Camera Mode</div>
       <div>B · Build Mode</div>
@@ -120,6 +120,7 @@
       <div>I · Stealth Mode</div>
       <div>M · Toggle Music</div>
       <div>TAB · Inventory</div>
+      <div>J · Marketplace</div>
       <div>Z · Prone</div>
       <div>X · Bandage</div>
       <div>N · Airdrop</div>
@@ -187,6 +188,13 @@
       <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);color:#00ff44;font-size:11px;font-family:monospace;opacity:0.6">🔦 NIGHT VISION [L]</div>
     </div>
 
+    <!-- OKC / Wallet HUD element -->
+    <div id="hud-okc-bar" style="position:fixed;top:42px;left:50%;transform:translateX(-50%);display:flex;gap:12px;font-size:12px;font-family:monospace;z-index:200;pointer-events:none">
+      <span id="hud-okc" style="color:#ffd700">🪙 0 OKC</span>
+      <span id="hud-wallet-status" style="color:#8247e5">🦊 —</span>
+      <span id="hud-premium-tag" style="color:#8247e5;display:none"></span>
+    </div>
+
     <!-- Weather indicator -->
     <div id="weather-indicator" style="position:fixed;top:28px;left:12px;color:#aaa;font-size:11px;font-family:monospace;z-index:200;pointer-events:none">☀ Clear</div>
 
@@ -218,6 +226,10 @@
     </div>
     <div id="start-weapons-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin:8px auto;max-width:520px;font-size:10px"></div>
     <button class="btn" id="start-btn">▶ START MISSION</button>
+    <div style="margin:8px 0">
+      <button class="btn" id="start-connect-wallet" style="font-size:12px;padding:5px 14px;border-color:#8247e5;color:#8247e5;display:inline-block">🦊 Connect MetaMask (Polygon)</button>
+      <span id="start-wallet-status" style="font-size:11px;color:#888;margin-left:8px"></span>
+    </div>
     <div id="controls-hint">
       WASD · MOVE &nbsp;|&nbsp; MOUSE · AIM &nbsp;|&nbsp; LMB · FIRE &nbsp;|&nbsp; R · RELOAD &nbsp;|&nbsp; 1-0 · WEAPON &nbsp;|&nbsp; SHIFT · SPRINT &nbsp;|&nbsp; SPACE · JUMP<br/>
       V · CAMERA MODE &nbsp;|&nbsp; B · BUILD &nbsp;|&nbsp; F · DRONE &nbsp;|&nbsp; G · VEHICLE &nbsp;|&nbsp; Q/E · SCROLL WEAPONS &nbsp;|&nbsp; I · STEALTH &nbsp;|&nbsp; ESC · PAUSE
@@ -268,27 +280,90 @@
     <div class="overlay-content" style="max-width:700px;max-height:90vh;overflow-y:auto">
       <h1>⏸ PAUSED / INVENTORY</h1>
 
-      <!-- Role Select -->
-      <div id="pause-role-select" style="margin:8px 0">
-        <span style="color:#aaa;font-size:13px">ROLE:</span>
-        <button class="btn" id="role-brigade-btn" style="font-size:12px;padding:4px 12px;border-color:#0af;color:#0af;display:inline-block;margin:0 4px">🎖 ASSAULT BRIGADE</button>
-        <button class="btn" id="role-lonewolf-btn" style="font-size:12px;padding:4px 12px;border-color:#fa0;color:#fa0;display:inline-block;margin:0 4px">🐺 LONE WOLF</button>
+      <!-- Wallet / OKC Bar -->
+      <div id="inv-wallet-bar" style="display:flex;justify-content:space-between;align-items:center;background:rgba(130,71,229,0.15);border:1px solid #8247e5;border-radius:6px;padding:8px 12px;margin:8px 0">
+        <div id="inv-okc-display" style="color:#ffd700;font-size:14px;font-weight:bold">🪙 0 OKC</div>
+        <div id="inv-wallet-info" style="font-size:12px;color:#8247e5">
+          <button class="btn" id="inv-connect-wallet-btn" style="font-size:11px;padding:3px 10px;border-color:#8247e5;color:#8247e5;display:inline-block">🦊 Connect Wallet</button>
+        </div>
+        <div id="inv-pol-display" style="color:#8247e5;font-size:13px;display:none">💎 0.00 POL</div>
       </div>
 
-      <!-- Materials / Resources Section -->
-      <div id="materials-section" style="background:rgba(0,0,0,0.4);border:1px solid #555;border-radius:6px;padding:10px;margin:10px 0">
-        <h3 style="margin:0 0 8px 0;color:#ffcc00;font-size:14px">📦 COLLECTED MATERIALS</h3>
-        <div id="materials-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:13px"></div>
-        <div id="currency-display" style="margin-top:8px;font-size:14px;color:#ffd700;text-align:center"></div>
+      <!-- Tab Navigation -->
+      <div id="inv-tabs" style="display:flex;gap:4px;margin:8px 0">
+        <button class="btn inv-tab active" data-tab="inventory" style="font-size:11px;padding:4px 10px;border-color:#fff;color:#fff;flex:1">📦 Inventory</button>
+        <button class="btn inv-tab" data-tab="shop" style="font-size:11px;padding:4px 10px;border-color:#ffd700;color:#ffd700;flex:1">🛒 Shop</button>
+        <button class="btn inv-tab" data-tab="sell" style="font-size:11px;padding:4px 10px;border-color:#ff8844;color:#ff8844;flex:1">💰 Sell</button>
+        <button class="btn inv-tab" data-tab="premium" style="font-size:11px;padding:4px 10px;border-color:#8247e5;color:#8247e5;flex:1">⭐ Premium</button>
+        <button class="btn inv-tab" data-tab="assets" style="font-size:11px;padding:4px 10px;border-color:#00ffcc;color:#00ffcc;flex:1">🎨 Assets</button>
       </div>
 
-      <!-- Weapon Switching Section -->
-      <h3 style="margin:10px 0 6px 0;color:#ff8844;font-size:14px">🔫 WEAPONS (click to equip)</h3>
-      <div id="inventory-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0;"></div>
-      <div id="pause-weapons-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:10px auto;max-width:500px;font-size:11px"></div>
+      <!-- ── TAB: Inventory ──────────────────────────────── -->
+      <div id="inv-panel-inventory" class="inv-panel">
+        <!-- Role Select -->
+        <div id="pause-role-select" style="margin:8px 0">
+          <span style="color:#aaa;font-size:13px">ROLE:</span>
+          <button class="btn" id="role-brigade-btn" style="font-size:12px;padding:4px 12px;border-color:#0af;color:#0af;display:inline-block;margin:0 4px">🎖 ASSAULT BRIGADE</button>
+          <button class="btn" id="role-lonewolf-btn" style="font-size:12px;padding:4px 12px;border-color:#fa0;color:#fa0;display:inline-block;margin:0 4px">🐺 LONE WOLF</button>
+        </div>
 
-      <!-- Player Stats -->
-      <div id="player-stats" style="text-align:left;font-size:14px;margin:10px 0;background:rgba(0,0,0,0.3);padding:8px;border-radius:4px"></div>
+        <!-- Materials / Resources Section -->
+        <div id="materials-section" style="background:rgba(0,0,0,0.4);border:1px solid #555;border-radius:6px;padding:10px;margin:10px 0">
+          <h3 style="margin:0 0 8px 0;color:#ffcc00;font-size:14px">📦 COLLECTED MATERIALS</h3>
+          <div id="materials-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:13px"></div>
+          <div id="currency-display" style="margin-top:8px;font-size:14px;color:#ffd700;text-align:center"></div>
+        </div>
+
+        <!-- Weapon Switching Section -->
+        <h3 style="margin:10px 0 6px 0;color:#ff8844;font-size:14px">🔫 WEAPONS (click to equip)</h3>
+        <div id="inventory-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0;"></div>
+        <div id="pause-weapons-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:10px auto;max-width:500px;font-size:11px"></div>
+
+        <!-- Player Stats -->
+        <div id="player-stats" style="text-align:left;font-size:14px;margin:10px 0;background:rgba(0,0,0,0.3);padding:8px;border-radius:4px"></div>
+      </div>
+
+      <!-- ── TAB: Shop ───────────────────────────────────── -->
+      <div id="inv-panel-shop" class="inv-panel" style="display:none">
+        <h3 style="color:#ffd700;font-size:14px;margin:6px 0">🛒 ITEM SHOP</h3>
+        <p style="color:#888;font-size:11px;margin-bottom:8px">Buy items with OKC or POL. 10% of POL purchases go to 🇺🇦 Ukraine defense fund.</p>
+        <div id="shop-items-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px"></div>
+        <h3 style="color:#ffd700;font-size:14px;margin:12px 0 6px 0">💱 CURRENCY EXCHANGE</h3>
+        <div style="display:flex;gap:8px;margin:6px 0">
+          <button class="btn" id="convert-okc-gold-btn" style="font-size:11px;padding:4px 10px;border-color:#ffd700;color:#ffd700;flex:1">100 OKC → 1000 Gold</button>
+          <button class="btn" id="convert-gold-okc-btn" style="font-size:11px;padding:4px 10px;border-color:#ffd700;color:#ffd700;flex:1">1000 Gold → 100 OKC</button>
+        </div>
+      </div>
+
+      <!-- ── TAB: Sell ───────────────────────────────────── -->
+      <div id="inv-panel-sell" class="inv-panel" style="display:none">
+        <h3 style="color:#ff8844;font-size:14px;margin:6px 0">💰 SELL WEAPONS &amp; AMMO</h3>
+        <p style="color:#888;font-size:11px;margin-bottom:8px">Sell surplus weapons for OKC or POL crypto. Starter weapons cannot be sold.</p>
+        <div id="sell-weapons-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px"></div>
+        <h3 style="color:#ff8844;font-size:14px;margin:12px 0 6px 0">📦 SELL AMMO</h3>
+        <div id="sell-ammo-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px"></div>
+      </div>
+
+      <!-- ── TAB: Premium ────────────────────────────────── -->
+      <div id="inv-panel-premium" class="inv-panel" style="display:none">
+        <h3 style="color:#8247e5;font-size:14px;margin:6px 0">⭐ PREMIUM SUBSCRIPTIONS</h3>
+        <p style="color:#888;font-size:11px;margin-bottom:8px">Boost your OKC earnings, unlock exclusive content, and get shop discounts! 10% of POL goes to 🇺🇦 Ukraine.</p>
+        <div id="premium-status" style="background:rgba(130,71,229,0.1);border:1px solid #8247e5;border-radius:6px;padding:8px;margin:6px 0;font-size:12px;color:#8247e5;display:none"></div>
+        <div id="premium-tiers-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0"></div>
+      </div>
+
+      <!-- ── TAB: Assets ─────────────────────────────────── -->
+      <div id="inv-panel-assets" class="inv-panel" style="display:none">
+        <h3 style="color:#00ffcc;font-size:14px;margin:6px 0">🎨 GAME ASSETS</h3>
+        <p style="color:#888;font-size:11px;margin-bottom:8px">Exclusive skins, emotes, titles &amp; trails. Buy with OKC or POL. 10% of POL goes to 🇺🇦 Ukraine.</p>
+        <div id="assets-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
+      </div>
+
+      <!-- ── Ukraine Donation Info ────────────────────────── -->
+      <div id="ukraine-donation-banner" style="background:linear-gradient(90deg,rgba(0,87,183,0.2),rgba(255,215,0,0.2));border:1px solid #ffd700;border-radius:6px;padding:8px;margin:10px 0;text-align:center">
+        <div style="font-size:13px;color:#ffd700">🇺🇦 10% of all POL proceeds go to Ukrainian defense</div>
+        <div style="font-size:10px;color:#aaa;margin-top:2px">Wallet: 0x165C…e14</div>
+      </div>
 
       <!-- Pause Controls -->
       <button class="btn" id="stealth-toggle-btn" style="border-color:#0f6;color:#0f6;margin-top:8px">👻 TOGGLE STEALTH</button>
@@ -330,6 +405,8 @@
 <script src="camera-system.js"></script>
 <script src="time-system.js"></script>
 <script src="economy.js"></script>
+<script src="blockchain.js"></script>
+<script src="marketplace.js"></script>
 <script src="skills.js"></script>
 <script src="ranks.js"></script>
 <script src="building.js"></script>
@@ -446,6 +523,65 @@
   GameManager.populateWeaponsGrid('start-weapons-grid');
   GameManager.populateWeaponsGrid('pause-weapons-grid');
   GameManager.updateRoleIndicator();
+
+  // ── Wallet Connect wiring ─────────────────────────────
+  function updateWalletUI() {
+    var startStatus = document.getElementById('start-wallet-status');
+    var invConnect  = document.getElementById('inv-connect-wallet-btn');
+    var invPol      = document.getElementById('inv-pol-display');
+    var hudWallet   = document.getElementById('hud-wallet-status');
+    if (Blockchain.isConnected()) {
+      var addr = Blockchain.getShortAddr();
+      var bal  = Blockchain.getBalance();
+      if (startStatus) startStatus.textContent = '✅ ' + addr + ' | ' + bal + ' POL';
+      if (invConnect) { invConnect.textContent = '✅ ' + addr; invConnect.style.borderColor = '#0f0'; invConnect.style.color = '#0f0'; }
+      if (invPol) { invPol.textContent = '💎 ' + bal + ' POL'; invPol.style.display = 'inline'; }
+      if (hudWallet) hudWallet.textContent = '🦊 ' + addr;
+    } else {
+      if (startStatus) startStatus.textContent = '';
+      if (invConnect) { invConnect.textContent = '🦊 Connect Wallet'; invConnect.style.borderColor = '#8247e5'; invConnect.style.color = '#8247e5'; }
+      if (invPol) invPol.style.display = 'none';
+      if (hudWallet) hudWallet.textContent = '🦊 —';
+    }
+  }
+
+  Blockchain.onEvent(function (evt) {
+    if (evt === 'connected' || evt === 'disconnected' || evt === 'balanceUpdate' || evt === 'accountChanged') {
+      updateWalletUI();
+    }
+  });
+
+  document.getElementById('start-connect-wallet').addEventListener('click', function () {
+    Blockchain.connect().then(updateWalletUI);
+  });
+  document.getElementById('inv-connect-wallet-btn').addEventListener('click', function () {
+    if (Blockchain.isConnected()) { Blockchain.disconnect(); } else { Blockchain.connect(); }
+    setTimeout(updateWalletUI, 500);
+  });
+
+  // ── Marketplace Tab wiring ────────────────────────────
+  var invTabs = document.querySelectorAll('.inv-tab');
+  invTabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      invTabs.forEach(function (t) { t.classList.remove('active'); t.style.opacity = '0.5'; });
+      tab.classList.add('active');
+      tab.style.opacity = '1';
+      document.querySelectorAll('.inv-panel').forEach(function (p) { p.style.display = 'none'; });
+      var panel = document.getElementById('inv-panel-' + tab.dataset.tab);
+      if (panel) panel.style.display = 'block';
+      GameManager.refreshMarketplaceUI(tab.dataset.tab);
+    });
+  });
+
+  // ── Currency Exchange ─────────────────────────────────
+  document.getElementById('convert-okc-gold-btn').addEventListener('click', function () {
+    var result = Marketplace.convertOKCToGold(100);
+    if (result > 0) { GameManager.refreshMarketplaceUI('shop'); }
+  });
+  document.getElementById('convert-gold-okc-btn').addEventListener('click', function () {
+    var result = Marketplace.convertGoldToOKC(1000);
+    if (result > 0) { GameManager.refreshMarketplaceUI('shop'); }
+  });
 
   // Start render loop
   GameManager.update();
