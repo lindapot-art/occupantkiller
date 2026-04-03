@@ -127,6 +127,14 @@
       <div>L · Night Vision</div>
       <div>LMB+Shovel · Mine</div>
       <div>RMB+Shovel · Build</div>
+      <div>Q/E · Lean</div>
+      <div>V (hold) · Inspect</div>
+      <div>C · Ammo Type</div>
+      <div>H · Bandage Perk</div>
+      <div>K · Killstreak</div>
+      <div>M · Ping Mark</div>
+      <div>P · Perks Menu</div>
+      <div>Y · War Journal</div>
     </div>
 
     <!-- Stealth indicator -->
@@ -295,6 +303,110 @@
 
     <!-- Tactical sprint indicator (Feature 7) -->
     <div id="tacsprint-indicator" style="display:none;position:fixed;bottom:245px;left:50%;transform:translateX(-50%);background:rgba(255,100,0,0.2);border:1px solid #ff6600;color:#ff8800;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">⚡ TAC SPRINT</div>
+
+    <!-- ═══════ NEW FEATURE HUD ELEMENTS (59 features) ═══════ -->
+
+    <!-- Lean indicator -->
+    <div id="lean-indicator" style="display:none;position:fixed;top:50%;left:12px;transform:translateY(-50%);color:#00ccff;font-size:12px;font-family:monospace;z-index:200;pointer-events:none">↕ LEANING</div>
+
+    <!-- Weapon inspect overlay -->
+    <div id="inspect-overlay" style="display:none;position:fixed;bottom:150px;left:50%;transform:translateX(-50%);color:#aaa;font-size:11px;font-family:monospace;z-index:200;pointer-events:none">🔍 INSPECTING WEAPON</div>
+
+    <!-- Bayonet charge indicator -->
+    <div id="bayonet-indicator" style="display:none;position:fixed;bottom:270px;left:50%;transform:translateX(-50%);background:rgba(255,0,0,0.2);border:1px solid #ff0000;color:#ff2222;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">🔪 BAYONET CHARGE!</div>
+
+    <!-- Maintenance indicator -->
+    <div id="maintenance-indicator" style="display:none;position:fixed;bottom:295px;left:50%;transform:translateX(-50%);background:rgba(100,100,0,0.2);border:1px solid #aaaa00;color:#cccc00;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">🔧 MAINTAINING WEAPON...</div>
+
+    <!-- Overheat warning -->
+    <div id="overheat-indicator" style="display:none;position:fixed;bottom:320px;left:50%;transform:translateX(-50%);background:rgba(255,50,0,0.3);border:1px solid #ff3300;color:#ff4400;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace;animation:blink 0.3s infinite">🔥 OVERHEATED!</div>
+
+    <!-- Blind fire indicator -->
+    <div id="blindfire-indicator" style="display:none;position:fixed;bottom:345px;left:50%;transform:translateX(-50%);background:rgba(150,150,150,0.2);border:1px solid #999;color:#bbb;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">🔫 BLIND FIRE</div>
+
+    <!-- Swimming indicator -->
+    <div id="swim-indicator" style="display:none;position:fixed;bottom:150px;left:50%;transform:translateX(-50%);background:rgba(0,100,200,0.3);border:1px solid #0066cc;color:#0099ff;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">🏊 SWIMMING</div>
+
+    <!-- Breath meter (swimming) -->
+    <div id="breath-bar-container" style="display:none;position:fixed;bottom:180px;left:50%;transform:translateX(-50%);width:100px;height:6px;background:rgba(0,0,0,0.5);border:1px solid rgba(0,150,255,0.4);border-radius:3px;z-index:200;pointer-events:none;overflow:hidden">
+      <div id="breath-bar" style="width:100%;height:100%;background:linear-gradient(90deg,#0088ff,#00ccff);border-radius:3px;transition:width 0.2s"></div>
+    </div>
+
+    <!-- Mantle indicator -->
+    <div id="mantle-indicator" style="display:none;position:fixed;bottom:370px;left:50%;transform:translateX(-50%);color:#00ff88;font-size:11px;font-family:monospace;z-index:200;pointer-events:none">⬆ MANTLING</div>
+
+    <!-- Killstreak panel (right side) -->
+    <div id="killstreak-panel" style="display:none;position:fixed;right:12px;top:40%;transform:translateY(-50%);background:rgba(0,0,0,0.8);border:1px solid #ff6600;padding:8px 12px;border-radius:6px;z-index:250;font-family:monospace;color:#fff;font-size:11px;pointer-events:auto">
+      <div style="color:#ff6600;font-weight:bold;margin-bottom:6px">⚡ KILLSTREAKS</div>
+      <div id="killstreak-list"></div>
+      <div style="color:#666;font-size:9px;margin-top:4px">Click to activate | K to toggle</div>
+    </div>
+
+    <!-- Perk display (bottom-left) -->
+    <div id="perk-display" style="position:fixed;bottom:130px;left:12px;font-size:11px;font-family:monospace;z-index:200;pointer-events:none;color:#ddd">
+      <div id="perk-slot-1" style="display:none;margin:2px 0;padding:2px 6px;background:rgba(0,0,0,0.5);border-radius:3px;border-left:2px solid #ffcc00"></div>
+      <div id="perk-slot-2" style="display:none;margin:2px 0;padding:2px 6px;background:rgba(0,0,0,0.5);border-radius:3px;border-left:2px solid #ffcc00"></div>
+      <div id="perk-slot-3" style="display:none;margin:2px 0;padding:2px 6px;background:rgba(0,0,0,0.5);border-radius:3px;border-left:2px solid #ffcc00"></div>
+    </div>
+
+    <!-- Perks selection menu -->
+    <div id="perks-menu" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.92);border:2px solid #ffcc00;padding:20px;border-radius:10px;z-index:500;font-family:monospace;color:#fff;min-width:400px;pointer-events:auto">
+      <div style="text-align:center;color:#ffcc00;font-size:16px;margin-bottom:12px">🎖 PERKS (Choose up to 3)</div>
+      <div id="perks-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+      <div style="text-align:center;margin-top:12px;color:#666;font-size:10px">Press P to close</div>
+    </div>
+
+    <!-- Daily challenges display -->
+    <div id="daily-challenges" style="display:none;position:fixed;top:90px;left:12px;background:rgba(0,0,0,0.7);border:1px solid rgba(0,200,255,0.3);padding:8px 12px;border-radius:6px;z-index:200;font-family:monospace;font-size:10px;pointer-events:none;color:#ccc;max-width:220px">
+      <div style="color:#00ccff;font-weight:bold;margin-bottom:4px">📋 DAILY CHALLENGES</div>
+      <div id="daily-challenges-list"></div>
+    </div>
+
+    <!-- Bounty board display -->
+    <div id="bounty-display" style="display:none;position:fixed;top:200px;left:12px;background:rgba(0,0,0,0.7);border:1px solid rgba(255,170,0,0.3);padding:8px 12px;border-radius:6px;z-index:200;font-family:monospace;font-size:10px;pointer-events:none;color:#ccc;max-width:220px">
+      <div style="color:#ffaa00;font-weight:bold;margin-bottom:4px">💰 BOUNTIES</div>
+      <div id="bounty-list"></div>
+    </div>
+
+    <!-- Prestige indicator -->
+    <div id="prestige-indicator" style="position:fixed;top:52px;left:12px;color:#ffd700;font-size:11px;font-family:monospace;z-index:200;pointer-events:none" id="prestige-display"></div>
+
+    <!-- Stats panel (press TAB to see) -->
+    <div id="stats-panel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.92);border:2px solid #4488ff;padding:20px;border-radius:10px;z-index:500;font-family:monospace;color:#fff;min-width:500px;pointer-events:auto">
+      <div style="text-align:center;color:#4488ff;font-size:16px;margin-bottom:12px">📊 CAREER STATISTICS</div>
+      <div id="stats-content" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:12px;line-height:1.8"></div>
+      <div style="text-align:center;margin-top:12px;color:#666;font-size:10px">Press ESC to close</div>
+    </div>
+
+    <!-- War Journal panel -->
+    <div id="journal-panel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.92);border:2px solid #8B6914;padding:20px;border-radius:10px;z-index:500;font-family:monospace;color:#fff;min-width:500px;max-height:70vh;overflow-y:auto;pointer-events:auto">
+      <div style="text-align:center;color:#8B6914;font-size:16px;margin-bottom:12px">📓 WAR JOURNAL</div>
+      <div id="journal-content" style="font-size:12px;line-height:1.6"></div>
+      <div style="text-align:center;margin-top:12px;color:#666;font-size:10px">Press Y to close</div>
+    </div>
+
+    <!-- Leaderboard panel -->
+    <div id="leaderboard-panel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.92);border:2px solid #ffd700;padding:20px;border-radius:10px;z-index:500;font-family:monospace;color:#fff;min-width:450px;pointer-events:auto">
+      <div style="text-align:center;color:#ffd700;font-size:16px;margin-bottom:12px">🏆 LEADERBOARD</div>
+      <div id="leaderboard-content" style="font-size:12px;line-height:1.8"></div>
+    </div>
+
+    <!-- Challenge mode selector (on start screen - referenced below) -->
+    <!-- Mission objective tracker -->
+    <div id="mission-tracker" style="display:none;position:fixed;top:110px;right:12px;background:rgba(0,0,0,0.7);border:1px solid rgba(255,200,0,0.3);padding:8px 12px;border-radius:6px;z-index:200;font-family:monospace;font-size:11px;pointer-events:none;color:#ccc;max-width:250px">
+      <div style="color:#ffcc00;font-weight:bold;margin-bottom:4px" id="mission-tracker-title">📍 MISSION</div>
+      <div id="mission-tracker-objectives"></div>
+      <div id="mission-tracker-timer" style="color:#ff6644;margin-top:4px"></div>
+    </div>
+
+    <!-- Landmine counter -->
+    <div id="mine-counter" style="display:none;position:fixed;bottom:395px;left:50%;transform:translateX(-50%);color:#44aa44;font-size:10px;font-family:monospace;z-index:200;pointer-events:none">💣 Mines: 0</div>
+
+    <!-- Adrenaline active indicator -->
+    <div id="adrenaline-indicator" style="display:none;position:fixed;bottom:420px;left:50%;transform:translateX(-50%);background:rgba(255,100,0,0.3);border:1px solid #ff6600;color:#ff8800;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">⚡ ADRENALINE RUSH!</div>
+
+    <!-- UAV active indicator -->
+    <div id="uav-indicator" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(0,255,0,0.15);border:1px solid #00ff44;color:#00ff44;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none;font-family:monospace">📡 UAV ACTIVE</div>
   </div>
 
   <!-- Start screen -->
@@ -314,6 +426,19 @@
       <p id="god-mode-desc" style="color:#666;font-size:11px;margin:4px 0;display:none">All weapons · Infinite health · Invisible to enemies</p>
     </div>
     <div id="start-weapons-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin:8px auto;max-width:520px;font-size:10px"></div>
+    <div id="challenge-select" style="margin:8px 0">
+      <p style="color:#ccc;font-size:13px;margin:4px 0">Challenge Mode (optional):</p>
+      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+        <button class="btn challenge-btn" data-mode="" style="font-size:11px;padding:4px 10px;border-color:#888;color:#888">🎮 Normal</button>
+        <button class="btn challenge-btn" data-mode="HARDCORE" style="font-size:11px;padding:4px 10px;border-color:#ff4444;color:#ff4444">💀 Hardcore</button>
+        <button class="btn challenge-btn" data-mode="SPEEDRUN" style="font-size:11px;padding:4px 10px;border-color:#00ccff;color:#00ccff">⏱️ Speedrun</button>
+        <button class="btn challenge-btn" data-mode="PACIFIST" style="font-size:11px;padding:4px 10px;border-color:#88ff88;color:#88ff88">🕊️ Pacifist</button>
+        <button class="btn challenge-btn" data-mode="ONE_SHOT" style="font-size:11px;padding:4px 10px;border-color:#ffcc00;color:#ffcc00">🎱 One Shot</button>
+        <button class="btn challenge-btn" data-mode="SNIPER_ONLY" style="font-size:11px;padding:4px 10px;border-color:#44ff88;color:#44ff88">🔭 Sniper</button>
+        <button class="btn challenge-btn" data-mode="NIGHT_OPS" style="font-size:11px;padding:4px 10px;border-color:#6644ff;color:#6644ff">🌙 Night Ops</button>
+      </div>
+      <p id="challenge-desc" style="color:#666;font-size:11px;margin:4px 0"></p>
+    </div>
     <button class="btn" id="start-btn">▶ START MISSION</button>
     <div style="margin:8px 0">
       <button class="btn" id="start-connect-wallet" style="font-size:12px;padding:5px 14px;border-color:#8247e5;color:#8247e5;display:inline-block">🦊 Connect MetaMask (Polygon)</button>
@@ -333,6 +458,7 @@
     <p class="stat">KILLS: <span id="dead-kills">0</span></p>
     <p class="stat">WAVES: <span id="dead-wave">0</span></p>
     <div id="dead-statistics" style="margin-top:12px;font-size:11px;color:#aaa;line-height:1.6"></div>
+    <div id="dead-leaderboard" style="margin-top:8px;font-size:10px;color:#ffd700;line-height:1.5"></div>
     <button class="btn" id="restart-btn">↺ TRY AGAIN</button>
   </div>
 
@@ -513,6 +639,17 @@
 <script src="weather-system.js"></script>
 <script src="ml-system.js"></script>
 <script src="tracers.js"></script>
+
+<!-- New feature modules (59 features) -->
+<script src="combat-extras.js"></script>
+<script src="traversal.js"></script>
+<script src="enemy-types.js"></script>
+<script src="world-features.js"></script>
+<script src="perks.js"></script>
+<script src="mission-types.js"></script>
+<script src="feedback.js"></script>
+<script src="progression.js"></script>
+
 <script src="game-manager.js"></script>
 
 <!-- Boot -->
@@ -618,6 +755,30 @@
   GameManager.populateWeaponsGrid('start-weapons-grid');
   GameManager.populateWeaponsGrid('pause-weapons-grid');
   GameManager.updateRoleIndicator();
+
+  // ── Challenge Mode selection wiring ────────────────────
+  var challengeBtns = document.querySelectorAll('.challenge-btn');
+  var challengeDesc = document.getElementById('challenge-desc');
+  for (var ci = 0; ci < challengeBtns.length; ci++) {
+    challengeBtns[ci].addEventListener('click', function () {
+      var mode = this.getAttribute('data-mode');
+      // Reset all button highlights
+      for (var j = 0; j < challengeBtns.length; j++) {
+        challengeBtns[j].style.background = 'transparent';
+      }
+      this.style.background = 'rgba(255,255,255,0.1)';
+      if (typeof Progression !== 'undefined') {
+        if (mode) {
+          Progression.setChallenge(mode);
+          var cm = Progression.getChallengeMode();
+          if (challengeDesc && cm) challengeDesc.textContent = cm.desc;
+        } else {
+          Progression.clearChallenge();
+          if (challengeDesc) challengeDesc.textContent = 'Standard gameplay - no modifiers.';
+        }
+      }
+    });
+  }
 
   // ── Wallet Connect wiring ─────────────────────────────
   function updateWalletUI() {
