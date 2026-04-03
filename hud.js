@@ -355,6 +355,131 @@ const HUD = (() => {
     jamEl.style.display = active ? 'block' : 'none';
   }
 
+  // ── Vehicle HUD ──────────────────────────────────────────────────
+  const vehicleHudEl = document.getElementById('vehicle-hud');
+  const vhTypeEl = document.getElementById('vehicle-hud-type');
+  const vhHealthBar = document.getElementById('vehicle-health-bar');
+  const vhHealthVal = document.getElementById('vehicle-health-val');
+  const vhSpeedEl = document.getElementById('vehicle-hud-speed');
+  const vhControlsEl = document.getElementById('vehicle-hud-controls');
+  const vhHijackBar = document.getElementById('vehicle-hijack-bar');
+  const vhHijackFill = document.getElementById('vehicle-hijack-fill');
+
+  const VEHICLE_ICONS = {
+    transport: '🚛', combat: '🪖', logistics: '📦',
+    helicopter: '🚁', plane: '✈️', turret_rover: '🤖'
+  };
+
+  function showVehicleHUD(vehicle) {
+    if (!vehicleHudEl || !vehicle) return;
+    vehicleHudEl.style.display = 'block';
+    const icon = VEHICLE_ICONS[vehicle.type] || '🚗';
+    vhTypeEl.textContent = icon + ' ' + vehicle.type.toUpperCase().replace('_', ' ');
+    if (vehicle.flying) {
+      vhControlsEl.textContent = 'WASD · Fly | SPACE · Ascend | SHIFT · Descend | G · Exit | T · View | LMB · Fire';
+    } else if (vehicle.damage > 0) {
+      vhControlsEl.textContent = 'WASD · Drive | G · Exit | T · View | LMB · Fire Turret';
+    } else {
+      vhControlsEl.textContent = 'WASD · Drive | G · Exit | T · View';
+    }
+  }
+
+  function hideVehicleHUD() {
+    if (vehicleHudEl) vehicleHudEl.style.display = 'none';
+  }
+
+  function updateVehicleHUD(vehicle) {
+    if (!vehicleHudEl || !vehicle) return;
+    // Health bar
+    const hpPct = Math.max(0, vehicle.health / vehicle.maxHealth) * 100;
+    if (vhHealthBar) {
+      vhHealthBar.style.width = hpPct + '%';
+      if (hpPct > 50) {
+        vhHealthBar.style.background = 'linear-gradient(90deg, #00ff44, #44ff88)';
+      } else if (hpPct > 25) {
+        vhHealthBar.style.background = 'linear-gradient(90deg, #ff8800, #ffcc00)';
+      } else {
+        vhHealthBar.style.background = 'linear-gradient(90deg, #ff0000, #ff4444)';
+      }
+    }
+    if (vhHealthVal) vhHealthVal.textContent = Math.ceil(vehicle.health) + '/' + vehicle.maxHealth;
+    // Speed
+    if (vhSpeedEl) {
+      const speed = vehicle.velocity ? Math.round(vehicle.velocity.length() * 3.6) : 0;
+      vhSpeedEl.textContent = speed + ' km/h';
+    }
+  }
+
+  function showHijackProgress(progress) {
+    if (!vhHijackBar) return;
+    if (progress <= 0 || progress >= 1) {
+      vhHijackBar.style.display = 'none';
+      return;
+    }
+    vhHijackBar.style.display = 'block';
+    if (vhHijackFill) vhHijackFill.style.width = (progress * 100) + '%';
+  }
+
+  // ── Stamina Bar ──────────────────────────────────────────────────
+  const staminaBarEl = document.getElementById('stamina-bar');
+
+  function updateStamina(pct) {
+    if (!staminaBarEl) return;
+    staminaBarEl.style.width = (pct * 100) + '%';
+    if (pct < 0.25) {
+      staminaBarEl.style.background = 'linear-gradient(90deg, #ff4444, #ff6644)';
+    } else if (pct < 0.5) {
+      staminaBarEl.style.background = 'linear-gradient(90deg, #ff8800, #ffaa44)';
+    } else {
+      staminaBarEl.style.background = 'linear-gradient(90deg, #ffcc00, #ffee66)';
+    }
+  }
+
+  // ── Night Vision ─────────────────────────────────────────────────
+  const nightVisionEl = document.getElementById('night-vision-overlay');
+
+  function showNightVision(active) {
+    if (nightVisionEl) nightVisionEl.style.display = active ? 'block' : 'none';
+  }
+
+  // ── Weather Indicator ────────────────────────────────────────────
+  const weatherEl = document.getElementById('weather-indicator');
+
+  function updateWeatherDisplay(label) {
+    if (weatherEl) weatherEl.textContent = label;
+  }
+
+  // ── Interaction Prompt ───────────────────────────────────────────
+  const interactEl = document.getElementById('interaction-prompt');
+  let _interactTimer = null;
+
+  function showInteractionPrompt(text) {
+    if (!interactEl) return;
+    interactEl.textContent = text;
+    interactEl.style.display = 'block';
+    clearTimeout(_interactTimer);
+    _interactTimer = setTimeout(function () {
+      interactEl.style.display = 'none';
+    }, 2000);
+  }
+
+  function hideInteractionPrompt() {
+    if (interactEl) interactEl.style.display = 'none';
+    clearTimeout(_interactTimer);
+  }
+
+  // ── Low HP Effects ───────────────────────────────────────────────
+  const lowHpEl = document.getElementById('low-hp-vignette');
+  const shieldEl = document.getElementById('shield-indicator');
+
+  function showLowHP(active) {
+    if (lowHpEl) lowHpEl.style.display = active ? 'block' : 'none';
+  }
+
+  function showShield(active) {
+    if (shieldEl) shieldEl.style.display = active ? 'block' : 'none';
+  }
+
   return {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
@@ -364,5 +489,9 @@ const HUD = (() => {
     announceWave, announceStage,
     addKill, showHitDirection, updateMinimap,
     updateCompass, showStreak, showBleed, showProne, showJam,
+    showVehicleHUD, hideVehicleHUD, updateVehicleHUD, showHijackProgress,
+    updateStamina, showNightVision, updateWeatherDisplay,
+    showInteractionPrompt, hideInteractionPrompt,
+    showLowHP, showShield,
   };
 })();

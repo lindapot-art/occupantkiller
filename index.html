@@ -123,6 +123,7 @@
       <div>Z · Prone</div>
       <div>X · Bandage</div>
       <div>N · Airdrop</div>
+      <div>L · Night Vision</div>
       <div>4-7 · Time Speed</div>
       <div>P · Pause Time</div>
     </div>
@@ -159,6 +160,44 @@
 
     <!-- Minimap radar -->
     <canvas id="minimap-canvas" width="180" height="180"></canvas>
+
+    <!-- Vehicle HUD overlay (shown when in vehicle) -->
+    <div id="vehicle-hud" style="display:none">
+      <div id="vehicle-hud-type">🚗 TRANSPORT</div>
+      <div id="vehicle-hud-health-row">
+        <span>HULL</span>
+        <div id="vehicle-health-bar-bg"><div id="vehicle-health-bar"></div></div>
+        <span id="vehicle-health-val">200/200</span>
+      </div>
+      <div id="vehicle-hud-speed">0 km/h</div>
+      <div id="vehicle-hud-controls">WASD · Drive | SPACE · Up | SHIFT · Down | G · Exit | T · View | LMB · Fire</div>
+      <div id="vehicle-hijack-bar" style="display:none">
+        <div id="vehicle-hijack-fill"></div>
+        <span id="vehicle-hijack-text">HIJACKING…</span>
+      </div>
+    </div>
+
+    <!-- Stamina bar -->
+    <div id="stamina-bar-container" style="position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:120px;height:6px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,200,0,0.3);border-radius:3px;z-index:200;pointer-events:none;overflow:hidden">
+      <div id="stamina-bar" style="width:100%;height:100%;background:linear-gradient(90deg,#ffcc00,#ffee66);border-radius:3px;transition:width 0.15s"></div>
+    </div>
+
+    <!-- Night vision overlay -->
+    <div id="night-vision-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,40,0,0.3);border:3px solid rgba(0,255,0,0.15);z-index:195;pointer-events:none;mix-blend-mode:screen">
+      <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);color:#00ff44;font-size:11px;font-family:monospace;opacity:0.6">🔦 NIGHT VISION [L]</div>
+    </div>
+
+    <!-- Weather indicator -->
+    <div id="weather-indicator" style="position:fixed;top:28px;left:12px;color:#aaa;font-size:11px;font-family:monospace;z-index:200;pointer-events:none">☀ Clear</div>
+
+    <!-- Interaction prompt -->
+    <div id="interaction-prompt" style="display:none;position:fixed;bottom:200px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:6px 16px;border-radius:6px;font-size:13px;font-family:monospace;z-index:200;pointer-events:none;text-align:center"></div>
+
+    <!-- Low HP vignette pulse -->
+    <div id="low-hp-vignette" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:190;box-shadow:inset 0 0 60px 20px rgba(255,0,0,0.3);animation:lowHpPulse 1.2s ease-in-out infinite"></div>
+
+    <!-- Shield active indicator -->
+    <div id="shield-indicator" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:188;box-shadow:inset 0 0 40px 15px rgba(255,215,0,0.15);border:2px solid rgba(255,215,0,0.2)"></div>
   </div>
 
   <!-- Start screen -->

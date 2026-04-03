@@ -28,6 +28,8 @@ const VehicleSystem = (function () {
   let _scene = null;
   let nextId = 1;
   let _occupiedVehicle = null;
+  let _hijackState = null;  // { vehicle, timer, duration }
+  let _playerBodyMesh = null;  // shown half-in during hijack/riding
 
   /* ── Turret Projectile State ────────────────────────────────────── */
   const turretProjectiles = [];
@@ -122,6 +124,67 @@ const VehicleSystem = (function () {
     return group;
   }
 
+  /* ── Player Body Mesh (half-body visible from vehicle hatch) ───── */
+  function buildPlayerBodyMesh() {
+    const body = new THREE.Group();
+    // Torso
+    const torso = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 0.6, 0.3),
+      new THREE.MeshLambertMaterial({ color: 0x3A5A2A })
+    );
+    torso.position.y = 0.3;
+    body.add(torso);
+    // Head
+    const head = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 0.3, 0.3),
+      new THREE.MeshLambertMaterial({ color: 0xD4A06A })
+    );
+    head.position.y = 0.75;
+    body.add(head);
+    // Helmet
+    const helmet = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, 0.15, 0.35),
+      new THREE.MeshLambertMaterial({ color: 0x3A4A2A })
+    );
+    helmet.position.y = 0.95;
+    body.add(helmet);
+    // Arms (posed as gripping hatch rim)
+    for (let side = -1; side <= 1; side += 2) {
+      const arm = new THREE.Mesh(
+        new THREE.BoxGeometry(0.15, 0.45, 0.15),
+        new THREE.MeshLambertMaterial({ color: 0x3A5A2A })
+      );
+      arm.position.set(side * 0.35, 0.2, 0);
+      arm.rotation.z = side * 0.3;
+      body.add(arm);
+    }
+    body.castShadow = true;
+    return body;
+  }
+
+  function attachPlayerBody(vehicle) {
+    if (!_scene) return;
+    if (_playerBodyMesh) {
+      _scene.remove(_playerBodyMesh);
+      _playerBodyMesh = null;
+    }
+    _playerBodyMesh = buildPlayerBodyMesh();
+    // Position on top of vehicle (emerging from hatch)
+    _playerBodyMesh.position.set(0, 1.4, 0);
+    vehicle.mesh.add(_playerBodyMesh);
+  }
+
+  function detachPlayerBody() {
+    if (_playerBodyMesh) {
+      if (_playerBodyMesh.parent) _playerBodyMesh.parent.remove(_playerBodyMesh);
+      _playerBodyMesh.traverse(function (c) {
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) c.material.dispose();
+      });
+      _playerBodyMesh = null;
+    }
+  }
+
   /* ── Init ────────────────────────────────────────────────────────── */
   function init(scene) {
     _scene = scene;
@@ -177,6 +240,7 @@ const VehicleSystem = (function () {
     if (!v || v.seats <= 0) return false;
     v.occupied = true;
     _occupiedVehicle = v;
+    attachPlayerBody(v);
     // Apply correct camera mode based on vehicle view preference
     if (v.viewMode === 'first') {
       CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
@@ -184,13 +248,27 @@ const VehicleSystem = (function () {
       CameraSystem.setMode(CameraSystem.MODE.VEHICLE);
     }
     CameraSystem.setVehicleTarget(v.mesh);
+    if (typeof HUD !== 'undefined' && HUD.showVehicleHUD) HUD.showVehicleHUD(v);
     return true;
   }
 
-  /** Hijack a vehicle (steal from enemy or friendly). Changes faction to friendly. */
-  function hijack(vehicleId) {
+  /** Start hijacking a vehicle (animated transition). Returns true if started. */
+  function startHijack(vehicleId) {
     const v = vehicles.find(v => v.id === vehicleId && v.alive);
     if (!v || v.seats <= 0) return false;
+    // Duration depends on faction: enemy takes longer
+    const duration = v.faction === 'enemy' ? 2.0 : 0.8;
+    _hijackState = { vehicle: v, timer: 0, duration: duration };
+    if (typeof HUD !== 'undefined' && HUD.showHijackProgress) HUD.showHijackProgress(0.01);
+    return true;
+  }
+
+  /** Complete the hijack (called when timer finishes) */
+  function completeHijack() {
+    if (!_hijackState) return false;
+    const v = _hijackState.vehicle;
+    _hijackState = null;
+    if (!v || !v.alive) return false;
     // Clean up prior state
     if (v.occupiedByNPC) {
       v.occupiedByNPC = false;
@@ -199,12 +277,39 @@ const VehicleSystem = (function () {
     v.faction = 'friendly';
     v.occupied = true;
     _occupiedVehicle = v;
+    attachPlayerBody(v);
     if (v.viewMode === 'first') {
       CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
     } else {
       CameraSystem.setMode(CameraSystem.MODE.VEHICLE);
     }
     CameraSystem.setVehicleTarget(v.mesh);
+    if (typeof HUD !== 'undefined') {
+      if (HUD.showVehicleHUD) HUD.showVehicleHUD(v);
+      if (HUD.showHijackProgress) HUD.showHijackProgress(0);
+    }
+    return true;
+  }
+
+  /** Legacy hijack (instant) for backward compat */
+  function hijack(vehicleId) {
+    const v = vehicles.find(v => v.id === vehicleId && v.alive);
+    if (!v || v.seats <= 0) return false;
+    if (v.occupiedByNPC) {
+      v.occupiedByNPC = false;
+      v.npcGunner = null;
+    }
+    v.faction = 'friendly';
+    v.occupied = true;
+    _occupiedVehicle = v;
+    attachPlayerBody(v);
+    if (v.viewMode === 'first') {
+      CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
+    } else {
+      CameraSystem.setMode(CameraSystem.MODE.VEHICLE);
+    }
+    CameraSystem.setVehicleTarget(v.mesh);
+    if (typeof HUD !== 'undefined' && HUD.showVehicleHUD) HUD.showVehicleHUD(v);
     return true;
   }
 
@@ -214,9 +319,13 @@ const VehicleSystem = (function () {
     if (_occupiedVehicle.viewMode === 'first') {
       _occupiedVehicle.viewMode = 'third';
       CameraSystem.setMode(CameraSystem.MODE.VEHICLE);
+      // Show player body mesh in third person
+      if (_playerBodyMesh) _playerBodyMesh.visible = true;
     } else {
       _occupiedVehicle.viewMode = 'first';
       CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
+      // Hide player body in first person (camera IS the player)
+      if (_playerBodyMesh) _playerBodyMesh.visible = false;
     }
     CameraSystem.setVehicleTarget(_occupiedVehicle.mesh);
   }
@@ -231,10 +340,13 @@ const VehicleSystem = (function () {
         _occupiedVehicle.occupiedByNPC = false;
         _occupiedVehicle.npcGunner = null;
       }
+      detachPlayerBody();
       _occupiedVehicle = null;
+      _hijackState = null;
       // Clear vehicle camera target so FPS camera doesn't stay locked to vehicle
       CameraSystem.setVehicleTarget(null);
       CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
+      if (typeof HUD !== 'undefined' && HUD.hideVehicleHUD) HUD.hideVehicleHUD();
       return exitPos;
     }
     return null;
@@ -267,6 +379,16 @@ const VehicleSystem = (function () {
 
   /* ── Update ──────────────────────────────────────────────────────── */
   function update(delta) {
+    // Process hijack animation
+    if (_hijackState) {
+      _hijackState.timer += delta;
+      const progress = Math.min(1, _hijackState.timer / _hijackState.duration);
+      if (typeof HUD !== 'undefined' && HUD.showHijackProgress) HUD.showHijackProgress(progress);
+      if (progress >= 1) {
+        completeHijack();
+      }
+    }
+
     for (const v of vehicles) {
       if (!v.alive) continue;
 
@@ -331,6 +453,11 @@ const VehicleSystem = (function () {
 
     // Update turret projectiles
     updateTurretProjectiles(delta);
+
+    // Update vehicle HUD
+    if (_occupiedVehicle && typeof HUD !== 'undefined' && HUD.updateVehicleHUD) {
+      HUD.updateVehicleHUD(_occupiedVehicle);
+    }
   }
 
   function updatePlayerVehicle(v, delta) {
@@ -653,7 +780,10 @@ const VehicleSystem = (function () {
 
   function destroyVehicle(v) {
     v.alive = false;
-    if (v === _occupiedVehicle) exit();
+    if (v === _occupiedVehicle) {
+      detachPlayerBody();
+      exit();
+    }
     if (v.mesh) {
       v.mesh.traverse(function (child) {
         if (child.geometry) child.geometry.dispose();
@@ -672,6 +802,8 @@ const VehicleSystem = (function () {
   }
 
   function clear() {
+    detachPlayerBody();
+    _hijackState = null;
     for (const v of vehicles) {
       if (v.mesh) {
         v.mesh.traverse(function (child) {
@@ -683,6 +815,7 @@ const VehicleSystem = (function () {
     }
     vehicles.length = 0;
     _occupiedVehicle = null;
+    if (typeof HUD !== 'undefined' && HUD.hideVehicleHUD) HUD.hideVehicleHUD();
     // Clean up turret projectiles
     for (const p of turretProjectiles) {
       if (p.mesh) {
@@ -703,6 +836,13 @@ const VehicleSystem = (function () {
     enter,
     exit,
     hijack,
+    startHijack,
+    completeHijack,
+    isHijacking: function () { return _hijackState !== null; },
+    cancelHijack: function () {
+      _hijackState = null;
+      if (typeof HUD !== 'undefined' && HUD.showHijackProgress) HUD.showHijackProgress(0);
+    },
     toggleVehicleView,
     boardNPCGunner,
     getOccupied,

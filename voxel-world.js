@@ -25,6 +25,13 @@ const VoxelWorld = (function () {
     RUBBLE:      16,
     SANDBAG:     17,
     ASPHALT:     18,
+    ROOFTILE:    19,
+    PLASTER:     20,
+    CARPET:      21,
+    LINOLEUM:    22,
+    WALLPAPER:   23,
+    CERAMIC:     24,
+    SHINGLE:     25,
   });
 
   const BLOCK_COLORS = {
@@ -45,7 +52,14 @@ const VoxelWorld = (function () {
     [BLOCK.FENCE]:       0x8B7355,
     [BLOCK.RUBBLE]:      0x7a6a5a,
     [BLOCK.SANDBAG]:     0xC2B280,
-    18: 0x333338,  // dark asphalt
+    [BLOCK.ASPHALT]:    0x333338,
+    [BLOCK.ROOFTILE]:   0x8B4513,  // saddle brown roof tiles
+    [BLOCK.PLASTER]:    0xE8DCC8,  // warm off-white plaster walls
+    [BLOCK.CARPET]:     0x6B3A2A,  // dark burgundy carpet
+    [BLOCK.LINOLEUM]:   0x7A8B6E,  // faded green linoleum floor
+    [BLOCK.WALLPAPER]:  0xC9B89E,  // beige/tan wallpaper
+    [BLOCK.CERAMIC]:    0xF5F0E8,  // off-white ceramic tile
+    [BLOCK.SHINGLE]:    0x4A4A4A,  // dark gray roofing shingles
   };
 
   const BLOCK_HARDNESS = {
@@ -66,7 +80,14 @@ const VoxelWorld = (function () {
     [BLOCK.FENCE]:       1,
     [BLOCK.RUBBLE]:      2,
     [BLOCK.SANDBAG]:     1,
-    18: 3,  // asphalt road
+    [BLOCK.ASPHALT]:    3,
+    [BLOCK.ROOFTILE]:   2,
+    [BLOCK.PLASTER]:    1.5,
+    [BLOCK.CARPET]:     0.5,
+    [BLOCK.LINOLEUM]:   0.5,
+    [BLOCK.WALLPAPER]:  1,
+    [BLOCK.CERAMIC]:    2,
+    [BLOCK.SHINGLE]:    2,
   };
 
   const BLOCK_TRANSPARENT = new Set([BLOCK.AIR, BLOCK.WATER, BLOCK.GLASS]);
@@ -2311,6 +2332,327 @@ const VoxelWorld = (function () {
     }
   }
 
+  /* ── Prebuilt: Complete Avdiivka Residential Home ────────────────── */
+  function generateAvdiivkaHome(ox, oz, variant) {
+    variant = variant || 0;
+    const surfH = getTerrainHeight(ox, oz);
+    const floors = 2 + (variant % 2);  // 2-3 story homes
+    const w = 6 + (variant % 3);       // 6-8 wide
+    const d = 5 + (variant % 2);       // 5-6 deep
+    const floorH = 3;                  // 3 blocks per floor
+
+    for (let floor = 0; floor < floors; floor++) {
+      const baseY = surfH + 1 + floor * floorH;
+
+      // Floor surface
+      for (let x = 0; x < w; x++) {
+        for (let z = 0; z < d; z++) {
+          let floorBlock = floor === 0 ? BLOCK.LINOLEUM : BLOCK.CARPET;
+          if (variant % 3 === 1 && floor > 0) floorBlock = BLOCK.WOOD;
+          setBlock(ox + x, baseY, oz + z, floorBlock);
+        }
+      }
+
+      // Walls — brick exterior, wallpaper/plaster interior
+      for (let y = 1; y <= floorH - 1; y++) {
+        for (let x = 0; x < w; x++) {
+          // Front and back walls
+          setBlock(ox + x, baseY + y, oz, BLOCK.BRICK);
+          setBlock(ox + x, baseY + y, oz + d - 1, BLOCK.BRICK);
+        }
+        for (let z = 0; z < d; z++) {
+          // Side walls
+          setBlock(ox, baseY + y, oz + z, BLOCK.BRICK);
+          setBlock(ox + w - 1, baseY + y, oz + z, BLOCK.BRICK);
+        }
+
+        // Interior wallpaper lining (1 block inside exterior walls)
+        if (y <= floorH - 2) {
+          for (let x = 1; x < w - 1; x++) {
+            setBlock(ox + x, baseY + y, oz + 1, BLOCK.WALLPAPER);
+            setBlock(ox + x, baseY + y, oz + d - 2, BLOCK.WALLPAPER);
+          }
+          for (let z = 1; z < d - 1; z++) {
+            setBlock(ox + 1, baseY + y, oz + z, BLOCK.WALLPAPER);
+            setBlock(ox + w - 2, baseY + y, oz + z, BLOCK.WALLPAPER);
+          }
+        }
+
+        // Interior partition wall (divides rooms)
+        const partX = Math.floor(w / 2);
+        for (let z = 1; z < d - 1; z++) {
+          if (z !== Math.floor(d / 2)) { // doorway gap
+            setBlock(ox + partX, baseY + y, oz + z, BLOCK.PLASTER);
+          }
+        }
+      }
+
+      // Windows (glass panes in walls) — front and back
+      for (let x = 2; x < w - 2; x += 2) {
+        setBlock(ox + x, baseY + 1, oz, BLOCK.GLASS);
+        setBlock(ox + x, baseY + 1, oz + d - 1, BLOCK.GLASS);
+      }
+      // Side windows
+      for (let z = 2; z < d - 2; z += 2) {
+        setBlock(ox, baseY + 1, oz + z, BLOCK.GLASS);
+        setBlock(ox + w - 1, baseY + 1, oz + z, BLOCK.GLASS);
+      }
+
+      // Door on ground floor front
+      if (floor === 0) {
+        setBlock(ox + Math.floor(w / 2), baseY + 1, oz, BLOCK.AIR);
+        setBlock(ox + Math.floor(w / 2), baseY + 2, oz, BLOCK.AIR);
+      }
+
+      // Kitchen area (ceramic tiles on ground floor in one room)
+      if (floor === 0) {
+        for (let x = 1; x < partX; x++) {
+          for (let z = 1; z < d - 1; z++) {
+            setBlock(ox + x, baseY, oz + z, BLOCK.CERAMIC);
+          }
+        }
+      }
+    }
+
+    // Roof — pitched with rooftiles
+    const roofBaseY = surfH + 1 + floors * floorH;
+    for (let x = 0; x < w; x++) {
+      for (let z = 0; z < d; z++) {
+        setBlock(ox + x, roofBaseY, oz + z, BLOCK.ROOFTILE);
+      }
+    }
+    // Peaked ridge
+    const midZ = Math.floor(d / 2);
+    for (let x = 0; x < w; x++) {
+      setBlock(ox + x, roofBaseY + 1, oz + midZ, BLOCK.SHINGLE);
+    }
+
+    // Battle damage — random holes in walls (war-torn effect)
+    const holeCount = 2 + (variant % 3);
+    for (let h = 0; h < holeCount; h++) {
+      const hx = ox + 1 + Math.floor(Math.random() * (w - 2));
+      const hy = surfH + 2 + Math.floor(Math.random() * (floors * floorH - 2));
+      const hz = (Math.random() > 0.5) ? oz : oz + d - 1;
+      setBlock(hx, hy, hz, BLOCK.AIR);
+      if (Math.random() > 0.5) setBlock(hx + 1, hy, hz, BLOCK.AIR);
+      // Rubble below
+      setBlock(hx, surfH, hz + (hz === oz ? -1 : 1), BLOCK.RUBBLE);
+    }
+  }
+
+  /* ── Prebuilt: Hostomel Airport Terminal (full voxel) ──────────── */
+  function generateHostomelTerminal(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    // Main terminal building: 24 wide x 12 deep x 5 high
+    const tw = 24, td = 12, th = 5;
+
+    // Foundation pad (concrete)
+    for (let x = -2; x < tw + 2; x++) {
+      for (let z = -2; z < td + 2; z++) {
+        setBlock(ox + x, surfH, oz + z, BLOCK.CONCRETE);
+      }
+    }
+
+    // Terminal floor — linoleum/ceramic
+    for (let x = 0; x < tw; x++) {
+      for (let z = 0; z < td; z++) {
+        setBlock(ox + x, surfH + 1, oz + z, (x + z) % 4 < 2 ? BLOCK.CERAMIC : BLOCK.LINOLEUM);
+      }
+    }
+
+    // Terminal walls — reinforced concrete with glass curtain wall front
+    for (let y = 1; y <= th; y++) {
+      for (let x = 0; x < tw; x++) {
+        // Back wall (solid concrete)
+        setBlock(ox + x, surfH + 1 + y, oz + td - 1, BLOCK.CONCRETE);
+        // Front wall (glass curtain wall with concrete columns every 4 blocks)
+        if (x % 4 === 0) {
+          setBlock(ox + x, surfH + 1 + y, oz, BLOCK.REINFORCED);
+        } else if (y <= th - 1) {
+          setBlock(ox + x, surfH + 1 + y, oz, BLOCK.GLASS);
+        } else {
+          setBlock(ox + x, surfH + 1 + y, oz, BLOCK.CONCRETE);
+        }
+      }
+      for (let z = 0; z < td; z++) {
+        // Side walls (concrete)
+        setBlock(ox, surfH + 1 + y, oz + z, BLOCK.CONCRETE);
+        setBlock(ox + tw - 1, surfH + 1 + y, oz + z, BLOCK.CONCRETE);
+      }
+    }
+
+    // Entrances (3 double doors in front glass wall)
+    for (let door = 0; door < 3; door++) {
+      const doorX = ox + 4 + door * 8;
+      for (let dx = 0; dx < 2; dx++) {
+        setBlock(doorX + dx, surfH + 2, oz, BLOCK.AIR);
+        setBlock(doorX + dx, surfH + 3, oz, BLOCK.AIR);
+      }
+    }
+
+    // Interior columns (reinforced pillars every 6 blocks)
+    for (let x = 3; x < tw; x += 6) {
+      for (let z = 3; z < td; z += 6) {
+        for (let y = 2; y <= th; y++) {
+          setBlock(ox + x, surfH + y, oz + z, BLOCK.REINFORCED);
+        }
+      }
+    }
+
+    // Interior partition walls (check-in counters, security)
+    // Check-in counter row at z=3
+    for (let x = 2; x < tw - 2; x++) {
+      setBlock(ox + x, surfH + 2, oz + 3, BLOCK.METAL);
+      setBlock(ox + x, surfH + 3, oz + 3, BLOCK.ELECTRONICS);
+    }
+    // Gap for walkthrough every 4 blocks
+    for (let x = 5; x < tw - 2; x += 5) {
+      setBlock(ox + x, surfH + 2, oz + 3, BLOCK.AIR);
+      setBlock(ox + x, surfH + 3, oz + 3, BLOCK.AIR);
+    }
+
+    // Security screening at z=6
+    for (let x = 4; x < tw - 4; x += 3) {
+      setBlock(ox + x, surfH + 2, oz + 6, BLOCK.METAL);
+      setBlock(ox + x + 1, surfH + 2, oz + 6, BLOCK.METAL);
+    }
+
+    // Gate waiting areas (bench rows)
+    for (let gateZ = 8; gateZ <= 10; gateZ += 2) {
+      for (let x = 2; x < tw - 2; x += 4) {
+        setBlock(ox + x, surfH + 2, oz + gateZ, BLOCK.WOOD);
+        setBlock(ox + x + 1, surfH + 2, oz + gateZ, BLOCK.WOOD);
+      }
+    }
+
+    // Flat roof (reinforced + metal)
+    for (let x = -1; x < tw + 1; x++) {
+      for (let z = -1; z < td + 1; z++) {
+        setBlock(ox + x, surfH + 1 + th + 1, oz + z, BLOCK.REINFORCED);
+      }
+    }
+
+    // Boarding bridges (2 jetways extending from back wall)
+    for (let jw = 0; jw < 2; jw++) {
+      const jwX = ox + 6 + jw * 12;
+      for (let z = td; z < td + 6; z++) {
+        setBlock(jwX, surfH + 3, oz + z, BLOCK.METAL);
+        setBlock(jwX + 1, surfH + 3, oz + z, BLOCK.METAL);
+        setBlock(jwX, surfH + 4, oz + z, BLOCK.METAL);
+        setBlock(jwX + 1, surfH + 4, oz + z, BLOCK.METAL);
+        // Floor of jetway
+        setBlock(jwX, surfH + 2, oz + z, BLOCK.LINOLEUM);
+        setBlock(jwX + 1, surfH + 2, oz + z, BLOCK.LINOLEUM);
+        // Roof
+        setBlock(jwX, surfH + 5, oz + z, BLOCK.METAL);
+        setBlock(jwX + 1, surfH + 5, oz + z, BLOCK.METAL);
+      }
+    }
+
+    // Battle damage — shell holes in terminal
+    for (let dmg = 0; dmg < 5; dmg++) {
+      const dmgX = ox + 2 + Math.floor(Math.random() * (tw - 4));
+      const dmgY = surfH + 2 + Math.floor(Math.random() * th);
+      const dmgZ = Math.random() > 0.5 ? oz : oz + td - 1;
+      setBlock(dmgX, dmgY, dmgZ, BLOCK.AIR);
+      setBlock(dmgX + 1, dmgY, dmgZ, BLOCK.AIR);
+      // Rubble scatter
+      setBlock(dmgX, surfH, dmgZ + (dmgZ === oz ? -1 : 1), BLOCK.RUBBLE);
+    }
+  }
+
+  /* ── Prebuilt: Full Hostomel Airport Complex ───────────────────── */
+  function generateHostomelAirport(ox, oz) {
+    // Main runway (extended, 80 blocks long x 8 wide)
+    generateRunway(ox - 40, oz, 80, 8);
+
+    // Parallel taxiway
+    for (let x = ox - 35; x < ox + 35; x++) {
+      for (let w = 0; w < 4; w++) {
+        const ty = getTerrainHeight(x, oz + 14);
+        setBlock(x, ty, oz + 14 + w, BLOCK.ASPHALT);
+      }
+    }
+
+    // Full terminal building
+    generateHostomelTerminal(ox - 12, oz + 20);
+
+    // Control tower (tall, 8 floors)
+    const ctOx = ox + 16, ctOz = oz + 22;
+    const ctH = getTerrainHeight(ctOx, ctOz);
+    // Tower shaft
+    for (let y = 1; y <= 12; y++) {
+      for (let x = 0; x < 3; x++) {
+        for (let z = 0; z < 3; z++) {
+          if (x === 0 || x === 2 || z === 0 || z === 2) {
+            setBlock(ctOx + x, ctH + y, ctOz + z, BLOCK.REINFORCED);
+          } else {
+            setBlock(ctOx + x, ctH + y, ctOz + z, BLOCK.AIR);
+          }
+        }
+      }
+    }
+    // Observation deck at top (glass)
+    for (let x = -1; x < 4; x++) {
+      for (let z = -1; z < 4; z++) {
+        setBlock(ctOx + x, ctH + 13, ctOz + z, BLOCK.REINFORCED);
+        if (x === -1 || x === 3 || z === -1 || z === 3) {
+          setBlock(ctOx + x, ctH + 14, ctOz + z, BLOCK.GLASS);
+          setBlock(ctOx + x, ctH + 15, ctOz + z, BLOCK.GLASS);
+        }
+        setBlock(ctOx + x, ctH + 16, ctOz + z, BLOCK.METAL);
+      }
+    }
+    // Radar dome on top
+    setBlock(ctOx + 1, ctH + 17, ctOz + 1, BLOCK.METAL);
+    setBlock(ctOx + 1, ctH + 18, ctOz + 1, BLOCK.ELECTRONICS);
+
+    // Hangars (3 large)
+    for (let hi = 0; hi < 3; hi++) {
+      const hx = ox - 30 + hi * 20;
+      const hz = oz - 8;
+      const hH = getTerrainHeight(hx, hz);
+      // Hangar building 10x8x6
+      for (let y = 1; y <= 6; y++) {
+        for (let x = 0; x < 10; x++) {
+          setBlock(hx + x, hH + y, hz, BLOCK.METAL);
+          setBlock(hx + x, hH + y, hz + 7, BLOCK.METAL);
+          if (x === 0 || x === 9) {
+            for (let z = 0; z < 8; z++) {
+              setBlock(hx + x, hH + y, hz + z, BLOCK.METAL);
+            }
+          }
+        }
+      }
+      // Hangar roof
+      for (let x = 0; x < 10; x++) {
+        for (let z = 0; z < 8; z++) {
+          setBlock(hx + x, hH + 7, hz + z, BLOCK.SHINGLE);
+        }
+      }
+      // Hangar bay door (open)
+      for (let dx = 2; dx < 8; dx++) {
+        for (let dy = 1; dy <= 4; dy++) {
+          setBlock(hx + dx, hH + dy, hz, BLOCK.AIR);
+        }
+      }
+      // Hangar floor
+      for (let x = 0; x < 10; x++) {
+        for (let z = 0; z < 8; z++) {
+          setBlock(hx + x, hH, hz + z, BLOCK.CONCRETE);
+        }
+      }
+    }
+
+    // Apron/parking area (concrete pads between runway and terminal)
+    for (let x = ox - 20; x < ox + 20; x++) {
+      for (let z = oz + 8; z < oz + 18; z++) {
+        const apH = getTerrainHeight(x, z);
+        setBlock(x, apH, z, BLOCK.CONCRETE);
+      }
+    }
+  }
+
   /* ── Level Generation ──────────────────────────────────────────── */
   function generateLevel(index) {
     const level = getLevelDef(index);
@@ -2356,34 +2698,31 @@ const VoxelWorld = (function () {
           // Side road to eastern positions
           [25, 20, 25, -15, 2],
         ]);
-        generateRunway(-30, -3, 60, 6);
-        generateBuilding(-10, 10, 12, 8, 4, BLOCK.CONCRETE);  // terminal
-        generateControlTower(15, 10);
-        generateBuilding(-25, -10, 10, 8, 5, BLOCK.METAL);    // hangar 1
-        generateBuilding(20, -10, 10, 8, 5, BLOCK.METAL);     // hangar 2
+        // ── FULL HOSTOMEL AIRPORT COMPLEX ──
+        generateHostomelAirport(0, -5);
         generateTrenches();
         generateDugouts(2);
         generateDefensivePosition(-18, 15);
         generateDefensivePosition(25, -15);
-        generateDestroyedVehicles(5);       // IDEA 4: destroyed Russian vehicles on runway
-        generateAntiTankHedgehogs(8);       // IDEA 11: Ukrainian defenses
-        generateCheckpoint(-5, 0, true);    // IDEA 9: airport checkpoint
-        generateFlagPole(0, 12);            // IDEA 18: Ukrainian flag at terminal
-        generateBarbedWire(-25, 5, 30, true); // IDEA 10: perimeter wire
-        generateFieldHospital(30, 5);       // IDEA 13: medical station
-        generateWatchtower(-15, -18);       // NEW: observation watchtower
-        generateMortarPit(18, 18);          // NEW: mortar position
-        generateAmmoCache(-28, 12);         // NEW: ammo crate storage
-        generateSupplyTent(25, 18);         // NEW: supply tent
-        generateRazorWireMaze(-35, -10, 4); // NEW: razor wire obstacle
-        generateUndergroundTunnel(-20, -5, 10); // NEW R2: tunnel under runway
-        generateFuelDepot(20, -15);             // NEW R2: airport fuel storage
-        generateRadarTower(-30, 5);             // NEW R2: radar tower
-        generateBunker(20, 20);                     // NEW R3: underground bunker
-        generateMGNest(-15, 25);                    // NEW R3: MG nest position
-        generateFoxhole(30, -10);                   // NEW R3: fighting position
-        generateFieldHospitalTent(-25, -20);        // NEW R3: medical tent
-        generateObservationPost(35, 15);            // NEW R3: lookout tower
+        generateDestroyedVehicles(5);       // destroyed Russian vehicles on runway
+        generateAntiTankHedgehogs(8);       // Ukrainian defenses
+        generateCheckpoint(-5, 0, true);    // airport checkpoint
+        generateFlagPole(0, 12);            // Ukrainian flag at terminal
+        generateBarbedWire(-25, 5, 30, true); // perimeter wire
+        generateFieldHospital(30, 5);       // medical station
+        generateWatchtower(-15, -18);       // observation watchtower
+        generateMortarPit(18, 18);          // mortar position
+        generateAmmoCache(-28, 12);         // ammo crate storage
+        generateSupplyTent(25, 18);         // supply tent
+        generateRazorWireMaze(-35, -10, 4); // razor wire obstacle
+        generateUndergroundTunnel(-20, -5, 10); // tunnel under runway
+        generateFuelDepot(20, -15);             // airport fuel storage
+        generateRadarTower(-30, 5);             // radar tower
+        generateBunker(20, 20);                 // underground bunker
+        generateMGNest(-15, 25);                // MG nest position
+        generateFoxhole(30, -10);               // fighting position
+        generateFieldHospitalTent(-25, -20);    // medical tent
+        generateObservationPost(35, 15);        // lookout tower
         scatterResources(BLOCK.WOOD, 0.003);
         break;
 
@@ -2408,12 +2747,21 @@ const VoxelWorld = (function () {
           // Southern approach road
           [-20, 35, 20, 35, 3],
         ]);
-        generateIndustrialComplex(-15, -10);  // IDEA 2: Avdiivka Coking Plant (main objective)
-        generateApartmentBlock(-35, 10, 7);   // IDEA 1: Soviet 7-story apartment block
-        generateApartmentBlock(-35, 25, 5);   // IDEA 1: Another apartment block
-        generateApartmentBlock(25, -20, 9);   // IDEA 1: Tall apartment block (eastern front)
-        generateApartmentBlock(30, 10, 6);    // IDEA 1: Apartment block near plant
-        generateRailway(-40, 0, 80, true);    // IDEA 3: Railway through industrial zone
+        generateIndustrialComplex(-15, -10);  // Avdiivka Coking Plant (main objective)
+        generateApartmentBlock(-35, 10, 7);   // Soviet 7-story apartment block
+        generateApartmentBlock(-35, 25, 5);   // Another apartment block
+        generateApartmentBlock(25, -20, 9);   // Tall apartment block (eastern front)
+        generateApartmentBlock(30, 10, 6);    // Apartment block near plant
+        // ── COMPLETE AVDIIVKA RESIDENTIAL HOMES (prebuilt interiors) ──
+        generateAvdiivkaHome(17, -8, 0);      // 2-story brick home with kitchen
+        generateAvdiivkaHome(17, 2, 1);       // 3-story variant with wood floors
+        generateAvdiivkaHome(24, -8, 2);      // 2-story wider home
+        generateAvdiivkaHome(24, 2, 3);       // 3-story home
+        generateAvdiivkaHome(32, -8, 4);      // Mixed home
+        generateAvdiivkaHome(32, 2, 5);       // Another variant
+        generateAvdiivkaHome(-8, 30, 0);      // Southern residential area
+        generateAvdiivkaHome(-8, 38, 1);      // Southern homes continued
+        generateRailway(-40, 0, 80, true);    // Railway through industrial zone
         generateCraters(35);                  // Heavy shelling — more craters than before
         generateTrenches();                   // Triple trench network
         generateTrenches();
@@ -2425,39 +2773,39 @@ const VoxelWorld = (function () {
         generateDefensivePosition(15, -20);
         generateDefensivePosition(0, 25);
         generateDefensivePosition(-10, -30);
-        generateDestroyedVehicles(12);        // IDEA 4: Destroyed Russian armor everywhere
-        generateAntiTankHedgehogs(15);        // IDEA 11: Anti-tank obstacles on approaches
-        generatePowerLines(-40, -25, 5);      // IDEA 5: Damaged power infrastructure
-        generateCheckpoint(10, 0, true);      // IDEA 9: Ukrainian checkpoint
-        generateAmmoDepot(-30, -25);          // IDEA 12: Ammunition storage
-        generateUndergroundBunker(5, -15);    // IDEA 15: Underground command post
-        generateSniperNest(-20, 30);          // IDEA 23: Sniper position in ruins
-        generateSniperNest(20, -30);          // IDEA 23: Second sniper nest
-        generateBarbedWire(-30, -15, 40, true); // IDEA 10: Defensive perimeter
-        generateBarbedWire(20, -25, 30, false); // IDEA 10: Eastern approach wire
-        generateCommTower(35, 0);             // IDEA 14: Military communications
-        generateBurningRuin(-8, -25);         // IDEA 25: Recently shelled building
-        generateBurningRuin(15, 20);          // IDEA 25: Another burning ruin
-        generateBillboard(-20, 0);            // IDEA 19: Billboard sign
-        generateMinefieldSigns(4);            // IDEA 22: Minefields around approaches
-        generateFlagPole(0, 0);               // IDEA 18: Ukrainian flag at center
-        generateMortarPit(-25, 20);           // NEW: mortar pit near apartments
-        generateMortarPit(30, -15);           // NEW: second mortar position
-        generateWatchtower(35, 25);           // NEW: observation tower
-        generateAmmoCache(-5, 30);            // NEW: ammo storage
-        generateAmmoCache(25, -25);           // NEW: second ammo cache
-        generateSupplyTent(-35, -5);          // NEW: supply tent
-        generateRazorWireMaze(-15, 25, 6);    // NEW: razor wire defensive maze
-        generateUndergroundTunnel(-30, -10, 14); // NEW R2: underground tunnel
-        generateCollapsedBridge(0, -35);         // NEW R2: collapsed overpass
-        generateFuelDepot(-25, -30);             // NEW R2: fuel depot
-        generateArtilleryBattery(30, 30);        // NEW R2: artillery position
-        generateRadarTower(-35, 20);             // NEW R2: radar tower
-        generateBunker(-20, 15);                    // NEW R3: underground bunker
-        generateCommandPost(25, -20);               // NEW R3: fortified command center
-        generateAmmoDumpBerm(-30, 10);              // NEW R3: ammo storage berm
-        generateDestroyedTank(15, 30);              // NEW R3: wrecked tank hull
-        generateTrenchNetwork(-10, -25);            // NEW R3: zig-zag trench system
+        generateDestroyedVehicles(12);        // Destroyed Russian armor everywhere
+        generateAntiTankHedgehogs(15);        // Anti-tank obstacles on approaches
+        generatePowerLines(-40, -25, 5);      // Damaged power infrastructure
+        generateCheckpoint(10, 0, true);      // Ukrainian checkpoint
+        generateAmmoDepot(-30, -25);          // Ammunition storage
+        generateUndergroundBunker(5, -15);    // Underground command post
+        generateSniperNest(-20, 30);          // Sniper position in ruins
+        generateSniperNest(20, -30);          // Second sniper nest
+        generateBarbedWire(-30, -15, 40, true); // Defensive perimeter
+        generateBarbedWire(20, -25, 30, false); // Eastern approach wire
+        generateCommTower(35, 0);             // Military communications
+        generateBurningRuin(-8, -25);         // Recently shelled building
+        generateBurningRuin(15, 20);          // Another burning ruin
+        generateBillboard(-20, 0);            // Billboard sign
+        generateMinefieldSigns(4);            // Minefields around approaches
+        generateFlagPole(0, 0);               // Ukrainian flag at center
+        generateMortarPit(-25, 20);           // mortar pit near apartments
+        generateMortarPit(30, -15);           // second mortar position
+        generateWatchtower(35, 25);           // observation tower
+        generateAmmoCache(-5, 30);            // ammo storage
+        generateAmmoCache(25, -25);           // second ammo cache
+        generateSupplyTent(-35, -5);          // supply tent
+        generateRazorWireMaze(-15, 25, 6);    // razor wire defensive maze
+        generateUndergroundTunnel(-30, -10, 14); // underground tunnel
+        generateCollapsedBridge(0, -35);         // collapsed overpass
+        generateFuelDepot(-25, -30);             // fuel depot
+        generateArtilleryBattery(30, 30);        // artillery position
+        generateRadarTower(-35, 20);             // radar tower
+        generateBunker(-20, 15);                 // underground bunker
+        generateCommandPost(25, -20);            // fortified command center
+        generateAmmoDumpBerm(-30, 10);           // ammo storage berm
+        generateDestroyedTank(15, 30);           // wrecked tank hull
+        generateTrenchNetwork(-10, -25);         // zig-zag trench system
         // Heavy rubble scatter (coking plant battle damage)
         for (let rb = 0; rb < 80; rb++) {
           const rx = randInWorld(), rz = randInWorld();

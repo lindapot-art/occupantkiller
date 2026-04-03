@@ -18,6 +18,8 @@ const Pickups = (() => {
     GRENADE: { color: 0xff6622, emissive: 0x883311, size: 0.20 },
     MEDKIT:  { color: 0xff4444, emissive: 0x882222, size: 0.32 },
     STIM:    { color: 0xcc44ff, emissive: 0x662288, size: 0.18 },
+    INTEL:   { color: 0x00ffff, emissive: 0x006666, size: 0.22 },
+    SHIELD:  { color: 0xffd700, emissive: 0x886600, size: 0.26 },
   };
 
   let scene   = null;
