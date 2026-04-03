@@ -734,3 +734,65 @@ canvas {
   );
   pointer-events: none;
 }
+
+/* ── Floating Damage Numbers ────────────────────────────── */
+.dmg-number {
+  position: absolute;
+  color: #fff;
+  font-size: 16px;
+  font-weight: bold;
+  font-family: monospace;
+  text-shadow: 0 0 4px rgba(0,0,0,0.8), 0 0 8px rgba(255,0,0,0.4);
+  pointer-events: none;
+  animation: dmgFloat 1s ease-out forwards;
+  z-index: 215;
+}
+.dmg-headshot {
+  color: #ff0000;
+  font-size: 22px;
+  text-shadow: 0 0 6px rgba(255,0,0,0.8), 0 0 12px rgba(255,0,0,0.4);
+}
+@keyframes dmgFloat {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  60% { opacity: 0.8; transform: translateY(-40px) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-70px) scale(0.8); }
+}
+
+/* ── Skills Panel ───────────────────────────────────────── */
+#skills-panel, #rank-panel {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid #555;
+  border-radius: 6px;
+  padding: 10px;
+  margin: 10px 0;
+}
+
+/* ── Wave Timer ─────────────────────────────────────────── */
+#wave-timer {
+  position: fixed;
+  top: 55px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ffcc00;
+  font-size: 20px;
+  font-weight: bold;
+  font-family: monospace;
+  z-index: 200;
+  pointer-events: none;
+  text-shadow: 0 0 8px rgba(255,200,0,0.5);
+  display: none;
+}
+
+/* ── Surrender enemies ──────────────────────────────────── */
+.surrender-hands {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 18px;
+  animation: surrenderBob 1.5s ease-in-out infinite;
+}
+@keyframes surrenderBob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-6px); }
+}

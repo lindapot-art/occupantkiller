@@ -480,6 +480,86 @@ const HUD = (() => {
     if (shieldEl) shieldEl.style.display = active ? 'block' : 'none';
   }
 
+  // ── OKC Display ─────────────────────────────────────────────────
+  const okcEl = document.getElementById('hud-okc');
+
+  function updateOKC(amount) {
+    if (okcEl) okcEl.textContent = '🪙 ' + Math.floor(amount) + ' OKC';
+  }
+
+  // ── Damage Numbers (floating combat text) ─────────────────────
+  const dmgContainer = document.getElementById('damage-numbers') || (function () {
+    var d = document.createElement('div');
+    d.id = 'damage-numbers';
+    d.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:210;overflow:hidden';
+    document.getElementById('hud').appendChild(d);
+    return d;
+  })();
+
+  function showDamageNumber(screenX, screenY, amount, isHeadshot) {
+    if (!dmgContainer) return;
+    var num = document.createElement('div');
+    num.className = 'dmg-number' + (isHeadshot ? ' dmg-headshot' : '');
+    num.textContent = (isHeadshot ? '💀 ' : '') + Math.round(amount);
+    num.style.left = screenX + 'px';
+    num.style.top = screenY + 'px';
+    dmgContainer.appendChild(num);
+    setTimeout(function () { if (num.parentNode) num.parentNode.removeChild(num); }, 1000);
+  }
+
+  // ── Skills Display Panel ──────────────────────────────────────
+  function buildSkillsPanel(container) {
+    if (!container || typeof SkillSystem === 'undefined') return;
+    container.innerHTML = '';
+    var cats = ['combat', 'engineering', 'drone', 'leadership'];
+    var catIcons = { combat: '⚔️', engineering: '🔧', drone: '🛸', leadership: '🎖️' };
+    var catColors = { combat: '#ff4444', engineering: '#ffaa00', drone: '#00ccff', leadership: '#44ff44' };
+    for (var ci = 0; ci < cats.length; ci++) {
+      var cat = cats[ci];
+      var skills = SkillSystem.getCategory(cat);
+      var section = document.createElement('div');
+      section.style.cssText = 'margin-bottom:8px';
+      section.innerHTML = '<div style="color:' + catColors[cat] + ';font-weight:bold;font-size:12px;margin-bottom:4px">' +
+        catIcons[cat] + ' ' + cat.toUpperCase() + '</div>';
+      for (var sname in skills) {
+        var sk = skills[sname];
+        var pct = Math.min(100, (sk.xp / (Math.pow((sk.level + 1), 2) * 25)) * 100);
+        var bar = document.createElement('div');
+        bar.style.cssText = 'display:flex;align-items:center;gap:6px;margin:2px 0;font-size:11px';
+        bar.innerHTML =
+          '<span style="color:#ccc;width:130px;text-transform:capitalize">' + sname.replace(/_/g, ' ') + '</span>' +
+          '<span style="color:' + catColors[cat] + ';width:30px;text-align:right">Lv ' + sk.level + '</span>' +
+          '<div style="flex:1;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden">' +
+          '<div style="width:' + pct + '%;height:100%;background:' + catColors[cat] + ';border-radius:3px"></div></div>';
+        section.appendChild(bar);
+      }
+      container.appendChild(section);
+    }
+  }
+
+  // ── Rank Progress Panel ───────────────────────────────────────
+  function buildRankPanel(container) {
+    if (!container || typeof RankSystem === 'undefined') return;
+    container.innerHTML = '';
+    var rank = RankSystem.getRank();
+    var prog = RankSystem.getProgress();
+    var next = RankSystem.getNextRank();
+    container.innerHTML =
+      '<div style="text-align:center;margin-bottom:6px">' +
+      '<span style="font-size:24px">' + rank.icon + '</span>' +
+      '<div style="font-size:16px;font-weight:bold;color:#ffcc00">' + rank.name.toUpperCase() + '</div>' +
+      '<div style="font-size:11px;color:#aaa">Total XP: ' + RankSystem.getTotalXP() + '</div>' +
+      '</div>' +
+      '<div style="height:10px;background:rgba(255,255,255,0.1);border-radius:5px;overflow:hidden;margin:6px 0">' +
+      '<div style="width:' + Math.floor(prog.percent) + '%;height:100%;background:linear-gradient(90deg,#ffcc00,#ff8800);border-radius:5px;transition:width 0.3s"></div>' +
+      '</div>' +
+      '<div style="font-size:11px;color:#888;text-align:center">' +
+      Math.floor(prog.current) + ' / ' + prog.needed + ' XP' +
+      (next ? ' → ' + next.name : ' (MAX RANK)') +
+      '</div>' +
+      (rank.unlocks ? '<div style="font-size:10px;color:#666;margin-top:4px;text-align:center">Unlocks: ' + rank.unlocks.join(', ') + '</div>' : '');
+  }
+
   return {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
@@ -493,5 +573,7 @@ const HUD = (() => {
     updateStamina, showNightVision, updateWeatherDisplay,
     showInteractionPrompt, hideInteractionPrompt,
     showLowHP, showShield,
+    updateOKC, showDamageNumber,
+    buildSkillsPanel, buildRankPanel,
   };
 })();
