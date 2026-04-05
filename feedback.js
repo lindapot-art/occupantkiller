@@ -281,12 +281,160 @@ const Feedback = (function () {
     }
   }
 
+  /* ── Feature: Screen Shake ─────────────────── */
+  let _shakeIntensity = 0;
+  let _shakeDecay = 0;
+  let _shakeOffsetX = 0;
+  let _shakeOffsetY = 0;
+
+  function triggerScreenShake(intensity, duration) {
+    _shakeIntensity = Math.max(_shakeIntensity, intensity);
+    _shakeDecay = duration || 0.3;
+  }
+
+  function updateScreenShake(dt) {
+    if (_shakeIntensity <= 0.001) {
+      _shakeOffsetX = 0; _shakeOffsetY = 0;
+      return;
+    }
+    _shakeOffsetX = (Math.random() - 0.5) * 2 * _shakeIntensity;
+    _shakeOffsetY = (Math.random() - 0.5) * 2 * _shakeIntensity;
+    _shakeIntensity -= (_shakeIntensity / _shakeDecay) * dt;
+    if (_shakeIntensity < 0.001) _shakeIntensity = 0;
+  }
+
+  function getShakeOffset() { return { x: _shakeOffsetX, y: _shakeOffsetY }; }
+
+  /* ── Feature: Hit Direction Indicator ──────── */
+  let _hitIndicators = [];
+  let _hitContainer = null;
+
+  function initHitIndicators() {
+    _hitContainer = document.getElementById('hit-indicators');
+    if (!_hitContainer) {
+      _hitContainer = document.createElement('div');
+      _hitContainer.id = 'hit-indicators';
+      _hitContainer.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:180;';
+      document.body.appendChild(_hitContainer);
+    }
+  }
+
+  function showHitDirection(angle) {
+    if (!_hitContainer) initHitIndicators();
+    const el = document.createElement('div');
+    const deg = (angle * 180 / Math.PI) + 90;
+    el.style.cssText = `position:absolute;top:50%;left:50%;width:80px;height:6px;background:linear-gradient(90deg,transparent,rgba(255,50,50,0.8));transform-origin:0 50%;transform:translate(-50%,-50%) rotate(${deg}deg) translateX(60px);border-radius:3px;`;
+    _hitContainer.appendChild(el);
+    _hitIndicators.push({ el, timer: 1.5 });
+  }
+
+  function updateHitIndicators(dt) {
+    for (let i = _hitIndicators.length - 1; i >= 0; i--) {
+      _hitIndicators[i].timer -= dt;
+      _hitIndicators[i].el.style.opacity = Math.max(0, _hitIndicators[i].timer / 1.5);
+      if (_hitIndicators[i].timer <= 0) {
+        _hitIndicators[i].el.remove();
+        _hitIndicators.splice(i, 1);
+      }
+    }
+  }
+
+  /* ── Feature: Kill Confirmation Effects ────── */
+  let _killConfirmTimer = 0;
+  function showKillConfirm() {
+    _killConfirmTimer = 0.4;
+    const el = document.getElementById('kill-confirm');
+    if (!el) {
+      const d = document.createElement('div');
+      d.id = 'kill-confirm';
+      d.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff4444;font-size:28px;font-weight:bold;pointer-events:none;z-index:210;text-shadow:0 0 8px #ff0000;opacity:0;transition:opacity 0.15s;';
+      d.textContent = '✕';
+      document.body.appendChild(d);
+      requestAnimationFrame(() => { d.style.opacity = '1'; });
+    } else {
+      el.style.opacity = '1';
+    }
+  }
+
+  function updateKillConfirm(dt) {
+    if (_killConfirmTimer > 0) {
+      _killConfirmTimer -= dt;
+      if (_killConfirmTimer <= 0) {
+        const el = document.getElementById('kill-confirm');
+        if (el) el.style.opacity = '0';
+      }
+    }
+  }
+
+  /* ── Feature: XP Pop-up ────────────────────── */
+  function showXPGain(amount, screenX, screenY) {
+    if (!_dmgContainer) initDamageNumbers();
+    const el = document.createElement('div');
+    el.textContent = '+' + amount + ' XP';
+    el.style.cssText = `position:absolute;left:${screenX || window.innerWidth / 2}px;top:${screenY || window.innerHeight * 0.4}px;color:#44ddff;font-size:14px;font-weight:bold;text-shadow:0 0 4px #00aaff;pointer-events:none;transition:all 1.0s ease-out;`;
+    _dmgContainer.appendChild(el);
+    requestAnimationFrame(() => {
+      el.style.top = ((screenY || window.innerHeight * 0.4) - 30) + 'px';
+      el.style.opacity = '0';
+    });
+    setTimeout(() => el.remove(), 1100);
+  }
+
+  /* ── Feature: Critical Hit Slow-Mo Flash ───── */
+  let _slowMoTimer = 0;
+  let _slowMoRate = 1.0;
+
+  function triggerSlowMo(duration, rate) {
+    _slowMoTimer = duration || 0.2;
+    _slowMoRate = rate || 0.3;
+  }
+
+  function getSlowMoRate() {
+    return _slowMoTimer > 0 ? _slowMoRate : 1.0;
+  }
+
+  function updateSlowMo(dt) {
+    if (_slowMoTimer > 0) _slowMoTimer -= dt;
+  }
+
+  /* ── Feature: Weapon Pickup Notification ───── */
+  function showWeaponPickup(weaponName) {
+    let el = document.getElementById('weapon-pickup-notify');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'weapon-pickup-notify';
+      el.style.cssText = 'position:fixed;bottom:25%;left:50%;transform:translateX(-50%);color:#ffdd44;font-size:18px;font-weight:bold;text-shadow:0 0 6px #aa8800;pointer-events:none;z-index:200;transition:opacity 0.5s;';
+      document.body.appendChild(el);
+    }
+    el.textContent = '🔫 ' + weaponName + ' ACQUIRED';
+    el.style.opacity = '1';
+    setTimeout(() => { el.style.opacity = '0'; }, 2500);
+  }
+
+  /* ── Feature: Environmental Warning ────────── */
+  function showEnvironmentWarning(text) {
+    let el = document.getElementById('env-warning');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'env-warning';
+      el.style.cssText = 'position:fixed;top:18%;left:50%;transform:translateX(-50%);color:#ffaa00;font-size:16px;font-weight:bold;text-shadow:0 0 4px #cc6600;pointer-events:none;z-index:200;transition:opacity 0.5s;';
+      document.body.appendChild(el);
+    }
+    el.textContent = '⚠ ' + text;
+    el.style.opacity = '1';
+    setTimeout(() => { el.style.opacity = '0'; }, 3000);
+  }
+
   /* ── Master Update ─────────────────────────── */
   function update(dt, yaw) {
     updateDamageNumbers(dt);
     updateKillFeed(dt);
     updatePings(dt);
     updateCompass(dt, yaw || 0);
+    updateScreenShake(dt);
+    updateHitIndicators(dt);
+    updateKillConfirm(dt);
+    updateSlowMo(dt);
   }
 
   function init() {
@@ -295,6 +443,7 @@ const Feedback = (function () {
     initCompass();
     initAchievements();
     initDynamicCrosshair();
+    initHitIndicators();
   }
 
   function clear() {
@@ -304,6 +453,11 @@ const Feedback = (function () {
     killFeed = [];
     pings = [];
     achievementQueue = [];
+    _hitIndicators.forEach(h => h.el.remove());
+    _hitIndicators = [];
+    _shakeIntensity = 0;
+    _killConfirmTimer = 0;
+    _slowMoTimer = 0;
   }
 
   function resetAchievements() {
@@ -327,6 +481,20 @@ const Feedback = (function () {
     // Achievements
     unlockAchievement, getAchievements, getUnlocked, getAchievementPoints, resetAchievements,
     // Crosshair
-    updateDynamicCrosshair, initDynamicCrosshair
+    updateDynamicCrosshair, initDynamicCrosshair,
+    // Screen shake
+    triggerScreenShake, getShakeOffset,
+    // Hit direction
+    showHitDirection,
+    // Kill confirm
+    showKillConfirm,
+    // XP popup
+    showXPGain,
+    // Slow-mo
+    triggerSlowMo, getSlowMoRate,
+    // Weapon pickup
+    showWeaponPickup,
+    // Environment warning
+    showEnvironmentWarning
   };
 })();

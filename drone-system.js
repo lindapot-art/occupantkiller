@@ -311,7 +311,9 @@ const DroneSystem = (function () {
   }
 
   /* ── Update All Drones ───────────────────────────────────────────── */
+  var _droneMotorActive = false;
   function update(delta) {
+    var nearestDroneDist = Infinity;
     for (const drone of drones) {
       if (!drone.alive || !drone.active) continue;
 
@@ -358,6 +360,26 @@ const DroneSystem = (function () {
           child.rotation.y += delta * 30;
         }
       });
+
+      // Track nearest drone distance for motor sound
+      if (typeof CameraSystem !== 'undefined') {
+        var cam = CameraSystem.getCamera ? CameraSystem.getCamera() : null;
+        if (cam) {
+          var dd = drone.position.distanceTo(cam.position);
+          if (dd < nearestDroneDist) nearestDroneDist = dd;
+        }
+      }
+    }
+
+    // Drone motor sound — start/update/stop based on nearest drone
+    if (typeof AudioSystem !== 'undefined') {
+      if (nearestDroneDist < 40) {
+        if (!_droneMotorActive) { AudioSystem.startDroneMotor(); _droneMotorActive = true; }
+        AudioSystem.updateDroneMotor(nearestDroneDist);
+      } else if (_droneMotorActive) {
+        AudioSystem.stopDroneMotor();
+        _droneMotorActive = false;
+      }
     }
   }
 
@@ -517,6 +539,129 @@ const DroneSystem = (function () {
     _possessedDrone = null;
   }
 
+  /* ── Drone Swarm ─────────────────────────────────────────────────── */
+  var _swarmActive = false;
+  var _swarmDrones = [];
+
+  function launchSwarm(count, target, scene) {
+    count = Math.max(3, Math.min(5, count || 3));
+    _swarmDrones = [];
+    _swarmActive = true;
+    for (var i = 0; i < count; i++) {
+      var offsetX = (Math.random() - 0.5) * 6;
+      var offsetZ = (Math.random() - 0.5) * 6;
+      var spawnPos = target.clone().add(new THREE.Vector3(offsetX, 15 + Math.random() * 5, offsetZ));
+      var d = spawn(spawnPos.x, spawnPos.y, spawnPos.z, DRONE_TYPE.FPV_ATTACK);
+      d.aiControlled = true;
+      d._swarmTarget = target.clone();
+      d.patrolPoints = [target.clone()];
+      d.patrolIdx = 0;
+      _swarmDrones.push(d);
+    }
+    return _swarmDrones;
+  }
+
+  function isSwarmActive() {
+    if (!_swarmActive) return false;
+    var anyAlive = false;
+    for (var i = 0; i < _swarmDrones.length; i++) {
+      if (_swarmDrones[i].alive) { anyAlive = true; break; }
+    }
+    if (!anyAlive) _swarmActive = false;
+    return _swarmActive;
+  }
+
+  /* ── Drone Camera Feed (PIP) ─────────────────────────────────────── */
+  var _pipActive = false;
+  var _pipDroneId = null;
+
+  function activatePIP(droneId) {
+    var d = drones.find(function (d) { return d.id === droneId && d.alive && d.active; });
+    if (!d) return false;
+    _pipActive = true;
+    _pipDroneId = droneId;
+    return true;
+  }
+
+  function deactivatePIP() {
+    _pipActive = false;
+    _pipDroneId = null;
+  }
+
+  function isPIPActive() { return _pipActive; }
+  function getPIPDroneId() { return _pipDroneId; }
+
+  /* ── Counter-Drone System ────────────────────────────────────────── */
+  var _enemyDrones = [];
+
+  function spawnEnemyDroneCD(pos, scene) {
+    var type = Math.random() > 0.5 ? DRONE_TYPE.ENEMY_BOMBER : DRONE_TYPE.ENEMY_FPV;
+    var d = spawn(pos.x, pos.y || 20, pos.z, type);
+    d.aiControlled = true;
+    _enemyDrones.push(d);
+    return d;
+  }
+
+  function updateEnemyDrones(delta, playerPos) {
+    for (var i = _enemyDrones.length - 1; i >= 0; i--) {
+      var d = _enemyDrones[i];
+      if (!d.alive) { _enemyDrones.splice(i, 1); continue; }
+      // Enemy drone AI is already handled in main update via updateEnemyDrone
+    }
+  }
+
+  function shootDownDrone(droneId) {
+    var d = drones.find(function (d) { return d.id === droneId && d.alive; });
+    if (!d) return false;
+    destroyDrone(d);
+    for (var i = _enemyDrones.length - 1; i >= 0; i--) {
+      if (_enemyDrones[i].id === droneId) { _enemyDrones.splice(i, 1); break; }
+    }
+    return true;
+  }
+
+  function getEnemyDronesList() {
+    return _enemyDrones.filter(function (d) { return d.alive; });
+  }
+
+  /* ── Drone Upgrades ──────────────────────────────────────────────── */
+  var DRONE_UPGRADES = {
+    extended_battery: { label: 'Extended Battery', effect: 'battery_mult', value: 1.5 },
+    armor_plating:    { label: 'Armor Plating',    effect: 'hp_add',       value: 30 },
+    thermal_camera:   { label: 'Thermal Camera',   effect: 'thermal',      value: true },
+    speed_boost:      { label: 'Speed Boost',      effect: 'speed_mult',   value: 1.3 },
+    emp_payload:      { label: 'EMP Payload',      effect: 'emp',          value: true },
+  };
+
+  var _droneUpgrades = {}; // droneId -> [upgradeId]
+
+  function upgradeDrone(droneId, upgradeId) {
+    var d = drones.find(function (d) { return d.id === droneId && d.alive; });
+    if (!d) return false;
+    var upg = DRONE_UPGRADES[upgradeId];
+    if (!upg) return false;
+    if (!_droneUpgrades[droneId]) _droneUpgrades[droneId] = [];
+    if (_droneUpgrades[droneId].indexOf(upgradeId) !== -1) return false;
+    _droneUpgrades[droneId].push(upgradeId);
+    if (upg.effect === 'battery_mult') {
+      d.maxBattery = Math.floor(d.maxBattery * upg.value);
+      d.battery = Math.min(d.battery + d.maxBattery * 0.3, d.maxBattery);
+    } else if (upg.effect === 'hp_add') {
+      d.health += upg.value;
+    } else if (upg.effect === 'speed_mult') {
+      d.speed = Math.floor(d.speed * upg.value);
+    } else if (upg.effect === 'thermal') {
+      d._hasThermal = true;
+    } else if (upg.effect === 'emp') {
+      d._hasEMP = true;
+    }
+    return true;
+  }
+
+  function getDroneUpgrades(droneId) {
+    return _droneUpgrades[droneId] ? _droneUpgrades[droneId].slice() : [];
+  }
+
   return {
     DRONE_TYPE,
     DRONE_STATS,
@@ -542,5 +687,22 @@ const DroneSystem = (function () {
     getFriendlyDrones: function() { return drones.filter(function(d) { return d.alive && d.faction === 'ukrainian'; }); },
     spawnEnemyDrone,
     clear,
+    // Drone Swarm
+    launchSwarm: launchSwarm,
+    isSwarmActive: isSwarmActive,
+    // Drone Camera Feed (PIP)
+    activatePIP: activatePIP,
+    deactivatePIP: deactivatePIP,
+    isPIPActive: isPIPActive,
+    getPIPDroneId: getPIPDroneId,
+    // Counter-Drone System
+    spawnEnemyDroneCD: spawnEnemyDroneCD,
+    updateEnemyDrones: updateEnemyDrones,
+    shootDownDrone: shootDownDrone,
+    getEnemyDronesList: getEnemyDronesList,
+    // Drone Upgrades
+    DRONE_UPGRADES: DRONE_UPGRADES,
+    upgradeDrone: upgradeDrone,
+    getDroneUpgrades: getDroneUpgrades,
   };
 })();

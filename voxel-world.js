@@ -209,6 +209,46 @@ const VoxelWorld = (function () {
       bgColor:      0x5a4a30,
       heightScale:  1.3,
     },
+    industrial: {
+      name: 'industrial',
+      seed: 23456,
+      surfaceBlock: BLOCK.CONCRETE,
+      subBlock:     BLOCK.METAL,
+      baseBlock:    BLOCK.STONE,
+      fogColor:     0x1a1a20,
+      bgColor:      0x1a1a20,
+      heightScale:  0.5,
+    },
+    coastal: {
+      name: 'coastal',
+      seed: 31415,
+      surfaceBlock: BLOCK.SAND,
+      subBlock:     BLOCK.DIRT,
+      baseBlock:    BLOCK.STONE,
+      fogColor:     0x5577aa,
+      bgColor:      0x5577aa,
+      heightScale:  0.8,
+    },
+    wasteland: {
+      name: 'wasteland',
+      seed: 42000,
+      surfaceBlock: BLOCK.DIRT,
+      subBlock:     BLOCK.STONE,
+      baseBlock:    BLOCK.STONE,
+      fogColor:     0x3a3520,
+      bgColor:      0x3a3520,
+      heightScale:  1.1,
+    },
+    cityscape: {
+      name: 'cityscape',
+      seed: 55555,
+      surfaceBlock: BLOCK.CONCRETE,
+      subBlock:     BLOCK.CONCRETE,
+      baseBlock:    BLOCK.STONE,
+      fogColor:     0x222228,
+      bgColor:      0x222228,
+      heightScale:  0.4,
+    },
   };
 
   function setTheme(themeName) {
@@ -291,6 +331,11 @@ const VoxelWorld = (function () {
       chunk.mesh.geometry.dispose();
       chunk.mesh = null;
     }
+    if (chunk.waterMesh) {
+      scene.remove(chunk.waterMesh);
+      chunk.waterMesh.geometry.dispose();
+      chunk.waterMesh = null;
+    }
 
     const positions = [];
     const normals   = [];
@@ -298,8 +343,18 @@ const VoxelWorld = (function () {
     const indices   = [];
     let vertCount   = 0;
 
+    // Separate arrays for water geometry
+    const wPositions = [];
+    const wNormals   = [];
+    const wColors    = [];
+    const wIndices   = [];
+    let wVertCount   = 0;
+
     const ox = chunk.cx * CHUNK_SIZE;
     const oz = chunk.cz * CHUNK_SIZE;
+
+    // AO darkening factors: index = occlusion level (0=full shadow, 3=no shadow)
+    const AO_CURVE = [0.45, 0.65, 0.82, 1.0];
 
     for (let ly = 0; ly < CHUNK_HEIGHT; ly++) {
       for (let lz = 0; lz < CHUNK_SIZE; lz++) {
@@ -310,51 +365,127 @@ const VoxelWorld = (function () {
           const wx = ox + lx;
           const wz = oz + lz;
           const col = new THREE.Color(BLOCK_COLORS[bt] || 0xFF00FF);
+          const isWater = (bt === BLOCK.WATER);
 
           for (const face of _faceNormals) {
-            const nx = wx + face.dir[0];
-            const ny = ly + face.dir[1];
-            const nz = wz + face.dir[2];
+            const fnx = face.dir[0], fny = face.dir[1], fnz = face.dir[2];
+            const nbx = wx + fnx;
+            const nby = ly + fny;
+            const nbz = wz + fnz;
 
-            if (!isTransparent(nx, ny, nz)) continue;
+            const nb = getBlock(nbx, nby, nbz);
+            // For water blocks: only draw face if neighbor is AIR (skip water-to-water)
+            if (isWater) {
+              if (nb !== BLOCK.AIR) continue;
+            } else {
+              if (!BLOCK_TRANSPARENT.has(nb)) continue;
+            }
 
+            // Pick target arrays (water vs solid)
+            const tPos = isWater ? wPositions : positions;
+            const tNrm = isWater ? wNormals : normals;
+            const tCol = isWater ? wColors : colors;
+            const tIdx = isWater ? wIndices : indices;
+            let tVert = isWater ? wVertCount : vertCount;
+
+            // Determine the two tangent axes for AO sampling
+            let t0, t1;
+            if (fnx !== 0) { t0 = 1; t1 = 2; }
+            else if (fny !== 0) { t0 = 0; t1 = 2; }
+            else { t0 = 0; t1 = 1; }
+
+            const aoVals = [];
             for (const c of face.corners) {
-              positions.push(
+              // Direction from face center to this corner along each tangent
+              const d0 = c[t0] === 0 ? -1 : 1;
+              const d1 = c[t1] === 0 ? -1 : 1;
+
+              // Three AO neighbor offsets from the face-neighbor block
+              const s1 = [0, 0, 0]; s1[t0] = d0;
+              const s2 = [0, 0, 0]; s2[t1] = d1;
+
+              const side1 = isTransparent(nbx + s1[0], nby + s1[1], nbz + s1[2]) ? 0 : 1;
+              const side2 = isTransparent(nbx + s2[0], nby + s2[1], nbz + s2[2]) ? 0 : 1;
+              const corn  = isTransparent(nbx + s1[0] + s2[0], nby + s1[1] + s2[1], nbz + s1[2] + s2[2]) ? 0 : 1;
+
+              const ao = (side1 && side2) ? 0 : 3 - (side1 + side2 + corn);
+              aoVals.push(ao);
+              const f = isWater ? 1.0 : AO_CURVE[ao]; // no AO darkening on water
+
+              tPos.push(
                 (lx + c[0]) * BLOCK_SIZE,
                 (ly + c[1]) * BLOCK_SIZE,
                 (lz + c[2]) * BLOCK_SIZE
               );
-              normals.push(face.dir[0], face.dir[1], face.dir[2]);
-              colors.push(col.r, col.g, col.b);
+              tNrm.push(fnx, fny, fnz);
+              tCol.push(col.r * f, col.g * f, col.b * f);
             }
-            indices.push(
-              vertCount, vertCount + 1, vertCount + 2,
-              vertCount, vertCount + 2, vertCount + 3
-            );
-            vertCount += 4;
+
+            // Flip quad when AO is anisotropic to avoid ugly diagonal artifact
+            if (aoVals[0] + aoVals[2] > aoVals[1] + aoVals[3]) {
+              tIdx.push(
+                tVert, tVert + 1, tVert + 2,
+                tVert, tVert + 2, tVert + 3
+              );
+            } else {
+              tIdx.push(
+                tVert + 1, tVert + 2, tVert + 3,
+                tVert + 1, tVert + 3, tVert
+              );
+            }
+            if (isWater) { wVertCount += 4; } else { vertCount += 4; }
           }
         }
       }
     }
 
-    if (vertCount === 0) { chunk.dirty = false; return; }
+    if (vertCount === 0 && wVertCount === 0) { chunk.dirty = false; return; }
 
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geo.setAttribute('normal',   new THREE.Float32BufferAttribute(normals, 3));
-    geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3));
-    geo.setIndex(indices);
-    geo.computeBoundingSphere();
+    // Solid terrain mesh
+    if (vertCount > 0) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geo.setAttribute('normal',   new THREE.Float32BufferAttribute(normals, 3));
+      geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3));
+      geo.setIndex(indices);
+      geo.computeBoundingSphere();
 
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(ox * BLOCK_SIZE, 0, oz * BLOCK_SIZE);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.userData.isVoxelTerrain = true;
+      const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(ox * BLOCK_SIZE, 0, oz * BLOCK_SIZE);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData.isVoxelTerrain = true;
 
-    scene.add(mesh);
-    chunk.mesh = mesh;
+      scene.add(mesh);
+      chunk.mesh = mesh;
+    }
+
+    // Transparent water mesh
+    if (wVertCount > 0) {
+      const wGeo = new THREE.BufferGeometry();
+      wGeo.setAttribute('position', new THREE.Float32BufferAttribute(wPositions, 3));
+      wGeo.setAttribute('normal',   new THREE.Float32BufferAttribute(wNormals, 3));
+      wGeo.setAttribute('color',    new THREE.Float32BufferAttribute(wColors, 3));
+      wGeo.setIndex(wIndices);
+      wGeo.computeBoundingSphere();
+
+      const wMat = new THREE.MeshLambertMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      const wMesh = new THREE.Mesh(wGeo, wMat);
+      wMesh.position.set(ox * BLOCK_SIZE, 0, oz * BLOCK_SIZE);
+      wMesh.renderOrder = 1; // draw after opaque
+      wMesh.userData.isVoxelTerrain = true;
+
+      scene.add(wMesh);
+      chunk.waterMesh = wMesh;
+    }
+
     chunk.dirty = false;
   }
 
@@ -386,6 +517,12 @@ const VoxelWorld = (function () {
         chunk.mesh.geometry.dispose();
         chunk.mesh.material.dispose();
         chunk.mesh = null;
+      }
+      if (chunk.waterMesh) {
+        _scene.remove(chunk.waterMesh);
+        chunk.waterMesh.geometry.dispose();
+        chunk.waterMesh.material.dispose();
+        chunk.waterMesh = null;
       }
     }
     chunks.clear();
@@ -468,6 +605,11 @@ const VoxelWorld = (function () {
         _scene.remove(chunk.mesh);
         chunk.mesh.geometry.dispose();
         chunk.mesh.material.dispose();
+      }
+      if (chunk.waterMesh) {
+        _scene.remove(chunk.waterMesh);
+        chunk.waterMesh.geometry.dispose();
+        chunk.waterMesh.material.dispose();
       }
     }
     chunks.clear();
@@ -2666,6 +2808,12 @@ const VoxelWorld = (function () {
         chunk.mesh.geometry.dispose();
         chunk.mesh.material.dispose();
         chunk.mesh = null;
+      }
+      if (chunk.waterMesh && _scene) {
+        _scene.remove(chunk.waterMesh);
+        chunk.waterMesh.geometry.dispose();
+        chunk.waterMesh.material.dispose();
+        chunk.waterMesh = null;
       }
     }
     chunks.clear();

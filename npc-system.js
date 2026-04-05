@@ -1075,6 +1075,159 @@ const NPCSystem = (function () {
     friendlyGroups.length = 0;
   }
 
+  /* ── NPC Dialogue System — Context-sensitive barks ─────────────── */
+  const NPC_BARKS = {
+    idle: [
+      'Слава Україні!', 'Все чисто!', 'Тримай позицію!',
+      'Sector clear, moving up.', 'Quiet... too quiet.', 'Copy that, holding position.'
+    ],
+    combat: [
+      'Contact front!', 'Covering fire!', 'Перезаряджаюсь!',
+      'Suppressing!', 'Grenade out!', 'Keep firing!'
+    ],
+    wounded: [
+      'Need medic!', 'Мені потрібна допомога!', 'I\'m hit!', 'Medic! Over here!'
+    ],
+    victory: [
+      'Target down!', 'Ворог знищений!', 'Area secured.', 'Героям слава!'
+    ],
+    spotted_enemy: [
+      'ВРАГ! ВОРОГ!', 'Enemy spotted!', 'Ammunition low!', 'Moving up!'
+    ]
+  };
+
+  function getRandomBark(category) {
+    const lines = NPC_BARKS[category];
+    if (!lines || lines.length === 0) return '';
+    return lines[Math.floor(Math.random() * lines.length)];
+  }
+
+  function triggerBark(npcId, category) {
+    const bark = getRandomBark(category);
+    if (!bark) return null;
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.playBark) {
+      AudioSystem.playBark(npcId, bark);
+    }
+    return bark;
+  }
+
+  /* ── NPC Morale Effects ──────────────────────────────────────────── */
+  function applyMoraleEffects(npc) {
+    const m = npc.morale;
+    const result = { speedMult: 1, accuracyMult: 1, fleeing: false };
+    if (m < 30) {
+      result.accuracyMult = 0.75;
+      if (Math.random() < 0.2) result.fleeing = true;
+    } else if (m < 50) {
+      result.accuracyMult = 0.75;
+    }
+    if (m > 80) {
+      result.speedMult = 1.15;
+    }
+    return result;
+  }
+
+  /* ── NPC Equipment Upgrades ──────────────────────────────────────── */
+  const NPC_UPGRADES = {
+    body_armor:    { label: 'Body Armor',    hpBonus: 50 },
+    better_weapon: { label: 'Better Weapon', damageMult: 1.25 },
+    radio:         { label: 'Radio',         detectionMult: 1.5 },
+    medkit:        { label: 'Medkit',        selfHeal: true },
+    nvg:           { label: 'NVG',           nightPenalty: 0 }
+  };
+
+  const _npcUpgrades = {}; // npcId -> Set of upgrade ids
+
+  function upgradeNPC(npcId, upgradeId) {
+    const npc = npcs.find(n => n.id === npcId && n.alive);
+    if (!npc) return false;
+    const def = NPC_UPGRADES[upgradeId];
+    if (!def) return false;
+    if (!_npcUpgrades[npcId]) _npcUpgrades[npcId] = new Set();
+    if (_npcUpgrades[npcId].has(upgradeId)) return false;
+    _npcUpgrades[npcId].add(upgradeId);
+    if (upgradeId === 'body_armor') npc.health = Math.min(150, npc.health + def.hpBonus);
+    if (upgradeId === 'better_weapon' && npc.weapon) {
+      npc.weapon = Object.assign({}, npc.weapon, { damage: npc.weapon.damage * def.damageMult });
+    }
+    return true;
+  }
+
+  function getUpgrades(npcId) {
+    return _npcUpgrades[npcId] ? Array.from(_npcUpgrades[npcId]) : [];
+  }
+
+  /* ── NPC Squad Commands ──────────────────────────────────────────── */
+  function commandSquad(groupId, command) {
+    const grp = friendlyGroups.find(g => g.id === groupId);
+    if (!grp) return false;
+    const aliveMembers = grp.members
+      .map(id => npcs.find(n => n.id === id))
+      .filter(n => n && n.alive);
+    if (aliveMembers.length === 0) return false;
+
+    switch (command) {
+      case 'attack':
+        grp.state = FGROUP_STATE.ADVANCING;
+        grp.stateTimer = 20;
+        for (const npc of aliveMembers) {
+          npc.job = JOB.ASSAULT;
+          npc.target = grp.guardPoint.clone();
+        }
+        break;
+      case 'defend':
+        grp.state = FGROUP_STATE.DEFENDING;
+        grp.stateTimer = 30;
+        for (const npc of aliveMembers) {
+          npc.job = JOB.GUARD;
+          npc.guardPos = grp.guardPoint.clone();
+        }
+        break;
+      case 'regroup':
+        grp.state = FGROUP_STATE.REGROUPING;
+        grp.stateTimer = 10;
+        for (const npc of aliveMembers) {
+          npc.target = grp.rallyPoint.clone();
+        }
+        break;
+      case 'flank_left': {
+        grp.state = FGROUP_STATE.ADVANCING;
+        grp.stateTimer = 15;
+        const flankL = grp.guardPoint.clone();
+        flankL.x -= 12;
+        for (const npc of aliveMembers) {
+          npc.job = JOB.ASSAULT;
+          npc.target = flankL.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, 0, (Math.random() - 0.5) * 3));
+        }
+        break;
+      }
+      case 'flank_right': {
+        grp.state = FGROUP_STATE.ADVANCING;
+        grp.stateTimer = 15;
+        const flankR = grp.guardPoint.clone();
+        flankR.x += 12;
+        for (const npc of aliveMembers) {
+          npc.job = JOB.ASSAULT;
+          npc.target = flankR.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, 0, (Math.random() - 0.5) * 3));
+        }
+        break;
+      }
+      case 'hold_fire':
+        grp.state = FGROUP_STATE.DEFENDING;
+        grp.stateTimer = 60;
+        for (const npc of aliveMembers) {
+          npc.combatTarget = null;
+          npc.target = null;
+          npc.job = JOB.GUARD;
+          npc.guardPos = npc.position.clone();
+        }
+        break;
+      default:
+        return false;
+    }
+    return true;
+  }
+
   return {
     NPC_RANK,
     JOB,
@@ -1096,5 +1249,17 @@ const NPCSystem = (function () {
     assignGuardPositions,
     getFriendlyGroups: function () { return friendlyGroups; },
     setMLStrategy: function (strategy) { _mlAssistStrategy = strategy; },
+    // Dialogue
+    NPC_BARKS,
+    getRandomBark,
+    triggerBark,
+    // Morale effects
+    applyMoraleEffects,
+    // Equipment upgrades
+    NPC_UPGRADES,
+    upgradeNPC,
+    getUpgrades,
+    // Squad commands
+    commandSquad,
   };
 })();

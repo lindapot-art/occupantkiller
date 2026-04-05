@@ -363,6 +363,152 @@ const WorldFeatures = (function () {
     return false;
   }
 
+  /* ── Destructible Environment ────────────── */
+  function applyExplosionDamage(x, y, z, radius, damage) {
+    const destroyed = [];
+    if (typeof VoxelWorld === 'undefined' || !VoxelWorld.getBlock || !VoxelWorld.setBlock) return destroyed;
+    const r = Math.ceil(radius);
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dz = -r; dz <= r; dz++) {
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (dist > radius) continue;
+          const bx = Math.floor(x) + dx;
+          const by = Math.floor(y) + dy;
+          const bz = Math.floor(z) + dz;
+          const block = VoxelWorld.getBlock(bx, by, bz);
+          if (block === 0) continue;
+          // Weak blocks: wood(4), glass(6), dirt(1) — destroy if damage sufficient
+          const weakBlocks = { 1: 30, 4: 20, 6: 10 };
+          const threshold = weakBlocks[block];
+          if (threshold !== undefined) {
+            const falloff = 1 - (dist / radius);
+            if (damage * falloff >= threshold) {
+              VoxelWorld.setBlock(bx, by, bz, 0);
+              destroyed.push({ x: bx, y: by, z: bz, wasBlock: block });
+            }
+          }
+        }
+      }
+    }
+    return destroyed;
+  }
+
+  /* ── Weather Hazards ───────────────────────── */
+  const HAZARD_ZONES = [];
+  let _hazardNextId = 1;
+
+  function addHazardZone(x, z, radius, type, damage) {
+    const id = _hazardNextId++;
+    HAZARD_ZONES.push({ id, x, z, radius, type, damage, duration: 30, elapsed: 0 });
+    return id;
+  }
+
+  function checkHazards(px, pz) {
+    for (const h of HAZARD_ZONES) {
+      const dx = px - h.x, dz = pz - h.z;
+      if (dx * dx + dz * dz < h.radius * h.radius) {
+        let effect = 'none';
+        if (h.type === 'toxic_gas') effect = 'poison';
+        else if (h.type === 'oil_fire') effect = 'burn';
+        else if (h.type === 'electric') effect = 'stun';
+        else if (h.type === 'quicksand') effect = 'slow';
+        return { inHazard: true, type: h.type, damage: h.damage, effect };
+      }
+    }
+    return { inHazard: false, type: null, damage: 0, effect: 'none' };
+  }
+
+  function updateHazards(delta) {
+    for (let i = HAZARD_ZONES.length - 1; i >= 0; i--) {
+      HAZARD_ZONES[i].elapsed += delta;
+      if (HAZARD_ZONES[i].elapsed >= HAZARD_ZONES[i].duration) {
+        HAZARD_ZONES.splice(i, 1);
+      }
+    }
+  }
+
+  /* ── Fortification System ──────────────────── */
+  const FORTIFICATION_TYPES = {
+    bunker:     { hp: 100, label: 'Bunker',     blocksBullets: true,  color: 0x555555, size: [3, 2, 3] },
+    barricade:  { hp: 50,  label: 'Barricade',   slowsEnemies: true,  color: 0x8B7355, size: [2, 1, 1] },
+    watchtower: { hp: 80,  label: 'Watchtower',  grantsVision: true,  color: 0x6B4226, size: [2, 4, 2] },
+    ammo_cache: { hp: 40,  label: 'Ammo Cache',  resupplies: true,    color: 0x556B2F, size: [1, 1, 1] }
+  };
+
+  const _fortifications = [];
+  let _fortNextId = 1;
+
+  function buildFortification(type, x, y, z, scene) {
+    const def = FORTIFICATION_TYPES[type];
+    if (!def) return null;
+    const s = scene || _scene;
+    const geo = new _THREE.BoxGeometry(def.size[0], def.size[1], def.size[2]);
+    const mat = new _THREE.MeshLambertMaterial({ color: def.color });
+    const mesh = new _THREE.Mesh(geo, mat);
+    mesh.position.set(x, y + def.size[1] / 2, z);
+    if (s) s.add(mesh);
+    const fort = { id: _fortNextId++, type, hp: def.hp, maxHp: def.hp, mesh, x, y, z };
+    _fortifications.push(fort);
+    return fort;
+  }
+
+  function getFortifications() {
+    return _fortifications;
+  }
+
+  function damageFortification(id, dmg) {
+    const fort = _fortifications.find(f => f.id === id);
+    if (!fort) return false;
+    fort.hp -= dmg;
+    if (fort.hp <= 0) {
+      if (fort.mesh && _scene) _scene.remove(fort.mesh);
+      const idx = _fortifications.indexOf(fort);
+      if (idx !== -1) _fortifications.splice(idx, 1);
+      return true; // destroyed
+    }
+    return false;
+  }
+
+  /* ── Dynamic Cover Points ──────────────────── */
+  function findCoverPoints(playerPos, enemyDir, count) {
+    const covers = [];
+    if (typeof VoxelWorld === 'undefined' || !VoxelWorld.getBlock) return covers;
+    const searchRadius = 12;
+    const px = Math.floor(playerPos.x);
+    const py = Math.floor(playerPos.y);
+    const pz = Math.floor(playerPos.z);
+    // Normalize enemy direction
+    const edx = enemyDir.x || 0;
+    const edz = enemyDir.z || 0;
+    const elen = Math.sqrt(edx * edx + edz * edz) || 1;
+    const enx = edx / elen;
+    const enz = edz / elen;
+
+    for (let dx = -searchRadius; dx <= searchRadius; dx += 2) {
+      for (let dz = -searchRadius; dz <= searchRadius; dz += 2) {
+        const bx = px + dx;
+        const bz = pz + dz;
+        // Check if there's a solid block that could be cover
+        const block = VoxelWorld.getBlock(bx, py, bz);
+        const blockAbove = VoxelWorld.getBlock(bx, py + 1, bz);
+        if (block !== 0 && blockAbove === 0) {
+          // Quality = how much this block is between player and enemy
+          const toBlockX = bx - px;
+          const toBlockZ = bz - pz;
+          const dot = toBlockX * enx + toBlockZ * enz;
+          if (dot > 0) {
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            const quality = Math.max(0, 1 - dist / searchRadius) * (dot / (dist || 1));
+            covers.push({ x: bx, y: py, z: bz, quality });
+          }
+        }
+      }
+    }
+    covers.sort((a, b) => b.quality - a.quality);
+    return covers.slice(0, count || 5);
+  }
+
   /* ── Master Update ─────────────────────────── */
   function update(dt, getBlock, setBlock, playerPos, enemyPositions) {
     const fireDmg = updateFires(dt, getBlock, setBlock);
@@ -371,6 +517,7 @@ const WorldFeatures = (function () {
     const mineExplosions = updateMines(playerPos, enemyPositions);
     const sandbagResult = updateSandbagDeploy(dt);
     updateSmoke(dt);
+    updateHazards(dt);
     return { fireDmg, landedDrops, mineExplosions, sandbagResult };
   }
 
@@ -392,6 +539,20 @@ const WorldFeatures = (function () {
     startSandbagDeploy,
     // Smoke
     createSmoke, isInSmoke,
+    // Destructible environment
+    applyExplosionDamage,
+    // Weather hazards
+    HAZARD_ZONES,
+    addHazardZone,
+    checkHazards,
+    updateHazards,
+    // Fortifications
+    FORTIFICATION_TYPES,
+    buildFortification,
+    getFortifications,
+    damageFortification,
+    // Dynamic cover
+    findCoverPoints,
     // Getters
     getFires: () => fires,
     getTrees: () => trees,

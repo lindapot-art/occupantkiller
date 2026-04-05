@@ -13,9 +13,15 @@
 
   <!-- HUD (shown while playing) -->
   <div id="hud" style="display:none">
-    <div id="crosshair"></div>
+    <div id="crosshair">
+      <div class="crosshair-line cl-top"></div>
+      <div class="crosshair-line cl-bottom"></div>
+      <div class="crosshair-line cl-left"></div>
+      <div class="crosshair-line cl-right"></div>
+    </div>
     <div id="hit-marker"></div>
     <div id="damage-vignette"></div>
+    <div id="flashbang-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;opacity:0;pointer-events:none;z-index:200;transition:opacity 0.05s"></div>
 
     <!-- ── Extended top info bar ───────────────────────────── -->
     <div id="extended-top-bar">
@@ -50,6 +56,7 @@
         <div id="ammo-label">AMMO</div>
         <div id="ammo-display">100</div>
         <div id="ammo-reserve">/ 250</div>
+        <div id="ammo-type" style="font-size:10px;color:#aaa;letter-spacing:1px;margin-top:2px">STD</div>
       </div>
 
       <div id="weapon-section">
@@ -369,7 +376,7 @@
     </div>
 
     <!-- Prestige indicator -->
-    <div id="prestige-indicator" style="position:fixed;top:52px;left:12px;color:#ffd700;font-size:11px;font-family:monospace;z-index:200;pointer-events:none" id="prestige-display"></div>
+    <div id="prestige-indicator" style="position:fixed;top:52px;left:12px;color:#ffd700;font-size:11px;font-family:monospace;z-index:200;pointer-events:none"></div>
 
     <!-- Stats panel (press TAB to see) -->
     <div id="stats-panel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.92);border:2px solid #4488ff;padding:20px;border-radius:10px;z-index:500;font-family:monospace;color:#fff;min-width:500px;pointer-events:auto">
@@ -448,6 +455,14 @@
       WASD · MOVE &nbsp;|&nbsp; MOUSE · AIM &nbsp;|&nbsp; LMB · FIRE &nbsp;|&nbsp; R · RELOAD &nbsp;|&nbsp; 1-0 · WEAPON &nbsp;|&nbsp; SHIFT · SPRINT &nbsp;|&nbsp; SPACE · JUMP<br/>
       V · CAMERA MODE &nbsp;|&nbsp; B · BUILD &nbsp;|&nbsp; F · DRONE &nbsp;|&nbsp; G · VEHICLE &nbsp;|&nbsp; Q/E · SCROLL WEAPONS &nbsp;|&nbsp; TAB · INVENTORY &nbsp;|&nbsp; ESC · PAUSE
     </div>
+  </div>
+
+  <!-- Pause screen -->
+  <div id="overlay-pause" class="overlay" style="display:none">
+    <h1>PAUSED</h1>
+    <p>Game paused. Click to resume.</p>
+    <button class="btn" id="pause-resume-btn" onclick="document.getElementById('overlay-pause').style.display='none';GameManager.setState(GameManager.STATE.PLAYING);GameManager.requestPointerLock()">▶ RESUME</button>
+    <button class="btn" id="pause-quit-btn" onclick="document.getElementById('overlay-pause').style.display='none';GameManager.hideOverlays();GameManager.showOverlay('start');GameManager.setState(GameManager.STATE.MENU)" style="margin-top:8px;border-color:#888;color:#888">✕ QUIT TO MENU</button>
   </div>
 
   <!-- Dead screen -->

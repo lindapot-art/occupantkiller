@@ -207,11 +207,204 @@ const Traversal = (function () {
 
   function isSwimming() { return state.swimming; }
 
+  /* ── Feature 16: Wall Run ───────────────────── */
+  const WALLRUN_DURATION = 1.5;
+  const WALLRUN_LIFT = 2.0;
+
+  let _wallRunState = { active: false, timer: 0, wallNormal: null };
+
+  function tryWallRun(playerPos, moveDir, getBlock) {
+    if (_wallRunState.active || state.mantling || state.diving) return false;
+    // check left and right for adjacent walls
+    const dirs = [
+      { x: -moveDir.z, z: moveDir.x },  // left
+      { x: moveDir.z, z: -moveDir.x }   // right
+    ];
+    for (const side of dirs) {
+      const cx = Math.floor(playerPos.x + side.x * 1.2);
+      const cz = Math.floor(playerPos.z + side.z * 1.2);
+      const cy = Math.floor(playerPos.y);
+      if (getBlock(cx, cy, cz)) {
+        _wallRunState.active = true;
+        _wallRunState.timer = WALLRUN_DURATION;
+        _wallRunState.wallNormal = { x: -side.x, y: 0, z: -side.z };
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function updateWallRun(delta) {
+    if (!_wallRunState.active) return { active: false, offsetY: 0, wallNormal: null };
+    _wallRunState.timer -= delta;
+    if (_wallRunState.timer <= 0) {
+      _wallRunState.active = false;
+      return { active: false, offsetY: 0, wallNormal: null };
+    }
+    const t = _wallRunState.timer / WALLRUN_DURATION;
+    const offsetY = Math.sin(t * Math.PI) * WALLRUN_LIFT;
+    return { active: true, offsetY: offsetY, wallNormal: _wallRunState.wallNormal };
+  }
+
+  function isWallRunning() { return _wallRunState.active; }
+
+  /* ── Feature 17: Grapple Hook ──────────────── */
+  const GRAPPLE_SPEED = 15;
+  const GRAPPLE_PULL_FORCE = 12;
+
+  let _grappleState = { active: false, anchor: null, extending: false, retracting: false, ropeLen: 0 };
+
+  function launchGrapple(origin, direction, maxRange, getBlock) {
+    if (_grappleState.active) return false;
+    // simple raycast to find anchor point
+    const step = 0.5;
+    for (let d = step; d <= maxRange; d += step) {
+      const px = origin.x + direction.x * d;
+      const py = origin.y + direction.y * d;
+      const pz = origin.z + direction.z * d;
+      if (getBlock(Math.floor(px), Math.floor(py), Math.floor(pz))) {
+        _grappleState.active = true;
+        _grappleState.anchor = { x: px - direction.x * step, y: py - direction.y * step, z: pz - direction.z * step };
+        _grappleState.extending = false;
+        _grappleState.retracting = true;
+        _grappleState.ropeLen = d;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function updateGrapple(delta, playerPos) {
+    if (!_grappleState.active) return { active: false, targetPos: null, force: null };
+    const a = _grappleState.anchor;
+    const dx = a.x - playerPos.x;
+    const dy = a.y - playerPos.y;
+    const dz = a.z - playerPos.z;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (dist < 1.5) {
+      releaseGrapple();
+      return { active: false, targetPos: a, force: null };
+    }
+    const inv = GRAPPLE_PULL_FORCE / dist;
+    return {
+      active: true,
+      targetPos: a,
+      force: { x: dx * inv, y: dy * inv, z: dz * inv }
+    };
+  }
+
+  function releaseGrapple() {
+    _grappleState.active = false;
+    _grappleState.anchor = null;
+    _grappleState.extending = false;
+    _grappleState.retracting = false;
+    _grappleState.ropeLen = 0;
+  }
+
+  function isGrappling() { return _grappleState.active; }
+
+  /* ── Feature 18: Ledge Grab ────────────────── */
+  let _ledgeState = { hanging: false, ledgePos: null };
+
+  function checkLedgeGrab(playerPos, velocity, getBlock) {
+    if (_ledgeState.hanging || state.mantling) return false;
+    // only grab when falling
+    if (velocity.y >= 0) return false;
+    const py = Math.floor(playerPos.y);
+    // check blocks around player at head level
+    const offsets = [ { x:1,z:0 }, { x:-1,z:0 }, { x:0,z:1 }, { x:0,z:-1 } ];
+    for (const off of offsets) {
+      const bx = Math.floor(playerPos.x) + off.x;
+      const bz = Math.floor(playerPos.z) + off.z;
+      const solidAtFeet = getBlock(bx, py, bz);
+      const emptyAbove = !getBlock(bx, py + 1, bz);
+      if (solidAtFeet && emptyAbove) {
+        _ledgeState.hanging = true;
+        _ledgeState.ledgePos = { x: bx + 0.5, y: py + 1.0, z: bz + 0.5 };
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function updateLedgeHang(delta) {
+    if (!_ledgeState.hanging) return { hanging: false, position: null };
+    return { hanging: true, position: _ledgeState.ledgePos };
+  }
+
+  function pullUp() {
+    if (!_ledgeState.hanging) return null;
+    const pos = { x: _ledgeState.ledgePos.x, y: _ledgeState.ledgePos.y + 0.5, z: _ledgeState.ledgePos.z };
+    _ledgeState.hanging = false;
+    _ledgeState.ledgePos = null;
+    return pos;
+  }
+
+  function dropDown() {
+    _ledgeState.hanging = false;
+    _ledgeState.ledgePos = null;
+  }
+
+  function isHanging() { return _ledgeState.hanging; }
+
+  /* ── Feature 19: Vault ─────────────────────── */
+  const VAULT_DURATION = 0.3;
+  const VAULT_HEIGHT = 1.5;
+
+  let _vaultState = { active: false, timer: 0, startPos: null, endPos: null };
+
+  function tryVault(playerPos, moveDir, getBlock) {
+    if (_vaultState.active || state.mantling) return false;
+    const ahead = {
+      x: Math.floor(playerPos.x + moveDir.x * 1.2),
+      z: Math.floor(playerPos.z + moveDir.z * 1.2)
+    };
+    const py = Math.floor(playerPos.y);
+    // 1-block high obstacle: solid at feet, empty above
+    const solidAtFeet = getBlock(ahead.x, py, ahead.z);
+    const emptyAbove = !getBlock(ahead.x, py + 1, ahead.z);
+    const emptyBeyond = !getBlock(ahead.x + Math.sign(moveDir.x), py, ahead.z + Math.sign(moveDir.z));
+    if (solidAtFeet && emptyAbove && emptyBeyond) {
+      _vaultState.active = true;
+      _vaultState.timer = VAULT_DURATION;
+      _vaultState.startPos = { x: playerPos.x, y: playerPos.y, z: playerPos.z };
+      _vaultState.endPos = {
+        x: ahead.x + 0.5 + moveDir.x * 1.0,
+        y: playerPos.y,
+        z: ahead.z + 0.5 + moveDir.z * 1.0
+      };
+      return true;
+    }
+    return false;
+  }
+
+  function updateVault(delta) {
+    if (!_vaultState.active) return { active: false, position: null };
+    _vaultState.timer -= delta;
+    const t = 1 - _vaultState.timer / VAULT_DURATION;
+    const s = _vaultState.startPos;
+    const e = _vaultState.endPos;
+    const pos = {
+      x: s.x + (e.x - s.x) * t,
+      y: s.y + Math.sin(t * Math.PI) * VAULT_HEIGHT,
+      z: s.z + (e.z - s.z) * t
+    };
+    if (_vaultState.timer <= 0) {
+      _vaultState.active = false;
+      return { active: false, position: e };
+    }
+    return { active: true, position: pos };
+  }
+
+  function isVaulting() { return _vaultState.active; }
+
   /* ── Master Update ─────────────────────────── */
   function update(dt) {
     const mantle = updateMantle(dt);
     const dive = updateDive(dt);
-    return { mantle, dive };
+    const wallRun = updateWallRun(dt);
+    const vault = updateVault(dt);
+    return { mantle, dive, wallRun, vault };
   }
 
   function reset() {
@@ -219,6 +412,10 @@ const Traversal = (function () {
     state.diving = false; state.diveTimer = 0; state.diveCooldown = 0;
     state.rappelling = false; state.onZipline = false;
     state.swimming = false; state.breathTimer = 10;
+    _wallRunState = { active: false, timer: 0, wallNormal: null };
+    _grappleState = { active: false, anchor: null, extending: false, retracting: false, ropeLen: 0 };
+    _ledgeState = { hanging: false, ledgePos: null };
+    _vaultState = { active: false, timer: 0, startPos: null, endPos: null };
   }
 
   return {
@@ -227,6 +424,14 @@ const Traversal = (function () {
     tryDolphinDive, isDiving,
     startRappel, updateRappel, stopRappel, isRappelling,
     startZipline, updateZipline, isOnZipline, exitZipline,
-    checkWater, updateSwimming, isSwimming
+    checkWater, updateSwimming, isSwimming,
+    // Wall run
+    tryWallRun, updateWallRun, isWallRunning,
+    // Grapple hook
+    launchGrapple, updateGrapple, releaseGrapple, isGrappling,
+    // Ledge grab
+    checkLedgeGrab, updateLedgeHang, pullUp, dropDown, isHanging,
+    // Vault
+    tryVault, updateVault, isVaulting
   };
 })();

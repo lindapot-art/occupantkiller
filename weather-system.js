@@ -230,6 +230,124 @@ const WeatherSystem = (function () {
     }
   }
 
+  /* ── Extreme Weather Events ──────────────────────────────────────── */
+  var EXTREME_EVENTS = {
+    blizzard:     { label: 'Blizzard',     visionMod: 0.05, speedMod: 0.5,  dmgPerSec: 0, duration: 30 },
+    sandstorm:    { label: 'Sandstorm',    visionMod: 0.15, speedMod: 0.7,  dmgPerSec: 2, duration: 25 },
+    tornado:      { label: 'Tornado',      visionMod: 0.3,  speedMod: 0.4,  dmgPerSec: 0, duration: 20, windForce: 30 },
+    hailstorm:    { label: 'Hailstorm',    visionMod: 0.5,  speedMod: 0.85, dmgPerSec: 3, duration: 20 },
+    thunderstorm: { label: 'Thunderstorm', visionMod: 0.35, speedMod: 0.9,  dmgPerSec: 0, duration: 30, lightning: true },
+  };
+
+  var _extremeEvent = null;
+  var _extremeTimer = 0;
+
+  function triggerExtremeEvent(type) {
+    var ev = EXTREME_EVENTS[type];
+    if (!ev) return false;
+    _extremeEvent = { type: type, config: ev, elapsed: 0 };
+    _extremeTimer = ev.duration;
+    return true;
+  }
+
+  function updateExtremeEvent(delta) {
+    if (!_extremeEvent) return null;
+    _extremeEvent.elapsed += delta;
+    _extremeTimer -= delta;
+    if (_extremeTimer <= 0) {
+      var finished = _extremeEvent;
+      _extremeEvent = null;
+      _extremeTimer = 0;
+      return finished;
+    }
+    // Apply periodic damage
+    var cfg = _extremeEvent.config;
+    if (cfg.dmgPerSec > 0 && typeof GameManager !== 'undefined') {
+      var p = GameManager.getPlayer();
+      if (p) p.hp -= cfg.dmgPerSec * delta;
+    }
+    // Lightning strikes during thunderstorm kill nearby enemies
+    if (cfg.lightning && Math.random() < delta * 0.3) {
+      if (typeof Enemies !== 'undefined' && Enemies.getAll) {
+        var enemies = Enemies.getAll();
+        if (enemies.length > 0) {
+          var target = enemies[Math.floor(Math.random() * enemies.length)];
+          if (target.alive) {
+            Enemies.damage(target, 999);
+            if (typeof AudioSystem !== 'undefined' && AudioSystem.playExplosion) AudioSystem.playExplosion();
+          }
+        }
+      }
+    }
+    return _extremeEvent;
+  }
+
+  function getExtremeEvent() {
+    return _extremeEvent;
+  }
+
+  /* ── Weather Forecast ────────────────────────────────────────────── */
+  var _forecast = [];
+
+  function generateForecast() {
+    _forecast = [];
+    var weathers = Object.values(WEATHER);
+    for (var i = 0; i < 3; i++) {
+      _forecast.push({
+        weather: weathers[Math.floor(Math.random() * weathers.length)],
+        timeUntil: (i + 1) * (60 + Math.floor(Math.random() * 120)),
+      });
+    }
+    return _forecast;
+  }
+
+  function getForecast() {
+    if (_forecast.length === 0) generateForecast();
+    return _forecast.slice();
+  }
+
+  /* ── Temperature System ──────────────────────────────────────────── */
+  var _temperature = 20; // Celsius
+
+  function updateTemperature(timeOfDay, season) {
+    // timeOfDay: 0-24 hours, season: 'spring'|'summer'|'autumn'|'winter'
+    var baseTemps = {
+      spring: 15, summer: 28, autumn: 12, winter: -5,
+    };
+    var base = baseTemps[season] || 20;
+    // Cooler at night (0-6, 18-24), warmer midday (10-14)
+    var hourFactor = 0;
+    if (timeOfDay >= 10 && timeOfDay <= 14) {
+      hourFactor = 8;
+    } else if (timeOfDay >= 0 && timeOfDay < 6) {
+      hourFactor = -6;
+    } else if (timeOfDay >= 18) {
+      hourFactor = -4;
+    }
+    _temperature = base + hourFactor + (Math.random() - 0.5) * 2;
+    return _temperature;
+  }
+
+  function getTemperature() {
+    return _temperature;
+  }
+
+  function getTemperatureEffects() {
+    var staminaDrain = 1.0;
+    var healRate = 1.0;
+    if (_temperature > 35) {
+      staminaDrain = 1.5;  // heat exhaustion
+      healRate = 0.8;
+    } else if (_temperature < 0) {
+      staminaDrain = 1.3;  // cold saps energy
+      healRate = 0.7;
+    } else if (_temperature >= 18 && _temperature <= 25) {
+      staminaDrain = 0.9;  // comfortable
+      healRate = 1.1;
+    }
+    return { staminaDrain: staminaDrain, healRate: healRate };
+  }
+
   return {
     WEATHER: WEATHER,
     init: init,
@@ -237,5 +355,17 @@ const WeatherSystem = (function () {
     setWeather: setWeather,
     getWeather: getWeather,
     getModifiers: getModifiers,
+    // Extreme Weather Events
+    EXTREME_EVENTS: EXTREME_EVENTS,
+    triggerExtremeEvent: triggerExtremeEvent,
+    updateExtremeEvent: updateExtremeEvent,
+    getExtremeEvent: getExtremeEvent,
+    // Weather Forecast
+    generateForecast: generateForecast,
+    getForecast: getForecast,
+    // Temperature System
+    updateTemperature: updateTemperature,
+    getTemperature: getTemperature,
+    getTemperatureEffects: getTemperatureEffects,
   };
 })();

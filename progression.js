@@ -322,6 +322,161 @@ const Progression = (function () {
 
   function clearChallenge() { activeChallengeMode = null; }
 
+  /* ── Achievement System ──────────────────────── */
+  const ACHIEVEMENTS = {
+    FIRST_BLOOD:    { id: 'FIRST_BLOOD',    name: 'First Blood',    description: 'Get your first kill',              icon: '🩸', requirement: 1,     reward: { okc: 50,   xp: 100 }  },
+    SHARPSHOOTER:   { id: 'SHARPSHOOTER',   name: 'Sharpshooter',   description: '50% accuracy over 100 shots',      icon: '🎯', requirement: 50,    reward: { okc: 200,  xp: 500 }  },
+    HEADHUNTER:     { id: 'HEADHUNTER',     name: 'Headhunter',     description: 'Get 100 headshots',                icon: '💀', requirement: 100,   reward: { okc: 300,  xp: 750 }  },
+    SURVIVOR:       { id: 'SURVIVOR',        name: 'Survivor',       description: 'Survive 10 waves',                 icon: '🛡️', requirement: 10,    reward: { okc: 150,  xp: 400 }  },
+    SLAYER:         { id: 'SLAYER',          name: 'Slayer',         description: '1000 total kills',                  icon: '⚔️', requirement: 1000,  reward: { okc: 500,  xp: 1000 } },
+    DEMOLITIONIST:  { id: 'DEMOLITIONIST',  name: 'Demolitionist',  description: 'Destroy 50 structures',            icon: '💥', requirement: 50,    reward: { okc: 200,  xp: 500 }  },
+    DRONE_ACE:      { id: 'DRONE_ACE',      name: 'Drone Ace',      description: 'Get 50 drone kills',               icon: '🛩️', requirement: 50,    reward: { okc: 250,  xp: 600 }  },
+    TREASURE_HUNTER:{ id: 'TREASURE_HUNTER', name: 'Treasure Hunter', description: 'Collect 50 pickups',              icon: '💎', requirement: 50,    reward: { okc: 150,  xp: 350 }  },
+    SPEEDRUNNER:    { id: 'SPEEDRUNNER',    name: 'Speedrunner',    description: 'Clear a wave under 30 seconds',    icon: '⚡', requirement: 30,    reward: { okc: 300,  xp: 700 }  },
+    IRONMAN:        { id: 'IRONMAN',         name: 'Ironman',        description: 'Clear a wave without taking damage', icon: '🏋️', requirement: 1,     reward: { okc: 400,  xp: 800 }  },
+    PRESTIGE:       { id: 'PRESTIGE',        name: 'Prestige',       description: 'Prestige at least once',           icon: '⭐', requirement: 1,     reward: { okc: 500,  xp: 1000 } },
+    COLLECTOR:      { id: 'COLLECTOR',       name: 'Collector',      description: 'Unlock all weapons',               icon: '🗄️', requirement: 1,     reward: { okc: 600,  xp: 1200 } },
+    COMMANDER:      { id: 'COMMANDER',       name: 'Commander',      description: 'Have 10 NPCs alive at once',       icon: '👥', requirement: 10,    reward: { okc: 350,  xp: 700 }  },
+    WEALTHY:        { id: 'WEALTHY',         name: 'Wealthy',        description: 'Earn 10000 OKC total',             icon: '💰', requirement: 10000, reward: { okc: 1000, xp: 2000 } },
+    LEGENDARY:      { id: 'LEGENDARY',       name: 'Legendary',      description: 'Reach level 50',                   icon: '👑', requirement: 50,    reward: { okc: 2000, xp: 5000 } }
+  };
+
+  const unlockedAchievements = new Set();
+
+  function checkAchievement(id, value) {
+    if (!ACHIEVEMENTS[id] || unlockedAchievements.has(id)) return null;
+    if (value >= ACHIEVEMENTS[id].requirement) {
+      unlockedAchievements.add(id);
+      return { ...ACHIEVEMENTS[id], unlockedAt: Date.now() };
+    }
+    return null;
+  }
+
+  function getAchievements() {
+    return Object.values(ACHIEVEMENTS).map(a => ({
+      ...a,
+      unlocked: unlockedAchievements.has(a.id)
+    }));
+  }
+
+  function isAchievementUnlocked(id) { return unlockedAchievements.has(id); }
+
+  /* ── Season Pass ───────────────────────────── */
+  const SEASON_REWARDS = [];
+  (function buildSeasonRewards() {
+    const freePool = [
+      { type: 'okc', amount: 50 },  { type: 'okc', amount: 100 }, { type: 'okc', amount: 150 },
+      { type: 'ammo', amount: 30 },  { type: 'ammo', amount: 60 },
+      { type: 'xp_boost', amount: 1.25 }, { type: 'xp_boost', amount: 1.5 }
+    ];
+    const premiumPool = [
+      { type: 'skin', id: 'skin_gold_ak' },     { type: 'skin', id: 'skin_neon_smg' },
+      { type: 'skin', id: 'skin_camo_sniper' },  { type: 'skin', id: 'skin_chrome_pistol' },
+      { type: 'skin', id: 'skin_flame_shotgun' }, { type: 'weapon', id: 'weapon_plasma' },
+      { type: 'weapon', id: 'weapon_railgun' },   { type: 'cosmetic', id: 'cosmetic_helmet_gold' },
+      { type: 'cosmetic', id: 'cosmetic_trail_fire' }, { type: 'cosmetic', id: 'cosmetic_emblem_skull' }
+    ];
+    for (let i = 0; i < 50; i++) {
+      SEASON_REWARDS.push({
+        level: i + 1,
+        free: freePool[i % freePool.length],
+        premium: premiumPool[i % premiumPool.length]
+      });
+    }
+  })();
+
+  let seasonLevel = 0;
+  let seasonXP = 0;
+  let seasonPremium = false;
+  const SEASON_XP_PER_LEVEL = 1000;
+
+  function addSeasonXP(amount) {
+    seasonXP += amount;
+    const newLevel = Math.min(50, Math.floor(seasonXP / SEASON_XP_PER_LEVEL));
+    const leveled = newLevel > seasonLevel;
+    seasonLevel = newLevel;
+    return leveled ? seasonLevel : false;
+  }
+
+  function getSeasonLevel() { return seasonLevel; }
+
+  function getSeasonRewards(level) {
+    if (level < 1 || level > 50) return null;
+    return SEASON_REWARDS[level - 1];
+  }
+
+  function isSeasonPremium() { return seasonPremium; }
+
+  /* ── Combat Rating ─────────────────────────── */
+  function calculateCombatRating() {
+    var accuracy = stats.shotsFired > 0 ? (stats.shotsHit / stats.shotsFired) * 100 : 0;
+    var kd = stats.deathCount > 0 ? stats.totalKills / stats.deathCount : stats.totalKills;
+    var hsRatio = stats.totalKills > 0 ? (stats.headshots / stats.totalKills) * 100 : 0;
+    var waves = stats.wavesCleared;
+    var prestige = prestigeLevel;
+
+    var raw =
+      (Math.min(accuracy, 100) / 100) * 1500 * 0.30 +
+      Math.min(kd, 20) / 20 * 1250 * 0.25 +
+      (Math.min(hsRatio, 100) / 100) * 1000 * 0.20 +
+      Math.min(waves, 100) / 100 * 750 * 0.15 +
+      (prestige / PRESTIGE.MAX_LEVEL) * 500 * 0.10;
+
+    var rating = Math.round(Math.min(5000, raw));
+    var rankThresholds = [
+      { min: 0,    rank: 'Bronze',   stars: 1 },
+      { min: 500,  rank: 'Bronze',   stars: 2 },
+      { min: 1000, rank: 'Bronze',   stars: 3 },
+      { min: 1500, rank: 'Silver',   stars: 1 },
+      { min: 2000, rank: 'Silver',   stars: 2 },
+      { min: 2250, rank: 'Silver',   stars: 3 },
+      { min: 2500, rank: 'Gold',     stars: 1 },
+      { min: 2800, rank: 'Gold',     stars: 2 },
+      { min: 3000, rank: 'Gold',     stars: 3 },
+      { min: 3300, rank: 'Platinum', stars: 1 },
+      { min: 3600, rank: 'Platinum', stars: 2 },
+      { min: 3800, rank: 'Platinum', stars: 3 },
+      { min: 4000, rank: 'Diamond',  stars: 1 },
+      { min: 4300, rank: 'Diamond',  stars: 2 },
+      { min: 4500, rank: 'Diamond',  stars: 3 },
+      { min: 4700, rank: 'Master',   stars: 1 },
+      { min: 4850, rank: 'Master',   stars: 2 },
+      { min: 5000, rank: 'Master',   stars: 3 }
+    ];
+    var result = { rating: rating, rank: 'Bronze', stars: 1 };
+    for (var i = rankThresholds.length - 1; i >= 0; i--) {
+      if (rating >= rankThresholds[i].min) {
+        result.rank = rankThresholds[i].rank;
+        result.stars = rankThresholds[i].stars;
+        break;
+      }
+    }
+    return result;
+  }
+
+  /* ── Loadout Presets ───────────────────────── */
+  const _loadouts = [];
+  const MAX_LOADOUTS = 5;
+
+  function saveLoadout(name, weaponIds, perkIds) {
+    if (_loadouts.length >= MAX_LOADOUTS) return false;
+    _loadouts.push({ name: name, weapons: weaponIds.slice(), perks: perkIds.slice(), createdAt: Date.now() });
+    return true;
+  }
+
+  function loadLoadout(index) {
+    if (index < 0 || index >= _loadouts.length) return null;
+    return { ..._loadouts[index], weapons: _loadouts[index].weapons.slice(), perks: _loadouts[index].perks.slice() };
+  }
+
+  function getLoadouts() { return _loadouts.map(function (l) { return { ...l }; }); }
+
+  function deleteLoadout(index) {
+    if (index < 0 || index >= _loadouts.length) return false;
+    _loadouts.splice(index, 1);
+    return true;
+  }
+
   /* ── Save/Load ─────────────────────────────── */
   function save() {
     try {
@@ -369,7 +524,7 @@ const Progression = (function () {
 
   return {
     PRESTIGE, CHALLENGE_MODES, DAILY_CHALLENGES, BOUNTY_TEMPLATES,
-    JOURNAL_CATEGORIES, CODEX_ENTRIES,
+    JOURNAL_CATEGORIES, CODEX_ENTRIES, ACHIEVEMENTS, SEASON_REWARDS,
     init, reset, save, load,
     // Prestige
     canPrestige, doPrestige, getPrestigeBonuses, getPrestigeLevel, getPrestigeIcon,
@@ -384,6 +539,14 @@ const Progression = (function () {
     // Leaderboard
     submitScore, getLeaderboard,
     // Challenge modes
-    setChallenge, getChallengeMode, getChallengeModifiers, clearChallenge
+    setChallenge, getChallengeMode, getChallengeModifiers, clearChallenge,
+    // Achievements
+    checkAchievement, getAchievements, isAchievementUnlocked,
+    // Season Pass
+    addSeasonXP, getSeasonLevel, getSeasonRewards, isSeasonPremium,
+    // Combat Rating
+    calculateCombatRating,
+    // Loadout Presets
+    saveLoadout, loadLoadout, getLoadouts, deleteLoadout
   };
 })();

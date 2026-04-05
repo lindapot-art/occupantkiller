@@ -1029,6 +1029,15 @@ var MLSystem = (function () {
     getMostVulnerableDirection: getMostVulnerableDirection,
     getBehavior: function () { return behavior; },
 
+    // B25: Adaptive difficulty rating based on recent performance
+    getPerformanceRating: function () {
+      // Combine accuracy, K/D, and kill timing into a 0-1 rating
+      var acc = session.hits / Math.max(1, session.shots);
+      var kd = session.kills / Math.max(1, session.deaths + 1);
+      var rating = (acc * 0.4) + (Math.min(kd / 5, 1) * 0.4) + (Math.min(session.kills / 50, 1) * 0.2);
+      return Math.min(1, Math.max(0, rating));
+    },
+
     save: save,
     load: load,
   };

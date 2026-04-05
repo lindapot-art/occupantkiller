@@ -175,6 +175,7 @@ const CombatExtras = (function () {
   }
 
   function isOverheated() { return state.overheated; }
+  function getHeat() { return state.heat; }
 
   /* ── Feature 8: Ammo Types ─────────────────── */
   function cycleAmmoType() {
@@ -230,6 +231,142 @@ const CombatExtras = (function () {
   function getMaintenanceLevel() { return state.maintenanceLevel; }
   function isMaintaining() { return state.maintaining; }
 
+  /* ── Feature 11: Weapon Juggling ─────────────── */
+  let _lastWeaponIdx = -1;
+
+  function quickSwap() {
+    if (_lastWeaponIdx < 0) return false;
+    if (typeof Weapons === 'undefined') return false;
+    const cur = Weapons.getCurrentIdx();
+    const target = _lastWeaponIdx;
+    _lastWeaponIdx = cur;
+    Weapons.switchTo(target);
+    return true;
+  }
+
+  function _trackWeaponSwap(newIdx) {
+    if (typeof Weapons !== 'undefined') {
+      _lastWeaponIdx = newIdx;
+    }
+  }
+
+  /* ── Feature 12: Tactical Reload ───────────── */
+  let _tacticalReloadPending = false;
+
+  function tacticalReload() {
+    if (typeof Weapons === 'undefined') return false;
+    const clip = Weapons.getClip ? Weapons.getClip() : -1;
+    if (clip <= 0) return false;
+    _tacticalReloadPending = true;
+    if (Weapons.reload) Weapons.reload();
+    return true;
+  }
+
+  function isTacticalReload() { return _tacticalReloadPending; }
+
+  function completeTacticalReload() {
+    if (!_tacticalReloadPending) return false;
+    _tacticalReloadPending = false;
+    if (typeof Weapons !== 'undefined' && Weapons.getClip && Weapons.setClip) {
+      Weapons.setClip(Weapons.getClip() + 1);
+    }
+    return true;
+  }
+
+  /* ── Feature 13: Execution System ──────────── */
+  function tryExecution(enemy) {
+    if (!enemy || typeof enemy.hp === 'undefined') return { success: false, bonusXP: 0 };
+    const dist = enemy.distance !== undefined ? enemy.distance : Infinity;
+    if (enemy.hp >= 20 || dist >= 2) return { success: false, bonusXP: 0 };
+    enemy.hp = 0;
+    const bonusXP = 50;
+    return { success: true, bonusXP: bonusXP };
+  }
+
+  /* ── Feature 14: Weapon Mastery ────────────── */
+  const MASTERY_RANKS = [
+    { name: 'Novice',   kills: 0 },
+    { name: 'Regular',  kills: 25 },
+    { name: 'Skilled',  kills: 50 },
+    { name: 'Expert',   kills: 100 },
+    { name: 'Master',   kills: 200 },
+    { name: 'Legend',   kills: 500 }
+  ];
+
+  const _weaponMastery = {};
+
+  function _ensureMastery(weaponId) {
+    if (!_weaponMastery[weaponId]) {
+      _weaponMastery[weaponId] = { kills: 0, rank: 0 };
+    }
+  }
+
+  function addWeaponKill(weaponId) {
+    _ensureMastery(weaponId);
+    _weaponMastery[weaponId].kills++;
+    const m = _weaponMastery[weaponId];
+    for (let i = MASTERY_RANKS.length - 1; i >= 0; i--) {
+      if (m.kills >= MASTERY_RANKS[i].kills) {
+        m.rank = i;
+        break;
+      }
+    }
+    return getWeaponMastery(weaponId);
+  }
+
+  function getWeaponMastery(weaponId) {
+    _ensureMastery(weaponId);
+    const m = _weaponMastery[weaponId];
+    const nextIdx = Math.min(m.rank + 1, MASTERY_RANKS.length - 1);
+    return {
+      kills: m.kills,
+      rank: m.rank,
+      rankName: MASTERY_RANKS[m.rank].name,
+      nextRankKills: m.rank < MASTERY_RANKS.length - 1 ? MASTERY_RANKS[nextIdx].kills : null
+    };
+  }
+
+  function getMasteryBonus(weaponId) {
+    _ensureMastery(weaponId);
+    const rank = _weaponMastery[weaponId].rank;
+    return {
+      damageMult: 1.0 + rank * 0.03,
+      reloadMult: 1.0 - rank * 0.02
+    };
+  }
+
+  /* ── Feature 15: Combat Roll ───────────────── */
+  let _rollTimer = 0;
+  let _rollCooldown = 0;
+  let _rollDir = null;
+  const ROLL_DURATION = 0.4;
+  const ROLL_COOLDOWN = 1.2;
+  const ROLL_SPEED = 10;
+
+  function tryRoll(direction) {
+    if (_rollTimer > 0 || _rollCooldown > 0) return false;
+    if (!direction) return false;
+    _rollTimer = ROLL_DURATION;
+    _rollCooldown = ROLL_COOLDOWN;
+    _rollDir = { x: direction.x, y: direction.y || 0, z: direction.z };
+    return true;
+  }
+
+  function isRolling() { return _rollTimer > 0; }
+
+  function updateRoll(delta) {
+    if (_rollCooldown > 0) _rollCooldown -= delta;
+    if (_rollTimer <= 0) return null;
+    _rollTimer -= delta;
+    if (_rollTimer <= 0) { _rollTimer = 0; _rollDir = null; return { active: false }; }
+    return {
+      active: true,
+      iframes: true,
+      moveX: _rollDir.x * ROLL_SPEED * delta,
+      moveZ: _rollDir.z * ROLL_SPEED * delta
+    };
+  }
+
   /* ── Update all ────────────────────────────── */
   function update(dt) {
     const lean = updateLean(dt);
@@ -238,7 +375,8 @@ const CombatExtras = (function () {
     const heatInfo = updateHeat(dt);
     updateQuickMelee(dt);
     updateMaintenance(dt);
-    return { lean, inspect, bayonet, heat: heatInfo };
+    const roll = updateRoll(dt);
+    return { lean, inspect, bayonet, heat: heatInfo, roll };
   }
 
   /* ── Public API ────────────────────────────── */
@@ -257,12 +395,22 @@ const CombatExtras = (function () {
     // Quick melee
     tryQuickMelee,
     // Heat
-    addHeat, isOverheated,
+    addHeat, isOverheated, getHeat,
     // Ammo types
     cycleAmmoType, getAmmoType, getAmmoModifiers,
     // Blind fire
     toggleBlindFire, getBlindFireMods, isBlindFiring,
     // Maintenance
-    registerShot, startMaintenance, getMaintenanceLevel, isMaintaining
+    registerShot, startMaintenance, getMaintenanceLevel, isMaintaining,
+    // Weapon juggling
+    quickSwap, _trackWeaponSwap,
+    // Tactical reload
+    tacticalReload, isTacticalReload, completeTacticalReload,
+    // Execution
+    tryExecution,
+    // Weapon mastery
+    addWeaponKill, getWeaponMastery, getMasteryBonus,
+    // Combat roll
+    tryRoll, isRolling, updateRoll
   };
 })();

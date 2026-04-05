@@ -347,6 +347,8 @@ const VehicleSystem = (function () {
       CameraSystem.setVehicleTarget(null);
       CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
       if (typeof HUD !== 'undefined' && HUD.hideVehicleHUD) HUD.hideVehicleHUD();
+      // Stop engine sound
+      if (typeof AudioSystem !== 'undefined' && AudioSystem.stopEngine) AudioSystem.stopEngine();
       return exitPos;
     }
     return null;
@@ -497,6 +499,8 @@ const VehicleSystem = (function () {
       v.velocity.x *= scale;
       v.velocity.z *= scale;
     }
+    // Update engine sound with current speed
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.updateEngine) AudioSystem.updateEngine(hSpeed);
   }
 
   /* ── AI Patrol Waypoint System ─────────────────────────────────── */
@@ -837,6 +841,104 @@ const VehicleSystem = (function () {
     turretProjectiles.length = 0;
   }
 
+  /* ── Vehicle Repair ──────────────────────────────────────────────── */
+  function isRepairable(vehicleId) {
+    var v = vehicles.find(function (v) { return v.id === vehicleId && v.alive; });
+    return v ? v.health < v.maxHealth : false;
+  }
+
+  function repairVehicle(vehicleId, amount) {
+    var v = vehicles.find(function (v) { return v.id === vehicleId && v.alive; });
+    if (!v) return false;
+    v.health = Math.min(v.maxHealth, v.health + amount);
+    return true;
+  }
+
+  /* ── Vehicle Upgrades ────────────────────────────────────────────── */
+  var VEHICLE_UPGRADES = {
+    armor_plating:      { label: 'Armor Plating',      effect: 'hp_mult',    value: 1.3 },
+    turbo_engine:       { label: 'Turbo Engine',        effect: 'speed_mult', value: 1.25 },
+    mounted_gun:        { label: 'Mounted Gun',         effect: 'add_turret', value: 25 },
+    reinforced_chassis: { label: 'Reinforced Chassis',  effect: 'ram_mult',   value: 1.5 },
+    smoke_launcher:     { label: 'Smoke Launcher',      effect: 'smoke',      value: true },
+  };
+
+  var _vehicleUpgrades = {}; // vehicleId -> [upgradeId]
+
+  function upgradeVehicle(vehicleId, upgradeId) {
+    var v = vehicles.find(function (v) { return v.id === vehicleId && v.alive; });
+    if (!v) return false;
+    var upg = VEHICLE_UPGRADES[upgradeId];
+    if (!upg) return false;
+    if (!_vehicleUpgrades[vehicleId]) _vehicleUpgrades[vehicleId] = [];
+    if (_vehicleUpgrades[vehicleId].indexOf(upgradeId) !== -1) return false; // already applied
+    _vehicleUpgrades[vehicleId].push(upgradeId);
+    // Apply effect
+    if (upg.effect === 'hp_mult') {
+      v.maxHealth = Math.floor(v.maxHealth * upg.value);
+      v.health = Math.min(v.health + Math.floor(v.maxHealth * 0.3), v.maxHealth);
+    } else if (upg.effect === 'speed_mult') {
+      v.speed = Math.floor(v.speed * upg.value);
+    } else if (upg.effect === 'add_turret') {
+      if (v.damage <= 0) { v.damage = upg.value; v.fireRate = 2.0; }
+    } else if (upg.effect === 'ram_mult') {
+      v._ramMult = upg.value;
+    } else if (upg.effect === 'smoke') {
+      v._hasSmoke = true;
+    }
+    return true;
+  }
+
+  function getVehicleUpgrades(vehicleId) {
+    return _vehicleUpgrades[vehicleId] ? _vehicleUpgrades[vehicleId].slice() : [];
+  }
+
+  /* ── Vehicle Horn ────────────────────────────────────────────────── */
+  function honkHorn(vehicleId) {
+    var v = vehicles.find(function (v) { return v.id === vehicleId && v.alive; });
+    if (!v) return false;
+    // Play horn sound
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.playVehicleEngine) {
+      AudioSystem.playVehicleEngine('boost');
+    }
+    // Stun enemies within 10m
+    if (typeof Enemies !== 'undefined' && Enemies.getAll) {
+      var enemies = Enemies.getAll();
+      for (var i = 0; i < enemies.length; i++) {
+        var e = enemies[i];
+        if (!e.alive || !e.mesh) continue;
+        if (v.position.distanceTo(e.mesh.position) < 10) {
+          e.stunTimer = (e.stunTimer || 0) + 1.0;
+        }
+      }
+    }
+    return true;
+  }
+
+  /* ── Fuel System ─────────────────────────────────────────────────── */
+  var _fuelLevels = {}; // vehicleId -> fuel (0-100)
+
+  function _initFuel(vehicleId) {
+    if (_fuelLevels[vehicleId] === undefined) _fuelLevels[vehicleId] = 100;
+  }
+
+  function consumeFuel(vehicleId, amount) {
+    _initFuel(vehicleId);
+    _fuelLevels[vehicleId] = Math.max(0, _fuelLevels[vehicleId] - amount);
+    return _fuelLevels[vehicleId];
+  }
+
+  function refuelVehicle(vehicleId, amount) {
+    _initFuel(vehicleId);
+    _fuelLevels[vehicleId] = Math.min(100, _fuelLevels[vehicleId] + amount);
+    return _fuelLevels[vehicleId];
+  }
+
+  function getFuel(vehicleId) {
+    _initFuel(vehicleId);
+    return _fuelLevels[vehicleId];
+  }
+
   return {
     VEHICLE_TYPE,
     VEHICLE_STATS,
@@ -866,5 +968,18 @@ const VehicleSystem = (function () {
     getByType,
     getNearby,
     clear,
+    // Vehicle Repair
+    repairVehicle: repairVehicle,
+    isRepairable: isRepairable,
+    // Vehicle Upgrades
+    VEHICLE_UPGRADES: VEHICLE_UPGRADES,
+    upgradeVehicle: upgradeVehicle,
+    getVehicleUpgrades: getVehicleUpgrades,
+    // Vehicle Horn
+    honkHorn: honkHorn,
+    // Fuel System
+    consumeFuel: consumeFuel,
+    refuelVehicle: refuelVehicle,
+    getFuel: getFuel,
   };
 })();

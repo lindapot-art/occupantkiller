@@ -16,7 +16,7 @@ const HUD = (() => {
     ammo:         document.getElementById('ammo-display'),
     ammoRes:      document.getElementById('ammo-reserve'),
     weaponName:   document.getElementById('weapon-name-display'),
-    weaponSlots:  Array.from({length: 30}, function(_, i) { return document.getElementById('wslot-' + i); }),
+    weaponSlots:  Array.from({length: 26}, function(_, i) { return document.getElementById('wslot-' + i); }),
     reload:       document.getElementById('reload-indicator'),
     hitMarker:    document.getElementById('hit-marker'),
     vignette:     document.getElementById('damage-vignette'),
@@ -54,9 +54,17 @@ const HUD = (() => {
     el.healthVal.textContent = Math.ceil(current) + ' / ' + max;
   }
 
-  function setAmmo(clip, reserve) {
+  function setAmmo(clip, reserve, clipSize) {
     el.ammo.textContent    = clip;
     el.ammoRes.textContent = '/ ' + reserve;
+    // Low ammo warning flash
+    if (clipSize && typeof clip === 'number' && clip > 0 && clip <= clipSize * 0.25) {
+      el.ammo.style.color = '#ff4444';
+      el.ammo.style.animation = 'lowAmmoFlash 0.4s infinite';
+    } else {
+      el.ammo.style.color = '';
+      el.ammo.style.animation = '';
+    }
   }
 
   function setWeapon(name, idx) {
@@ -66,6 +74,8 @@ const HUD = (() => {
       s.classList.toggle('active', i === idx);
       const isLocked = typeof Weapons !== 'undefined' && !Weapons.isUnlocked(i);
       s.classList.toggle('locked', isLocked);
+      // Hide locked slots to prevent overflow
+      s.style.display = isLocked ? 'none' : '';
     });
   }
 
@@ -74,14 +84,29 @@ const HUD = (() => {
     else    el.reload.classList.remove('visible');
   }
 
-  function flashHit(isHeadshot) {
+  let _chFlashTimer = null;
+  function flashHit(isHeadshot, isKill) {
+    el.hitMarker.classList.remove('visible', 'headshot', 'kill');
+    void el.hitMarker.offsetWidth; // force reflow for re-trigger
     el.hitMarker.classList.add('visible');
     if (isHeadshot) el.hitMarker.classList.add('headshot');
-    else            el.hitMarker.classList.remove('headshot');
+    if (isKill) el.hitMarker.classList.add('kill');
     clearTimeout(hitMarkerTimer);
     hitMarkerTimer = setTimeout(() => {
-      el.hitMarker.classList.remove('visible', 'headshot');
-    }, 140);
+      el.hitMarker.classList.remove('visible', 'headshot', 'kill');
+    }, isKill ? 350 : 180);
+
+    // Crosshair red flash on headshot
+    if (isHeadshot) {
+      var ch = document.getElementById('crosshair');
+      if (ch) {
+        ch.classList.remove('headshot-flash');
+        void ch.offsetWidth;
+        ch.classList.add('headshot-flash');
+        clearTimeout(_chFlashTimer);
+        _chFlashTimer = setTimeout(() => ch.classList.remove('headshot-flash'), 300);
+      }
+    }
   }
 
   function flashDamage() {
@@ -203,8 +228,16 @@ const HUD = (() => {
     }
 
     // Enemies - red dots
+    // Enemies — color-coded by type
+    var _mmEnemyColors = {
+      CONSCRIPT: '#ff3333', STORMER: '#ff6600', ARMORED: '#cc00cc',
+      SNIPER: '#ffff00', SNIPER_ELITE: '#ffff00', OFFICER: '#ff00ff',
+      BOMBER: '#ff8800', MEDIC: '#00ff88', ENGINEER: '#00ccff',
+      BOSS: '#ffffff', WAR_DOG: '#bb6600', SHIELD_BEARER: '#8888ff',
+      MORTAR: '#ff4488', FLAMETHROWER: '#ff4400', SABOTEUR: '#aa00ff',
+      DRONE_OP: '#00ffcc'
+    };
     if (enemies) {
-      ctx.fillStyle = '#ff3333';
       for (var i = 0; i < enemies.length; i++) {
         var e = enemies[i];
         if (!e.alive) continue;
@@ -212,7 +245,10 @@ const HUD = (() => {
         if (!ep) continue;
         var mp = toMM(ep.x, ep.z);
         if (Math.abs(mp.x - MM_HALF) < MM_HALF && Math.abs(mp.y - MM_HALF) < MM_HALF) {
-          ctx.beginPath(); ctx.arc(mp.x, mp.y, 2.5, 0, Math.PI * 2); ctx.fill();
+          var tn = e.typeCfg ? e.typeCfg.name : '';
+          ctx.fillStyle = _mmEnemyColors[tn] || '#ff3333';
+          var r = (tn === 'BOSS') ? 4 : 2.5;
+          ctx.beginPath(); ctx.arc(mp.x, mp.y, r, 0, Math.PI * 2); ctx.fill();
         }
       }
     }
@@ -322,13 +358,26 @@ const HUD = (() => {
   // ── Kill Streak Display ────────────────────────────────────
   const streakEl = document.getElementById('streak-display');
 
+  var _streakNames = {
+    2: 'DOUBLE KILL', 3: 'TRIPLE KILL', 4: 'MULTI KILL',
+    5: 'MEGA KILL', 7: 'ULTRA KILL', 10: 'UNSTOPPABLE',
+    15: 'GODLIKE', 20: 'LEGENDARY'
+  };
   function showStreak(count, multiplier) {
     if (!streakEl) return;
     if (count < 2) { streakEl.style.display = 'none'; return; }
     streakEl.style.display = 'block';
     var color = count >= 10 ? '#ff0000' : count >= 5 ? '#ff8800' : '#ffcc00';
-    streakEl.innerHTML = '🔥 ' + count + 'x STREAK <span style="color:' + color + '">(' + multiplier.toFixed(1) + 'x)</span>';
+    // Find highest matching streak name
+    var label = '';
+    var thresholds = [20, 15, 10, 7, 5, 4, 3, 2];
+    for (var t = 0; t < thresholds.length; t++) {
+      if (count >= thresholds[t]) { label = _streakNames[thresholds[t]]; break; }
+    }
+    streakEl.innerHTML = '🔥 ' + label + ' <span style="font-size:0.85em;color:' + color + '">(' + count + 'x · ' + multiplier.toFixed(1) + 'x)</span>';
     streakEl.style.color = color;
+    streakEl.style.fontSize = count >= 10 ? '28px' : count >= 5 ? '24px' : '20px';
+    streakEl.style.textShadow = '0 0 10px ' + color;
   }
 
   // ── Bleed Indicator ────────────────────────────────────────
@@ -523,8 +572,14 @@ const HUD = (() => {
   function updateHeat(pct) { if (heatBarEl) heatBarEl.style.width = (pct * 100) + '%'; }
 
   // ── Feature 20: Ammo Type ────────────────────────────────────────
-  const ammoTypeEl = document.getElementById('ammo-type-indicator');
-  function updateAmmoType(label) { if (ammoTypeEl) ammoTypeEl.textContent = label; }
+  const ammoTypeEl = document.getElementById('ammo-type-indicator') || document.getElementById('ammo-type');
+  const AMMO_COLORS = { 'Standard': '#aaa', 'Armor-Piercing': '#00ccff', 'Incendiary': '#ff4400', 'Hollow Point': '#ff00ff', 'Subsonic': '#888' };
+  function updateAmmoType(label) {
+    if (ammoTypeEl) {
+      ammoTypeEl.textContent = label;
+      ammoTypeEl.style.color = AMMO_COLORS[label] || '#aaa';
+    }
+  }
 
   // ── Feature 35: Fog of War ───────────────────────────────────────
   const fogEl = document.getElementById('fog-of-war');
@@ -668,6 +723,220 @@ const HUD = (() => {
     if (el) el.textContent = '🪙 ' + val + ' OKC';
   }
 
+  // ── B22: Boss Health Bar ─────────────────────────────────────────
+  let _bossBarEl = null;
+  let _bossBarFill = null;
+  let _bossBarName = null;
+
+  function showBossBar(name, hp, maxHp) {
+    if (!_bossBarEl) {
+      _bossBarEl = document.createElement('div');
+      _bossBarEl.id = 'boss-health-bar';
+      _bossBarEl.style.cssText = 'position:fixed;top:5%;left:50%;transform:translateX(-50%);width:400px;background:rgba(0,0,0,0.7);border:2px solid #cc0000;border-radius:4px;padding:4px;z-index:200;text-align:center;display:none;';
+      _bossBarName = document.createElement('div');
+      _bossBarName.style.cssText = 'color:#ff4444;font-size:14px;font-weight:bold;margin-bottom:2px;';
+      _bossBarFill = document.createElement('div');
+      _bossBarFill.style.cssText = 'height:12px;background:linear-gradient(90deg,#cc0000,#ff4444);border-radius:2px;transition:width 0.3s;';
+      _bossBarEl.appendChild(_bossBarName);
+      _bossBarEl.appendChild(_bossBarFill);
+      document.body.appendChild(_bossBarEl);
+    }
+    _bossBarName.textContent = '☠ ' + name;
+    _bossBarFill.style.width = Math.max(0, (hp / maxHp) * 100) + '%';
+    _bossBarEl.style.display = 'block';
+  }
+
+  function hideBossBar() {
+    if (_bossBarEl) _bossBarEl.style.display = 'none';
+  }
+
+  // ── B22: XP Progress Bar ────────────────────────────────────────
+  let _xpBarEl = null;
+  let _xpBarFill = null;
+  let _xpBarText = null;
+
+  function updateXPBar(currentXP, nextLevelXP, level) {
+    if (!_xpBarEl) {
+      _xpBarEl = document.createElement('div');
+      _xpBarEl.style.cssText = 'position:fixed;bottom:2px;left:50%;transform:translateX(-50%);width:300px;background:rgba(0,0,0,0.5);border:1px solid #4488ff;border-radius:3px;padding:2px;z-index:150;';
+      _xpBarFill = document.createElement('div');
+      _xpBarFill.style.cssText = 'height:6px;background:linear-gradient(90deg,#2266cc,#44aaff);border-radius:2px;transition:width 0.4s;';
+      _xpBarText = document.createElement('div');
+      _xpBarText.style.cssText = 'color:#aaccff;font-size:10px;text-align:center;';
+      _xpBarEl.appendChild(_xpBarFill);
+      _xpBarEl.appendChild(_xpBarText);
+      document.body.appendChild(_xpBarEl);
+    }
+    var pct = nextLevelXP > 0 ? Math.min(100, (currentXP / nextLevelXP) * 100) : 100;
+    _xpBarFill.style.width = pct + '%';
+    _xpBarText.textContent = 'LVL ' + level + ' — ' + currentXP + '/' + nextLevelXP + ' XP';
+  }
+
+  // ── B22: Objective Waypoint ──────────────────────────────────────
+  let _objectiveEl = null;
+
+  function showObjective(text) {
+    if (!_objectiveEl) {
+      _objectiveEl = document.createElement('div');
+      _objectiveEl.id = 'objective-marker';
+      _objectiveEl.style.cssText = 'position:fixed;top:12%;left:50%;transform:translateX(-50%);color:#ffcc44;font-size:14px;font-weight:bold;text-shadow:0 0 6px #886600;pointer-events:none;z-index:180;transition:opacity 0.5s;';
+      document.body.appendChild(_objectiveEl);
+    }
+    _objectiveEl.textContent = '📍 ' + text;
+    _objectiveEl.style.opacity = '1';
+  }
+
+  function hideObjective() {
+    if (_objectiveEl) _objectiveEl.style.opacity = '0';
+  }
+
+  // ── B22: Kill Streak Banner ──────────────────────────────────────
+  function showStreakBanner(streakName, count) {
+    var el = document.getElementById('streak-banner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'streak-banner';
+      el.style.cssText = 'position:fixed;top:25%;left:50%;transform:translateX(-50%);color:#ffdd44;font-size:26px;font-weight:bold;text-shadow:0 0 12px #ff8800;pointer-events:none;z-index:220;opacity:0;transition:opacity 0.3s,transform 0.3s;';
+      document.body.appendChild(el);
+    }
+    el.textContent = '🔥 ' + streakName.toUpperCase() + ' (' + count + ' KILLS)';
+    el.style.opacity = '1';
+    el.style.transform = 'translateX(-50%) scale(1.2)';
+    setTimeout(function () {
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(-50%) scale(1)';
+    }, 2500);
+  }
+
+  // ── B22: Damage Log (scrolling combat text) ──────────────────────
+  let _dmgLogEl = null;
+
+  function addDamageLog(text, color) {
+    if (!_dmgLogEl) {
+      _dmgLogEl = document.createElement('div');
+      _dmgLogEl.id = 'damage-log';
+      _dmgLogEl.style.cssText = 'position:fixed;bottom:15%;right:10px;width:200px;max-height:120px;overflow:hidden;pointer-events:none;z-index:150;font-size:11px;';
+      document.body.appendChild(_dmgLogEl);
+    }
+    var entry = document.createElement('div');
+    entry.textContent = text;
+    entry.style.cssText = 'color:' + (color || '#cccccc') + ';opacity:1;transition:opacity 2s;margin-bottom:1px;';
+    _dmgLogEl.appendChild(entry);
+    // limit entries
+    while (_dmgLogEl.children.length > 8) _dmgLogEl.removeChild(_dmgLogEl.firstChild);
+    setTimeout(function () { entry.style.opacity = '0'; }, 3000);
+    setTimeout(function () { if (entry.parentNode) entry.remove(); }, 5000);
+  }
+
+  // ── B22: Grenade Indicator ───────────────────────────────────────
+  function showGrenadeWarning(direction) {
+    var el = document.getElementById('grenade-warning');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'grenade-warning';
+      el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff4400;font-size:32px;font-weight:bold;text-shadow:0 0 10px #ff0000;pointer-events:none;z-index:250;opacity:0;transition:opacity 0.2s;';
+      document.body.appendChild(el);
+    }
+    el.textContent = '💣 GRENADE!';
+    el.style.opacity = '1';
+    setTimeout(function () { el.style.opacity = '0'; }, 1500);
+  }
+
+  // ── B22: Stage Progress Bar ──────────────────────────────────────
+  let _stageProgressEl = null;
+  let _stageProgressFill = null;
+
+  function updateStageProgress(currentWave, totalWaves) {
+    if (!_stageProgressEl) {
+      _stageProgressEl = document.createElement('div');
+      _stageProgressEl.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:3px;background:rgba(0,0,0,0.3);z-index:150;';
+      _stageProgressFill = document.createElement('div');
+      _stageProgressFill.style.cssText = 'height:100%;background:linear-gradient(90deg,#ffcc00,#ff6600);transition:width 0.5s;';
+      _stageProgressEl.appendChild(_stageProgressFill);
+      document.body.appendChild(_stageProgressEl);
+    }
+    _stageProgressFill.style.width = Math.min(100, (currentWave / totalWaves) * 100) + '%';
+  }
+
+  // ── B22: Damage Flash with Color ─────────────────────────────────
+  function showDamageFlash(color, opacity) {
+    var el = document.getElementById('damage-vignette');
+    if (!el) return;
+    var prev = el.style.background;
+    el.style.background = 'radial-gradient(ellipse at center, transparent 50%, ' + (typeof color === 'number' ? '#' + color.toString(16).padStart(6, '0') : color || 'rgba(255,0,0,0.4)') + ' 100%)';
+    el.style.opacity = opacity || '0.5';
+    el.style.display = 'block';
+    setTimeout(function () {
+      el.style.opacity = '0';
+      setTimeout(function () { el.style.display = 'none'; el.style.background = prev; }, 300);
+    }, 200);
+  }
+
+  // ── B26: FPS Counter ──
+  var _fpsEl = null, _fpsTimes = [], _fpsVisible = false;
+  (function initFPSCounter() {
+    _fpsEl = document.createElement('div');
+    _fpsEl.id = 'fps-counter';
+    _fpsEl.style.cssText = 'position:fixed;top:4px;left:4px;color:#0f0;font:bold 14px monospace;' +
+      'z-index:9999;pointer-events:none;text-shadow:1px 1px 2px #000;display:none;';
+    document.body.appendChild(_fpsEl);
+  })();
+  function toggleFPS() {
+    _fpsVisible = !_fpsVisible;
+    if (_fpsEl) _fpsEl.style.display = _fpsVisible ? 'block' : 'none';
+  }
+  function updateFPS() {
+    if (!_fpsVisible || !_fpsEl) return;
+    var now = performance.now();
+    _fpsTimes.push(now);
+    while (_fpsTimes.length > 0 && _fpsTimes[0] <= now - 1000) _fpsTimes.shift();
+    _fpsEl.textContent = _fpsTimes.length + ' FPS';
+  }
+
+  // ── B26: Settings Panel ──
+  var _settingsOpen = false;
+  var _settings = {
+    musicVol: 0.5, sfxVol: 0.8, sensitivity: 1.0, fov: 70,
+    showFPS: false, crosshairColor: '#ffffff', crosshairSize: 1.0,
+  };
+  var _settingsEl = null;
+  (function initSettingsPanel() {
+    _settingsEl = document.createElement('div');
+    _settingsEl.id = 'settings-panel';
+    _settingsEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);' +
+      'background:rgba(0,0,0,0.92);border:2px solid #ffcc00;border-radius:12px;padding:24px;' +
+      'color:#fff;font:14px sans-serif;z-index:10000;display:none;min-width:320px;';
+    _settingsEl.innerHTML = '<h2 style="margin:0 0 16px;color:#ffcc00;text-align:center;">⚙ SETTINGS</h2>' +
+      '<label>Music Volume <input type="range" id="set-music" min="0" max="100" value="50"></label><br>' +
+      '<label>SFX Volume <input type="range" id="set-sfx" min="0" max="100" value="80"></label><br>' +
+      '<label>Mouse Sensitivity <input type="range" id="set-sens" min="10" max="300" value="100"></label><br>' +
+      '<label>FOV <input type="range" id="set-fov" min="50" max="120" value="70"></label><br>' +
+      '<label>Show FPS <input type="checkbox" id="set-fps"></label><br>' +
+      '<label>Crosshair Color <input type="color" id="set-xhair" value="#ffffff"></label><br>' +
+      '<div style="text-align:center;margin-top:16px;"><button id="set-close" style="padding:8px 24px;' +
+      'background:#ffcc00;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">CLOSE</button></div>';
+    document.body.appendChild(_settingsEl);
+    setTimeout(function () {
+      var btn = document.getElementById('set-close');
+      if (btn) btn.onclick = function () { toggleSettings(); };
+      var fpsCheck = document.getElementById('set-fps');
+      if (fpsCheck) fpsCheck.onchange = function () {
+        _settings.showFPS = fpsCheck.checked;
+        if (_settings.showFPS && !_fpsVisible) toggleFPS();
+        else if (!_settings.showFPS && _fpsVisible) toggleFPS();
+      };
+      var fovSlider = document.getElementById('set-fov');
+      if (fovSlider) fovSlider.oninput = function () {
+        _settings.fov = parseInt(fovSlider.value);
+      };
+    }, 100);
+  })();
+  function toggleSettings() {
+    _settingsOpen = !_settingsOpen;
+    if (_settingsEl) _settingsEl.style.display = _settingsOpen ? 'block' : 'none';
+  }
+  function getSettings() { return _settings; }
+
   return {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
@@ -690,5 +959,13 @@ const HUD = (() => {
     showTacticalMap, isTacticalMapVisible, updateTacticalMap,
     showSupplyMenu, showFieldPromotion, showWaveStats,
     showDeathStats, updateOKC,
+    // ── B22: New HUD ──
+    showBossBar, hideBossBar,
+    updateXPBar, showObjective, hideObjective,
+    showStreakBanner, addDamageLog,
+    showGrenadeWarning, updateStageProgress,
+    showDamageFlash,
+    // ── B26: QoL ──
+    toggleFPS, updateFPS, toggleSettings, getSettings,
   };
 })();

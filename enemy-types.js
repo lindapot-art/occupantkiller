@@ -1,7 +1,9 @@
 /* ============================================================
- *  ENEMY-TYPES.JS — 8 new enemy type features
- *  Features: boss enemies, suicide bomber, sniper, medic,
- *  engineer, war dog, shield bearer, mortar
+ *  ENEMY-TYPES.JS — 18 enemy type features
+ *  Features: boss, bomber, sniper, medic, engineer, war dog,
+ *  shield bearer, mortar, flamethrower, paratroop, tank,
+ *  drone operator, spetsnaz, kadyrovite, wagner, BTR,
+ *  kamikaze drone, officer
  * ============================================================ */
 const EnemyTypes = (function () {
   'use strict';
@@ -77,6 +79,93 @@ const EnemyTypes = (function () {
       mortarDamage: 80, mortarRadius: 4, mortarInterval: 5,
       setupTime: 3, // seconds to deploy mortar
       behavior: 'indirect_fire'
+    },
+    // Feature 24: Flamethrower
+    FLAMETHROWER: {
+      id: 'FLAMETHROWER', name: 'Flamethrower', tier: 3,
+      hp: 100, speed: 2.5, damage: 0, attackRange: 10,
+      color: 0xff6600, scale: 1.1, xpReward: 85,
+      flameDamage: 25, flameRate: 0.1, flameRange: 10,
+      burnDuration: 3, burnDPS: 8,
+      behavior: 'advance_and_burn'
+    },
+    // Feature 25: Paratroop
+    PARATROOP: {
+      id: 'PARATROOP', name: 'VDV Paratrooper', tier: 2,
+      hp: 75, speed: 4.5, damage: 28, attackRange: 12,
+      color: 0x4466aa, scale: 1.0, xpReward: 65,
+      dropHeight: 30, parachuteSpeed: 3,
+      behavior: 'air_drop_assault'
+    },
+    // Feature 26: T-72 Tank
+    TANK: {
+      id: 'TANK', name: 'T-72B3 Tank', tier: 4,
+      hp: 1500, speed: 1.2, damage: 200, attackRange: 35,
+      color: 0x445533, scale: 2.5, xpReward: 300,
+      armorFront: 0.8, armorSide: 0.5, armorRear: 0.2,
+      reloadTime: 4, mgDamage: 15, mgRate: 0.15,
+      behavior: 'tank_advance'
+    },
+    // Feature 27: Drone Operator
+    DRONE_OP: {
+      id: 'DRONE_OP', name: 'FPV Drone Operator', tier: 2,
+      hp: 50, speed: 1.5, damage: 10, attackRange: 5,
+      color: 0x888888, scale: 1.0, xpReward: 70,
+      droneHP: 15, droneDamage: 100, droneSpeed: 12,
+      droneInterval: 8, maxDrones: 2,
+      behavior: 'send_drones'
+    },
+    // Feature 28: Spetsnaz
+    SPETSNAZ: {
+      id: 'SPETSNAZ', name: 'Spetsnaz Operator', tier: 3,
+      hp: 130, speed: 5, damage: 35, attackRange: 15,
+      color: 0x1a1a1a, scale: 1.05, xpReward: 100,
+      dodgeChance: 0.3, flashbangInterval: 12,
+      canFlank: true, grenadeRange: 18,
+      behavior: 'tactical_assault'
+    },
+    // Feature 29: Kadyrovite
+    KADYROVITE: {
+      id: 'KADYROVITE', name: 'Kadyrovite Fighter', tier: 2,
+      hp: 95, speed: 3, damage: 22, attackRange: 10,
+      color: 0x334411, scale: 1.1, xpReward: 55,
+      rallyRadius: 12, rallyBuff: 1.3,
+      behavior: 'rally_and_push'
+    },
+    // Feature 30: Wagner Prisoner
+    WAGNER: {
+      id: 'WAGNER', name: 'Wagner Convict', tier: 1,
+      hp: 40, speed: 5.5, damage: 18, attackRange: 3,
+      color: 0x554433, scale: 1.0, xpReward: 25,
+      berserkerHP: 0.3, berserkerSpeedMult: 1.8,
+      behavior: 'zerg_rush'
+    },
+    // Feature 31: BTR APC
+    BTR: {
+      id: 'BTR', name: 'BTR-82A APC', tier: 3,
+      hp: 600, speed: 2.5, damage: 30, attackRange: 20,
+      color: 0x445544, scale: 2.0, xpReward: 180,
+      armorAll: 0.5, autocannonRate: 0.2,
+      canSpawnInfantry: true, infantryCount: 3, infantryInterval: 15,
+      behavior: 'apc_advance'
+    },
+    // Feature 32: Kamikaze Drone
+    KAMIKAZE_DRONE: {
+      id: 'KAMIKAZE_DRONE', name: 'Shahed Drone', tier: 2,
+      hp: 20, speed: 8, damage: 0, attackRange: 1.5,
+      color: 0x666666, scale: 0.5, xpReward: 40,
+      explosionDamage: 120, explosionRadius: 4,
+      flyHeight: 8, diveSpeed: 15,
+      behavior: 'fly_and_dive'
+    },
+    // Feature 33: Officer
+    OFFICER: {
+      id: 'OFFICER', name: 'Russian Officer', tier: 3,
+      hp: 110, speed: 2, damage: 25, attackRange: 12,
+      color: 0x334455, scale: 1.15, xpReward: 120,
+      buffRadius: 15, buffDamage: 1.25, buffSpeed: 1.2,
+      callReinforcementInterval: 20, reinforceCount: 4,
+      behavior: 'command_and_buff'
     }
   };
 
@@ -91,7 +180,13 @@ const EnemyTypes = (function () {
     7:  { types: ['ARMORED', 'SNIPER_ELITE', 'MORTAR', 'MEDIC'], weights: [0.3, 0.25, 0.25, 0.2] },
     8:  { types: ['ARMORED', 'SHIELD_BEARER', 'ENGINEER', 'MORTAR'], weights: [0.3, 0.25, 0.25, 0.2] },
     9:  { types: ['BOSS', 'ARMORED', 'SNIPER_ELITE', 'BOMBER', 'WAR_DOG'], weights: [0.05, 0.3, 0.25, 0.2, 0.2] },
-    10: { types: ['BOSS', 'ARMORED', 'SHIELD_BEARER', 'MORTAR', 'SNIPER_ELITE', 'MEDIC'], weights: [0.1, 0.25, 0.2, 0.15, 0.15, 0.15] }
+    10: { types: ['BOSS', 'ARMORED', 'SHIELD_BEARER', 'MORTAR', 'SNIPER_ELITE', 'MEDIC'], weights: [0.1, 0.25, 0.2, 0.15, 0.15, 0.15] },
+    // Stage 5+ waves: introduce new types
+    11: { types: ['FLAMETHROWER', 'WAGNER', 'KADYROVITE', 'STORMER', 'MEDIC'], weights: [0.2, 0.25, 0.2, 0.2, 0.15] },
+    12: { types: ['PARATROOP', 'SPETSNAZ', 'DRONE_OP', 'SNIPER_ELITE'], weights: [0.25, 0.25, 0.25, 0.25] },
+    13: { types: ['BTR', 'FLAMETHROWER', 'SHIELD_BEARER', 'WAGNER', 'KAMIKAZE_DRONE'], weights: [0.1, 0.2, 0.2, 0.3, 0.2] },
+    14: { types: ['TANK', 'SPETSNAZ', 'OFFICER', 'MORTAR', 'DRONE_OP'], weights: [0.08, 0.25, 0.17, 0.25, 0.25] },
+    15: { types: ['BOSS', 'TANK', 'SPETSNAZ', 'KAMIKAZE_DRONE', 'FLAMETHROWER', 'OFFICER'], weights: [0.08, 0.12, 0.2, 0.2, 0.2, 0.2] },
   };
 
   /* ── AI Behavior State ─────────────────────── */
@@ -100,7 +195,7 @@ const EnemyTypes = (function () {
   function init() { activeEnemies = []; }
 
   function selectType(wave) {
-    const comp = WAVE_COMPOSITIONS[Math.min(wave, 10)] || WAVE_COMPOSITIONS[10];
+    const comp = WAVE_COMPOSITIONS[Math.min(wave, 15)] || WAVE_COMPOSITIONS[15];
     const roll = Math.random();
     let cumulative = 0;
     for (let i = 0; i < comp.types.length; i++) {
@@ -276,11 +371,205 @@ const EnemyTypes = (function () {
   /* ── Boss scaling per wave ─────────────────── */
   function getBossHP(wave) { return TYPES.BOSS.hp + (wave - 1) * 50; }
 
+  /* ── New AI update functions for B18 enemy types ─── */
+
+  function updateFlamethrower(enemy, playerPos, dt) {
+    if (!enemy.alive) return null;
+    const dx = playerPos.x - enemy.x, dz = playerPos.z - enemy.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < TYPES.FLAMETHROWER.flameRange) {
+      enemy._flameTimer = (enemy._flameTimer || 0) + dt;
+      if (enemy._flameTimer >= TYPES.FLAMETHROWER.flameRate) {
+        enemy._flameTimer = 0;
+        return { flame: true, damage: TYPES.FLAMETHROWER.flameDamage, burn: TYPES.FLAMETHROWER.burnDuration, burnDPS: TYPES.FLAMETHROWER.burnDPS };
+      }
+    }
+    return null;
+  }
+
+  function updateParatroop(enemy, playerPos, dt) {
+    if (!enemy.alive) return null;
+    if (enemy._dropping) {
+      enemy.y = (enemy.y || 30) - TYPES.PARATROOP.parachuteSpeed * dt;
+      if (enemy.y <= (enemy._groundY || 5)) {
+        enemy._dropping = false;
+        enemy.y = enemy._groundY || 5;
+      }
+      return { dropping: true, y: enemy.y };
+    }
+    return null; // normal combat handled by base AI
+  }
+
+  function updateTank(enemy, playerPos, dt) {
+    if (!enemy.alive) return null;
+    enemy._reloadTimer = (enemy._reloadTimer || 0) + dt;
+    enemy._mgTimer = (enemy._mgTimer || 0) + dt;
+    const dx = playerPos.x - enemy.x, dz = playerPos.z - enemy.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    const result = {};
+    // Main gun
+    if (dist < TYPES.TANK.attackRange && enemy._reloadTimer >= TYPES.TANK.reloadTime) {
+      enemy._reloadTimer = 0;
+      result.mainGun = true;
+      result.damage = TYPES.TANK.damage;
+      result.targetX = playerPos.x + (Math.random() - 0.5) * 3;
+      result.targetZ = playerPos.z + (Math.random() - 0.5) * 3;
+    }
+    // Coaxial MG
+    if (dist < 25 && enemy._mgTimer >= TYPES.TANK.mgRate) {
+      enemy._mgTimer = 0;
+      result.mg = true;
+      result.mgDamage = TYPES.TANK.mgDamage;
+    }
+    return result.mainGun || result.mg ? result : null;
+  }
+
+  function updateDroneOp(enemy, playerPos, dt) {
+    if (!enemy.alive) return null;
+    enemy._droneTimer = (enemy._droneTimer || 0) + dt;
+    enemy._activeDrones = enemy._activeDrones || 0;
+    if (enemy._droneTimer >= TYPES.DRONE_OP.droneInterval && enemy._activeDrones < TYPES.DRONE_OP.maxDrones) {
+      enemy._droneTimer = 0;
+      enemy._activeDrones++;
+      return { launchDrone: true, droneDamage: TYPES.DRONE_OP.droneDamage, droneSpeed: TYPES.DRONE_OP.droneSpeed };
+    }
+    return null;
+  }
+
+  function updateSpetsnaz(enemy, playerPos, dt) {
+    if (!enemy.alive) return null;
+    enemy._flashTimer = (enemy._flashTimer || 0) + dt;
+    const dx = playerPos.x - enemy.x, dz = playerPos.z - enemy.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    // Dodge chance on incoming fire handled in applyDamage
+    if (dist < TYPES.SPETSNAZ.grenadeRange && enemy._flashTimer >= TYPES.SPETSNAZ.flashbangInterval) {
+      enemy._flashTimer = 0;
+      return { flashbang: true, targetX: playerPos.x, targetZ: playerPos.z };
+    }
+    if (TYPES.SPETSNAZ.canFlank && dist < 20 && dist > 8) {
+      // Try to flank: move perpendicular
+      const perpX = -dz / dist, perpZ = dx / dist;
+      return { flanking: true, moveX: perpX, moveZ: perpZ };
+    }
+    return null;
+  }
+
+  function updateKadyrovite(enemy, allEnemies) {
+    if (!enemy.alive) return null;
+    // Rally nearby allies
+    const range = TYPES.KADYROVITE.rallyRadius;
+    let rallied = 0;
+    for (const ally of allEnemies) {
+      if (ally === enemy || !ally.alive) continue;
+      const dx = ally.x - enemy.x, dz = ally.z - enemy.z;
+      if (dx * dx + dz * dz < range * range) {
+        ally._rallyBuff = TYPES.KADYROVITE.rallyBuff;
+        rallied++;
+      }
+    }
+    return rallied > 0 ? { rallying: true, count: rallied } : null;
+  }
+
+  function updateWagner(enemy, playerPos, dt) {
+    if (!enemy.alive) return null;
+    // Berserker mode at low HP
+    const cfg = TYPES.WAGNER;
+    if (enemy.hp < cfg.hp * cfg.berserkerHP) {
+      enemy._berserker = true;
+      return { berserker: true, speedMult: cfg.berserkerSpeedMult };
+    }
+    return null;
+  }
+
+  function updateBTR(enemy, playerPos, dt, allEnemies) {
+    if (!enemy.alive) return null;
+    const result = {};
+    enemy._cannonTimer = (enemy._cannonTimer || 0) + dt;
+    enemy._spawnTimer = (enemy._spawnTimer || 0) + dt;
+    const dx = playerPos.x - enemy.x, dz = playerPos.z - enemy.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    // Autocannon
+    if (dist < TYPES.BTR.attackRange && enemy._cannonTimer >= TYPES.BTR.autocannonRate) {
+      enemy._cannonTimer = 0;
+      result.fire = true;
+      result.damage = TYPES.BTR.damage;
+    }
+    // Spawn infantry
+    if (TYPES.BTR.canSpawnInfantry && enemy._spawnTimer >= TYPES.BTR.infantryInterval) {
+      enemy._spawnTimer = 0;
+      result.spawnInfantry = true;
+      result.infantryCount = TYPES.BTR.infantryCount;
+    }
+    return result.fire || result.spawnInfantry ? result : null;
+  }
+
+  function updateKamikazeDrone(enemy, playerPos, dt) {
+    if (!enemy.alive) return null;
+    const dx = playerPos.x - enemy.x, dz = playerPos.z - enemy.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    // Fly high then dive when close
+    if (enemy._diving) {
+      if (dist < TYPES.KAMIKAZE_DRONE.attackRange) {
+        return { detonate: true, damage: TYPES.KAMIKAZE_DRONE.explosionDamage, radius: TYPES.KAMIKAZE_DRONE.explosionRadius };
+      }
+      return { diving: true };
+    }
+    if (dist < 15) {
+      enemy._diving = true;
+      return { startDive: true };
+    }
+    return { flying: true, height: TYPES.KAMIKAZE_DRONE.flyHeight };
+  }
+
+  function updateOfficer(enemy, allEnemies, dt) {
+    if (!enemy.alive) return null;
+    const result = {};
+    enemy._reinforceTimer = (enemy._reinforceTimer || 0) + dt;
+    // Buff nearby allies
+    const range = TYPES.OFFICER.buffRadius;
+    let buffed = 0;
+    for (const ally of allEnemies) {
+      if (ally === enemy || !ally.alive) continue;
+      const dx = ally.x - enemy.x, dz = ally.z - enemy.z;
+      if (dx * dx + dz * dz < range * range) {
+        ally._officerBuffDmg = TYPES.OFFICER.buffDamage;
+        ally._officerBuffSpd = TYPES.OFFICER.buffSpeed;
+        buffed++;
+      }
+    }
+    if (buffed > 0) result.buffing = true;
+    // Call reinforcements
+    if (enemy._reinforceTimer >= TYPES.OFFICER.callReinforcementInterval) {
+      enemy._reinforceTimer = 0;
+      result.reinforce = true;
+      result.reinforceCount = TYPES.OFFICER.reinforceCount;
+    }
+    return result.buffing || result.reinforce ? result : null;
+  }
+
+  /* ── Tank armor damage reduction ──────────── */
+  function applyTankArmor(enemy, damage, fromAngle) {
+    if (enemy.type !== 'TANK') return damage;
+    const facingAngle = enemy.rotation || 0;
+    let angleDiff = fromAngle - facingAngle;
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    const absDiff = Math.abs(angleDiff);
+    let reduction;
+    if (absDiff < Math.PI * 0.3) reduction = TYPES.TANK.armorFront;
+    else if (absDiff > Math.PI * 0.7) reduction = TYPES.TANK.armorRear;
+    else reduction = TYPES.TANK.armorSide;
+    return damage * (1 - reduction);
+  }
+
   return {
     TYPES, WAVE_COMPOSITIONS,
     init, selectType, getTypeConfig,
     updateBomber, updateSniper, updateMedic, updateEngineer,
     updateWarDog, updateShieldBearer, updateMortar, updateBoss,
-    applyDamage, getBossHP
+    updateFlamethrower, updateParatroop, updateTank, updateDroneOp,
+    updateSpetsnaz, updateKadyrovite, updateWagner, updateBTR,
+    updateKamikazeDrone, updateOfficer,
+    applyDamage, applyTankArmor, getBossHP
   };
 })();
