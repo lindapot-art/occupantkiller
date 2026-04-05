@@ -16,7 +16,7 @@ const HUD = (() => {
     ammo:         document.getElementById('ammo-display'),
     ammoRes:      document.getElementById('ammo-reserve'),
     weaponName:   document.getElementById('weapon-name-display'),
-    weaponSlots:  Array.from({length: 26}, function(_, i) { return document.getElementById('wslot-' + i); }),
+    weaponSlots:  Array.from({length: 36}, function(_, i) { return document.getElementById('wslot-' + i); }),
     reload:       document.getElementById('reload-indicator'),
     hitMarker:    document.getElementById('hit-marker'),
     vignette:     document.getElementById('damage-vignette'),
@@ -46,11 +46,13 @@ const HUD = (() => {
   function setHealth(current, max) {
     const pct = Math.max(0, current / max) * 100;
     el.healthBar.style.width  = pct + '%';
-    el.healthBar.style.background = pct > 50
-      ? 'linear-gradient(90deg,#ff2222,#ff6666)'
-      : pct > 25
-        ? 'linear-gradient(90deg,#ff6600,#ffaa44)'
+    el.healthBar.style.background = pct > 60
+      ? 'linear-gradient(90deg,#00cc44,#44ff88)'
+      : pct > 30
+        ? 'linear-gradient(90deg,#ff8800,#ffcc00)'
         : 'linear-gradient(90deg,#ff0000,#ff3333)';
+    if (pct <= 30) el.healthBar.style.animation = 'lowHpPulse 0.6s infinite';
+    else el.healthBar.style.animation = '';
     el.healthVal.textContent = Math.ceil(current) + ' / ' + max;
   }
 

@@ -485,6 +485,54 @@ const GameManager = (function () {
       sunIntensity: 0.4,
       description:  'The final push to the Kremlin. End it here.',
     },
+    {
+      id:           9,
+      name:         'SEVASTOPOL NAVAL BASE',
+      theme:        'coastal',
+      wavesPerStage: 7,
+      difficulty:   3.8,
+      fogColor:     0x3355aa,
+      bgColor:      0x3355aa,
+      sunColor:     0xddccaa,
+      sunIntensity: 0.85,
+      description:  'Destroy the Black Sea Fleet at Sevastopol. Sink them all.',
+    },
+    {
+      id:           10,
+      name:         'DONBAS FINAL PUSH',
+      theme:        'urban',
+      wavesPerStage: 8,
+      difficulty:   4.2,
+      fogColor:     0x2a2020,
+      bgColor:      0x2a2020,
+      sunColor:     0xdd6633,
+      sunIntensity: 0.6,
+      description:  'Liberate the last occupied stronghold in Donbas.',
+    },
+    {
+      id:           11,
+      name:         'BELGOROD OFFENSIVE',
+      theme:        'grassland',
+      wavesPerStage: 8,
+      difficulty:   4.6,
+      fogColor:     0x3a4a2a,
+      bgColor:      0x3a4a2a,
+      sunColor:     0xffaa44,
+      sunIntensity: 0.75,
+      description:  'Cross into enemy territory. Take the fight to them.',
+    },
+    {
+      id:           12,
+      name:         'KREMLIN SHOWDOWN',
+      theme:        'cityscape',
+      wavesPerStage: 10,
+      difficulty:   5.0,
+      fogColor:     0x111118,
+      bgColor:      0x111118,
+      sunColor:     0xff3322,
+      sunIntensity: 0.3,
+      description:  'The ultimate battle for peace. Storm the Kremlin. End the war.',
+    },
   ];
 
   let currentStage = 0;  // 0-based index into STAGES
@@ -1679,7 +1727,15 @@ const GameManager = (function () {
       [],                          // Stage 0→1: nothing extra (player earns via drops)
       [2, 3, 4, 5],               // Stage 1→2: AK-74M, RPK-74, SVD, PKM
       [6, 7, 8, 9, 10, 11, 12, 13], // Stage 2→3: NLAW thru SCAR-H
-      [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25] // Stage 3→4: DShK thru Flashbang
+      [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29], // Stage 3→4: DShK thru Glock
+      [30, 31, 32, 33, 34, 35],  // Stage 4→5: KS-23 thru C4
+      [],  // Stage 5→6
+      [],  // Stage 6→7
+      [],  // Stage 7→8
+      [],  // Stage 8→9
+      [],  // Stage 9→10
+      [],  // Stage 10→11
+      [],  // Stage 11→12
     ];
     var rewards = stageUnlocks[currentStage] || [];
     for (var ri = 0; ri < rewards.length; ri++) {
@@ -2304,7 +2360,7 @@ const GameManager = (function () {
       const weaponType = Weapons.getCurrentType();
       const weaponId = Weapons.getCurrentId();
       // Map weapon type to audio sound type
-      const audioMap = { MELEE: 'melee', PISTOL: 'pistol', ASSAULT: 'rifle', LMG: 'rifle', SNIPER: 'sniper', HMG: 'hmg', AT: 'launcher', ATGM: 'launcher', NATO: 'rifle', AT_HEAVY: 'launcher', AT_LIGHT: 'launcher', AA: 'launcher', GRENADE: 'launcher', NATO_HEAVY: 'rifle', HMG_HEAVY: 'hmg', INCENDIARY: 'launcher', MACHINEGUN: 'hmg', SMG: 'pistol', AMR: 'sniper', MINIGUN: 'hmg', SILENT: 'pistol', THERMOBARIC: 'launcher', SHOTGUN: 'rifle', MINE: 'launcher', SMOKE: 'launcher', FLASHBANG: 'launcher' };
+      const audioMap = { MELEE: 'melee', PISTOL: 'pistol', ASSAULT: 'rifle', LMG: 'rifle', SNIPER: 'sniper', HMG: 'hmg', AT: 'launcher', ATGM: 'launcher', NATO: 'rifle', AT_HEAVY: 'launcher', AT_LIGHT: 'launcher', AA: 'launcher', GRENADE: 'launcher', NATO_HEAVY: 'rifle', HMG_HEAVY: 'hmg', INCENDIARY: 'launcher', MACHINEGUN: 'hmg', SMG: 'smg', AMR: 'heavy_sniper', MINIGUN: 'hmg', SILENT: 'pistol', THERMOBARIC: 'launcher', SHOTGUN: 'shotgun', MINE: 'explosive', SMOKE: 'launcher', FLASHBANG: 'launcher', EXPLOSIVE: 'explosive' };
       Weapons.tryFire(_camera, targets, delta, function (hit) {
         // Check if hit a vehicle mesh
         var hitVehicle = null;

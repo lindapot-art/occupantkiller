@@ -40,12 +40,16 @@ const AudioSystem = (function () {
 
     // Different gun types have different characteristics
     const params = {
-      pistol:  { freq: 800, decay: 0.06, noiseVol: 0.4, filterFreq: 3000 },
-      rifle:   { freq: 400, decay: 0.10, noiseVol: 0.6, filterFreq: 2000 },
-      sniper:  { freq: 200, decay: 0.15, noiseVol: 0.8, filterFreq: 1500 },
-      hmg:     { freq: 300, decay: 0.08, noiseVol: 0.7, filterFreq: 1800 },
-      launcher:{ freq: 150, decay: 0.25, noiseVol: 0.9, filterFreq: 800 },
-      melee:   { freq: 600, decay: 0.05, noiseVol: 0.3, filterFreq: 4000 },
+      pistol:       { freq: 800, decay: 0.06, noiseVol: 0.4, filterFreq: 3000 },
+      rifle:        { freq: 400, decay: 0.10, noiseVol: 0.6, filterFreq: 2000 },
+      sniper:       { freq: 200, decay: 0.15, noiseVol: 0.8, filterFreq: 1500 },
+      heavy_sniper: { freq: 120, decay: 0.22, noiseVol: 0.95, filterFreq: 1000 },
+      hmg:          { freq: 300, decay: 0.08, noiseVol: 0.7, filterFreq: 1800 },
+      launcher:     { freq: 150, decay: 0.25, noiseVol: 0.9, filterFreq: 800 },
+      melee:        { freq: 600, decay: 0.05, noiseVol: 0.3, filterFreq: 4000 },
+      shotgun:      { freq: 250, decay: 0.12, noiseVol: 0.85, filterFreq: 1200 },
+      smg:          { freq: 650, decay: 0.04, noiseVol: 0.5, filterFreq: 2800 },
+      explosive:    { freq: 100, decay: 0.30, noiseVol: 1.0, filterFreq: 600 },
     }[type] || { freq: 400, decay: 0.10, noiseVol: 0.6, filterFreq: 2000 };
 
     filter.type = 'lowpass';

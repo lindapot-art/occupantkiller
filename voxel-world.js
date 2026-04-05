@@ -649,6 +649,14 @@ const VoxelWorld = (function () {
     { id: 'AVDIIVKA',  name: 'Avdiivka Industrial Zone', desc: 'Hold the coking plant',  theme: 'urban',     wavesPerLevel: 7, difficulty: 1.3, fogColor: 0x3a3028 },
     { id: 'BAKHMUT',   name: 'Bakhmut Ruins',        desc: 'Defend the city',             theme: 'urban',     wavesPerLevel: 7, difficulty: 1.6, fogColor: 0x2a2a2a },
     { id: 'KHERSON',   name: 'Kherson Bridgehead',   desc: 'Cross the Dnipro',            theme: 'grassland', wavesPerLevel: 7, difficulty: 1.9, fogColor: 0x4a5a3a },
+    { id: 'MARIUPOL',  name: 'Mariupol Steelworks',  desc: 'Fight through Azovstal',      theme: 'industrial', wavesPerLevel: 7, difficulty: 2.2, fogColor: 0x1a1a20 },
+    { id: 'CRIMEA',    name: 'Crimea Bridge',        desc: 'Cut the supply line',         theme: 'coastal',   wavesPerLevel: 7, difficulty: 2.5, fogColor: 0x5577aa },
+    { id: 'CHORNOBYL', name: 'Chornobyl Zone',       desc: 'Irradiated exclusion zone',   theme: 'wasteland', wavesPerLevel: 7, difficulty: 2.8, fogColor: 0x3a3520 },
+    { id: 'MOSCOW',    name: 'Moscow Finale',        desc: 'End it at the Kremlin',       theme: 'cityscape', wavesPerLevel: 9, difficulty: 3.5, fogColor: 0x222228 },
+    { id: 'SEVASTOPOL', name: 'Sevastopol Naval Base', desc: 'Destroy the Black Sea Fleet', theme: 'coastal',  wavesPerLevel: 7, difficulty: 3.8, fogColor: 0x3355aa },
+    { id: 'DONBAS',    name: 'Donbas Final Push',     desc: 'Liberate the last stronghold', theme: 'urban',   wavesPerLevel: 8, difficulty: 4.2, fogColor: 0x2a2020 },
+    { id: 'BELGOROD',  name: 'Belgorod Offensive',    desc: 'Cross into enemy territory',   theme: 'grassland', wavesPerLevel: 8, difficulty: 4.6, fogColor: 0x3a4a2a },
+    { id: 'KREMLIN',   name: 'Kremlin Showdown',      desc: 'The final battle for peace',   theme: 'cityscape', wavesPerLevel: 10, difficulty: 5.0, fogColor: 0x111118 },
   ];
 
   const PROC_CITIES = ['Mariupol','Severodonetsk','Lysychansk','Bucha','Irpin','Izium','Kupyansk','Robotyne','Vuhledar'];
@@ -3123,6 +3131,459 @@ const VoxelWorld = (function () {
         generateDestroyedTank(-15, -30);            // NEW R3: wrecked tank hull
         generateMGNest(10, 35);                     // NEW R3: MG nest position
         scatterResources(BLOCK.WOOD, 0.003);    // More vegetation than Bakhmut
+        break;
+
+      case 'MARIUPOL':
+        // Siege of Mariupol, Feb-May 2022
+        // Azovstal steelworks, dense urban, industrial hellscape
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          [-45, 0, 45, 0, 4],   // Main avenue through Mariupol
+          [0, -40, 0, 40, 3],   // North-south industrial road
+          [-30, -20, 30, -20, 2], // Southern factory road
+          [-30, 20, 30, 20, 2],   // Northern residential road
+          [-20, -40, -20, 10, 2], // Western approach
+          [20, -10, 20, 40, 2],   // Eastern flank road
+        ]);
+        generateIndustrialComplex(-5, -15);   // Azovstal main complex
+        generateIndustrialComplex(15, -25);   // Secondary steelworks building
+        generateApartmentBlock(-30, 10, 9);   // Tall Soviet apartment block
+        generateApartmentBlock(-30, 25, 7);   // Damaged residential
+        generateApartmentBlock(25, 15, 6);    // Eastern residential
+        generateRuins(20);                     // Massive destruction
+        generateCraters(25);                   // Heavy shelling
+        generateTrenches();
+        generateTrenches();
+        generateTrenches();                    // Triple trench network
+        generateDugouts(6);
+        generateBurningRuin(-15, 5);           // Fires everywhere
+        generateBurningRuin(10, 20);
+        generateBurningRuin(-25, -10);
+        generateDestroyedVehicles(12);         // Destroyed Russian armor
+        generateAntiTankHedgehogs(15);
+        generateBarbedWire(-30, -10, 50, true);
+        generateBarbedWire(20, 5, 30, false);
+        generateFieldHospital(-20, -30);       // Makeshift hospital
+        generateFieldHospitalTent(15, 30);
+        generateAmmoCache(-25, -20);
+        generateAmmoDepot(25, -25);
+        generateWatchtower(-35, -10);
+        generateWatchtower(30, 25);
+        generateBunker(-10, 5);                // Underground bunker (Azovstal)
+        generateBunker(5, -10);
+        generateUndergroundTunnel(-15, -20, 18); // Long tunnel under factory
+        generateMGNest(-20, 0);
+        generateMGNest(15, 10);
+        generateMortarPit(-30, -25);
+        generateFuelDepot(20, -30);
+        generateRadarTower(-35, 20);
+        generateDestroyedTank(10, -15);
+        generateDestroyedTank(-20, 20);
+        generateMinefield(25, 10);
+        generateCheckpoint(-5, -5, true);
+        generateFlagPole(0, 0);                // Azov defenders flag
+        scatterResources(BLOCK.METAL, 0.005);
+        break;
+
+      case 'CRIMEA':
+        // Kerch Strait Bridge attack
+        // Coastal terrain, massive bridge, naval elements
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          [-45, 0, 45, 0, 5],     // The Kerch Bridge (wide highway)
+          [-30, -25, -30, 25, 2], // Western coastal road
+          [30, -25, 30, 25, 2],   // Eastern coastal road
+          [-20, -15, 20, -15, 2], // South access road
+          [-20, 15, 20, 15, 2],   // North access road
+        ]);
+        generateRiver(0, 18);                  // Kerch Strait (wide water)
+        generateRiver(0, 12);                  // Second channel
+        generateFortifiedBridge(0, -5, 40, 6); // The Crimea Bridge (massive)
+        generateMarsh(5);                       // Coastal wetlands
+        generateDefensivePosition(-25, -10);
+        generateDefensivePosition(25, 10);
+        generateDefensivePosition(-15, 15);
+        generateDefensivePosition(15, -20);
+        generateAntiTankHedgehogs(12);
+        generateBarbedWire(-15, -5, 35, true);
+        generateDestroyedVehicles(8);
+        generateCheckpoint(-5, -5, true);
+        generateCheckpoint(5, 5, false);
+        generateRadarTower(-30, 15);
+        generateRadarTower(30, -15);
+        generateArtilleryBattery(-25, -25);
+        generateArtilleryBattery(25, 25);
+        generateAmmoDepot(-20, 20);
+        generateFuelDepot(20, -20);
+        generateWatchtower(-35, 0);
+        generateWatchtower(35, 0);
+        generateBunker(-15, -20);
+        generateMGNest(10, 10);
+        generateMGNest(-10, -10);
+        generateFlagPole(0, 0);
+        scatterResources(BLOCK.SAND, 0.003);
+        break;
+
+      case 'CHORNOBYL':
+        // Chornobyl Exclusion Zone
+        // Wasteland, abandoned buildings, radiation hazards, overgrown
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          [-40, 5, 40, 5, 3],      // Old highway through zone
+          [0, -35, 0, 35, 2],      // Road to reactor
+          [-25, -20, 25, -20, 2],  // Southern perimeter road
+          [-30, 20, 30, 20, 2],    // Northern access road
+        ]);
+        generateApartmentBlock(-25, -15, 5);   // Abandoned Pripyat apartment
+        generateApartmentBlock(-25, 0, 8);     // Taller Pripyat block
+        generateApartmentBlock(20, -10, 6);    // More abandoned housing
+        generateIndustrialComplex(5, -20);     // Reactor complex
+        generateRuins(12);                      // Decayed structures
+        generateBrokenTrees(30);                // Dead irradiated forest
+        generateCraters(8);                     // Old craters
+        generateTrenches();
+        generateDugouts(3);
+        generateDestroyedVehicles(6);           // Abandoned Soviet vehicles
+        generateDestroyedTank(-15, 10);         // Rusted tank
+        generateDestroyedTank(20, 20);
+        generateBarbedWire(-20, -10, 40, true); // Exclusion zone wire
+        generateMinefield(-15, 15);
+        generateMinefield(20, -15);
+        generateRadarTower(-30, -10);           // Old DUGA radar
+        generateRadarTower(25, 15);
+        generateWatchtower(-20, 25);
+        generateBunker(0, 10);                  // Underground shelter
+        generateBunker(-10, -25);
+        generateCheckpoint(-5, 5, false);       // Abandoned checkpoint
+        generateFuelDepot(-25, -25);
+        generateFieldHospital(15, 25);
+        generateAmmoCache(-20, -15);
+        generateMGNest(10, -10);
+        generateCommandPost(-15, 20);
+        generateFlagPole(0, 0);
+        scatterResources(BLOCK.WOOD, 0.002);
+        break;
+
+      case 'MOSCOW':
+        // Final assault on Moscow
+        // Dense cityscape, Red Square, government buildings
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          [-45, 0, 45, 0, 5],     // Tverskaya Street (main boulevard)
+          [0, -45, 0, 45, 5],     // Perpendicular grand avenue
+          [-30, -30, 30, -30, 3], // Ring road south
+          [-30, 30, 30, 30, 3],   // Ring road north
+          [-30, -30, -30, 30, 3], // Ring road west
+          [30, -30, 30, 30, 3],   // Ring road east
+          [-20, -10, 20, -10, 2], // Inner road
+          [-20, 10, 20, 10, 2],   // Inner road
+        ]);
+        generateApartmentBlock(-30, -20, 10);  // Tall Moscow apartment
+        generateApartmentBlock(-30, 10, 12);   // Government building
+        generateApartmentBlock(25, -15, 8);    // Office block
+        generateApartmentBlock(25, 15, 11);    // Tower
+        generateApartmentBlock(-15, -30, 9);   // Southern block
+        generateApartmentBlock(15, 30, 8);     // Northern block
+        generateIndustrialComplex(-20, 20);    // Ministry building
+        generateRuins(10);
+        generateCraters(12);
+        generateTrenches();
+        generateTrenches();
+        generateDugouts(5);
+        generateDestroyedVehicles(15);
+        generateDestroyedTank(5, 5);
+        generateDestroyedTank(-10, -10);
+        generateDestroyedTank(15, -15);
+        generateAntiTankHedgehogs(20);
+        generateBarbedWire(-25, 0, 50, true);
+        generateBarbedWire(0, -25, 50, false);
+        generateBunker(0, 0);                  // Kremlin bunker
+        generateBunker(-5, -5);
+        generateBunker(5, 5);
+        generateMGNest(-15, 0);
+        generateMGNest(15, 0);
+        generateMGNest(0, -15);
+        generateMGNest(0, 15);
+        generateMortarPit(-25, -25);
+        generateMortarPit(25, 25);
+        generateArtilleryBattery(-30, 0);
+        generateArtilleryBattery(30, 0);
+        generateRadarTower(-35, -15);
+        generateRadarTower(35, 15);
+        generateCommandPost(0, -5);            // Kremlin command center
+        generateCheckpoint(-10, -10, false);
+        generateCheckpoint(10, 10, false);
+        generateAmmoDepot(-20, -20);
+        generateAmmoDepot(20, 20);
+        generateFuelDepot(-25, 15);
+        generateWatchtower(-30, 25);
+        generateWatchtower(30, -25);
+        generateMinefield(-15, 20);
+        generateMinefield(15, -20);
+        generateFlagPole(0, 0);
+        scatterResources(BLOCK.CONCRETE, 0.004);
+        break;
+
+      case 'SEVASTOPOL':
+        // Sevastopol Naval Base — Black Sea Fleet HQ
+        // Coastal urban, drydocks, warships, naval defenses
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          [-45, 5, 45, 5, 4],     // Coastal highway
+          [0, -40, 0, 30, 3],     // Road to naval base
+          [-30, -20, 30, -20, 2], // Southern port road
+          [-25, 20, 25, 20, 2],   // Northern residential road
+          [-20, -10, -20, 25, 2], // Western docks road
+          [20, -15, 20, 25, 2],   // Eastern approach
+        ]);
+        generateRiver(-5, 20);                  // Harbor/bay
+        generateRiver(5, 15);                    // Inner harbor
+        generateFortifiedBridge(-5, 10, 18, 4); // Harbor bridge
+        generateIndustrialComplex(-15, -15);    // Drydock complex
+        generateIndustrialComplex(15, -20);     // Fuel depot area
+        generateApartmentBlock(-30, 15, 6);     // Naval housing
+        generateApartmentBlock(25, 20, 5);      // Officers quarters
+        generateRuins(8);
+        generateCraters(10);
+        generateTrenches();
+        generateTrenches();
+        generateDugouts(4);
+        generateDestroyedVehicles(10);
+        generateAntiTankHedgehogs(12);
+        generateBarbedWire(-25, 0, 40, true);
+        generateArtilleryBattery(-25, -25);
+        generateArtilleryBattery(25, -25);
+        generateRadarTower(-30, -10);
+        generateRadarTower(30, 10);
+        generateBunker(-10, -10);
+        generateBunker(10, 5);
+        generateMGNest(-20, 5);
+        generateMGNest(20, -5);
+        generateMortarPit(-15, 25);
+        generateAmmoDepot(-25, -30);
+        generateFuelDepot(25, -30);
+        generateCommandPost(0, -15);
+        generateWatchtower(-30, 20);
+        generateWatchtower(30, -20);
+        generateCheckpoint(-5, -5, false);
+        generateMinefield(15, 15);
+        generateFlagPole(0, 0);
+        scatterResources(BLOCK.METAL, 0.004);
+        break;
+
+      case 'DONBAS':
+        // Donbas Final Push — last Russian stronghold in eastern Ukraine
+        // Urban + industrial, mega trench networks, heavily fortified
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          [-45, 0, 45, 0, 4],    // Main highway
+          [0, -45, 0, 45, 3],    // North-south axis
+          [-35, -20, 35, -20, 2],// Southern trench line road
+          [-35, 20, 35, 20, 2],  // Northern defense line
+          [-20, -35, -20, 35, 2],// Western sector road
+          [20, -35, 20, 35, 2],  // Eastern sector road
+        ]);
+        generateIndustrialComplex(-20, -20);  // Abandoned mine complex
+        generateIndustrialComplex(15, 10);    // Processing plant
+        generateApartmentBlock(-30, 10, 7);   // Worker housing
+        generateApartmentBlock(25, -15, 6);
+        generateApartmentBlock(-15, 25, 8);
+        generateRuins(18);                     // Years of war damage
+        generateCraters(30);                   // Massive cratering
+        generateTrenches();
+        generateTrenches();
+        generateTrenches();
+        generateTrenches();                    // Quadruple trench system
+        generateDugouts(8);
+        generateBurningRuin(-10, 5);
+        generateBurningRuin(10, -5);
+        generateDestroyedVehicles(15);
+        generateDestroyedTank(-15, -15);
+        generateDestroyedTank(15, 15);
+        generateDestroyedTank(0, -20);
+        generateAntiTankHedgehogs(20);
+        generateBarbedWire(-30, -5, 60, true);
+        generateBarbedWire(-5, -30, 60, false);
+        generateRazorWireMaze(-15, -15, 6);
+        generateRazorWireMaze(15, 15, 5);
+        generateBunker(-10, -10);
+        generateBunker(10, 10);
+        generateBunker(0, -5);
+        generateMGNest(-20, 0);
+        generateMGNest(20, 0);
+        generateMGNest(0, -20);
+        generateMGNest(0, 20);
+        generateMortarPit(-25, -25);
+        generateMortarPit(25, 25);
+        generateArtilleryBattery(-30, 10);
+        generateArtilleryBattery(30, -10);
+        generateRadarTower(-35, -20);
+        generateCommandPost(5, 5);
+        generateMinefield(-20, 20);
+        generateMinefield(20, -20);
+        generateMinefield(-10, -25);
+        generateAmmoDepot(-25, -15);
+        generateAmmoDepot(25, 15);
+        generateFuelDepot(-20, 25);
+        generateFieldHospital(20, 25);
+        generateWatchtower(-30, 30);
+        generateCheckpoint(-5, 0, true);
+        generateCheckpoint(0, -5, false);
+        generateFlagPole(0, 0);
+        scatterResources(BLOCK.METAL, 0.003);
+        break;
+
+      case 'BELGOROD':
+        // Cross-border offensive into Belgorod Oblast
+        // Open grassland with fortified military bases, airfields
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          [-45, 0, 45, 0, 4],     // Main highway (M2)
+          [0, -45, 0, 45, 3],     // North-south road
+          [-30, -25, 30, -25, 2], // Southern perimeter
+          [-30, 25, 30, 25, 2],   // Northern perimeter
+          [-25, -10, -25, 30, 2], // Western access
+          [25, -30, 25, 10, 2],   // Eastern access
+        ]);
+        // Airfield (like a smaller Hostomel)
+        generateHostomelAirport(0, -15);       // Russian airfield
+        generateIndustrialComplex(-25, 15);    // Military depot
+        generateApartmentBlock(25, 20, 5);     // Border town housing
+        generateApartmentBlock(-30, -25, 4);
+        generateCropFields(-25, -10, 15, 12); // Russian farmland
+        generateCropFields(15, 25, 12, 10);
+        generateGrainSilo(20, -20);
+        generateGrainSilo(-20, 25);
+        generateFarmBuilding(15, -25);
+        generateDefensivePosition(-15, -20);
+        generateDefensivePosition(15, 10);
+        generateDefensivePosition(-10, 20);
+        generateTrenches();
+        generateTrenches();
+        generateTrenches();
+        generateDugouts(6);
+        generateDestroyedVehicles(10);
+        generateDestroyedTank(10, -10);
+        generateDestroyedTank(-15, 15);
+        generateAntiTankHedgehogs(15);
+        generateBarbedWire(-30, 0, 60, true);
+        generateRazorWireMaze(-10, -5, 5);
+        generateBunker(-5, -5);
+        generateBunker(5, 5);
+        generateMGNest(-20, -10);
+        generateMGNest(20, 10);
+        generateMortarPit(-25, 20);
+        generateMortarPit(25, -20);
+        generateArtilleryBattery(-30, -15);
+        generateArtilleryBattery(30, 15);
+        generateRadarTower(-35, 5);
+        generateRadarTower(35, -5);
+        generateCommandPost(0, 0);
+        generateAmmoDepot(-20, -25);
+        generateAmmoDepot(20, 25);
+        generateFuelDepot(-25, 20);
+        generateFuelDepot(25, -20);
+        generateWatchtower(-30, -30);
+        generateWatchtower(30, 30);
+        generateMinefield(-15, -20);
+        generateMinefield(15, 20);
+        generateMinefieldSigns(6);
+        generatePowerLines(-35, -35, 6);
+        generateCheckpoint(-5, -15, false);
+        generateCheckpoint(5, 15, false);
+        generateFlagPole(0, 0);
+        scatterResources(BLOCK.WOOD, 0.004);
+        break;
+
+      case 'KREMLIN':
+        // The ultimate final battle — Kremlin Showdown
+        // Dense cityscape, Red Square, massive fortifications, everything thrown at you
+        _roadWaypoints.length = 0;
+        generateRoadNetwork([
+          [-45, 0, 45, 0, 6],     // Grand boulevard (widest road)
+          [0, -45, 0, 45, 6],     // Cross boulevard
+          [-35, -15, 35, -15, 3], // Inner ring south
+          [-35, 15, 35, 15, 3],   // Inner ring north
+          [-15, -35, -15, 35, 3], // Inner ring west
+          [15, -35, 15, 35, 3],   // Inner ring east
+          [-25, -25, 25, -25, 2], // Outer ring south
+          [-25, 25, 25, 25, 2],   // Outer ring north
+        ]);
+        // Massive building complex — the Kremlin
+        generateApartmentBlock(-10, -10, 15);  // Kremlin main building
+        generateApartmentBlock(10, -10, 12);   // Senate Palace
+        generateApartmentBlock(-10, 10, 13);   // Arsenal
+        generateApartmentBlock(10, 10, 14);    // Grand Kremlin Palace
+        // Surrounding city
+        generateApartmentBlock(-30, -25, 10);
+        generateApartmentBlock(-30, 20, 9);
+        generateApartmentBlock(25, -25, 11);
+        generateApartmentBlock(25, 20, 8);
+        generateApartmentBlock(-20, -35, 7);
+        generateApartmentBlock(20, 35, 6);
+        generateIndustrialComplex(-25, 0);     // Ministry of Defense
+        generateIndustrialComplex(25, 0);      // FSB HQ
+        generateRuins(15);
+        generateCraters(18);
+        generateTrenches();
+        generateTrenches();
+        generateTrenches();
+        generateDugouts(8);
+        generateBurningRuin(-15, 5);
+        generateBurningRuin(15, -5);
+        generateBurningRuin(5, 15);
+        generateDestroyedVehicles(20);
+        generateDestroyedTank(0, 0);
+        generateDestroyedTank(-15, -15);
+        generateDestroyedTank(15, 15);
+        generateDestroyedTank(-15, 15);
+        generateDestroyedTank(15, -15);
+        generateAntiTankHedgehogs(25);
+        generateBarbedWire(-30, 0, 60, true);
+        generateBarbedWire(0, -30, 60, false);
+        generateBarbedWire(-15, -15, 30, true);
+        generateRazorWireMaze(-5, -5, 8);
+        generateRazorWireMaze(5, 5, 6);
+        generateBunker(0, 0);           // Kremlin underground bunker
+        generateBunker(-5, -5);
+        generateBunker(5, 5);
+        generateBunker(-5, 5);
+        generateBunker(5, -5);
+        generateMGNest(-20, 0);
+        generateMGNest(20, 0);
+        generateMGNest(0, -20);
+        generateMGNest(0, 20);
+        generateMGNest(-10, -10);
+        generateMGNest(10, 10);
+        generateMortarPit(-25, -25);
+        generateMortarPit(25, 25);
+        generateMortarPit(-25, 25);
+        generateMortarPit(25, -25);
+        generateArtilleryBattery(-35, 0);
+        generateArtilleryBattery(35, 0);
+        generateArtilleryBattery(0, -35);
+        generateArtilleryBattery(0, 35);
+        generateRadarTower(-35, -30);
+        generateRadarTower(35, 30);
+        generateCommandPost(0, 0);      // Putin's last command post
+        generateAmmoDepot(-20, -20);
+        generateAmmoDepot(20, 20);
+        generateAmmoDepot(-20, 20);
+        generateAmmoDepot(20, -20);
+        generateFuelDepot(-30, -15);
+        generateFuelDepot(30, 15);
+        generateMinefield(-15, -25);
+        generateMinefield(15, 25);
+        generateMinefield(-25, 15);
+        generateMinefield(25, -15);
+        generateWatchtower(-35, -20);
+        generateWatchtower(35, 20);
+        generateCheckpoint(-10, -10, false);
+        generateCheckpoint(10, 10, false);
+        generateCheckpoint(-10, 10, false);
+        generateCheckpoint(10, -10, false);
+        generateFlagPole(0, 0);          // Victory flag
+        scatterResources(BLOCK.CONCRETE, 0.005);
         break;
 
       default:

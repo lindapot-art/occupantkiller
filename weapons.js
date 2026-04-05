@@ -2178,7 +2178,7 @@ const Weapons = (() => {
   function reset() {
     states     = WEAPONS.map(makeState);
     currentIdx = 0;
-    unlocked   = WEAPONS.map(() => true);
+    unlocked   = WEAPONS.map((_, i) => i <= 1);
     if (zoomed) exitZoom();
     recoilOffset = 0;
     recoilOffsetY = 0;

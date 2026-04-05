@@ -517,21 +517,28 @@ const Enemies = (() => {
     const r = Math.random();
     // Boss every 5th wave
     if (w % 5 === 0 && w >= 5 && r < 0.08) return 'BOSS';
-    // Late waves: advanced enemy types
-    if (w >= 7 && r < 0.04) return 'MORTAR';
-    if (w >= 7 && r < 0.07) return 'SNIPER_ELITE';
-    if (w >= 6 && r < 0.11) return 'SHIELD_BEARER';
-    if (w >= 5 && r < 0.16) return 'BOMBER';
-    if (w >= 4 && r < 0.21) return 'WAR_DOG';
+    // Endgame enemy types (stages 9-12, wave ~15+)
+    if (w >= 20 && r < 0.04) return 'ASSAULT_MECH';
+    if (w >= 16 && r < 0.07) return 'THERMOBARIC';
+    if (w >= 16 && r < 0.10) return 'HEAVY_SNIPER';
+    if (w >= 14 && r < 0.13) return 'SWARM_OP';
+    if (w >= 14 && r < 0.16) return 'EW_OPERATOR';
+    if (w >= 12 && r < 0.19) return 'COMMISSAR';
+    // Mid-game types
+    if (w >= 7 && r < 0.22) return 'MORTAR';
+    if (w >= 7 && r < 0.25) return 'SNIPER_ELITE';
+    if (w >= 6 && r < 0.29) return 'SHIELD_BEARER';
+    if (w >= 5 && r < 0.34) return 'BOMBER';
+    if (w >= 4 && r < 0.39) return 'WAR_DOG';
     // Original types
-    if (w >= 7 && r < 0.24) return 'SABOTEUR';
-    if (w >= 7 && r < 0.27) return 'DRONE_OP';
-    if (w >= 6 && r < 0.32) return 'SNIPER';
-    if (w >= 6 && r < 0.37) return 'FLAMETHROWER';
-    if (w >= 5 && r < 0.42) return 'ENGINEER';
-    if (w >= 5 && r < 0.52) return 'ARMORED';
-    if (w >= 3 && r < 0.65) return 'STORMER';
-    if (w >= 2 && r < 0.15) return 'ENGINEER';
+    if (w >= 7 && r < 0.42) return 'SABOTEUR';
+    if (w >= 7 && r < 0.45) return 'DRONE_OP';
+    if (w >= 6 && r < 0.50) return 'SNIPER';
+    if (w >= 6 && r < 0.55) return 'FLAMETHROWER';
+    if (w >= 5 && r < 0.60) return 'ENGINEER';
+    if (w >= 5 && r < 0.70) return 'ARMORED';
+    if (w >= 3 && r < 0.80) return 'STORMER';
+    if (w >= 2 && r < 0.25) return 'ENGINEER';
     return 'CONSCRIPT';
   }
 

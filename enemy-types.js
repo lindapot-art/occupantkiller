@@ -1,9 +1,10 @@
 /* ============================================================
- *  ENEMY-TYPES.JS — 18 enemy type features
+ *  ENEMY-TYPES.JS — 24 enemy type features
  *  Features: boss, bomber, sniper, medic, engineer, war dog,
  *  shield bearer, mortar, flamethrower, paratroop, tank,
  *  drone operator, spetsnaz, kadyrovite, wagner, BTR,
- *  kamikaze drone, officer
+ *  kamikaze drone, officer, heavy sniper, commissar,
+ *  thermobaric, EW operator, assault mech, swarm operator
  * ============================================================ */
 const EnemyTypes = (function () {
   'use strict';
@@ -166,6 +167,64 @@ const EnemyTypes = (function () {
       buffRadius: 15, buffDamage: 1.25, buffSpeed: 1.2,
       callReinforcementInterval: 20, reinforceCount: 4,
       behavior: 'command_and_buff'
+    },
+    // Feature 34: Heavy Sniper
+    HEAVY_SNIPER: {
+      id: 'HEAVY_SNIPER', name: 'Anti-Material Sniper', tier: 4,
+      hp: 90, speed: 0.8, damage: 120, attackRange: 60,
+      color: 0x2a3a2a, scale: 1.1, xpReward: 150,
+      aimTime: 3.0, relocateAfterShots: 1,
+      penetration: true, canHitVehicles: true,
+      laserSight: true, laserColor: 0x00ff00,
+      behavior: 'camp_and_snipe'
+    },
+    // Feature 35: Commissar (political officer that prevents retreat)
+    COMMISSAR: {
+      id: 'COMMISSAR', name: 'Political Commissar', tier: 3,
+      hp: 100, speed: 1.5, damage: 20, attackRange: 10,
+      color: 0x880000, scale: 1.2, xpReward: 130,
+      fearRadius: 20, moraleBuff: 1.5,
+      preventsFlee: true, executesDeserters: true,
+      behavior: 'command_and_execute'
+    },
+    // Feature 36: Thermobaric Launcher
+    THERMOBARIC: {
+      id: 'THERMOBARIC', name: 'TOS-1 Operator', tier: 4,
+      hp: 80, speed: 1.2, damage: 0, attackRange: 35,
+      color: 0xff3300, scale: 1.15, xpReward: 160,
+      thermobaricDamage: 200, thermobaricRadius: 8,
+      thermobaricInterval: 8, setupTime: 4,
+      burnDuration: 5, burnDPS: 15,
+      behavior: 'indirect_fire'
+    },
+    // Feature 37: Electronic Warfare Operator (jams player HUD)
+    EW_OPERATOR: {
+      id: 'EW_OPERATOR', name: 'EW Jammer', tier: 3,
+      hp: 60, speed: 2, damage: 15, attackRange: 8,
+      color: 0x4488aa, scale: 1.0, xpReward: 100,
+      jamRadius: 25, jamEffect: 'hud_static',
+      disablesMinimap: true, disablesCompass: true,
+      behavior: 'hide_and_jam'
+    },
+    // Feature 38: Assault Mech (prototype heavy walker)
+    ASSAULT_MECH: {
+      id: 'ASSAULT_MECH', name: 'Assault Walker', tier: 5,
+      hp: 3000, speed: 1.0, damage: 80, attackRange: 25,
+      color: 0x444444, scale: 3.0, xpReward: 500,
+      armorFront: 0.85, armorSide: 0.6, armorRear: 0.3,
+      rocketSalvoDmg: 150, rocketSalvoCount: 4, rocketInterval: 6,
+      mgDamage: 20, mgRate: 0.12,
+      shieldHP: 500, shieldRegenRate: 10,
+      behavior: 'mech_advance'
+    },
+    // Feature 39: Suicide Drone Swarm Operator
+    SWARM_OP: {
+      id: 'SWARM_OP', name: 'Drone Swarm Operator', tier: 3,
+      hp: 45, speed: 1.0, damage: 8, attackRange: 5,
+      color: 0x777777, scale: 1.0, xpReward: 110,
+      swarmSize: 5, droneDamage: 40, droneSpeed: 15, droneHP: 8,
+      swarmInterval: 12,
+      behavior: 'send_swarm'
     }
   };
 
@@ -187,6 +246,18 @@ const EnemyTypes = (function () {
     13: { types: ['BTR', 'FLAMETHROWER', 'SHIELD_BEARER', 'WAGNER', 'KAMIKAZE_DRONE'], weights: [0.1, 0.2, 0.2, 0.3, 0.2] },
     14: { types: ['TANK', 'SPETSNAZ', 'OFFICER', 'MORTAR', 'DRONE_OP'], weights: [0.08, 0.25, 0.17, 0.25, 0.25] },
     15: { types: ['BOSS', 'TANK', 'SPETSNAZ', 'KAMIKAZE_DRONE', 'FLAMETHROWER', 'OFFICER'], weights: [0.08, 0.12, 0.2, 0.2, 0.2, 0.2] },
+    // Stages 9-10: Naval & Donbas endgame waves
+    16: { types: ['HEAVY_SNIPER', 'BTR', 'SPETSNAZ', 'DRONE_OP', 'SHIELD_BEARER'], weights: [0.15, 0.15, 0.25, 0.25, 0.2] },
+    17: { types: ['COMMISSAR', 'WAGNER', 'KADYROVITE', 'FLAMETHROWER', 'MORTAR'], weights: [0.1, 0.25, 0.2, 0.25, 0.2] },
+    18: { types: ['THERMOBARIC', 'TANK', 'HEAVY_SNIPER', 'SPETSNAZ', 'EW_OPERATOR'], weights: [0.1, 0.15, 0.2, 0.3, 0.25] },
+    19: { types: ['BOSS', 'THERMOBARIC', 'COMMISSAR', 'BTR', 'SWARM_OP', 'HEAVY_SNIPER'], weights: [0.08, 0.15, 0.12, 0.2, 0.25, 0.2] },
+    20: { types: ['BOSS', 'ASSAULT_MECH', 'TANK', 'THERMOBARIC', 'SWARM_OP', 'SPETSNAZ'], weights: [0.1, 0.05, 0.15, 0.2, 0.25, 0.25] },
+    // Stages 11-12: Belgorod & Kremlin — maximum intensity
+    21: { types: ['ASSAULT_MECH', 'HEAVY_SNIPER', 'COMMISSAR', 'EW_OPERATOR', 'THERMOBARIC', 'SWARM_OP'], weights: [0.08, 0.2, 0.15, 0.17, 0.2, 0.2] },
+    22: { types: ['BOSS', 'ASSAULT_MECH', 'TANK', 'BTR', 'THERMOBARIC', 'SWARM_OP', 'COMMISSAR'], weights: [0.1, 0.08, 0.12, 0.15, 0.2, 0.2, 0.15] },
+    23: { types: ['BOSS', 'ASSAULT_MECH', 'HEAVY_SNIPER', 'SPETSNAZ', 'THERMOBARIC', 'EW_OPERATOR', 'SWARM_OP'], weights: [0.12, 0.1, 0.15, 0.18, 0.15, 0.15, 0.15] },
+    // Wave 24 = Kremlin final — everything
+    24: { types: ['BOSS', 'ASSAULT_MECH', 'TANK', 'THERMOBARIC', 'HEAVY_SNIPER', 'COMMISSAR', 'SWARM_OP', 'SPETSNAZ'], weights: [0.15, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.13] },
   };
 
   /* ── AI Behavior State ─────────────────────── */
@@ -195,7 +266,7 @@ const EnemyTypes = (function () {
   function init() { activeEnemies = []; }
 
   function selectType(wave) {
-    const comp = WAVE_COMPOSITIONS[Math.min(wave, 15)] || WAVE_COMPOSITIONS[15];
+    const comp = WAVE_COMPOSITIONS[Math.min(wave, 24)] || WAVE_COMPOSITIONS[24];
     const roll = Math.random();
     let cumulative = 0;
     for (let i = 0; i < comp.types.length; i++) {
