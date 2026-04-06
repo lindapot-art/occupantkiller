@@ -32,7 +32,19 @@ Details: Full audit of start→wave→kill→clear→stage→win flow. Enemy sys
 Status: DONE
 Requested: 2026-04-06
 Completed: 2026-04-06
-Details: Eliminated all remaining per-frame heap allocations: drone-system.js temp vectors, enemies.js buffer reuse + temp vectors, npc-system.js O(1) lookup + buffer, game-manager.js tracer/mantle temp vectors. Commit 22ce5c9.
+Details: Eliminated all remaining per-frame heap allocations: drone-system.js temp vectors, enemies.js buffer reuse + temp vectors, npc-system.js O(1) lookup + buffer, game-manager.js tracer/mantle temp vectors. Commit 22ce5c9. Deep clone elimination batch 2: camera-system.js, drone-system.js, npc-system.js. Commit c874351.
+
+### [HIGH] Memory Leak Fixes — GPU Resource Disposal
+Status: DONE
+Requested: 2026-04-06
+Completed: 2026-04-06
+Details: Audited all clear() functions. Fixed: building.js (added missing clear()), pickups.js (added geometry/material disposal), world-features.js (added _disposeMesh traversal). Wired Building.clear() into game-manager.js. Commit fff792c.
+
+### [HIGH] Server Enhancement — Gzip Compression + Cache Headers
+Status: DONE
+Requested: 2026-04-06
+Completed: 2026-04-06
+Details: Added zlib gzip compression (80% reduction), in-memory cache, Cache-Control headers. Commit 07bd333. Expanded test suite to 31 tests. Commit 2e1b921.
 
 ### [LOW] Render.com Live Deployment Verification
 Status: BLOCKED

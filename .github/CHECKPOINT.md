@@ -4,40 +4,48 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-06 — Session 8: Performance Optimization Batch 2
+- **Timestamp**: 2026-04-06 — Session 8: Memory Leaks + Bug Fixes + Testing
 - **Agent**: KING
-- **Status**: QA PASSED, PUSHED TO GITHUB (commit 22ce5c9)
+- **Status**: QA PASSED, PUSHED TO GITHUB (commit bb3b652)
 
 ## Current Task
-- COMPLETED: Remaining per-frame heap allocation elimination
+- COMPLETED: Memory leak fixes, vehicle optimization, death handler bug, test suite, README
 
 ## Steps Completed This Session
-1. [x] Resumed from Session 7 — drone-system.js temp vector replacement
-2. [x] drone-system.js: _dTmpFwd/_dTmpRight in updatePossessedDrone (6 allocs eliminated)
-3. [x] enemies.js: _aliveMembersBuf reusable buffer for assault group filter
-4. [x] enemies.js: _tmpVec3e for medic direction, _tmpVec3f for flinch direction
-5. [x] npc-system.js: _npcById O(1) lookup map, _aliveGrpBuf buffer
-6. [x] game-manager.js: _gmTmp2/_gmTmp3 for tracer spawning, _gmTmp2 for mantle check
-7. [x] Syntax check: 33/33 JS files PASS
-8. [x] Master test suite: 28/28 PASS
-9. [x] HTTP verification: HTTP 200, 58KB
-10. [x] QA Gate: 5/5 specialists PASS (syntax, runtime, visual, integration, security)
-11. [x] Committed and pushed (22ce5c9)
-12. [x] Render.com: TIMEOUT (free tier suspended, not code issue)
+1. [x] Performance batch 1: drone/enemies/npc/game-manager vectors (commit 22ce5c9)
+2. [x] Performance batch 2: deep clone elimination in 5 files (commit c874351)
+3. [x] Server gzip + cache headers (commit 07bd333)
+4. [x] Test suite expanded to 31 tests (commit 2e1b921)
+5. [x] Memory leak: building.js — added clear() function
+6. [x] Memory leak: pickups.js — added geometry/material disposal in clear() + update()
+7. [x] Memory leak: world-features.js — added _disposeMesh() traversal helper
+8. [x] Wired Building.clear() into game-manager.js startGame() + nextStage()
+9. [x] Committed memory leak fixes (commit fff792c)
+10. [x] Vehicle waypoint copy-or-clone optimization (commit 0f539e4/dfb9c39)
+11. [x] Test suite Phase 7: disposal pattern checks — 32/32 PASS
+12. [x] README updated (commit 33add13)
+13. [x] Bug fix: force vehicle exit + drone release on player death (commit bb3b652)
+14. [x] Identified Old Eden source: D:\antiruscist\oldeden (auto-starts from VS Code terminal)
+15. [x] All QA gates passed: 5/5 specialists, 32/32 tests
 
-## Files Changed This Session
-- `drone-system.js` — temp vectors for possessed drone movement
-- `enemies.js` — buffer reuse for group filter, temp vectors for medic/flinch
-- `npc-system.js` — O(1) NPC lookup, buffer reuse for group iteration
-- `game-manager.js` — temp vectors for tracer spawning and mantle check
+## Files Changed This Session (10 total)
+- `building.js` — Added clear() function for ghost mesh disposal + structures reset
+- `pickups.js` — Fixed clear() and update() to dispose geometry/materials
+- `world-features.js` — Added _disposeMesh() helper, updated clear() to dispose all feature meshes
+- `game-manager.js` — Added Building.clear(), death handler vehicle/drone exit
+- `vehicles.js` — Copy-or-clone for waypoint/patrol allocations
+- `tools/test-master.js` — Phase 7 disposal checks (32 tests total)
+- `README.md` — Comprehensive update for 12-stage, 33-module game
+- (earlier: drone-system.js, enemies.js, npc-system.js, camera-system.js, server.js)
 
 ## Last Known Good State
 - Server: HTTP 200 (58,041 bytes)
 - Syntax: 33/33 PASS
-- Test Suite: 28/28 PASS
+- Test Suite: 32/32 PASS (7 phases)
 - QA: All 5 specialists PASS
-- GitHub: pushed (commit 22ce5c9)
+- GitHub: pushed (commit bb3b652)
 - Render.com: TIMEOUT (free tier, code works locally)
+- Old Eden imposter: D:\antiruscist\oldeden — kills needed before server start
 
 ## Next Steps
 - [ ] Scan remaining .clone() calls in hot paths
