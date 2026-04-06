@@ -534,7 +534,8 @@ const VehicleSystem = (function () {
           // Once on a road, follow sequential waypoints for realistic driving
           if (v._roadIdx === undefined) v._roadIdx = bestIdx;
           v._roadIdx = (v._roadIdx + 1) % roadWPs.length;
-          v.waypoint = roadWPs[v._roadIdx].clone();
+          if (v.waypoint) v.waypoint.copy(roadWPs[v._roadIdx]);
+          else v.waypoint = roadWPs[v._roadIdx].clone();
           v.waypoint.y = 0;
           v._onRoad = true;
           v.waypointTimer = 12 + Math.random() * 8;
@@ -557,8 +558,8 @@ const VehicleSystem = (function () {
         }
       }
       if (bestRoad) {
-        v._patrolTarget = bestRoad.clone();
-        v._patrolTarget.y = VoxelWorld.getTerrainHeight(bestRoad.x, bestRoad.z);
+        if (v._patrolTarget) v._patrolTarget.set(bestRoad.x, VoxelWorld.getTerrainHeight(bestRoad.x, bestRoad.z), bestRoad.z);
+        else { v._patrolTarget = bestRoad.clone(); v._patrolTarget.y = VoxelWorld.getTerrainHeight(bestRoad.x, bestRoad.z); }
       }
     }
 
@@ -567,14 +568,10 @@ const VehicleSystem = (function () {
     const home = v.spawnPos;
     const angle = Math.random() * Math.PI * 2;
     const dist  = 8 + Math.random() * PATROL_RADIUS;
-    const wx = home.x + Math.cos(angle) * dist;
-    const wz = home.z + Math.sin(angle) * dist;
-    // Clamp within patrol bounds
-    v.waypoint = new THREE.Vector3(
-      Math.max(-PATROL_BOUND, Math.min(PATROL_BOUND, wx)),
-      0,
-      Math.max(-PATROL_BOUND, Math.min(PATROL_BOUND, wz))
-    );
+    const wx = Math.max(-PATROL_BOUND, Math.min(PATROL_BOUND, home.x + Math.cos(angle) * dist));
+    const wz = Math.max(-PATROL_BOUND, Math.min(PATROL_BOUND, home.z + Math.sin(angle) * dist));
+    if (v.waypoint) v.waypoint.set(wx, 0, wz);
+    else v.waypoint = new THREE.Vector3(wx, 0, wz);
     v.waypointTimer = 8 + Math.random() * 10; // timeout to force new waypoint
   }
 
