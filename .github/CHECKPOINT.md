@@ -4,29 +4,22 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-06 — Perfection Sweep Round 2 COMPLETE
+- **Timestamp**: 2026-04-06 — Critical Wave Progression Fix
 - **Agent**: KING
-- **Status**: ALL FIXES DEPLOYED AND VERIFIED
+- **Status**: FIXES DEPLOYED, QA PASSED, PUSHING TO GITHUB
 
 ## Current Task
-- COMPLETED: Perfection sweep round 2 (runtime + integration + security)
+- COMPLETED: Fixed game-breaking wave progression bugs
 
 ## Steps Completed This Session
-1. [x] Port change 8080→3000 across all files (10+ files)
-2. [x] Runtime audit round 2 — found 6 HIGH bugs
-3. [x] Fixed drone-system.js — typeof VoxelWorld guards (getTerrainHeight, setBlock)
-4. [x] Fixed drone-system.js — typeof CameraSystem guards (setMode, setDroneTarget, getYaw, getPitch)
-5. [x] Fixed drone-system.js — null-safe getPlayer() in possess/update/bomber/FPV
-6. [x] Fixed npc-system.js — VoxelWorld.getTerrainHeight typeof guard
-7. [x] Fixed npc-system.js — e.mesh null guard in findNearestEnemy
-8. [x] Fixed feedback.js — closure bug in updateKillFeed (capture el before splice)
-9. [x] Fixed marketplace.js — sellWeaponForPOL now calls Blockchain.purchaseWithDonation before locking
-10. [x] Fixed marketplace.js — double-spend race condition (_pendingSells Set guard)
-11. [x] Fixed weapons.js — getWeaponInfo() now returns id field
-12. [x] Fixed hud.js — addKill defers to Feedback module to prevent kill feed dual-write
-13. [x] QA gate passed: all 5 specialists PASS
-14. [x] Server verified: HTTP 200, 58041 bytes, security headers, null byte blocked (400)
-15. [x] Syntax: all 34 JS files pass node --check
+1. [x] Diagnosed premature wave-clear bug via Puppeteer headless testing
+2. [x] Fixed enemies.js clear() — allDead=true prevents false wave completion during startGame→beginWave gap
+3. [x] Fixed enemies.js MEDIC case — swapped updateMedic(e, delta, enemies) to updateMedic(e, enemies, delta)
+4. [x] Verified fix via Puppeteer: wave 1 starts correctly, wave 2 advances correctly
+5. [x] QA gate: all 5 specialists PASS (syntax, runtime, visual, integration, security)
+6. [x] All 32 JS files pass node --check
+7. [x] Server verified: HTTP 200, 58041 bytes
+8. [ ] Push to GitHub and verify live deployment
 
 ## Files Changed This Session
 - `drone-system.js` — MODIFIED (typeof guards, null-safe getPlayer)

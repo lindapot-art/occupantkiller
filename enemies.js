@@ -1828,7 +1828,7 @@ const Enemies = (() => {
             etResult = EnemyTypes.updateEngineer(e, delta, typeof VoxelWorld !== 'undefined' ? VoxelWorld.setBlock : null);
             break;
           case 'MEDIC':
-            etResult = EnemyTypes.updateMedic(e, delta, enemies);
+            etResult = EnemyTypes.updateMedic(e, enemies, delta);
             break;
           // ── B18/B19: New enemy type AI ──
           case 'FLAMETHROWER':
@@ -2254,7 +2254,7 @@ const Enemies = (() => {
     });
     enemies    = [];
     spawnQueue = [];
-    allDead    = false;
+    allDead    = true;   // Prevent premature wave-complete check during startGame→beginWave gap
     assaultGroups.length = 0;
   }
 
