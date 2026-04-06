@@ -419,17 +419,17 @@ const DroneSystem = (function () {
     if (drone.patrolPoints.length === 0) return;
 
     const target = drone.patrolPoints[drone.patrolIdx];
-    const dir = target.clone().sub(drone.position);
-    const dist = dir.length();
+    _dTmpFwd.copy(target).sub(drone.position);
+    const dist = _dTmpFwd.length();
 
     if (dist < 2) {
       drone.patrolIdx = (drone.patrolIdx + 1) % drone.patrolPoints.length;
       return;
     }
 
-    dir.normalize().multiplyScalar(drone.speed * 0.5);
-    drone.velocity.copy(dir);
-    drone.mesh.rotation.y = Math.atan2(dir.x, dir.z);
+    _dTmpFwd.normalize().multiplyScalar(drone.speed * 0.5);
+    drone.velocity.copy(_dTmpFwd);
+    drone.mesh.rotation.y = Math.atan2(_dTmpFwd.x, _dTmpFwd.z);
   }
 
   /* ── Drone Actions ───────────────────────────────────────────────── */

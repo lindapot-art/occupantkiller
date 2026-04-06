@@ -167,9 +167,9 @@ const CameraSystem = (function () {
 
     // If we have a vehicle target (first-person vehicle mode), use vehicle pos
     if (_vehicleObj) {
-      var vPos = _vehicleObj.position.clone();
-      vPos.y += 2.0; // Hatch view height
-      _camera.position.copy(vPos);
+      _tmpVec3a.copy(_vehicleObj.position);
+      _tmpVec3a.y += 2.0; // Hatch view height
+      _camera.position.copy(_tmpVec3a);
       _camera.position.x += shakeOffsetX;
       _camera.position.y += shakeOffsetY;
       // Use vehicle yaw as base + allow limited freelook via mouse offset

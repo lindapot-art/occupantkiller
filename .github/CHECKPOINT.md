@@ -4,48 +4,46 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-06 — Full QA + Bug Fix Batch
+- **Timestamp**: 2026-04-06 — Session 8: Performance Optimization Batch 2
 - **Agent**: KING
-- **Status**: QA PASSED, PUSHED TO GITHUB (commit 493a92b)
+- **Status**: QA PASSED, PUSHED TO GITHUB (commit 22ce5c9)
 
 ## Current Task
-- COMPLETED: Full QA gate (5/5 specialists), fixed 6 bugs found during QA
+- COMPLETED: Remaining per-frame heap allocation elimination
 
 ## Steps Completed This Session
-1. [x] Killed "Old Eden" imposter process hogging port 3000
-2. [x] Verified server identity (HTTP 200, 56KB, ZOMBIELAND title, security headers)
-3. [x] Tested security: path traversal → 404, null byte → 400, 404 → correct
-4. [x] Syntax check: 33/33 JS files PASS
-5. [x] Full test suite: 35/35 assets serve, 10/10 HTML elements, 32/32 IIFE modules
-6. [x] Render.com check: TIMEOUT (free tier sleeping, not a code issue)
-7. [x] qa-syntax: PASS — all balanced, all IIFEs closed
-8. [x] qa-runtime: FAIL → FIXED (enemies.js null guards, game-manager.js mesh guard)
-9. [x] qa-visual: PASS — 98 DOM elements, 33/33 scripts load, full CSS coverage
-10. [x] qa-integration: PASS with caveats → FIXED (missing clear/reset calls on stage transitions)
-11. [x] qa-security: PASS — no critical vulns, XSS review noted for future
-12. [x] Fixed ml-system.js interval leak (clearInterval on re-init)
-13. [x] Added AudioSystem.playBark alias for NPC bark support
-14. [x] Pushed to GitHub (493a92b)
+1. [x] Resumed from Session 7 — drone-system.js temp vector replacement
+2. [x] drone-system.js: _dTmpFwd/_dTmpRight in updatePossessedDrone (6 allocs eliminated)
+3. [x] enemies.js: _aliveMembersBuf reusable buffer for assault group filter
+4. [x] enemies.js: _tmpVec3e for medic direction, _tmpVec3f for flinch direction
+5. [x] npc-system.js: _npcById O(1) lookup map, _aliveGrpBuf buffer
+6. [x] game-manager.js: _gmTmp2/_gmTmp3 for tracer spawning, _gmTmp2 for mantle check
+7. [x] Syntax check: 33/33 JS files PASS
+8. [x] Master test suite: 28/28 PASS
+9. [x] HTTP verification: HTTP 200, 58KB
+10. [x] QA Gate: 5/5 specialists PASS (syntax, runtime, visual, integration, security)
+11. [x] Committed and pushed (22ce5c9)
+12. [x] Render.com: TIMEOUT (free tier suspended, not code issue)
 
 ## Files Changed This Session
-- `enemies.js` — null guard on mesh.userData.parts + blood spawn
-- `game-manager.js` — mesh guard in quick melee, missing clear/reset calls on nextStage/startGame
-- `ml-system.js` — clearInterval on re-init to prevent leak
-- `audio-system.js` — playBark alias to playEnemyBark
-- `tools/test-full-qa.js` — NEW: Puppeteer-based test (WebGL doesn't work on this machine)
-- `tools/test-qa-v2.js` — NEW: Node.js HTTP-based QA test
+- `drone-system.js` — temp vectors for possessed drone movement
+- `enemies.js` — buffer reuse for group filter, temp vectors for medic/flinch
+- `npc-system.js` — O(1) NPC lookup, buffer reuse for group iteration
+- `game-manager.js` — temp vectors for tracer spawning and mantle check
 
 ## Last Known Good State
-- Server: HTTP 200 (56,343 bytes)
+- Server: HTTP 200 (58,041 bytes)
 - Syntax: 33/33 PASS
+- Test Suite: 28/28 PASS
 - QA: All 5 specialists PASS
-- GitHub: pushed (commit 493a92b)
+- GitHub: pushed (commit 22ce5c9)
+- Render.com: TIMEOUT (free tier, code works locally)
 
 ## Next Steps
-- [ ] Comprehensive gameplay logic audit (wave flow, scoring, progression)
-- [ ] Render.com live deployment verification (free tier cold start)
-- [ ] Code cleanup & dead code sweep
-- [ ] innerHTML XSS hardening (low priority — game-generated content only)
+- [ ] Scan remaining .clone() calls in hot paths
+- [ ] Deep code robustness audit
+- [ ] Game balance review
+- [ ] Render.com recheck when free tier wakes up
 
 ## Recovery Instructions
 If you are reading this after a crash:

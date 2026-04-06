@@ -620,7 +620,8 @@ const NPCSystem = (function () {
 
         case FGROUP_STATE.RETREATING:
           for (const npc of aliveMembers) {
-            npc.target = grp.rallyPoint.clone();
+            if (npc.target) npc.target.copy(grp.rallyPoint);
+            else npc.target = grp.rallyPoint.clone();
           }
           if (grp.stateTimer <= 0) {
             grp.state = FGROUP_STATE.REGROUPING;
@@ -635,7 +636,8 @@ const NPCSystem = (function () {
             if (npc.job === JOB.MEDIC) {
               const wounded = aliveMembers.find(m => m.health < 60 && m !== npc);
               if (wounded) {
-                npc.target = wounded.position.clone();
+                if (npc.target) npc.target.copy(wounded.position);
+                else npc.target = wounded.position.clone();
                 const d = npc.position.distanceTo(wounded.position);
                 if (d < 2) {
                   wounded.health = Math.min(100, wounded.health + delta * 10);
@@ -717,7 +719,9 @@ const NPCSystem = (function () {
     if (dist > wep.range * 0.7) {
       // Move toward enemy, stop at ~50% of max range
       var dir = _nTmp1.subVectors(enemy.mesh.position, npc.position).setY(0).normalize();
-      npc.target = npc.position.clone().add(dir.multiplyScalar(dist - wep.range * 0.5));
+      _nTmp2.copy(npc.position).addScaledVector(dir, dist - wep.range * 0.5);
+      if (npc.target) npc.target.copy(_nTmp2);
+      else npc.target = _nTmp2.clone();
     } else if (dist >= 4) {
       // Stop and shoot
       npc.target = null;
@@ -762,7 +766,9 @@ const NPCSystem = (function () {
     } else {
       // Too close — back away
       var away = _nTmp1.subVectors(npc.position, enemy.mesh.position).setY(0).normalize();
-      npc.target = npc.position.clone().add(away.multiplyScalar(6));
+      _nTmp2.copy(npc.position).addScaledVector(away, 6);
+      if (npc.target) npc.target.copy(_nTmp2);
+      else npc.target = _nTmp2.clone();
     }
   }
 
@@ -787,26 +793,24 @@ const NPCSystem = (function () {
           if (playerPos) {
             var playerYaw = (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) ? CameraSystem.getYaw() : 0;
             var worldCoverAngle = playerYaw + coverAngle;
-            var coverTarget = new THREE.Vector3(
+            var coverTarget = _nTmp3.set(
               playerPos.x + Math.sin(worldCoverAngle) * coverDist + (Math.random() - 0.5) * 3,
               0,
               playerPos.z + Math.cos(worldCoverAngle) * coverDist + (Math.random() - 0.5) * 3
             );
-            coverTarget.y = 0;
-            npc.target = coverTarget;
+            if (npc.target) npc.target.copy(coverTarget);
+            else npc.target = coverTarget.clone();
           }
         }
         if (!npc.target) {
           // Default: Move toward center (0,0,0) where battles happen, with some randomness
-          const toCenter = new THREE.Vector3(-npc.position.x, 0, -npc.position.z).normalize();
-          const randomOffset = new THREE.Vector3(
-            (Math.random() - 0.5) * 10,
-            0,
-            (Math.random() - 0.5) * 10
-          );
-          const huntTarget = npc.position.clone().add(toCenter.multiplyScalar(5 + Math.random() * 10)).add(randomOffset);
-          huntTarget.y = 0;
-          npc.target = huntTarget;
+          _nTmp1.set(-npc.position.x, 0, -npc.position.z).normalize();
+          _nTmp2.copy(npc.position).addScaledVector(_nTmp1, 5 + Math.random() * 10);
+          _nTmp2.x += (Math.random() - 0.5) * 10;
+          _nTmp2.z += (Math.random() - 0.5) * 10;
+          _nTmp2.y = 0;
+          if (npc.target) npc.target.copy(_nTmp2);
+          else npc.target = _nTmp2.clone();
         }
       }
     }
@@ -892,15 +896,13 @@ const NPCSystem = (function () {
     // Wander if idle — patrol toward battle areas, not random
     if (npc.job === JOB.IDLE && !npc.target) {
       // Move toward center where enemies likely are, with randomness
-      const toCenter = new THREE.Vector3(-npc.position.x, 0, -npc.position.z).normalize();
-      const idleOffset = new THREE.Vector3(
-        (Math.random() - 0.5) * 8,
-        0,
-        (Math.random() - 0.5) * 8
-      );
-      const idleTarget = npc.position.clone().add(toCenter.multiplyScalar(3 + Math.random() * 8)).add(idleOffset);
-      idleTarget.y = 0;
-      npc.target = idleTarget;
+      _nTmp1.set(-npc.position.x, 0, -npc.position.z).normalize();
+      _nTmp2.copy(npc.position).addScaledVector(_nTmp1, 3 + Math.random() * 8);
+      _nTmp2.x += (Math.random() - 0.5) * 8;
+      _nTmp2.z += (Math.random() - 0.5) * 8;
+      _nTmp2.y = 0;
+      if (npc.target) npc.target.copy(_nTmp2);
+      else npc.target = _nTmp2.clone();
     }
   }
 

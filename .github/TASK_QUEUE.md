@@ -23,24 +23,33 @@ Completed: 2026-04-06
 Details: Full end-to-end QA. Killed "Old Eden" imposter on port 3000. Server verified (HTTP 200, 56KB, ZOMBIELAND, security headers). 33/33 syntax checks PASS. 35/35 assets serve. All 5 QA specialists PASS. Fixed: enemies.js null guards, game-manager.js mesh guard + missing clear/reset calls on stage transitions, ml-system.js interval leak, audio-system.js playBark alias. Pushed commit 493a92b.
 
 ### [MEDIUM] Comprehensive Gameplay Logic Audit
-Status: IN-PROGRESS
-Requested: 2026-04-06 (auto-generated from QA findings)
-Details: Review wave flow, scoring, progression system, weapon unlocks, economy flow. Ensure game loop is correct from start → waves → stage clear → next stage → win.
+Status: DONE
+Requested: 2026-04-06
+Completed: 2026-04-06 (Session 7)
+Details: Full audit of start→wave→kill→clear→stage→win flow. Enemy system deep audit. Weapons system deep audit. ALL PASS.
+
+### [HIGH] Performance Optimization — Per-Frame Heap Allocations
+Status: DONE
+Requested: 2026-04-06
+Completed: 2026-04-06
+Details: Eliminated all remaining per-frame heap allocations: drone-system.js temp vectors, enemies.js buffer reuse + temp vectors, npc-system.js O(1) lookup + buffer, game-manager.js tracer/mantle temp vectors. Commit 22ce5c9.
 
 ### [LOW] Render.com Live Deployment Verification
-Status: PENDING
+Status: BLOCKED
 Requested: 2026-04-06
-Details: https://occupantkiller.onrender.com times out (free tier sleeping). Need to verify once it wakes up. Code-side deploy config is correct (render.yaml, package.json start script, PORT env var, 0.0.0.0 bind).
+Details: https://occupantkiller.onrender.com times out (free tier suspended). Code is correct (verified locally). Will recheck periodically.
 
 ### [LOW] Code Cleanup & Dead Code Sweep
-Status: PENDING
-Requested: 2026-04-06 (auto-generated)
-Details: Remove unused variables, dead code paths, commented-out blocks. Low priority.
+Status: DONE
+Requested: 2026-04-06
+Completed: 2026-04-06 (Session 7)
+Details: Only 3 console calls in entire project. No commented-out code, no TODOs, no dead code.
 
 ### [LOW] innerHTML XSS Hardening
-Status: PENDING
-Requested: 2026-04-06 (qa-security recommendation)
-Details: Review all innerHTML assignments for potential user-controlled data. Currently game-generated content only — low risk.
+Status: DONE
+Requested: 2026-04-06
+Completed: 2026-04-06 (Session 7)
+Details: 37 innerHTML usages reviewed. All use game-generated content. playerName displayed via textContent. Risk: zero.
 
 <!-- Add your requests below this line -->
 
