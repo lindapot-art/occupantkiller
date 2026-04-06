@@ -297,6 +297,39 @@ function phase6() {
   }
 }
 
+function phase7() {
+  console.log('\n══ Phase 7: Memory Disposal Patterns ══');
+  // Modules that manage THREE.js scene objects MUST have clear() with dispose()
+  const disposalRequired = [
+    { file: 'enemies.js', label: 'enemies' },
+    { file: 'vehicles.js', label: 'vehicles' },
+    { file: 'drone-system.js', label: 'drones' },
+    { file: 'npc-system.js', label: 'NPCs' },
+    { file: 'pickups.js', label: 'pickups' },
+    { file: 'tracers.js', label: 'tracers' },
+    { file: 'stage-vfx.js', label: 'VFX' },
+    { file: 'world-features.js', label: 'world features' },
+    { file: 'building.js', label: 'buildings' },
+  ];
+
+  let dispPass = 0;
+  disposalRequired.forEach(({ file, label }) => {
+    const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    const hasClear = /function\s+clear\s*\(/.test(src);
+    const hasDispose = src.includes('.dispose()');
+    if (hasClear && hasDispose) {
+      dispPass++;
+    } else {
+      const missing = [];
+      if (!hasClear) missing.push('clear()');
+      if (!hasDispose) missing.push('.dispose()');
+      fail('Disposal: ' + label, 'missing ' + missing.join(' and '));
+    }
+  });
+  if (dispPass === disposalRequired.length)
+    ok(dispPass + '/' + disposalRequired.length + ' modules have clear() + dispose()');
+}
+
 async function main() {
   console.log('╔══════════════════════════════════════════════╗');
   console.log('║     OccupantKiller Master QA Test Suite      ║');
@@ -309,6 +342,7 @@ async function main() {
   phase4();
   phase5();
   phase6();
+  phase7();
 
   console.log('\n══════════════════════════════════════════════');
   console.log(`  Results: ${passed} passed, ${failed} failed, ${warned} warnings`);
