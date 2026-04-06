@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
@@ -30,6 +31,16 @@ const MIME = {
   '.mp3':  'audio/mpeg',
   '.ogg':  'audio/ogg',
 };
+
+// Compressible MIME types
+const COMPRESSIBLE = new Set([
+  'text/html', 'text/css', 'application/javascript', 'application/json',
+  'image/svg+xml', 'model/gltf+json',
+]);
+
+// In-memory cache for gzipped assets (populated on first request)
+const _gzCache = {};
+const CACHE_MAX = 100; // max cached files
 
 const server = http.createServer((req, res) => {
   // Fast health check endpoint for Render.com
@@ -65,8 +76,45 @@ const server = http.createServer((req, res) => {
       return res.end('Not found');
     }
     const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', ...SECURITY_HEADERS });
-    res.end(data);
+    const mime = MIME[ext] || 'application/octet-stream';
+    const headers = { 'Content-Type': mime, ...SECURITY_HEADERS };
+
+    // Cache-Control: cache JS/CSS/images for 1 hour, HTML for 5 min
+    if (ext === '.html') {
+      headers['Cache-Control'] = 'public, max-age=300';
+    } else if (ext === '.js' || ext === '.css') {
+      headers['Cache-Control'] = 'public, max-age=3600';
+    } else if (['.png', '.jpg', '.gif', '.svg', '.ico', '.glb', '.wav', '.mp3', '.ogg'].indexOf(ext) !== -1) {
+      headers['Cache-Control'] = 'public, max-age=86400';
+    }
+
+    // Gzip compress text-based assets (with cache)
+    const acceptEncoding = req.headers['accept-encoding'] || '';
+    if (COMPRESSIBLE.has(mime) && acceptEncoding.indexOf('gzip') !== -1) {
+      if (_gzCache[filePath]) {
+        headers['Content-Encoding'] = 'gzip';
+        headers['Vary'] = 'Accept-Encoding';
+        res.writeHead(200, headers);
+        return res.end(_gzCache[filePath]);
+      }
+      zlib.gzip(data, (gzErr, compressed) => {
+        if (gzErr) {
+          res.writeHead(200, headers);
+          return res.end(data);
+        }
+        // Cache for future requests
+        if (Object.keys(_gzCache).length < CACHE_MAX) {
+          _gzCache[filePath] = compressed;
+        }
+        headers['Content-Encoding'] = 'gzip';
+        headers['Vary'] = 'Accept-Encoding';
+        res.writeHead(200, headers);
+        res.end(compressed);
+      });
+    } else {
+      res.writeHead(200, headers);
+      res.end(data);
+    }
   });
 });
 
