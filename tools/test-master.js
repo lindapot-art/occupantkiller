@@ -30,14 +30,19 @@ function ok(name) { passed++; console.log(`  ✅ ${name}`); }
 function fail(name, reason) { failed++; console.log(`  ❌ ${name}: ${reason}`); }
 function warn(name, reason) { warned++; console.log(`  ⚠️  ${name}: ${reason}`); }
 
-function get(urlPath) {
+function get(urlPath, extraHeaders) {
   return new Promise((resolve, reject) => {
     const url = BASE + urlPath;
     const mod = url.startsWith('https') ? https : http;
-    mod.get(url, { timeout: 10000 }, res => {
-      let d = '';
-      res.on('data', c => d += c);
-      res.on('end', () => resolve({ status: res.statusCode, body: d, headers: res.headers }));
+    const opts = { timeout: 10000 };
+    if (extraHeaders) opts.headers = extraHeaders;
+    mod.get(url, opts, res => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        resolve({ status: res.statusCode, body: buf.toString(), rawLength: buf.length, headers: res.headers });
+      });
     }).on('error', reject).on('timeout', function() { this.destroy(); reject(new Error('timeout')); });
   });
 }
@@ -91,6 +96,28 @@ async function phase1() {
     if (r.status === 404) ok('404 correct for missing file');
     else fail('404 test', 'Got ' + r.status);
   } catch (e) { fail('404 test', e.message); }
+
+  // Gzip compression
+  try {
+    const r = await get('/', { 'Accept-Encoding': 'gzip' });
+    if (r.headers['content-encoding'] === 'gzip') ok('Gzip compression active');
+    else fail('Gzip compression', 'Content-Encoding: ' + (r.headers['content-encoding'] || 'none'));
+  } catch (e) { fail('Gzip test', e.message); }
+
+  // Cache-Control headers
+  try {
+    const r = await get('/game-manager.js');
+    if (r.headers['cache-control'] && r.headers['cache-control'].includes('max-age=3600'))
+      ok('Cache-Control: JS files (1hr)');
+    else fail('Cache-Control JS', r.headers['cache-control'] || 'missing');
+  } catch (e) { fail('Cache-Control test', e.message); }
+
+  // Health check endpoint
+  try {
+    const r = await get('/healthz');
+    if (r.status === 200 && r.body === 'ok') ok('Health check: /healthz');
+    else fail('Health check', 'Status: ' + r.status + ' Body: ' + r.body);
+  } catch (e) { fail('Health check', e.message); }
 }
 
 async function phase2() {
