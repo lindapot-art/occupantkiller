@@ -4,6 +4,7 @@
   "description": "A browser-based first-person shooter built with [Three.js](https://threejs.org/).   Survive 10 waves of increasingly dangerous **occupants** before they overrun you.",
   "main": "index.html",
   "scripts": {
+    "start": "node server.js",
     "dev": "npx --yes serve -l 3000 .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -18,8 +19,5 @@
   "bugs": {
     "url": "https://github.com/lindapot-art/occupantkiller/issues"
   },
-  "homepage": "https://github.com/lindapot-art/occupantkiller#readme",
-  "dependencies": {
-    "three": "^0.137.0"
-  }
+  "homepage": "https://github.com/lindapot-art/occupantkiller#readme"
 }

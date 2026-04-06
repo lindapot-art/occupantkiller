@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 
 const SECURITY_HEADERS = {
@@ -64,8 +64,7 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`\n  OccupantKiller dev server running at:\n`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n  OccupantKiller server running at:\n`);
   console.log(`  > http://localhost:${PORT}\n`);
-  console.log(`  Press Ctrl+C to stop.\n`);
 });
