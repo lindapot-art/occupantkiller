@@ -2831,6 +2831,9 @@ const GameManager = (function () {
         return;
       }
       gameState = STATE.DEAD;
+      // Force exit vehicle / release drone on death
+      if (VehicleSystem.isInVehicle()) VehicleSystem.exit();
+      if (DroneSystem.isPossessing()) DroneSystem.release();
       if (AudioSystem.stopMusic) AudioSystem.stopMusic();
       Weapons.exitZoom();
       MLSystem.onDeath();
