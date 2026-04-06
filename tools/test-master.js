@@ -415,6 +415,67 @@ function phase8() {
   else ok(p8pass + '/' + p8total + ' gameplay bug fixes verified');
 }
 
+function phase9() {
+  console.log('\n══ Phase 9: Edge Case & Resource Fixes ══');
+  let p9pass = 0;
+  let p9total = 0;
+
+  function check(name, test) {
+    p9total++;
+    if (test) { p9pass++; } else { fail(name, 'pattern not found'); }
+  }
+
+  // Weather system clear()
+  const wsSrc = fs.readFileSync(path.join(ROOT, 'weather-system.js'), 'utf8');
+  check('WeatherSystem: has clear() function',
+    /function\s+clear\s*\(/.test(wsSrc));
+  check('WeatherSystem: clear disposes geometry',
+    wsSrc.includes('.geometry.dispose()') || wsSrc.includes('geometry) particles.geometry.dispose'));
+  check('WeatherSystem: clear exported',
+    wsSrc.includes('clear: clear'));
+
+  // Time system while loop
+  const tsSrc = fs.readFileSync(path.join(ROOT, 'time-system.js'), 'utf8');
+  check('TimeSystem: day rollover uses while (not if)',
+    tsSrc.includes('while (timeOfDay >= 1.0)'));
+
+  // Drone explosion interval tracking
+  const dsSrc = fs.readFileSync(path.join(ROOT, 'drone-system.js'), 'utf8');
+  check('DroneSystem: tracks explosion intervals',
+    dsSrc.includes('_explosionIntervals'));
+  check('DroneSystem: clear() clears explosion intervals',
+    dsSrc.includes('clearInterval(_explosionIntervals'));
+
+  // Pickup Y-axis check
+  const pkSrc = fs.readFileSync(path.join(ROOT, 'pickups.js'), 'utf8');
+  check('Pickups: Y-distance check in collection',
+    pkSrc.includes('dy < 3'));
+
+  // NPC cleanup
+  const npcSrc = fs.readFileSync(path.join(ROOT, 'npc-system.js'), 'utf8');
+  check('NPCSystem: killNPC deletes from _npcById',
+    npcSrc.includes('_npcById.delete'));
+  check('NPCSystem: killNPC nulls mesh',
+    npcSrc.includes('npc.mesh = null'));
+
+  // Blood particle pooling
+  const enSrc = fs.readFileSync(path.join(ROOT, 'enemies.js'), 'utf8');
+  check('Enemies: shared blood geometry (_bloodGeo)',
+    enSrc.includes('_bloodGeo'));
+  check('Enemies: blood uses scale instead of opacity fade',
+    enSrc.includes('_origScale'));
+
+  // GM wires WeatherSystem.clear
+  const gmSrc = fs.readFileSync(path.join(ROOT, 'game-manager.js'), 'utf8');
+  check('GM: calls WeatherSystem.clear in cleanup',
+    gmSrc.includes('WeatherSystem.clear'));
+  check('GM: re-inits WeatherSystem after clear',
+    gmSrc.includes('WeatherSystem.init'));
+
+  if (p9pass === p9total) ok(p9pass + '/' + p9total + ' edge case fixes verified');
+  else ok(p9pass + '/' + p9total + ' edge case fixes verified');
+}
+
 async function main() {
   console.log('╔══════════════════════════════════════════════╗');
   console.log('║     OccupantKiller Master QA Test Suite      ║');
@@ -429,6 +490,7 @@ async function main() {
   phase6();
   phase7();
   phase8();
+  phase9();
 
   console.log('\n══════════════════════════════════════════════');
   console.log(`  Results: ${passed} passed, ${failed} failed, ${warned} warnings`);

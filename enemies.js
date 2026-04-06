@@ -11,6 +11,10 @@ const Enemies = (() => {
 
   const MAX_CLIMBABLE_HEIGHT = 2; // Max terrain height difference enemies can climb
   const bloodParticles = [];
+  // Shared blood particle resources (pool geometry + 2 materials)
+  var _bloodGeo = new THREE.BoxGeometry(1, 1, 1);
+  var _bloodMatDark = new THREE.MeshLambertMaterial({ color: 0x880000 });
+  var _bloodMatLight = new THREE.MeshLambertMaterial({ color: 0xaa0000 });
 
   // ── Floating damage numbers ────────────────────────────────
   const _dmgNumbers = [];
@@ -1192,10 +1196,10 @@ const Enemies = (() => {
       blood.mesh.rotation.x += delta * 3;
       blood.mesh.rotation.z += delta * 2;
       blood.life -= delta;
-      // Fade out in last 0.5s
+      // Shrink in last 0.5s (avoids shared material mutation)
       if (blood.life < 0.5) {
-        blood.mesh.material.opacity = blood.life / 0.5;
-        blood.mesh.material.transparent = true;
+        var fadeScale = (blood.life / 0.5) * blood._origScale;
+        blood.mesh.scale.setScalar(Math.max(0.01, fadeScale));
       }
       // Ground collision
       if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
@@ -2198,20 +2202,19 @@ const Enemies = (() => {
       }
     }
 
-    // Spawn blood voxel particles
+    // Spawn blood voxel particles (shared geometry + materials)
     if (scene && enemy.mesh) {
       var bloodCount = Math.min(8, Math.ceil(amount / 10));
       for (var b = 0; b < bloodCount; b++) {
         var bloodSize = 0.08 + Math.random() * 0.12;
-        var bloodMesh = new THREE.Mesh(
-          new THREE.BoxGeometry(bloodSize, bloodSize, bloodSize),
-          new THREE.MeshLambertMaterial({ color: Math.random() < 0.5 ? 0xaa0000 : 0x880000 })
-        );
+        var bloodMesh = new THREE.Mesh(_bloodGeo, Math.random() < 0.5 ? _bloodMatLight : _bloodMatDark);
+        bloodMesh.scale.setScalar(bloodSize);
         bloodMesh.position.copy(enemy.mesh.position);
         bloodMesh.position.y += 0.5 + Math.random() * 1.0;
         scene.add(bloodMesh);
         bloodParticles.push({
           mesh: bloodMesh,
+          _origScale: bloodSize,
           velocity: new THREE.Vector3(
             (Math.random() - 0.5) * 4,
             1.5 + Math.random() * 3,
