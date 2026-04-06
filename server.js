@@ -32,6 +32,12 @@ const MIME = {
 };
 
 const server = http.createServer((req, res) => {
+  // Fast health check endpoint for Render.com
+  if (req.url === '/healthz') {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    return res.end('ok');
+  }
+
   let url;
   try { url = decodeURIComponent(req.url.split('?')[0]); } catch(e) {
     res.writeHead(400, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });

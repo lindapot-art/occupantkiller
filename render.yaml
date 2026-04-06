@@ -7,4 +7,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-    healthCheckPath: /
+    healthCheckPath: /healthz
+    numInstances: 1
+    plan: free
