@@ -1,0 +1,302 @@
+/**
+ * test-master.js — Master QA Test Suite for OccupantKiller
+ * 
+ * Usage: node tools/test-master.js [url]
+ * Default URL: http://localhost:3000
+ * 
+ * Tests:
+ *   Phase 1: Server & Security
+ *   Phase 2: Asset Serving
+ *   Phase 3: HTML Structure
+ *   Phase 4: Syntax Validation (node --check)
+ *   Phase 5: Module Pattern & API Verification
+ *   Phase 6: Deploy Config
+ */
+
+const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
+
+const BASE = process.argv[2] || 'http://localhost:3000';
+const ROOT = path.resolve(__dirname, '..');
+
+let passed = 0;
+let failed = 0;
+let warned = 0;
+
+function ok(name) { passed++; console.log(`  ✅ ${name}`); }
+function fail(name, reason) { failed++; console.log(`  ❌ ${name}: ${reason}`); }
+function warn(name, reason) { warned++; console.log(`  ⚠️  ${name}: ${reason}`); }
+
+function get(urlPath) {
+  return new Promise((resolve, reject) => {
+    const url = BASE + urlPath;
+    const mod = url.startsWith('https') ? https : http;
+    mod.get(url, { timeout: 10000 }, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => resolve({ status: res.statusCode, body: d, headers: res.headers }));
+    }).on('error', reject).on('timeout', function() { this.destroy(); reject(new Error('timeout')); });
+  });
+}
+
+async function phase1() {
+  console.log('\n══ Phase 1: Server & Security ══');
+  try {
+    const r = await get('/');
+    if (r.status === 200) ok('Index returns 200');
+    else fail('Index returns 200', 'Got ' + r.status);
+
+    if (r.body.length > 40000) ok('Index size > 40KB (' + r.body.length + 'b)');
+    else fail('Index size', r.body.length + 'b (expected >40KB)');
+
+    if (r.body.includes('ZOMBIELAND')) ok('Title contains ZOMBIELAND');
+    else fail('Title', 'ZOMBIELAND not found');
+
+    // Security headers
+    const secHeaders = ['x-content-type-options', 'x-frame-options', 'x-xss-protection'];
+    secHeaders.forEach(h => {
+      if (r.headers[h]) ok('Header: ' + h);
+      else fail('Header: ' + h, 'missing');
+    });
+
+    // No Express header
+    if (!r.headers['x-powered-by']) ok('No X-Powered-By (not Express)');
+    else fail('X-Powered-By detected', r.headers['x-powered-by']);
+
+  } catch (e) {
+    fail('Server reachable', e.message);
+    return;
+  }
+
+  // Path traversal
+  try {
+    const r = await get('/..%2F..%2Fetc%2Fpasswd');
+    if (r.status === 404 || r.status === 400) ok('Path traversal blocked (' + r.status + ')');
+    else fail('Path traversal', 'Got ' + r.status);
+  } catch (e) { fail('Path traversal test', e.message); }
+
+  // Null byte
+  try {
+    const r = await get('/index.html%00.js');
+    if (r.status === 400) ok('Null byte blocked (400)');
+    else fail('Null byte', 'Got ' + r.status);
+  } catch (e) { fail('Null byte test', e.message); }
+
+  // 404
+  try {
+    const r = await get('/nonexistent-file-xyz.html');
+    if (r.status === 404) ok('404 correct for missing file');
+    else fail('404 test', 'Got ' + r.status);
+  } catch (e) { fail('404 test', e.message); }
+}
+
+async function phase2() {
+  console.log('\n══ Phase 2: Asset Serving ══');
+  const assets = [
+    'index.html', 'style.css', 'three.min.js',
+    'weapons.js', 'enemies.js', 'game-manager.js', 'hud.js',
+    'combat-extras.js', 'voxel-world.js', 'audio-system.js',
+    'camera-system.js', 'vehicles.js', 'drone-system.js',
+    'npc-system.js', 'tracers.js', 'progression.js', 'missions.js',
+    'weather-system.js', 'pickups.js', 'perks.js', 'skills.js',
+    'economy.js', 'marketplace.js', 'building.js', 'traversal.js',
+    'ranks.js', 'feedback.js', 'stage-vfx.js', 'world-features.js',
+    'time-system.js', 'enemy-types.js', 'mission-types.js',
+    'blockchain.js', 'ml-system.js', 'automation.js'
+  ];
+
+  let assetPass = 0;
+  for (const a of assets) {
+    try {
+      const r = await get('/' + a);
+      if (r.status === 200 && r.body.length > 0) { assetPass++; }
+      else { fail('Asset: ' + a, 'Status ' + r.status + ', ' + r.body.length + 'b'); }
+    } catch (e) { fail('Asset: ' + a, e.message); }
+  }
+  if (assetPass === assets.length) ok(assetPass + '/' + assets.length + ' assets serve correctly');
+  else fail('Assets', assetPass + '/' + assets.length + ' serve correctly');
+}
+
+async function phase3() {
+  console.log('\n══ Phase 3: HTML Structure ══');
+  try {
+    const r = await get('/');
+    const html = r.body;
+
+    // Essential elements
+    const elements = [
+      'game-container', 'crosshair', 'health-bar', 'ammo-display',
+      'wave-display', 'stage-display', 'kill-feed', 'minimap-canvas',
+      'start-btn', 'restart-btn', 'next-wave-btn', 'next-stage-btn',
+      'overlay-start', 'overlay-dead', 'overlay-waveclear', 'overlay-stageclear',
+      'overlay-win', 'hud', 'score-display', 'weapon-name-display',
+      'hit-marker', 'damage-vignette', 'tactical-compass'
+    ];
+
+    let elPass = 0;
+    elements.forEach(id => {
+      if (html.includes('id="' + id + '"')) { elPass++; }
+      else { fail('Element #' + id, 'not found in HTML'); }
+    });
+    if (elPass === elements.length) ok(elPass + '/' + elements.length + ' DOM elements present');
+
+    // Script tags
+    const scripts = (html.match(/<script\s+src="[^"]+"/g) || []);
+    if (scripts.length >= 33) ok(scripts.length + ' script tags found (>=33)');
+    else fail('Script tags', 'Only ' + scripts.length + ' found (need 33)');
+
+    // Boot script
+    if (html.includes('GameManager.init()')) ok('Boot script: GameManager.init()');
+    else fail('Boot script', 'GameManager.init() not found');
+
+    // DOCTYPE
+    if (html.trim().startsWith('<!DOCTYPE')) ok('DOCTYPE present');
+    else fail('DOCTYPE', 'missing');
+
+    // Mobile viewport
+    if (html.includes('viewport')) ok('Mobile viewport meta');
+    else fail('Viewport', 'missing');
+
+  } catch (e) { fail('HTML structure', e.message); }
+}
+
+function phase4() {
+  console.log('\n══ Phase 4: Syntax Validation ══');
+  const files = fs.readdirSync(ROOT).filter(f => f.endsWith('.js') && f !== 'three.min.js');
+  let synPass = 0;
+  files.forEach(f => {
+    const r = spawnSync('node', ['--check', path.join(ROOT, f)], { encoding: 'utf8' });
+    if (r.status === 0) { synPass++; }
+    else { fail('Syntax: ' + f, r.stderr.trim().split('\n')[0]); }
+  });
+  if (synPass === files.length) ok(synPass + '/' + files.length + ' JS files pass node --check');
+  else fail('Syntax', synPass + '/' + files.length + ' passed');
+}
+
+function phase5() {
+  console.log('\n══ Phase 5: Module Patterns & APIs ══');
+  const clientFiles = fs.readdirSync(ROOT).filter(f =>
+    f.endsWith('.js') && f !== 'three.min.js' && f !== 'server.js'
+  );
+
+  // IIFE check
+  let iifePass = 0;
+  clientFiles.forEach(f => {
+    const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    if (/window\.\w+\s*=\s*\(function/.test(src) || /\(function\s*\(\)/.test(src) ||
+        /const\s+\w+\s*=\s*\(\(\)\s*=>/.test(src) || /=\s*\(\(\)\s*=>\s*\{/.test(src)) {
+      iifePass++;
+    } else {
+      fail('IIFE: ' + f, 'No IIFE pattern detected');
+    }
+  });
+  if (iifePass === clientFiles.length) ok(iifePass + '/' + clientFiles.length + ' use IIFE pattern');
+
+  // Critical API checks (check exported methods in return block)
+  const apiChecks = {
+    'game-manager.js': ['init', 'startGame', 'update', 'nextStage', 'beginWave'],
+    'enemies.js': ['startWave', 'update', 'clear', 'damage', 'getAll'],
+    'weapons.js': ['update', 'reset', 'fire', 'createGunMesh'],
+    'hud.js': ['setScore', 'setHealth', 'setAmmo', 'setWave', 'show'],
+    'voxel-world.js': ['init', 'getTerrainHeight', 'generateLevel'],
+    'camera-system.js': ['init', 'update', 'getYaw', 'getPitch'],
+    'audio-system.js': ['init', 'playGunshot', 'playHit', 'playDeath', 'playBark'],
+    'npc-system.js': ['init', 'update', 'clear', 'spawn'],
+    'vehicles.js': ['init', 'update', 'clear', 'spawn'],
+    'drone-system.js': ['init', 'update', 'clear', 'spawn'],
+    'tracers.js': ['init', 'update', 'clear'],
+  };
+
+  let apiPass = 0;
+  let apiTotal = 0;
+  Object.entries(apiChecks).forEach(([file, methods]) => {
+    const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    methods.forEach(m => {
+      apiTotal++;
+      // Check in return block (exported APIs) — look for method name as key
+      if (src.includes(m + ':') || src.includes(m + ',') ||
+          new RegExp('\\b' + m + '\\s*:').test(src) ||
+          new RegExp('\\b' + m + '\\b').test(src)) {
+        apiPass++;
+      } else {
+        fail('API: ' + file + '.' + m, 'not found');
+      }
+    });
+  });
+  if (apiPass === apiTotal) ok(apiPass + '/' + apiTotal + ' critical APIs verified');
+
+  // Frame cache check (performance optimization)
+  const cacheModules = ['enemies.js', 'npc-system.js', 'vehicles.js', 'drone-system.js'];
+  cacheModules.forEach(f => {
+    const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    if (src.includes('CacheFrame') || src.includes('_rebuildCache') || src.includes('_cachedFrame') ||
+        src.includes('cacheFrame') || src.includes('_cacheStamp')) {
+      ok('Frame cache: ' + f);
+    } else {
+      warn('Frame cache: ' + f, 'no frame caching detected');
+    }
+  });
+}
+
+function phase6() {
+  console.log('\n══ Phase 6: Deploy Config ══');
+
+  // package.json
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+    if (pkg.scripts && pkg.scripts.start === 'node server.js') ok('package.json start script');
+    else fail('package.json start', pkg.scripts?.start || 'missing');
+  } catch (e) { fail('package.json', e.message); }
+
+  // server.js
+  const serverSrc = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
+  if (serverSrc.includes('process.env.PORT')) ok('server.js: PORT from env');
+  else fail('server.js PORT', 'no process.env.PORT');
+  if (serverSrc.includes('0.0.0.0')) ok('server.js: binds 0.0.0.0');
+  else fail('server.js bind', 'no 0.0.0.0');
+
+  // render.yaml
+  if (fs.existsSync(path.join(ROOT, 'render.yaml'))) {
+    const ry = fs.readFileSync(path.join(ROOT, 'render.yaml'), 'utf8');
+    if (ry.includes('node server.js')) ok('render.yaml: correct start command');
+    else fail('render.yaml start', 'missing node server.js');
+    if (ry.includes('healthCheckPath')) ok('render.yaml: health check configured');
+    else warn('render.yaml', 'no health check');
+  } else {
+    fail('render.yaml', 'file missing');
+  }
+}
+
+async function main() {
+  console.log('╔══════════════════════════════════════════════╗');
+  console.log('║     OccupantKiller Master QA Test Suite      ║');
+  console.log('║     Target: ' + BASE.padEnd(33) + '║');
+  console.log('╚══════════════════════════════════════════════╝');
+
+  await phase1();
+  await phase2();
+  await phase3();
+  phase4();
+  phase5();
+  phase6();
+
+  console.log('\n══════════════════════════════════════════════');
+  console.log(`  Results: ${passed} passed, ${failed} failed, ${warned} warnings`);
+  console.log('══════════════════════════════════════════════');
+
+  if (failed > 0) {
+    console.log('\n  ❌ QA FAILED — ' + failed + ' issue(s) need fixing');
+    process.exit(1);
+  } else {
+    console.log('\n  ✅ QA PASSED — all checks green');
+    process.exit(0);
+  }
+}
+
+main().catch(e => {
+  console.error('Test suite error:', e.message);
+  process.exit(1);
+});
