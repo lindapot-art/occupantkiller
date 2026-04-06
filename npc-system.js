@@ -78,6 +78,8 @@ const NPCSystem = (function () {
 
   /* ── State ───────────────────────────────────────────────────────── */
   const npcs = [];
+  var _npcById = {};  // id → npc lookup for O(1) access
+  var _aliveGrpBuf = [];  // reusable buffer for alive group members
   let _scene = null;
   let nextId = 1;
   let _mlAssistStrategy = null; // ML-guided NPC assistance strategy
@@ -460,6 +462,7 @@ const NPCSystem = (function () {
   function spawn(x, y, z, rank) {
     const npc = createNPC(x, y, z, rank);
     npcs.push(npc);
+    _npcById[npc.id] = npc;
     if (_scene) _scene.add(npc.mesh);
     return npc;
   }
@@ -541,9 +544,13 @@ const NPCSystem = (function () {
   /* ── Friendly Assault Group AI ──────────────────────────────────── */
   function updateFriendlyGroups(delta) {
     for (const grp of friendlyGroups) {
-      const aliveMembers = grp.members
-        .map(id => npcs.find(n => n.id === id))
-        .filter(n => n && n.alive);
+      // Reuse buffer to avoid per-frame alloc
+      _aliveGrpBuf.length = 0;
+      for (var mi = 0; mi < grp.members.length; mi++) {
+        var n = _npcById[grp.members[mi]];
+        if (n && n.alive) _aliveGrpBuf.push(n);
+      }
+      var aliveMembers = _aliveGrpBuf;
       if (aliveMembers.length === 0) continue;
 
       grp.stateTimer -= delta;
@@ -1089,6 +1096,7 @@ const NPCSystem = (function () {
       }
     }
     npcs.length = 0;
+    _npcById = {};
     friendlyGroups.length = 0;
   }
 

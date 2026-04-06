@@ -305,9 +305,9 @@ const GameManager = (function () {
       // Magnet toward player
       var dist = lp.position.distanceTo(player.position);
       if (dist < LOOT_CONFIG.MAGNET_RANGE) {
-        var pullDir = player.position.clone().sub(lp.position).normalize();
+        var pullDir = _gmTmp1.copy(player.position).sub(lp.position).normalize();
         var pullSpeed = (1 - dist / LOOT_CONFIG.MAGNET_RANGE) * 12;
-        lp.position.add(pullDir.multiplyScalar(pullSpeed * delta));
+        lp.position.addScaledVector(pullDir, pullSpeed * delta);
       }
       // Collect
       if (dist < LOOT_CONFIG.COLLECT_RANGE) {
@@ -2314,8 +2314,8 @@ const GameManager = (function () {
     if (VoxelWorld.isSolid(newPos.x, checkH, newPos.z)) {
       // Try mantling over a wall when blocked horizontally and not on ground
       if (!player.onGround && typeof Traversal !== 'undefined' && !Traversal.isMantling()) {
-        var fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(_camera.quaternion);
-        Traversal.tryMantle(player.position, player.velocity.y, { x: fwd.x, z: fwd.z }, function (bx, by, bz) {
+        _gmTmp2.set(0, 0, -1).applyQuaternion(_camera.quaternion);
+        Traversal.tryMantle(player.position, player.velocity.y, { x: _gmTmp2.x, z: _gmTmp2.z }, function (bx, by, bz) {
           return VoxelWorld.getBlock(bx, by, bz);
         });
       }
@@ -2420,17 +2420,17 @@ const GameManager = (function () {
         player.waveShots++;
         // Spawn bullet tracer
         if (typeof Tracers !== 'undefined' && weaponType !== 'MELEE') {
-          var tOrigin = _camera.position.clone();
-          var tDir = new THREE.Vector3();
-          _camera.getWorldDirection(tDir);
+          _gmTmp2.copy(_camera.position);
+          _camera.getWorldDirection(_gmTmp3);
           var isHeavy = ['HMG', 'HMG_HEAVY', 'MACHINEGUN', 'MINIGUN'].indexOf(weaponType) >= 0;
           var isExplosive = ['AT', 'ATGM', 'AT_HEAVY', 'AT_LIGHT', 'AA', 'GRENADE', 'INCENDIARY', 'THERMOBARIC'].indexOf(weaponType) >= 0;
           if (!isExplosive) {
-            Tracers.spawnTracer(tOrigin.clone().addScaledVector(tDir, 0.5), tDir, isHeavy ? 0xff4400 : 0xffcc44, 120);
+            _gmNewPos.copy(_gmTmp2).addScaledVector(_gmTmp3, 0.5);
+            Tracers.spawnTracer(_gmNewPos.clone(), _gmTmp3, isHeavy ? 0xff4400 : 0xffcc44, 120);
           }
           // Muzzle flash on every shot
           if (Tracers.spawnMuzzleFlash) {
-            Tracers.spawnMuzzleFlash(tOrigin, tDir);
+            Tracers.spawnMuzzleFlash(_gmTmp2, _gmTmp3);
           }
           // Screen shake for heavy weapons
           if (isHeavy && CameraSystem.shake) {
@@ -3483,12 +3483,20 @@ const GameManager = (function () {
           player.hp = Math.min(player.maxHp, player.hp + perkResult.healThisTick);
           HUD.setHealth(player.hp, player.maxHp);
         }
-        // Gunship DPS to random enemy
-        if (perkResult.gunshipDPS > 0) {
-          var aliveEnemies = Enemies.getAll().filter(function (e) { return e.alive; });
-          if (aliveEnemies.length > 0) {
-            var targetIdx = Math.floor(Math.random() * aliveEnemies.length);
-            Enemies.damage(aliveEnemies[targetIdx], perkResult.gunshipDPS * delta);
+        // Gunship DPS to random enemy (no per-frame filter allocation)
+        if (perkResult.gunshipDPS > 0 && Enemies.getAliveCount() > 0) {
+          var _allE = Enemies.getAll();
+          var _aliveCount = Enemies.getAliveCount();
+          var _pick = Math.floor(Math.random() * _aliveCount);
+          var _seen = 0;
+          for (var _gi = 0; _gi < _allE.length; _gi++) {
+            if (_allE[_gi].alive) {
+              if (_seen === _pick) {
+                Enemies.damage(_allE[_gi], perkResult.gunshipDPS * delta);
+                break;
+              }
+              _seen++;
+            }
           }
         }
         // UAV indicator

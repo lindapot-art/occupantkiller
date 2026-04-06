@@ -516,6 +516,7 @@ const Enemies = (() => {
   // 5 enemy assault groups, Russian army "штурмовая группа" style
   const NUM_ASSAULT_GROUPS = 5;
   const assaultGroups = [];
+  var _aliveMembersBuf = [];  // reusable buffer for alive member indices
 
   // Group states
   const GROUP_STATE = Object.freeze({
@@ -2001,8 +2002,8 @@ const Enemies = (() => {
 
     // Move toward wounded
     if (wDist > 1.5) {
-      const dir = new THREE.Vector3().subVectors(wounded.mesh.position, medic.mesh.position).setY(0).normalize();
-      medic.mesh.position.addScaledVector(dir, medic.speed * 1.2 * delta);
+      _tmpVec3e.subVectors(wounded.mesh.position, medic.mesh.position).setY(0).normalize();
+      medic.mesh.position.addScaledVector(_tmpVec3e, medic.speed * 1.2 * delta);
       medic.mesh.lookAt(wounded.mesh.position.x, medic.mesh.position.y, wounded.mesh.position.z);
     } else {
       // Heal
@@ -2015,8 +2016,13 @@ const Enemies = (() => {
   // ── Assault Group AI ──────────────────────────────────────
   function updateAssaultGroups(delta, playerPos) {
     for (const grp of assaultGroups) {
-      // Count alive members
-      const aliveMembers = grp.members.filter(idx => enemies[idx] && enemies[idx].alive);
+      // Count alive members (reuse buffer to avoid per-frame alloc)
+      _aliveMembersBuf.length = 0;
+      for (var mi = 0; mi < grp.members.length; mi++) {
+        var idx = grp.members[mi];
+        if (enemies[idx] && enemies[idx].alive) _aliveMembersBuf.push(idx);
+      }
+      var aliveMembers = _aliveMembersBuf;
       if (aliveMembers.length === 0) continue;
 
       grp.stateTimer -= delta;
@@ -2176,9 +2182,9 @@ const Enemies = (() => {
 
     // Hit flinch: push enemy backward from damage source
     if (_playerPos && enemy.mesh) {
-      var flinchDir = new THREE.Vector3().subVectors(enemy.mesh.position, _playerPos).setY(0).normalize();
+      _tmpVec3f.subVectors(enemy.mesh.position, _playerPos).setY(0).normalize();
       var flinchDist = amount > 30 ? 0.5 : 0.3;
-      enemy.mesh.position.addScaledVector(flinchDir, flinchDist);
+      enemy.mesh.position.addScaledVector(_tmpVec3f, flinchDist);
       // Heavy hit stagger: pause movement briefly
       if (amount > 30) {
         enemy._staggerTimer = 0.3;

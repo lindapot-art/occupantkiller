@@ -5,6 +5,10 @@ const DroneSystem = (function () {
   'use strict';
 
   /* ── Drone Types ─────────────────────────────────────────────────── */
+  // Reusable temp vectors for possessed drone update (avoids per-frame alloc)
+  var _dTmpFwd = new THREE.Vector3();
+  var _dTmpRight = new THREE.Vector3();
+
   const DRONE_TYPE = Object.freeze({
     RECON:        'recon',
     FPV_ATTACK:   'fpv_attack',
@@ -391,15 +395,15 @@ const DroneSystem = (function () {
     const pitch = (typeof CameraSystem !== 'undefined') ? CameraSystem.getPitch() : 0;
 
     // Movement in drone's local space
-    const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-    const right   = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+    _dTmpFwd.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    _dTmpRight.set(Math.cos(yaw), 0, -Math.sin(yaw));
 
     drone.velocity.set(0, 0, 0);
 
-    if (_droneKeys.w) drone.velocity.add(forward.clone().multiplyScalar(drone.speed));
-    if (_droneKeys.s) drone.velocity.add(forward.clone().multiplyScalar(-drone.speed));
-    if (_droneKeys.a) drone.velocity.add(right.clone().multiplyScalar(-drone.speed));
-    if (_droneKeys.d) drone.velocity.add(right.clone().multiplyScalar(drone.speed));
+    if (_droneKeys.w) drone.velocity.addScaledVector(_dTmpFwd, drone.speed);
+    if (_droneKeys.s) drone.velocity.addScaledVector(_dTmpFwd, -drone.speed);
+    if (_droneKeys.a) drone.velocity.addScaledVector(_dTmpRight, -drone.speed);
+    if (_droneKeys.d) drone.velocity.addScaledVector(_dTmpRight, drone.speed);
     if (_droneKeys.up) drone.velocity.y = drone.speed * 0.6;
     if (_droneKeys.down) drone.velocity.y = -drone.speed * 0.6;
 
