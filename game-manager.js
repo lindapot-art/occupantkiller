@@ -28,6 +28,7 @@ const GameManager = (function () {
   var _gmTmp3 = new THREE.Vector3();
   var _gmNewPos = new THREE.Vector3();
   var _waveStartTimer = null;
+  var _hudSlowTimer = 0; // throttle slow HUD updates (dailies, bounties, prestige)
 
   /* ── Player State ────────────────────────────────────────────────── */
   const GOD_MODE_HP = 999999;
@@ -3581,6 +3582,11 @@ const GameManager = (function () {
       if (typeof Progression !== 'undefined') {
         Progression.trackStat('totalPlayTime', delta);
 
+        // Throttle slow HUD updates (dailies, bounties, prestige) to once per second
+        _hudSlowTimer -= delta;
+        if (_hudSlowTimer <= 0) {
+          _hudSlowTimer = 1.0;
+
         // Daily challenges display
         var dailyPanel = document.getElementById('daily-challenges');
         if (dailyPanel) {
@@ -3626,6 +3632,7 @@ const GameManager = (function () {
         if (prestigeInd && Progression.getPrestigeLevel() > 0) {
           prestigeInd.textContent = Progression.getPrestigeIcon() + ' P' + Progression.getPrestigeLevel();
         }
+        } // end _hudSlowTimer throttle
       }
 
       // Sync stealth state to enemy detection system

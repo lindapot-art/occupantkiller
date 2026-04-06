@@ -44,6 +44,7 @@ const HUD = (() => {
   }
 
   function setHealth(current, max) {
+    if (!max || !el.healthBar) return;
     const pct = Math.max(0, current / max) * 100;
     el.healthBar.style.width  = pct + '%';
     el.healthBar.style.background = pct > 60
@@ -57,6 +58,7 @@ const HUD = (() => {
   }
 
   function setAmmo(clip, reserve, clipSize) {
+    if (!el.ammo || !el.ammoRes) return;
     el.ammo.textContent    = clip;
     el.ammoRes.textContent = '/ ' + reserve;
     // Low ammo warning flash
@@ -327,9 +329,14 @@ const HUD = (() => {
 
   // ── Tactical Compass ──────────────────────────────────────
   const compassEl = document.getElementById('tactical-compass');
+  var _compassLastUpdate = 0;
 
   function updateCompass(yaw) {
     if (!compassEl) return;
+    // Throttle to ~10fps (100ms) to avoid per-frame innerHTML rebuild
+    var now = performance.now();
+    if (now - _compassLastUpdate < 100) return;
+    _compassLastUpdate = now;
     // Cardinal directions spread across compass bar based on player yaw
     var degs = (-yaw * 180 / Math.PI) % 360;
     if (degs < 0) degs += 360;
