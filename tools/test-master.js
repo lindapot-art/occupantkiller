@@ -11,6 +11,10 @@
  *   Phase 4: Syntax Validation (node --check)
  *   Phase 5: Module Pattern & API Verification
  *   Phase 6: Deploy Config
+ *   Phase 7: Memory Disposal Patterns
+ *   Phase 8: Gameplay Bug Fix Verification
+ *   Phase 9: Edge Case & Resource Fixes
+ *   Phase 10: Traversal & Integration Fixes
  */
 
 const http = require('http');
@@ -476,6 +480,65 @@ function phase9() {
   else ok(p9pass + '/' + p9total + ' edge case fixes verified');
 }
 
+/* ══════════════════════════════════════════════════════════════════
+ *  Phase 10 — Traversal Integration & Pattern Fixes
+ * ══════════════════════════════════════════════════════════════════ */
+function phase10() {
+  console.log('\n══ Phase 10: Traversal & Integration Fixes ══');
+  var p10pass = 0, p10total = 0;
+  function check(name, ok) { p10total++; if (ok) p10pass++; else fail(name); }
+
+  var travSrc = fs.readFileSync(path.join(ROOT, 'traversal.js'), 'utf8');
+  var gmSrc = fs.readFileSync(path.join(ROOT, 'game-manager.js'), 'utf8');
+  var ceSrc = fs.readFileSync(path.join(ROOT, 'combat-extras.js'), 'utf8');
+  var vehSrc = fs.readFileSync(path.join(ROOT, 'vehicles.js'), 'utf8');
+
+  // Mantle horizontal push
+  check('Traversal: mantle stores forward direction (mantleFwdX)',
+    travSrc.includes('mantleFwdX'));
+  check('Traversal: mantle stores start position (mantleStartX)',
+    travSrc.includes('mantleStartX'));
+  check('Traversal: updateMantle returns x,z coordinates',
+    travSrc.includes('x: currentX') && travSrc.includes('z: currentZ'));
+
+  // GM applies mantle XZ
+  check('GM: applies mantle x position',
+    gmSrc.includes('travResult.mantle.x'));
+  check('GM: applies mantle z position',
+    gmSrc.includes('travResult.mantle.z'));
+
+  // Dolphin dive integration
+  check('GM: applies dolphin dive moveX',
+    gmSrc.includes('travResult.dive') && gmSrc.includes('dive.moveX'));
+  check('GM: applies dolphin dive moveZ',
+    gmSrc.includes('dive.moveZ'));
+
+  // Vault integration
+  check('GM: applies vault position',
+    gmSrc.includes('travResult.vault') && gmSrc.includes('vault.position'));
+
+  // Wall run double-update fix
+  check('GM: no duplicate Traversal.updateWallRun call',
+    !gmSrc.includes('Traversal.updateWallRun(delta)'));
+  check('GM: uses travResult.wallRun instead',
+    gmSrc.includes('travResult.wallRun'));
+
+  // CombatExtras pattern compliance
+  check('CombatExtras: has clear() export',
+    ceSrc.includes('clear:'));
+  check('CombatExtras: has init() export',
+    ceSrc.includes('init:'));
+
+  // Vehicles per-frame allocation fix
+  check('Vehicles: no per-frame Vector2 allocation',
+    !vehSrc.includes('new THREE.Vector2'));
+  check('Vehicles: uses Math.sqrt for speed calc',
+    vehSrc.includes('Math.sqrt(v.velocity.x * v.velocity.x'));
+
+  if (p10pass === p10total) ok(p10pass + '/' + p10total + ' traversal & integration fixes verified');
+  else ok(p10pass + '/' + p10total + ' traversal & integration fixes verified');
+}
+
 async function main() {
   console.log('╔══════════════════════════════════════════════╗');
   console.log('║     OccupantKiller Master QA Test Suite      ║');
@@ -491,6 +554,7 @@ async function main() {
   phase7();
   phase8();
   phase9();
+  phase10();
 
   console.log('\n══════════════════════════════════════════════');
   console.log(`  Results: ${passed} passed, ${failed} failed, ${warned} warnings`);

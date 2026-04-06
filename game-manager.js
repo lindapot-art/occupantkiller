@@ -3301,9 +3301,26 @@ const GameManager = (function () {
       // Traversal update (mantle, dive)
       if (typeof Traversal !== 'undefined') {
         var travResult = Traversal.update(delta);
-        // Apply mantle Y override if mantling
+        // Apply mantle position override if mantling
         if (travResult && travResult.mantle && travResult.mantle.active) {
+          player.position.x = travResult.mantle.x;
           player.position.y = travResult.mantle.y;
+          player.position.z = travResult.mantle.z;
+          player.velocity.y = 0;
+        }
+
+        // Apply dolphin dive movement
+        if (travResult && travResult.dive && travResult.dive.active) {
+          player.position.x += travResult.dive.moveX;
+          player.position.z += travResult.dive.moveZ;
+          player.position.y += travResult.dive.heightOffset;
+        }
+
+        // Apply vault movement
+        if (travResult && travResult.vault && travResult.vault.active && travResult.vault.position) {
+          player.position.x = travResult.vault.position.x;
+          player.position.y = travResult.vault.position.y;
+          player.position.z = travResult.vault.position.z;
           player.velocity.y = 0;
         }
 
@@ -3346,14 +3363,11 @@ const GameManager = (function () {
           }
         }
 
-        // ── B30: Wall run update ──
-        if (Traversal.isWallRunning && Traversal.isWallRunning()) {
-          var wrUp = Traversal.updateWallRun(delta);
-          if (wrUp && wrUp.active) {
-            player.position.y += wrUp.offsetY * delta;
-            player.velocity.y = 0;
-            if (AudioSystem.playWallRun) AudioSystem.playWallRun();
-          }
+        // ── B30: Wall run update (uses result from Traversal.update above, not a second call) ──
+        if (travResult && travResult.wallRun && travResult.wallRun.active) {
+          player.position.y += travResult.wallRun.offsetY * delta;
+          player.velocity.y = 0;
+          if (AudioSystem.playWallRun) AudioSystem.playWallRun();
         }
 
         // ── B30: Ledge grab update ──

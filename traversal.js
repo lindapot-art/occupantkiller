@@ -35,6 +35,10 @@ const Traversal = (function () {
     mantleTimer: 0,
     mantleStartY: 0,
     mantleTargetY: 0,
+    mantleFwdX: 0,
+    mantleFwdZ: 0,
+    mantleStartX: 0,
+    mantleStartZ: 0,
     // Dolphin dive
     diving: false,
     diveTimer: 0,
@@ -72,6 +76,10 @@ const Traversal = (function () {
         state.mantleTimer = CFG.MANTLE_DURATION;
         state.mantleStartY = playerPos.y;
         state.mantleTargetY = playerBlockY + dy + 1.5;
+        state.mantleFwdX = forwardDir.x;
+        state.mantleFwdZ = forwardDir.z;
+        state.mantleStartX = playerPos.x;
+        state.mantleStartZ = playerPos.z;
         return true;
       }
     }
@@ -83,8 +91,12 @@ const Traversal = (function () {
     state.mantleTimer -= dt;
     const t = 1 - state.mantleTimer / CFG.MANTLE_DURATION;
     const currentY = state.mantleStartY + (state.mantleTargetY - state.mantleStartY) * Math.min(1, t);
+    // Push forward 1.5 units over the mantle duration so player lands on top
+    var fwd = Math.min(1, t) * 1.5;
+    var currentX = state.mantleStartX + state.mantleFwdX * fwd;
+    var currentZ = state.mantleStartZ + state.mantleFwdZ * fwd;
     if (state.mantleTimer <= 0) { state.mantling = false; }
-    return { y: currentY, active: state.mantling || t >= 0.99 };
+    return { y: currentY, x: currentX, z: currentZ, active: state.mantling || t >= 0.99 };
   }
 
   function isMantling() { return state.mantling; }
@@ -409,6 +421,8 @@ const Traversal = (function () {
 
   function reset() {
     state.mantling = false; state.mantleTimer = 0;
+    state.mantleFwdX = 0; state.mantleFwdZ = 0;
+    state.mantleStartX = 0; state.mantleStartZ = 0;
     state.diving = false; state.diveTimer = 0; state.diveCooldown = 0;
     state.rappelling = false; state.onZipline = false;
     state.swimming = false; state.breathTimer = 10;

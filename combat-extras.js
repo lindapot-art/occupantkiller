@@ -381,7 +381,7 @@ const CombatExtras = (function () {
 
   /* ── Public API ────────────────────────────── */
   return {
-    CFG, AMMO_TYPES, reset, update,
+    CFG, AMMO_TYPES, reset, update, init: reset, clear: reset,
     // Lean
     setLean, isLeaning,
     // Inspect

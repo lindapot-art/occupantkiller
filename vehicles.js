@@ -493,7 +493,7 @@ const VehicleSystem = (function () {
     }
 
     // Speed cap
-    const hSpeed = new THREE.Vector2(v.velocity.x, v.velocity.z).length();
+    const hSpeed = Math.sqrt(v.velocity.x * v.velocity.x + v.velocity.z * v.velocity.z);
     if (hSpeed > v.speed) {
       const scale = v.speed / hSpeed;
       v.velocity.x *= scale;
