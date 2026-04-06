@@ -852,7 +852,7 @@ const GameManager = (function () {
               var enemies = Enemies.getAll();
               for (var qi = 0; qi < enemies.length; qi++) {
                 var qe = enemies[qi];
-                if (!qe.alive) continue;
+                if (!qe.alive || !qe.mesh) continue;
                 var qdx = qe.mesh.position.x - player.position.x;
                 var qdz = qe.mesh.position.z - player.position.z;
                 if (qdx * qdx + qdz * qdz < qm.range * qm.range) {
@@ -1628,7 +1628,9 @@ const GameManager = (function () {
     Pickups.clear();
     VehicleSystem.clear();
     DroneSystem.clear();
+    NPCSystem.clear();
     if (typeof Tracers !== 'undefined') Tracers.clear();
+    if (typeof StageVFX !== 'undefined' && StageVFX.clear) StageVFX.clear();
 
     // Respawn vehicle fleet on roads for first stage
     var _rwps = (VoxelWorld.getRoadWaypoints ? VoxelWorld.getRoadWaypoints() : []);
@@ -1775,11 +1777,17 @@ const GameManager = (function () {
     player.position.set(0, spawnH + player.height, 0);
     player.velocity.set(0, 0, 0);
 
-    // Clear enemies and pickups from old stage
+    // Clear enemies, pickups, and module state from old stage
     Enemies.clear();
     Pickups.clear();
     DroneSystem.clear();
+    if (typeof Tracers !== 'undefined' && Tracers.clear) Tracers.clear();
     if (typeof StageVFX !== 'undefined' && StageVFX.clear) StageVFX.clear();
+    if (typeof WorldFeatures !== 'undefined' && WorldFeatures.clear) WorldFeatures.clear();
+    if (typeof CombatExtras !== 'undefined' && CombatExtras.reset) CombatExtras.reset();
+    if (typeof Traversal !== 'undefined' && Traversal.reset) Traversal.reset();
+    if (typeof MissionTypes !== 'undefined' && MissionTypes.clear) MissionTypes.clear();
+    if (typeof Feedback !== 'undefined' && Feedback.clear) Feedback.clear();
 
     // Respawn NPCs on new terrain
     NPCSystem.clear();

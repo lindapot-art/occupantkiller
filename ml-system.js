@@ -945,6 +945,7 @@ var MLSystem = (function () {
   }
 
   /* ── Init & Session Management ──────────────────────────── */
+  var _saveInterval = null;
   function init() {
     load();
     data.sessions++;
@@ -953,8 +954,9 @@ var MLSystem = (function () {
     // Restore difficulty from persistent profile
     difficultyMult = 0.5 + data.difficultyProfile;
 
-    // Auto-save every 30 seconds
-    setInterval(save, 30000);
+    // Auto-save every 30 seconds (clear previous if re-init)
+    if (_saveInterval) clearInterval(_saveInterval);
+    _saveInterval = setInterval(save, 30000);
 
     // Store initial project facts
     if (data.projectMemory.facts.length === 0) {

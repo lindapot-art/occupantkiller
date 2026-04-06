@@ -1139,6 +1139,7 @@ const AudioSystem = (function () {
     isEnabled: function () { return enabled; },
     // B21: New audio
     playEnemyBark: playEnemyBark,
+    playBark: playEnemyBark,
     playHeadshotDing: playHeadshotDing,
     playLevelComplete: playLevelComplete,
     playGrenadeBounce: playGrenadeBounce,

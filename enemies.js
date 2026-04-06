@@ -2155,19 +2155,23 @@ const Enemies = (() => {
 
     enemy.hp = Math.max(0, enemy.hp - amount);
 
-    // Floating damage number
-    if (enemy.mesh) spawnDmgNumber(enemy.mesh.position, amount, !!isHeadshot);
+    // Floating damage number + white flash on hit
+    if (enemy.mesh) {
+      spawnDmgNumber(enemy.mesh.position, amount, !!isHeadshot);
 
       // White flash on hit — start timer; update() resets colors
-    enemy.mesh.userData.parts.forEach(p => {
-      if (p.material && p.material.visible !== false && !p.material.transparent) {
-        // Cache original color on first hit
-        if (p.userData.origColor === undefined) {
-          p.userData.origColor = p.material.color.getHex();
-        }
-        p.material.color.setHex(0xffffff);
+      if (enemy.mesh.userData && enemy.mesh.userData.parts) {
+        enemy.mesh.userData.parts.forEach(p => {
+          if (p.material && p.material.visible !== false && !p.material.transparent) {
+            // Cache original color on first hit
+            if (p.userData.origColor === undefined) {
+              p.userData.origColor = p.material.color.getHex();
+            }
+            p.material.color.setHex(0xffffff);
+          }
+        });
       }
-    });
+    }
     enemy.flashTimer = 0.08;
 
     // Hit flinch: push enemy backward from damage source
@@ -2182,7 +2186,7 @@ const Enemies = (() => {
     }
 
     // Spawn blood voxel particles
-    if (scene) {
+    if (scene && enemy.mesh) {
       var bloodCount = Math.min(8, Math.ceil(amount / 10));
       for (var b = 0; b < bloodCount; b++) {
         var bloodSize = 0.08 + Math.random() * 0.12;
