@@ -1557,9 +1557,10 @@ const Weapons = (() => {
     // Grenades, smoke, flashbangs have upward arc
     if (isGrenade || isMolotov || isSmoke || isFlash) dir.y += 0.3;
     dir.normalize();
-    const pos = camera.getWorldPosition(new THREE.Vector3());
+    const pos = camera.getWorldPosition(_wTmp1);
     mesh.position.copy(pos).addScaledVector(dir, 1.0);
-    mesh.lookAt(pos.clone().addScaledVector(dir, 2));
+    _wTmp2.copy(pos).addScaledVector(dir, 2);
+    mesh.lookAt(_wTmp2);
     _scene.add(mesh);
     const speed = (isGrenade || isMolotov || isSmoke || isFlash) ? 18 : PROJ_SPEED;
     projectiles.push({
@@ -1596,7 +1597,7 @@ const Weapons = (() => {
       // Check enemy collision
       let hit = false;
       const enemyMeshes = Enemies.getEnemyMeshes();
-      _projRaycaster.set(p.mesh.position, p.dir.clone());
+      _projRaycaster.set(p.mesh.position, p.dir);
       _projRaycaster.near = 0;
       _projRaycaster.far = p.speed * delta + 0.5;
       const hits = _projRaycaster.intersectObjects(enemyMeshes, true);
@@ -1604,8 +1605,9 @@ const Weapons = (() => {
 
       // Check terrain collision via VoxelWorld
       if (!hit && typeof VoxelWorld !== 'undefined') {
+        _wTmpFakePos.copy(p.mesh.position);
         const fakeCamera = {
-          position: p.mesh.position.clone(),
+          position: _wTmpFakePos,
           getWorldDirection: function(v) { return v.copy(p.dir); },
         };
         const ray = VoxelWorld.raycastBlock(fakeCamera, p.speed * delta + 0.5);
@@ -1813,6 +1815,9 @@ const Weapons = (() => {
   const raycaster = new THREE.Raycaster();
   const _projRaycaster = new THREE.Raycaster(); // hoisted for projectile collision checks
   const spreadVec = new THREE.Vector2();
+  const _wTmp1 = new THREE.Vector3(); // reusable temp vectors for fire/projectile paths
+  const _wTmp2 = new THREE.Vector3();
+  const _wTmpFakePos = new THREE.Vector3();
 
   // Track whether a shot was actually fired this frame (for sound)
   let _firedThisFrame = false;
@@ -1854,8 +1859,8 @@ const Weapons = (() => {
         swingTimer = 0.3;
       }
       raycaster.set(
-        camera.getWorldPosition(new THREE.Vector3()),
-        camera.getWorldDirection(new THREE.Vector3())
+        camera.getWorldPosition(_wTmp1),
+        camera.getWorldDirection(_wTmp2)
       );
       raycaster.far = meleeRange;
       const hits = raycaster.intersectObjects(targets, true);
@@ -1936,10 +1941,11 @@ const Weapons = (() => {
           onHit(pelletHits[0], Math.floor(wep.damage / pellets));
         } else if (typeof VoxelWorld !== 'undefined') {
           // Pellet missed — dig terrain using pellet's spread direction
-          const pelletDir = raycaster.ray.direction.clone();
+          _wTmp1.copy(raycaster.ray.direction);
+          var _pelletX = _wTmp1.x, _pelletY = _wTmp1.y, _pelletZ = _wTmp1.z;
           const pelletCam = {
             position: camera.position,
-            getWorldDirection: function(v) { return v.copy(pelletDir); },
+            getWorldDirection: function(v) { return v.set(_pelletX, _pelletY, _pelletZ); },
           };
           const pRay = VoxelWorld.raycastBlock(pelletCam, 25);
           if (pRay) destroyBlock(pRay.hit.x, pRay.hit.y, pRay.hit.z, false);
@@ -1983,10 +1989,11 @@ const Weapons = (() => {
       }
     } else if (typeof VoxelWorld !== 'undefined') {
       // Bullet missed enemies — dig terrain on impact using bullet's spread direction
-      const bulletDir = raycaster.ray.direction.clone();
+      _wTmp1.copy(raycaster.ray.direction);
+      var _bx = _wTmp1.x, _by = _wTmp1.y, _bz = _wTmp1.z;
       const bulletCam = {
         position: camera.position,
-        getWorldDirection: function(v) { return v.copy(bulletDir); },
+        getWorldDirection: function(v) { return v.set(_bx, _by, _bz); },
       };
       const bRay = VoxelWorld.raycastBlock(bulletCam, 80);
       if (bRay) {

@@ -4,43 +4,38 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-06 — Critical Wave Progression Fix
+- **Timestamp**: 2026-04-06 — Performance Optimization Batch
 - **Agent**: KING
-- **Status**: FIXES DEPLOYED, QA PASSED, PUSHING TO GITHUB
+- **Status**: QA PASSED, READY TO PUSH
 
 ## Current Task
-- COMPLETED: Fixed game-breaking wave progression bugs
+- COMPLETED: Major performance optimization — eliminated ~170+ per-frame heap allocations
 
 ## Steps Completed This Session
-1. [x] Diagnosed premature wave-clear bug via Puppeteer headless testing
-2. [x] Fixed enemies.js clear() — allDead=true prevents false wave completion during startGame→beginWave gap
-3. [x] Fixed enemies.js MEDIC case — swapped updateMedic(e, delta, enemies) to updateMedic(e, enemies, delta)
-4. [x] Verified fix via Puppeteer: wave 1 starts correctly, wave 2 advances correctly
-5. [x] QA gate: all 5 specialists PASS (syntax, runtime, visual, integration, security)
-6. [x] All 32 JS files pass node --check
-7. [x] Server verified: HTTP 200, 58041 bytes
-8. [ ] Push to GitHub and verify live deployment
+1. [x] Syntax-checked all 5 previously modified files (enemies, npc-system, vehicles, drone-system, game-manager)
+2. [x] Optimized tracers.js — shared geometry for all particles (sphere, box, plane, ring), eliminated per-spawn geometry creation
+3. [x] Fixed tracers.js particle scale bug (qa-visual caught: unit geometry needed _baseSize multiplier in update)
+4. [x] Optimized weapons.js — hoisted temp vectors, eliminated raycaster direction clones, eliminated per-fire getWorldPosition allocs
+5. [x] Optimized vehicles.js — hoisted raycaster + temp vectors, eliminated per-frame Raycaster construction, eliminated clone() in AI/turret paths
+6. [x] Fixed game-manager.js cache mutation bug (qa-integration caught: .push() on cached getEnemyMeshes array)
+7. [x] QA gate: all 5 specialists PASS after fixes
+8. [x] All 33 JS files pass node --check
+9. [x] Server verified: HTTP 200, 58041 bytes
+10. [ ] Push to GitHub
 
 ## Files Changed This Session
-- `drone-system.js` — MODIFIED (typeof guards, null-safe getPlayer)
-- `feedback.js` — MODIFIED (closure fix in updateKillFeed)
-- `npc-system.js` — MODIFIED (VoxelWorld guard, mesh null guard)
-- `marketplace.js` — MODIFIED (blockchain call before lockWeapon, double-spend guard)
-- `weapons.js` — MODIFIED (id field in getWeaponInfo)
-- `hud.js` — MODIFIED (kill feed dedup)
-- `server.js` — MODIFIED (port 3000)
-- `start.bat` — MODIFIED (port 3000)
-- `package.json` — MODIFIED (port 3000)
-- `.github/CHECKPOINT.md` — MODIFIED
-- `.github/TASK_QUEUE.md` — MODIFIED
-- `.github/CHECKPOINT.md` — MODIFIED
+- `enemies.js` — temp vectors, cached getAll/getAliveCount/getEnemyMeshes, sniper laser reuse
+- `npc-system.js` — temp vectors, cached getAll/getCount
+- `vehicles.js` — temp vectors, hoisted raycaster, cached getAll, eliminated clones
+- `drone-system.js` — cached getAll
+- `game-manager.js` — temp vectors, renderer optimizations, adaptive quality, .slice() fix
+- `tracers.js` — shared geometries, temp vectors, _baseSize particle fix
+- `weapons.js` — temp vectors, eliminated raycaster clones
 
 ## Last Known Good State
 - Server: HTTP 200 (58,041 bytes)
-- Syntax: 34/34 PASS
-- Security Headers: X-Content-Type-Options: nosniff, X-Frame-Options: SAMEORIGIN, X-XSS-Protection: 1; mode=block
-- Null byte attack: BLOCKED (400)
-- Path traversal: BLOCKED (404)
+- Syntax: 33/33 PASS
+- QA: All 5 specialists PASS (2 bugs found and fixed during QA)
 
 ## Recovery Instructions
 If you are reading this after a crash:

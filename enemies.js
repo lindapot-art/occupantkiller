@@ -613,6 +613,14 @@ const Enemies = (() => {
   const _tmpVec3 = new THREE.Vector3();
   const _tmpVec3b = new THREE.Vector3();
   const _tmpVec3c = new THREE.Vector3();
+  const _tmpVec3d = new THREE.Vector3();
+  const _tmpVec3e = new THREE.Vector3();
+  const _tmpVec3f = new THREE.Vector3();
+
+  // ── Cached getAll results (rebuilt once per update frame) ──
+  let _cachedAlive = [];
+  let _cachedMeshes = [];
+  let _cacheFrame = -1;
 
   // ── Enemy grenade system ─────────────────────────────────
   const _enemyGrenades = [];
@@ -1362,8 +1370,8 @@ const Enemies = (() => {
       // Player detection: only spot if not stealthed and within detection range/angle
       if (!_playerStealth && distToPlayer < DETECTION_RANGE) {
         // Check if player is roughly in front of enemy (FOV cone)
-        const facingDir = new THREE.Vector3(0, 0, -1).applyQuaternion(e.mesh.quaternion);
-        const angleToPlayer = facingDir.angleTo(dirToPlayer.clone().normalize());
+        const facingDir = _tmpVec3d.set(0, 0, -1).applyQuaternion(e.mesh.quaternion);
+        const angleToPlayer = facingDir.angleTo(_tmpVec3e.copy(dirToPlayer).normalize());
         if (angleToPlayer < DETECTION_ANGLE || distToPlayer < 4) {
           e.spotLevel = Math.min(SPOT_TIME + 0.5, e.spotLevel + delta);
         } else {
@@ -1453,7 +1461,7 @@ const Enemies = (() => {
               playerYaw = CameraSystem.getYaw();
             }
             var vulnAngle = playerYaw + _aiStrategy.vulnerableSector * (Math.PI * 0.25);
-            var vulnDir = new THREE.Vector3(Math.sin(vulnAngle), 0, Math.cos(vulnAngle));
+            var vulnDir = _tmpVec3d.set(Math.sin(vulnAngle), 0, Math.cos(vulnAngle));
             var vulnWeight = 0.3 * _aiStrategy.adaptationLevel;
             dir.addScaledVector(vulnDir, vulnWeight).normalize();
           }
@@ -1462,7 +1470,7 @@ const Enemies = (() => {
           if (typeof MLSystem !== 'undefined' && MLSystem.predictPlayerPosition && targetDist > 10) {
             var predicted = MLSystem.predictPlayerPosition(2.0);
             if (predicted) {
-              var predDir = new THREE.Vector3(predicted.x - e.mesh.position.x, 0, predicted.z - e.mesh.position.z);
+              var predDir = _tmpVec3e.set(predicted.x - e.mesh.position.x, 0, predicted.z - e.mesh.position.z);
               if (predDir.lengthSq() > 1) {
                 predDir.normalize();
                 dir.lerp(predDir, 0.2 * _aiStrategy.adaptationLevel).normalize();
@@ -1500,7 +1508,7 @@ const Enemies = (() => {
             // Flank: perpendicular offset based on enemy ID (alternating L/R)
             const flankSign = (e.id % 2 === 0) ? 1 : -1;
             const flankStrength = Math.min(1, (targetDist - 6) / 10) * Math.max(0.7, flankMod);
-            const perp = new THREE.Vector3(-dir.z * flankSign, 0, dir.x * flankSign);
+            const perp = _tmpVec3d.set(-dir.z * flankSign, 0, dir.x * flankSign);
             dir.addScaledVector(perp, flankStrength).normalize();
           } else if (typeName === 'SNIPER') {
             // Snipers maintain distance: slow approach, prefer to hold at range
@@ -1512,7 +1520,7 @@ const Enemies = (() => {
             // ML: even regular troops get some flanking behavior when AI is adapting
             const flankSign2 = (e.id % 2 === 0) ? 1 : -1;
             const flankStr2 = Math.min(1, (targetDist - 6) / 15) * flankMod * 0.5;
-            const perp2 = new THREE.Vector3(-dir.z * flankSign2, 0, dir.x * flankSign2);
+            const perp2 = _tmpVec3d.set(-dir.z * flankSign2, 0, dir.x * flankSign2);
             dir.addScaledVector(perp2, flankStr2).normalize();
           }
         }
@@ -1531,7 +1539,7 @@ const Enemies = (() => {
         if (blocked) {
           if (!e._avoidDir) e._avoidDir = Math.random() > 0.5 ? 1 : -1;
           e._avoidTimer = (e._avoidTimer || 0) + delta;
-          const sideDir = new THREE.Vector3(-dir.z * e._avoidDir, 0, dir.x * e._avoidDir);
+          const sideDir = _tmpVec3d.set(-dir.z * e._avoidDir, 0, dir.x * e._avoidDir);
           e.mesh.position.addScaledVector(sideDir, stepDist);
           if (e._avoidTimer > 1.5) { e._avoidDir *= -1; e._avoidTimer = 0; }
         } else {
@@ -1574,7 +1582,7 @@ const Enemies = (() => {
         if (playerPos) {
           var awayDir = _tmpVec3c.subVectors(e.mesh.position, playerPos).setY(0).normalize();
           e.mesh.position.addScaledVector(awayDir, e.speed * 1.5 * delta);
-          e.mesh.lookAt(e.mesh.position.clone().add(awayDir));
+          e.mesh.lookAt(e.mesh.position.x + awayDir.x, e.mesh.position.y, e.mesh.position.z + awayDir.z);
         }
         if (e._retreatTimer <= 0) e.retreating = false;
         // Update HP bar and continue
@@ -1667,13 +1675,10 @@ const Enemies = (() => {
             }
             // Spawn tracer toward player
             if (typeof Tracers !== 'undefined' && Tracers.spawnTracer) {
-              var origin = e.mesh.position.clone();
-              origin.y += 1.2;
-              var dir = new THREE.Vector3().subVectors(
-                new THREE.Vector3(playerPos.x, playerPos.y + 0.8, playerPos.z),
-                origin
-              ).normalize();
-              Tracers.spawnTracer(origin, dir, 0xff4400, 80);
+              var tOrigin = _tmpVec3d.copy(e.mesh.position);
+              tOrigin.y += 1.2;
+              var tDir = _tmpVec3e.set(playerPos.x, playerPos.y + 0.8, playerPos.z).sub(tOrigin).normalize();
+              Tracers.spawnTracer(tOrigin, tDir, 0xff4400, 80);
             }
             }
           }
@@ -1794,14 +1799,18 @@ const Enemies = (() => {
             // Sniper laser sight while aiming
             if (etResult && etResult.aiming && e.mesh) {
               if (!e._laserLine) {
+                var _laserPositions = new Float32Array(6);
                 var laserGeo = new THREE.BufferGeometry();
+                laserGeo.setAttribute('position', new THREE.BufferAttribute(_laserPositions, 3));
                 var laserMat = new THREE.LineBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.6 });
                 e._laserLine = new THREE.Line(laserGeo, laserMat);
+                e._laserLine._posArr = _laserPositions;
                 _scene.add(e._laserLine);
               }
-              var pts = [e.mesh.position.clone(), new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z)];
-              e._laserLine.geometry.dispose();
-              e._laserLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+              var lp = e._laserLine._posArr;
+              lp[0] = e.mesh.position.x; lp[1] = e.mesh.position.y; lp[2] = e.mesh.position.z;
+              lp[3] = playerPos.x; lp[4] = playerPos.y; lp[5] = playerPos.z;
+              e._laserLine.geometry.attributes.position.needsUpdate = true;
               // Pulse opacity with aim progress
               e._laserLine.material.opacity = 0.2 + etResult.progress * 0.6;
               e._laserLine.visible = true;
@@ -2219,12 +2228,31 @@ const Enemies = (() => {
     return null;
   }
 
+  function _rebuildCache() {
+    var f = performance.now();
+    if (f === _cacheFrame) return;
+    _cacheFrame = f;
+    _cachedAlive.length = 0;
+    _cachedMeshes.length = 0;
+    for (var ci = 0; ci < enemies.length; ci++) {
+      var ce = enemies[ci];
+      if (ce.alive) {
+        _cachedAlive.push(ce);
+        var pp = ce.mesh.userData.parts;
+        if (pp) { for (var pi = 0; pi < pp.length; pi++) _cachedMeshes.push(pp[pi]); }
+        else _cachedMeshes.push(ce.mesh);
+      }
+    }
+  }
+
   function getEnemyMeshes() {
-    return enemies.filter(e => e.alive).flatMap(e => e.mesh.userData.parts || [e.mesh]);
+    _rebuildCache();
+    return _cachedMeshes;
   }
 
   function getAliveCount() {
-    return enemies.filter(e => e.alive).length + spawnQueue.length;
+    _rebuildCache();
+    return _cachedAlive.length + spawnQueue.length;
   }
 
   function isWaveDone() { return allDead; }
@@ -2289,7 +2317,7 @@ const Enemies = (() => {
   }
 
   // ── Get all alive enemies ─────────────────────────────────
-  function getAll() { return enemies.filter(e => e.alive); }
+  function getAll() { _rebuildCache(); return _cachedAlive; }
 
   // ── Get assault groups info ───────────────────────────────
   function getAssaultGroups() { return assaultGroups; }

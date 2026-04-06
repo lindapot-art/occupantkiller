@@ -413,7 +413,7 @@ const VehicleSystem = (function () {
       }
 
       // Apply velocity
-      v.position.add(v.velocity.clone().multiplyScalar(delta));
+      v.position.addScaledVector(v.velocity, delta);
 
       // Gravity for non-flying vehicles — prevent going airborne
       if (!v.flying) {
@@ -475,12 +475,12 @@ const VehicleSystem = (function () {
     // Use vehicle's own rotation for movement direction (not camera yaw)
     // This prevents the vehicle from flying off based on where the camera looks
     const vYaw = v.rotation.y;
-    const forward = new THREE.Vector3(-Math.sin(vYaw), 0, -Math.cos(vYaw));
+    _vTmp1.set(-Math.sin(vYaw), 0, -Math.cos(vYaw));
 
     const accel = v.speed * 2;
 
-    if (_vKeys.w) v.velocity.add(forward.clone().multiplyScalar(accel * delta));
-    if (_vKeys.s) v.velocity.add(forward.clone().multiplyScalar(-accel * delta * 0.5));
+    if (_vKeys.w) v.velocity.addScaledVector(_vTmp1, accel * delta);
+    if (_vKeys.s) v.velocity.addScaledVector(_vTmp1, -accel * delta * 0.5);
     if (_vKeys.a) v.rotation.y += delta * 1.5;
     if (_vKeys.d) v.rotation.y -= delta * 1.5;
 
@@ -629,9 +629,9 @@ const VehicleSystem = (function () {
 
     // ── Combat behavior (armed vehicles) ──
     if (nearestEnemy && v.damage > 0) {
-      const toEnemy = nearestEnemy.mesh.position.clone().sub(v.position);
-      const enemyDist = toEnemy.length();
-      const faceDir = toEnemy.normalize();
+      _vTmp1.copy(nearestEnemy.mesh.position).sub(v.position);
+      const enemyDist = _vTmp1.length();
+      const faceDir = _vTmp1.normalize();
       v.rotation.y = Math.atan2(faceDir.x, faceDir.z);
 
       // Fire at enemy
@@ -654,9 +654,9 @@ const VehicleSystem = (function () {
     // ── Patrol behavior (all vehicles when no enemy) ──
     if (!v.waypoint) pickWaypoint(v);
 
-    const toWP = v.waypoint.clone().sub(v.position);
-    toWP.y = 0;
-    const distToWP = toWP.length();
+    _vTmp1.copy(v.waypoint).sub(v.position);
+    _vTmp1.y = 0;
+    const distToWP = _vTmp1.length();
 
     if (distToWP < WAYPOINT_ARRIVE_DIST) {
       // Arrived at waypoint — pick a new one
@@ -667,7 +667,7 @@ const VehicleSystem = (function () {
     }
 
     // Drive towards waypoint
-    const dir = toWP.normalize();
+    const dir = _vTmp1.normalize();
     const moveSpeed = v.speed * (v._onRoad ? ROAD_SPEED_FACTOR : PATROL_SPEED_FACTOR);
     v.velocity.x = dir.x * moveSpeed;
     v.velocity.z = dir.z * moveSpeed;
@@ -686,16 +686,16 @@ const VehicleSystem = (function () {
     v.fireCooldown = v.fireRate;
     // Fire in the direction the camera is facing (player-controlled)
     const yaw = CameraSystem.getYaw();
-    const dir = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-    spawnTurretProjectile(v.position, dir, v.damage);
+    _vTmp1.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    spawnTurretProjectile(v.position, _vTmp1, v.damage);
     if (typeof AudioSystem !== 'undefined') AudioSystem.playGunshot('hmg');
   }
 
   function fireTurretAt(v, targetPos) {
     if (!_scene || v.fireCooldown > 0 || v.damage <= 0) return;
     v.fireCooldown = v.fireRate;
-    const dir = targetPos.clone().sub(v.position).normalize();
-    spawnTurretProjectile(v.position, dir, v.damage);
+    _vTmp1.copy(targetPos).sub(v.position).normalize();
+    spawnTurretProjectile(v.position, _vTmp1, v.damage);
     if (typeof AudioSystem !== 'undefined') AudioSystem.playGunshot('hmg');
   }
 
@@ -727,10 +727,10 @@ const VehicleSystem = (function () {
       new THREE.BoxGeometry(0.1, 0.1, 0.3),
       new THREE.MeshBasicMaterial({ color: 0xffcc22 })
     );
-    const start = origin.clone();
-    start.y += 1.6; // Turret height
-    mesh.position.copy(start);
-    mesh.lookAt(start.clone().add(dir));
+    _vTmp2.copy(origin);
+    _vTmp2.y += 1.6; // Turret height
+    mesh.position.copy(_vTmp2);
+    mesh.lookAt(_vTmp2.x + dir.x, _vTmp2.y + dir.y, _vTmp2.z + dir.z);
     _scene.add(mesh);
     turretProjectiles.push({
       mesh: mesh, dir: dir.clone(), speed: TURRET_PROJ_SPEED,
@@ -748,13 +748,10 @@ const VehicleSystem = (function () {
       let hit = false;
       if (typeof Enemies !== 'undefined') {
         const enemyMeshes = Enemies.getEnemyMeshes();
-        const rc = new THREE.Raycaster(
-          p.mesh.position.clone(),
-          p.dir.clone(),
-          0,
-          p.speed * delta + 0.5
-        );
-        const hits = rc.intersectObjects(enemyMeshes, true);
+        _vRaycaster.set(p.mesh.position, p.dir);
+        _vRaycaster.near = 0;
+        _vRaycaster.far = p.speed * delta + 0.5;
+        const hits = _vRaycaster.intersectObjects(enemyMeshes, true);
         if (hits.length > 0) {
           hit = true;
           const enemy = Enemies.findByMesh(hits[0].object);
@@ -766,8 +763,9 @@ const VehicleSystem = (function () {
 
       // Check terrain collision
       if (!hit && typeof VoxelWorld !== 'undefined') {
+        _vTmp2.copy(p.mesh.position);
         const fakeCamera = {
-          position: p.mesh.position.clone(),
+          position: _vTmp2,
           getWorldDirection: function(v) { return v.copy(p.dir); },
         };
         const ray = VoxelWorld.raycastBlock(fakeCamera, p.speed * delta + 0.5);
@@ -808,7 +806,22 @@ const VehicleSystem = (function () {
   }
 
   /* ── Queries ─────────────────────────────────────────────────────── */
-  function getAll()        { return vehicles.filter(v => v.alive); }
+  var _vehAliveCache = [];
+  var _vehCacheFrame = -1;
+  // ── Reusable temp vectors ──
+  var _vTmp1 = new THREE.Vector3();
+  var _vTmp2 = new THREE.Vector3();
+  var _vRaycaster = new THREE.Raycaster(); // hoisted for turret projectile collision
+  function _rebuildVehicleCache() {
+    var f = performance.now();
+    if (f === _vehCacheFrame) return;
+    _vehCacheFrame = f;
+    _vehAliveCache.length = 0;
+    for (var i = 0; i < vehicles.length; i++) {
+      if (vehicles[i].alive) _vehAliveCache.push(vehicles[i]);
+    }
+  }
+  function getAll()        { _rebuildVehicleCache(); return _vehAliveCache; }
   function getById(id)     { return vehicles.find(v => v.id === id && v.alive); }
   function getByType(type) { return vehicles.filter(v => v.alive && v.type === type); }
   function getNearby(pos, radius) {

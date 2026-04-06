@@ -342,7 +342,7 @@ const DroneSystem = (function () {
       }
 
       // Apply velocity
-      drone.position.add(drone.velocity.clone().multiplyScalar(delta));
+      drone.position.addScaledVector(drone.velocity, delta);
 
       // Ground collision
       const terrainH = (typeof VoxelWorld !== 'undefined' ? VoxelWorld.getTerrainHeight(drone.position.x, drone.position.z) : 0) + 1;
@@ -523,7 +523,18 @@ const DroneSystem = (function () {
   }
 
   /* ── Queries ─────────────────────────────────────────────────────── */
-  function getAll()        { return drones.filter(d => d.alive); }
+  var _droneAliveCache = [];
+  var _droneCacheFrame = -1;
+  function _rebuildDroneCache() {
+    var f = performance.now();
+    if (f === _droneCacheFrame) return;
+    _droneCacheFrame = f;
+    _droneAliveCache.length = 0;
+    for (var i = 0; i < drones.length; i++) {
+      if (drones[i].alive) _droneAliveCache.push(drones[i]);
+    }
+  }
+  function getAll()        { _rebuildDroneCache(); return _droneAliveCache; }
   function getActive()     { return drones.filter(d => d.alive && d.active); }
   function getById(id)     { return drones.find(d => d.id === id && d.alive); }
   function getByType(type) { return drones.filter(d => d.alive && d.type === type); }

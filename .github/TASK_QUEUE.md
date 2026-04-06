@@ -16,6 +16,12 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [CRITICAL] Performance Optimization — Game Unplayable
+Status: DONE
+Requested: 2026-04-06
+Completed: 2026-04-06
+Details: Eliminated ~170+ per-frame heap allocations causing GC stutters. Changes across 7 files: frame-cached getAll() in 4 modules, shared geometry in tracers.js, hoisted raycasters/temp vectors in weapons.js + vehicles.js, renderer downgrades (antialias off, lower shadows, adaptive quality). QA found and fixed 2 bugs: particle scale with unit geometry and cached array mutation.
+
 <!-- Add your requests below this line -->
 
 ---

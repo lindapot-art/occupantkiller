@@ -50,6 +50,11 @@ const NPCSystem = (function () {
     REGROUPING: 'regrouping',
   });
 
+  // Reusable temp vectors to avoid per-frame allocations
+  var _nTmp1 = new THREE.Vector3();
+  var _nTmp2 = new THREE.Vector3();
+  var _nTmp3 = new THREE.Vector3();
+
   function createFriendlyGroup(id) {
     const angle = (id / NUM_FRIENDLY_GROUPS) * Math.PI * 2 + 0.4;
     const dist = 4 + Math.random() * 6;
@@ -704,13 +709,13 @@ const NPCSystem = (function () {
 
     if (dist > wep.range * 0.7) {
       // Move toward enemy, stop at ~50% of max range
-      const dir = new THREE.Vector3().subVectors(enemy.mesh.position, npc.position).setY(0).normalize();
+      var dir = _nTmp1.subVectors(enemy.mesh.position, npc.position).setY(0).normalize();
       npc.target = npc.position.clone().add(dir.multiplyScalar(dist - wep.range * 0.5));
     } else if (dist >= 4) {
       // Stop and shoot
       npc.target = null;
       // Face enemy
-      const lookDir = new THREE.Vector3().subVectors(enemy.mesh.position, npc.position).setY(0);
+      var lookDir = _nTmp1.subVectors(enemy.mesh.position, npc.position).setY(0);
       if (lookDir.length() > 0.1) {
         npc.mesh.rotation.y = Math.atan2(lookDir.x, lookDir.z);
       }
@@ -749,7 +754,7 @@ const NPCSystem = (function () {
       }
     } else {
       // Too close — back away
-      const away = new THREE.Vector3().subVectors(npc.position, enemy.mesh.position).setY(0).normalize();
+      var away = _nTmp1.subVectors(npc.position, enemy.mesh.position).setY(0).normalize();
       npc.target = npc.position.clone().add(away.multiplyScalar(6));
     }
   }
@@ -951,7 +956,7 @@ const NPCSystem = (function () {
   function updateMovement(npc, delta) {
     if (!npc.target || npc.asleep) return;
 
-    const dir = npc.target.clone().sub(npc.position);
+    const dir = _nTmp2.copy(npc.target).sub(npc.position);
     dir.y = 0;
     const dist = dir.length();
 
@@ -1052,8 +1057,19 @@ const NPCSystem = (function () {
   }
 
   /* ── Queries ─────────────────────────────────────────────────────── */
-  function getAll()      { return npcs.filter(n => n.alive); }
-  function getCount()    { return npcs.filter(n => n.alive).length; }
+  var _npcAliveCache = [];
+  var _npcCacheFrame = -1;
+  function _rebuildNpcCache() {
+    var f = performance.now();
+    if (f === _npcCacheFrame) return;
+    _npcCacheFrame = f;
+    _npcAliveCache.length = 0;
+    for (var i = 0; i < npcs.length; i++) {
+      if (npcs[i].alive) _npcAliveCache.push(npcs[i]);
+    }
+  }
+  function getAll()      { _rebuildNpcCache(); return _npcAliveCache; }
+  function getCount()    { _rebuildNpcCache(); return _npcAliveCache.length; }
   function getById(id)   { return npcs.find(n => n.id === id && n.alive); }
   function getByJob(job) { return npcs.filter(n => n.alive && n.job === job); }
   function getByRank(r)  { return npcs.filter(n => n.alive && n.rank === r); }

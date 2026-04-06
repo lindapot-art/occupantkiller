@@ -22,6 +22,12 @@ const GameManager = (function () {
   let _camera       = null;
   let _renderer     = null;
 
+  // Reusable temp vectors for update loops (avoids per-frame GC)
+  var _gmTmp1 = new THREE.Vector3();
+  var _gmTmp2 = new THREE.Vector3();
+  var _gmTmp3 = new THREE.Vector3();
+  var _gmNewPos = new THREE.Vector3();
+
   /* ── Player State ────────────────────────────────────────────────── */
   const GOD_MODE_HP = 999999;
   const player = {
@@ -576,11 +582,11 @@ const GameManager = (function () {
   /* ── Init ────────────────────────────────────────────────────────── */
   function init() {
     // Create renderer
-    _renderer = new THREE.WebGLRenderer({ antialias: true });
+    _renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     _renderer.setSize(window.innerWidth, window.innerHeight);
-    _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     _renderer.shadowMap.enabled = true;
-    _renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    _renderer.shadowMap.type = THREE.PCFShadowMap;
     document.getElementById('game-container').appendChild(_renderer.domElement);
 
     // Create scene — Ukrainian theme (golden sky)
@@ -598,7 +604,7 @@ const GameManager = (function () {
     sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
     sunLight.position.set(20, 30, 10);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.mapSize.set(1024, 1024);
     sunLight.shadow.camera.near = 0.5;
     sunLight.shadow.camera.far = 100;
     sunLight.shadow.camera.left   = -50;
@@ -2192,10 +2198,10 @@ const GameManager = (function () {
     }
 
     const yaw = CameraSystem.getYaw();
-    const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-    const right   = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+    const forward = _gmTmp1.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const right   = _gmTmp2.set(Math.cos(yaw), 0, -Math.sin(yaw));
 
-    const moveDir = new THREE.Vector3();
+    const moveDir = _gmTmp3.set(0, 0, 0);
 
     // Keyboard movement
     if (keys['KeyW'] || keys['ArrowUp'])    moveDir.add(forward);
@@ -2287,7 +2293,7 @@ const GameManager = (function () {
     }
 
     // Apply movement
-    const newPos = player.position.clone();
+    const newPos = _gmNewPos.copy(player.position);
     newPos.x += moveDir.x;
     newPos.z += moveDir.z;
     newPos.y += player.velocity.y * delta;
@@ -2370,7 +2376,7 @@ const GameManager = (function () {
     if (CameraSystem.getMode() === CameraSystem.MODE.STRATEGIC) return;
 
     if (mouseDown || touch.firing) {
-      const targets = Enemies.getEnemyMeshes();
+      const targets = Enemies.getEnemyMeshes().slice();
       // Add vehicle meshes as targets so player can damage/destroy vehicles
       var allVehicles = VehicleSystem.getAll();
       for (var vi = 0; vi < allVehicles.length; vi++) {
@@ -2862,6 +2868,10 @@ const GameManager = (function () {
 
   /* ── Main Update Loop ────────────────────────────────────────────── */
   let prevTime = performance.now();
+  var _fpsAccum = 0;
+  var _fpsSamples = 0;
+  var _perfCheckTimer = 0;
+  var _qualityReduced = false;
 
   function update() {
     requestAnimationFrame(update);
@@ -2869,6 +2879,23 @@ const GameManager = (function () {
     const now = performance.now();
     const delta = Math.min((now - prevTime) / 1000, 0.1);
     prevTime = now;
+
+    // Adaptive quality: measure FPS, reduce quality if below 30
+    _fpsAccum += delta;
+    _fpsSamples++;
+    _perfCheckTimer += delta;
+    if (_perfCheckTimer > 3 && _fpsSamples > 10) {
+      var avgFps = _fpsSamples / _fpsAccum;
+      if (avgFps < 25 && !_qualityReduced && _renderer) {
+        _qualityReduced = true;
+        _renderer.setPixelRatio(1);
+        if (_scene && _scene.fog) _scene.fog.far = 50;
+        if (sunLight) sunLight.castShadow = false;
+      }
+      _fpsAccum = 0;
+      _fpsSamples = 0;
+      _perfCheckTimer = 0;
+    }
 
     // ── B26: FPS counter ──
     if (HUD.updateFPS) HUD.updateFPS();
