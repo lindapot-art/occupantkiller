@@ -332,9 +332,22 @@ const Building = (function () {
     return structures.some(s => s.unlocks && s.unlocks.includes(name));
   }
 
+  function clear() {
+    if (_ghostMesh) {
+      _scene && _scene.remove(_ghostMesh);
+      _ghostMesh.geometry.dispose();
+      _ghostMesh.material.dispose();
+      _ghostMesh = null;
+    }
+    _selectedTemplate = null;
+    buildMode = false;
+    structures.length = 0;
+  }
+
   return {
     TEMPLATES,
     init,
+    clear,
     placeBlock,
     removeBlock,
     selectTemplate,

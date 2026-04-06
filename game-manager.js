@@ -1629,6 +1629,7 @@ const GameManager = (function () {
     VehicleSystem.clear();
     DroneSystem.clear();
     NPCSystem.clear();
+    if (typeof Building !== 'undefined' && Building.clear) Building.clear();
     if (typeof Tracers !== 'undefined') Tracers.clear();
     if (typeof StageVFX !== 'undefined' && StageVFX.clear) StageVFX.clear();
 
@@ -1781,6 +1782,7 @@ const GameManager = (function () {
     Enemies.clear();
     Pickups.clear();
     DroneSystem.clear();
+    if (typeof Building !== 'undefined' && Building.clear) Building.clear();
     if (typeof Tracers !== 'undefined' && Tracers.clear) Tracers.clear();
     if (typeof StageVFX !== 'undefined' && StageVFX.clear) StageVFX.clear();
     if (typeof WorldFeatures !== 'undefined' && WorldFeatures.clear) WorldFeatures.clear();

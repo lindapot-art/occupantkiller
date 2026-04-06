@@ -82,6 +82,8 @@ const Pickups = (() => {
       const dz = p.group.position.z - playerPos.z;
       if (dx * dx + dz * dz < COLLECT_DIST_SQ) {
         scene.remove(p.group);
+        if (p.boxMesh)  { if (p.boxMesh.geometry) p.boxMesh.geometry.dispose(); if (p.boxMesh.material) p.boxMesh.material.dispose(); }
+        if (p.ringMesh) { if (p.ringMesh.geometry) p.ringMesh.geometry.dispose(); if (p.ringMesh.material) p.ringMesh.material.dispose(); }
         pickups.splice(i, 1);
         onCollect(p.type);
       }
@@ -89,7 +91,12 @@ const Pickups = (() => {
   }
 
   function clear() {
-    pickups.forEach(p => scene && scene.remove(p.group));
+    for (let i = 0; i < pickups.length; i++) {
+      const p = pickups[i];
+      if (scene) scene.remove(p.group);
+      if (p.boxMesh)  { if (p.boxMesh.geometry) p.boxMesh.geometry.dispose(); if (p.boxMesh.material) p.boxMesh.material.dispose(); }
+      if (p.ringMesh) { if (p.ringMesh.geometry) p.ringMesh.geometry.dispose(); if (p.ringMesh.material) p.ringMesh.material.dispose(); }
+    }
     pickups = [];
     time    = 0;
   }

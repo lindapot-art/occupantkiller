@@ -59,14 +59,28 @@ const WorldFeatures = (function () {
     clear();
   }
 
+  function _disposeMesh(m) {
+    if (!m) return;
+    m.traverse(function (child) {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) child.material.forEach(function (mt) { mt.dispose(); });
+        else child.material.dispose();
+      }
+    });
+  }
+
   function clear() {
-    fires.forEach(f => { if (f.mesh) _scene.remove(f.mesh); });
-    trees.forEach(t => { if (t.mesh) _scene.remove(t.mesh); });
-    airdrops.forEach(a => { if (a.mesh) _scene.remove(a.mesh); });
-    landmines.forEach(m => { if (m.mesh) _scene.remove(m.mesh); });
-    barbedWire.forEach(w => { if (w.mesh) _scene.remove(w.mesh); });
-    sandbags.forEach(s => { if (s.mesh) _scene.remove(s.mesh); });
-    smokeZones.forEach(s => { if (s.mesh) _scene.remove(s.mesh); });
+    fires.forEach(function (f) {
+      if (f.mesh) { _scene.remove(f.mesh); _disposeMesh(f.mesh); }
+      if (f.light) _scene.remove(f.light);
+    });
+    trees.forEach(function (t) { if (t.mesh) { _scene.remove(t.mesh); _disposeMesh(t.mesh); } });
+    airdrops.forEach(function (a) { if (a.mesh) { _scene.remove(a.mesh); _disposeMesh(a.mesh); } });
+    landmines.forEach(function (m) { if (m.mesh) { _scene.remove(m.mesh); _disposeMesh(m.mesh); } });
+    barbedWire.forEach(function (w) { if (w.mesh) { _scene.remove(w.mesh); _disposeMesh(w.mesh); } });
+    sandbags.forEach(function (s) { if (s.mesh) { _scene.remove(s.mesh); _disposeMesh(s.mesh); } });
+    smokeZones.forEach(function (s) { if (s.mesh) { _scene.remove(s.mesh); _disposeMesh(s.mesh); } });
     fires = []; trees = []; radiationZones = []; airdrops = [];
     landmines = []; barbedWire = []; sandbags = []; smokeZones = [];
   }
