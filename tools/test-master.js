@@ -330,6 +330,91 @@ function phase7() {
     ok(dispPass + '/' + disposalRequired.length + ' modules have clear() + dispose()');
 }
 
+function phase8() {
+  console.log('\n══ Phase 8: Gameplay Bug Fix Verification ══');
+  let p8pass = 0;
+  let p8total = 0;
+
+  function check(name, test) {
+    p8total++;
+    if (test) { p8pass++; } else { fail(name, 'pattern not found'); }
+  }
+
+  // BUG 1: splice→null (index preservation)
+  const enemySrc = fs.readFileSync(path.join(ROOT, 'enemies.js'), 'utf8');
+  check('Enemies: null removal (no splice in corpse cleanup)',
+    enemySrc.includes('enemies[i] = null') && !(/enemies\.splice\(i,\s*1\)/.test(enemySrc)));
+  
+  // Null guards in iteration
+  check('Enemies: null guard in main update loop',
+    enemySrc.includes('if (!e) continue'));
+  check('Enemies: null guard in _rebuildCache',
+    enemySrc.includes('if (!ce) continue'));
+  check('Enemies: null guard in damageInRadius',
+    /if \(!e \|\| !e\.alive\) continue/.test(enemySrc));
+  check('Enemies: null guard in findByMesh',
+    enemySrc.includes('e && e.mesh === obj'));
+  check('Enemies: null guard in getSurrenderedCount',
+    enemySrc.includes('e && e.alive && e.surrendered'));
+  
+  // BUG 2: wave completion (no enemies.length check)
+  check('Enemies: wave completion uses alive counter (not array length)',
+    /alive === 0 && !allDead/.test(enemySrc) && !enemySrc.includes('enemies.length === 0'));
+  
+  // Cache invalidation
+  check('Enemies: cache invalidated on death',
+    enemySrc.includes('_cacheFrame = -1; // invalidate cache on death'));
+  check('Enemies: cache invalidated on removal',
+    enemySrc.includes('_cacheFrame = -1; // force cache rebuild'));
+  
+  // BUG 4: grenade terrain height
+  check('Enemies: grenade uses terrain height',
+    enemySrc.includes('VoxelWorld.getTerrainHeight(g.mesh.position.x, g.mesh.position.z)'));
+  
+  // BUG 5: retreat terrain snap
+  check('Enemies: retreat snaps to terrain',
+    /retreating[\s\S]{100,500}getTerrainHeight/.test(enemySrc));
+  
+  // BUG 8: surrender helmet
+  check('Enemies: surrender helmet uses parts[2]',
+    enemySrc.includes('parts[2].material = parts[2].material.clone()'));
+  
+  // _scene fix
+  check('Enemies: no _scene reference (should use scene)',
+    !enemySrc.includes('_scene.'));
+
+  // game-manager.js checks
+  const gmSrc = fs.readFileSync(path.join(ROOT, 'game-manager.js'), 'utf8');
+  
+  // BUG 2: wave timer protection
+  check('GM: _waveStartTimer declared',
+    gmSrc.includes('var _waveStartTimer'));
+  check('GM: clearTimeout before beginWave setTimeout',
+    gmSrc.includes('clearTimeout(_waveStartTimer)'));
+  
+  // BUG 3: onPlayerHit state guard
+  check('GM: onPlayerHit checks game state',
+    gmSrc.includes('gameState !== STATE.PLAYING'));
+  
+  // BUG 7: loot blink before despawn
+  check('GM: loot blink check before despawn check',
+    /LIFETIME - 3[\s\S]{10,200}LIFETIME\)/.test(gmSrc));
+  
+  // BUG 9: ARMOR_PUSH full circle
+  check('GM: ARMOR_PUSH uses full 360 angle',
+    gmSrc.includes('Math.random() * Math.PI * 2'));
+
+  // enemy-types.js checks
+  const etSrc = fs.readFileSync(path.join(ROOT, 'enemy-types.js'), 'utf8');
+  check('EnemyTypes: null guard in ally iteration',
+    etSrc.includes('!ally ||'));
+  check('EnemyTypes: uses ally.mesh.position (not ally.x)',
+    etSrc.includes('ally.mesh.position.x') && !(/ally\.x\s*-/.test(etSrc)));
+
+  if (p8pass === p8total) ok(p8pass + '/' + p8total + ' gameplay bug fixes verified');
+  else ok(p8pass + '/' + p8total + ' gameplay bug fixes verified');
+}
+
 async function main() {
   console.log('╔══════════════════════════════════════════════╗');
   console.log('║     OccupantKiller Master QA Test Suite      ║');
@@ -343,6 +428,7 @@ async function main() {
   phase5();
   phase6();
   phase7();
+  phase8();
 
   console.log('\n══════════════════════════════════════════════');
   console.log(`  Results: ${passed} passed, ${failed} failed, ${warned} warnings`);
