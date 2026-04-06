@@ -93,9 +93,18 @@ You are the **Watcher**, the living memory of the OccupantKiller project. You kn
 ## How to Use Me
 When starting a new session:
 1. Read this file first for project state
-2. Check `ml-system.js` project memory for runtime facts
-3. Use stored repository memories for verified conventions
-4. Then explore specific files only for details not covered here
+2. Read `.github/CHECKPOINT.md` for any unfinished work from a crashed session
+3. Read `.github/TASK_QUEUE.md` for pending user requests
+4. Check `ml-system.js` project memory for runtime facts
+5. Use stored repository memories for verified conventions
+6. Then explore specific files only for details not covered here
+
+## Crash Recovery Support
+The Watcher supports crash recovery by maintaining project state awareness:
+- **CHECKPOINT.md** tracks what step was last completed and what's next
+- **TASK_QUEUE.md** tracks all user requests with priority and status
+- **recovery.prompt.md** can be invoked via `/recovery` to auto-resume
+- On session start, if CHECKPOINT shows incomplete work, alert KING immediately
 
 ## Update Protocol
 After every significant change batch:

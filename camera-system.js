@@ -53,6 +53,13 @@ const CameraSystem = (function () {
   let shakeOffsetX   = 0;
   let shakeOffsetY   = 0;
 
+  /* ── Reusable temp objects (avoid per-frame allocation) ──────────── */
+  const _tmpEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+  const _tmpVec3a = new THREE.Vector3();
+  const _tmpVec3b = new THREE.Vector3();
+  const _tmpVec3c = new THREE.Vector3();
+  const _tmpFwdDir = new THREE.Vector3();
+
   /* ── Init ────────────────────────────────────────────────────────── */
   function init(camera) {
     _camera = camera;
@@ -168,7 +175,7 @@ const CameraSystem = (function () {
       // Use vehicle yaw as base + allow limited freelook via mouse offset
       var vehicleYaw = _vehicleObj.rotation.y;
       var lookYaw = vehicleYaw + (yaw - vehicleYaw) * 1.0; // freelook from vehicle heading
-      var vEuler = new THREE.Euler(pitch + shakeOffsetY * 0.5, lookYaw + shakeOffsetX * 0.5, 0, 'YXZ');
+      var vEuler = _tmpEuler.set(pitch + shakeOffsetY * 0.5, lookYaw + shakeOffsetX * 0.5, 0, 'YXZ');
       _camera.quaternion.setFromEuler(vEuler);
       return;
     }
@@ -189,7 +196,7 @@ const CameraSystem = (function () {
       playerPos.z
     );
 
-    const euler = new THREE.Euler(
+    const euler = _tmpEuler.set(
       pitch + shakeOffsetY * 0.5,
       yaw + shakeOffsetX * 0.5,
       0, 'YXZ'
@@ -199,14 +206,14 @@ const CameraSystem = (function () {
 
   /* ── Third Person Camera ─────────────────────────────────────────── */
   function updateTPS(delta, playerPos) {
-    const idealOffset = new THREE.Vector3(
+    _tmpVec3a.set(
       Math.sin(yaw) * tpsDist,
       tpsHeight - pitch * 2,
       Math.cos(yaw) * tpsDist
     );
 
-    const target = playerPos.clone().add(idealOffset);
-    _camera.position.lerp(target, Math.min(1, tpsSmooth * delta));
+    _tmpVec3b.copy(playerPos).add(_tmpVec3a);
+    _camera.position.lerp(_tmpVec3b, Math.min(1, tpsSmooth * delta));
     _camera.lookAt(playerPos.x, playerPos.y + 1, playerPos.z);
   }
 
@@ -222,19 +229,19 @@ const CameraSystem = (function () {
     const panX = (_rtsKeys.right ? 1 : 0) - (_rtsKeys.left ? 1 : 0);
     const panZ = (_rtsKeys.down  ? 1 : 0) - (_rtsKeys.up   ? 1 : 0);
 
-    const forward = new THREE.Vector3(-Math.sin(rtsYaw), 0, -Math.cos(rtsYaw));
-    const right   = new THREE.Vector3(Math.cos(rtsYaw), 0, -Math.sin(rtsYaw));
+    const forward = _tmpVec3a.set(-Math.sin(rtsYaw), 0, -Math.cos(rtsYaw));
+    const right   = _tmpVec3b.set(Math.cos(rtsYaw), 0, -Math.sin(rtsYaw));
 
     rtsTarget.addScaledVector(right,   panX * RTS_PAN_SPEED * delta);
     rtsTarget.addScaledVector(forward, panZ * RTS_PAN_SPEED * delta);
 
     // Position camera above target
-    const camPos = rtsTarget.clone();
-    camPos.y += rtsZoom;
-    camPos.x += Math.sin(rtsYaw) * rtsZoom * 0.5;
-    camPos.z += Math.cos(rtsYaw) * rtsZoom * 0.5;
+    _tmpVec3c.copy(rtsTarget);
+    _tmpVec3c.y += rtsZoom;
+    _tmpVec3c.x += Math.sin(rtsYaw) * rtsZoom * 0.5;
+    _tmpVec3c.z += Math.cos(rtsYaw) * rtsZoom * 0.5;
 
-    _camera.position.lerp(camPos, Math.min(1, 6 * delta));
+    _camera.position.lerp(_tmpVec3c, Math.min(1, 6 * delta));
     _camera.lookAt(rtsTarget);
   }
 
@@ -246,7 +253,7 @@ const CameraSystem = (function () {
   function updateDrone(delta) {
     if (!_droneObj) return;
     _camera.position.copy(_droneObj.position);
-    const euler = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+    const euler = _tmpEuler.set(pitch, yaw, 0, 'YXZ');
     _camera.quaternion.setFromEuler(euler);
   }
 
@@ -277,14 +284,13 @@ const CameraSystem = (function () {
   function setPitch(v) { pitch = v; }
 
   function getForwardDir() {
-    const dir = new THREE.Vector3();
-    _camera.getWorldDirection(dir);
-    return dir;
+    _camera.getWorldDirection(_tmpFwdDir);
+    return _tmpFwdDir;
   }
 
   function getMoveDir() {
     // Horizontal forward (no pitch)
-    return new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+    return _tmpVec3a.set(-Math.sin(yaw), 0, -Math.cos(yaw));
   }
 
   return {

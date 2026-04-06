@@ -20,6 +20,127 @@ const EnemyTypes = (function () {
       lootTable: ['WEAPON', 'ARMOR', 'MEDKIT'],
       spawnMessage: '⚠️ ENEMY COMMANDER APPROACHING!'
     },
+
+    // ── Stage-Specific Boss Types (Stages 5-12) ──────────────
+
+    // Stage 5: MARIUPOL STEELWORKS — Forge Master amid molten steel
+    BOSS_MARIUPOL: {
+      id: 'BOSS_MARIUPOL', name: 'Azovstal Forge Master', tier: 4,
+      hp: 800, speed: 1.8, damage: 55, attackRange: 10,
+      color: 0xff4400, scale: 1.8, xpReward: 350,
+      abilities: ['summon_reinforcements', 'rage_mode', 'flame_aura'],
+      lootTable: ['WEAPON', 'ARMOR', 'MEDKIT', 'RARE_WEAPON'],
+      spawnMessage: '🔥 THE FORGE MASTER EMERGES FROM THE FURNACE!',
+      behavior: 'boss',
+      burnDPS: 5, burnRadius: 6, // passive fire aura
+      rageThreshold: 0.5, rageDamageMult: 1.6,
+      summonTypes: ['FLAMETHROWER', 'SHIELD_BEARER'], summonCount: 3, summonInterval: 18
+    },
+
+    // Stage 6: CRIMEA BRIDGE — Admiral raining down naval fire
+    BOSS_CRIMEA: {
+      id: 'BOSS_CRIMEA', name: 'Kerch Bridge Admiral', tier: 4,
+      hp: 1000, speed: 1.2, damage: 40, attackRange: 30,
+      color: 0x2244aa, scale: 1.7, xpReward: 450,
+      abilities: ['summon_reinforcements', 'rage_mode', 'naval_barrage'],
+      lootTable: ['WEAPON', 'ARMOR', 'MEDKIT', 'RARE_WEAPON'],
+      spawnMessage: '⚓ KERCH BRIDGE ADMIRAL ON DECK!',
+      behavior: 'boss',
+      barrageDamage: 100, barrageRadius: 6, barrageInterval: 10,
+      rageThreshold: 0.4, rageDamageMult: 1.5,
+      summonTypes: ['PARATROOP', 'KAMIKAZE_DRONE'], summonCount: 4, summonInterval: 16
+    },
+
+    // Stage 7: CHORNOBYL ZONE — Irradiated mutant commander, regenerates
+    BOSS_CHORNOBYL: {
+      id: 'BOSS_CHORNOBYL', name: 'Irradiated Stalker', tier: 4,
+      hp: 1200, speed: 2.0, damage: 50, attackRange: 12,
+      color: 0x44ff22, scale: 2.0, xpReward: 550,
+      abilities: ['summon_reinforcements', 'rage_mode', 'radiation_aura', 'regeneration'],
+      lootTable: ['WEAPON', 'ARMOR', 'MEDKIT', 'RARE_WEAPON', 'XP_BOOST'],
+      spawnMessage: '☢️ IRRADIATED STALKER CRAWLS FROM THE REACTOR!',
+      behavior: 'boss',
+      radDPS: 8, radRadius: 10, // radiation damages player nearby
+      regenRate: 15, // HP per second when not taking damage for 3s
+      rageThreshold: 0.35, rageDamageMult: 1.7,
+      summonTypes: ['WAR_DOG', 'BOMBER', 'WAGNER'], summonCount: 5, summonInterval: 14
+    },
+
+    // Stage 8: MOSCOW FINALE — Elite FSB field commander, fast & lethal
+    BOSS_MOSCOW: {
+      id: 'BOSS_MOSCOW', name: 'FSB Black Colonel', tier: 5,
+      hp: 1800, speed: 3.0, damage: 65, attackRange: 18,
+      color: 0x111111, scale: 1.6, xpReward: 700,
+      abilities: ['summon_reinforcements', 'rage_mode', 'flashbang_salvo', 'tactical_dodge'],
+      lootTable: ['RARE_WEAPON', 'ARMOR', 'MEDKIT', 'XP_BOOST'],
+      spawnMessage: '🕶️ FSB BLACK COLONEL HAS ENTERED THE FIELD!',
+      behavior: 'boss',
+      dodgeChance: 0.25, flashbangInterval: 8,
+      rageThreshold: 0.4, rageDamageMult: 1.8, rageSpeedMult: 1.5,
+      summonTypes: ['SPETSNAZ', 'SNIPER_ELITE', 'EW_OPERATOR'], summonCount: 4, summonInterval: 15
+    },
+
+    // Stage 9: SEVASTOPOL NAVAL BASE — Fleet Commander with heavy ordnance
+    BOSS_SEVASTOPOL: {
+      id: 'BOSS_SEVASTOPOL', name: 'Black Sea Fleet Commander', tier: 5,
+      hp: 2000, speed: 1.0, damage: 80, attackRange: 35,
+      color: 0x335588, scale: 2.2, xpReward: 850,
+      abilities: ['summon_reinforcements', 'rage_mode', 'cruise_missile', 'torpedo_salvo'],
+      lootTable: ['RARE_WEAPON', 'ARMOR', 'MEDKIT', 'XP_BOOST', 'LEGENDARY_WEAPON'],
+      spawnMessage: '🚢 BLACK SEA FLEET COMMANDER ORDERS ALL HANDS!',
+      behavior: 'boss',
+      missileDamage: 150, missileRadius: 7, missileInterval: 12,
+      armorFront: 0.5, armorSide: 0.3,
+      rageThreshold: 0.35, rageDamageMult: 1.6,
+      summonTypes: ['BTR', 'DRONE_OP', 'HEAVY_SNIPER'], summonCount: 3, summonInterval: 20
+    },
+
+    // Stage 10: DONBAS FINAL PUSH — Entrenched warlord, overwhelming reinforcements
+    BOSS_DONBAS: {
+      id: 'BOSS_DONBAS', name: 'Donbas Warlord', tier: 5,
+      hp: 2500, speed: 1.4, damage: 60, attackRange: 15,
+      color: 0x553322, scale: 2.0, xpReward: 1000,
+      abilities: ['summon_reinforcements', 'rage_mode', 'fortify', 'artillery_call'],
+      lootTable: ['RARE_WEAPON', 'LEGENDARY_WEAPON', 'ARMOR', 'MEDKIT', 'XP_BOOST'],
+      spawnMessage: '💀 THE DONBAS WARLORD CALLS HIS HORDE!',
+      behavior: 'boss',
+      artilleryDamage: 120, artilleryRadius: 5, artilleryInterval: 10,
+      shieldHP: 300, // temporary barrier
+      rageThreshold: 0.3, rageDamageMult: 1.8,
+      summonTypes: ['KADYROVITE', 'WAGNER', 'COMMISSAR', 'MORTAR'], summonCount: 6, summonInterval: 12
+    },
+
+    // Stage 11: BELGOROD OFFENSIVE — Walking fortress general
+    BOSS_BELGOROD: {
+      id: 'BOSS_BELGOROD', name: 'Belgorod Iron General', tier: 5,
+      hp: 3000, speed: 1.2, damage: 90, attackRange: 25,
+      color: 0x445533, scale: 2.5, xpReward: 1200,
+      abilities: ['summon_reinforcements', 'rage_mode', 'rocket_salvo', 'armor_plates'],
+      lootTable: ['LEGENDARY_WEAPON', 'ARMOR', 'MEDKIT', 'XP_BOOST'],
+      spawnMessage: '🛡️ THE IRON GENERAL ROLLS INTO BATTLE!',
+      behavior: 'boss',
+      armorFront: 0.6, armorSide: 0.4, armorRear: 0.15,
+      rocketSalvoDmg: 130, rocketSalvoCount: 6, rocketInterval: 8,
+      rageThreshold: 0.25, rageDamageMult: 2.0, rageArmorBoost: 0.2,
+      summonTypes: ['TANK', 'THERMOBARIC', 'ASSAULT_MECH'], summonCount: 3, summonInterval: 22
+    },
+
+    // Stage 12: KREMLIN SHOWDOWN — The Tyrant, final boss of the game
+    BOSS_KREMLIN: {
+      id: 'BOSS_KREMLIN', name: 'The Tyrant', tier: 5,
+      hp: 5000, speed: 1.5, damage: 100, attackRange: 20,
+      color: 0xcc0000, scale: 3.0, xpReward: 2500,
+      abilities: ['summon_reinforcements', 'rage_mode', 'nuclear_briefcase', 'body_doubles', 'bunker_shield'],
+      lootTable: ['LEGENDARY_WEAPON', 'LEGENDARY_WEAPON', 'XP_BOOST', 'VICTORY_TOKEN'],
+      spawnMessage: '👑 THE TYRANT MAKES HIS LAST STAND!',
+      behavior: 'boss',
+      phaseThresholds: [0.75, 0.5, 0.25], // 4-phase fight
+      shieldHP: 800, shieldRegenRate: 5,
+      nukeDamage: 250, nukeRadius: 12, nukeInterval: 20,
+      rageThreshold: 0.25, rageDamageMult: 2.5, rageSpeedMult: 2.0,
+      summonTypes: ['SPETSNAZ', 'ASSAULT_MECH', 'THERMOBARIC', 'SWARM_OP'], summonCount: 5, summonInterval: 15
+    },
+
     // Feature 17: Suicide Bomber
     BOMBER: {
       id: 'BOMBER', name: 'Suicide Bomber', tier: 2,
@@ -442,6 +563,36 @@ const EnemyTypes = (function () {
   /* ── Boss scaling per wave ─────────────────── */
   function getBossHP(wave) { return TYPES.BOSS.hp + (wave - 1) * 50; }
 
+  /* ── Stage-Specific Boss Selection ─────────── */
+  const STAGE_BOSS_MAP = {
+    5:  'BOSS_MARIUPOL',    // Azovstal Forge Master
+    6:  'BOSS_CRIMEA',      // Kerch Bridge Admiral
+    7:  'BOSS_CHORNOBYL',   // Irradiated Stalker
+    8:  'BOSS_MOSCOW',      // FSB Black Colonel
+    9:  'BOSS_SEVASTOPOL',  // Black Sea Fleet Commander
+    10: 'BOSS_DONBAS',      // Donbas Warlord
+    11: 'BOSS_BELGOROD',    // Belgorod Iron General
+    12: 'BOSS_KREMLIN'      // The Tyrant
+  };
+
+  /**
+   * Returns the boss type ID for a given stage (1-based stage id).
+   * Stages 1-4 use the generic 'BOSS'. Stages 5-12 have unique bosses.
+   */
+  function getBossForStage(stageId) {
+    return STAGE_BOSS_MAP[stageId] || 'BOSS';
+  }
+
+  /**
+   * Returns max HP for any boss type, with optional wave-based scaling.
+   * Stage bosses use their base HP + 5% per wave beyond their spawn wave.
+   */
+  function getStageBossHP(bossTypeId, wave) {
+    const cfg = TYPES[bossTypeId];
+    if (!cfg) return getBossHP(wave);
+    return cfg.hp + Math.floor(wave * 0.05 * cfg.hp);
+  }
+
   /* ── New AI update functions for B18 enemy types ─── */
 
   function updateFlamethrower(enemy, playerPos, dt) {
@@ -634,13 +785,14 @@ const EnemyTypes = (function () {
   }
 
   return {
-    TYPES, WAVE_COMPOSITIONS,
+    TYPES, WAVE_COMPOSITIONS, STAGE_BOSS_MAP,
     init, selectType, getTypeConfig,
     updateBomber, updateSniper, updateMedic, updateEngineer,
     updateWarDog, updateShieldBearer, updateMortar, updateBoss,
     updateFlamethrower, updateParatroop, updateTank, updateDroneOp,
     updateSpetsnaz, updateKadyrovite, updateWagner, updateBTR,
     updateKamikazeDrone, updateOfficer,
-    applyDamage, applyTankArmor, getBossHP
+    applyDamage, applyTankArmor, getBossHP,
+    getBossForStage, getStageBossHP
   };
 })();

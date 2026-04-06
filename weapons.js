@@ -2211,6 +2211,7 @@ const Weapons = (() => {
   }
 
   function forceReload() { startReload(); }
+  function setClip(val) { var st = curState(); if (typeof val === 'number') { st.clip = Math.min(val, cur().clipSize || val); HUD.setAmmo(st.clip, st.reserve); } }
 
   function clearJam() {
     const st = curState();
@@ -2307,6 +2308,8 @@ const Weapons = (() => {
     reset,
     addAmmo,
     forceReload,
+    reload: forceReload,
+    setClip,
     cancelReload,
     isReloading,
     getClip,
@@ -2334,7 +2337,7 @@ const Weapons = (() => {
     getWeaponInfo:  function (i) {
       if (!WEAPONS[i]) return null;
       const s = states[i];
-      return { name: WEAPONS[i].name, damage: WEAPONS[i].damage, clip: s.clip, reserve: s.reserve, type: WEAPONS[i].type };
+      return { id: WEAPONS[i].id, name: WEAPONS[i].name, damage: WEAPONS[i].damage, clip: s.clip, reserve: s.reserve, type: WEAPONS[i].type };
     },
     isUnlocked:     function (i) { return !!unlocked[i]; },
     lockWeapon:     function (i) {

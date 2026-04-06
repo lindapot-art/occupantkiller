@@ -681,6 +681,7 @@ const NPCSystem = (function () {
     let nearest = null;
     let nearDist = Infinity;
     for (const e of allEnemies) {
+      if (!e.mesh) continue;
       const dist = npc.position.distanceTo(e.mesh.position);
       if (dist < nearDist) {
         nearDist = dist;
@@ -964,7 +965,7 @@ const NPCSystem = (function () {
     npc.position.add(move);
 
     // Terrain follow
-    const terrainY = VoxelWorld.getTerrainHeight(npc.position.x, npc.position.z);
+    const terrainY = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(npc.position.x, npc.position.z) : 0;
     npc.position.y = terrainY;
 
     npc.mesh.position.copy(npc.position);

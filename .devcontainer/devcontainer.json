@@ -1,15 +1,15 @@
 {
   "name": "Occupant Killer",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
-  "forwardPorts": [8080],
+  "forwardPorts": [3000],
   "portsAttributes": {
-    "8080": {
+    "3000": {
       "label": "Game + Admin",
       "onAutoForward": "openBrowser",
       "visibility": "public"
     }
   },
-  "postStartCommand": "nohup npx --yes serve -l 8080 . &",
+  "postStartCommand": "nohup npx --yes serve -l 3000 . &",
   "customizations": {
     "vscode": {
       "extensions": ["esbenp.prettier-vscode", "dbaeumer.vscode-eslint"]

@@ -175,15 +175,17 @@ const DroneSystem = (function () {
     if (!drone) return false;
     _possessedDrone = drone;
     drone.aiControlled = false;
-    CameraSystem.setMode(CameraSystem.MODE.DRONE);
-    CameraSystem.setDroneTarget(drone.mesh);
+    if (typeof CameraSystem !== 'undefined') {
+      CameraSystem.setMode(CameraSystem.MODE.DRONE);
+      CameraSystem.setDroneTarget(drone.mesh);
+    }
     return true;
   }
 
   function release() {
     if (_possessedDrone) {
       _possessedDrone = null;
-      CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
+      if (typeof CameraSystem !== 'undefined') CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
     }
   }
 
@@ -201,7 +203,8 @@ const DroneSystem = (function () {
   function updateEnemyDrone(drone, delta) {
     // Get player position from GameManager
     var gm = (typeof GameManager !== 'undefined') ? GameManager : null;
-    var playerPos = gm ? gm.getPlayer().position : new THREE.Vector3(0, 5, 0);
+    var _p = gm && gm.getPlayer ? gm.getPlayer() : null;
+    var playerPos = _p && _p.position ? _p.position : new THREE.Vector3(0, 5, 0);
 
     var dx = playerPos.x - drone.position.x;
     var dz = playerPos.z - drone.position.z;
@@ -234,7 +237,7 @@ const DroneSystem = (function () {
           // Create explosion at ground below drone
           var bombX = drone.position.x;
           var bombZ = drone.position.z;
-          var bombY = VoxelWorld.getTerrainHeight(bombX, bombZ);
+          var bombY = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(bombX, bombZ) : 0;
           if (typeof Enemies !== 'undefined' && Enemies.damageInRadius) {
             // Damage player via GameManager
             var bombPos = new THREE.Vector3(bombX, bombY, bombZ);
@@ -242,11 +245,11 @@ const DroneSystem = (function () {
             if (distToPlayer < 6 && gm) {
               var dmg = Math.max(1, Math.floor(drone.damage * (1 - distToPlayer / 6)));
               var p = gm.getPlayer();
-              p.hp -= dmg;
+              if (p) p.hp -= dmg;
             }
           }
           // Terrain destruction
-          if (VoxelWorld.setBlock) {
+          if (typeof VoxelWorld !== 'undefined' && VoxelWorld.setBlock) {
             for (var rx = -2; rx <= 2; rx++) {
               for (var rz = -2; rz <= 2; rz++) {
                 VoxelWorld.setBlock(Math.floor(bombX) + rx, Math.floor(bombY), Math.floor(bombZ) + rz, 0);
@@ -275,13 +278,13 @@ const DroneSystem = (function () {
         // Impact! Explode and damage player
         if (gm) {
           var p = gm.getPlayer();
-          p.hp -= drone.damage;
+          if (p) p.hp -= drone.damage;
         }
         // Terrain destruction at impact
         var ix = Math.floor(drone.position.x);
         var iy = Math.floor(drone.position.y);
         var iz = Math.floor(drone.position.z);
-        if (VoxelWorld.setBlock) {
+        if (typeof VoxelWorld !== 'undefined' && VoxelWorld.setBlock) {
           for (var bx = -1; bx <= 1; bx++) {
             for (var bz = -1; bz <= 1; bz++) {
               VoxelWorld.setBlock(ix + bx, iy, iz + bz, 0);
@@ -342,7 +345,7 @@ const DroneSystem = (function () {
       drone.position.add(drone.velocity.clone().multiplyScalar(delta));
 
       // Ground collision
-      const terrainH = VoxelWorld.getTerrainHeight(drone.position.x, drone.position.z) + 1;
+      const terrainH = (typeof VoxelWorld !== 'undefined' ? VoxelWorld.getTerrainHeight(drone.position.x, drone.position.z) : 0) + 1;
       if (drone.position.y < terrainH) {
         drone.position.y = terrainH;
         if (!drone.active) {
@@ -384,8 +387,8 @@ const DroneSystem = (function () {
   }
 
   function updatePossessedDrone(drone, delta) {
-    const yaw = CameraSystem.getYaw();
-    const pitch = CameraSystem.getPitch();
+    const yaw = (typeof CameraSystem !== 'undefined') ? CameraSystem.getYaw() : 0;
+    const pitch = (typeof CameraSystem !== 'undefined') ? CameraSystem.getPitch() : 0;
 
     // Movement in drone's local space
     const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));

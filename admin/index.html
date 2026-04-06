@@ -412,9 +412,9 @@
             <ol style="padding-left:16px;color:var(--dim);font-size:11px;line-height:2">
               <li>Open the repo on GitHub</li>
               <li>Click <strong>Code → Codespaces → Create codespace on this branch</strong></li>
-              <li>Wait for container to start — the game opens automatically at port 8080</li>
+              <li>Wait for container to start — the game opens automatically at port 3000</li>
               <li>Find URLs in the <strong>Ports</strong> tab of the terminal panel</li>
-              <li>Right-click port 8080 → <strong>Port Visibility → Public</strong> to share</li>
+              <li>Right-click port 3000 → <strong>Port Visibility → Public</strong> to share</li>
             </ol>
           </div>
         </div>
@@ -680,15 +680,15 @@ function detectCodespacesUrl() {
   if (csMatch || csMatchAlt) {
     const base   = (csMatch || csMatchAlt)[1];
     const suffix = csMatch ? '.app.github.dev' : '.preview.app.github.dev';
-    gameUrl  = `https://${base}-8080${suffix}/`;
-    adminUrl = `https://${base}-8080${suffix}/admin/`;
+    gameUrl  = `https://${base}-3000${suffix}/`;
+    adminUrl = `https://${base}-3000${suffix}/admin/`;
   } else if (h === 'localhost' || h === '127.0.0.1') {
-    const port = window.location.port || '8080';
+    const port = window.location.port || '3000';
     gameUrl  = `http://localhost:${port}/`;
     adminUrl = `http://localhost:${port}/admin/`;
   } else if (h.endsWith('.github.dev') || h.endsWith('.githubpreview.dev')) {
     // Unknown Codespaces-like pattern — derive from current origin
-    gameUrl  = window.location.origin.replace(/-\d+(\.(?:preview\.)?app\.github(?:preview)?\.dev)$/, '-8080$1') + '/';
+    gameUrl  = window.location.origin.replace(/-\d+(\.(?:preview\.)?app\.github(?:preview)?\.dev)$/, '-3000$1') + '/';
     adminUrl = gameUrl + 'admin/';
   } else {
     // Generic fallback: relative to current server

@@ -160,6 +160,7 @@ const HUD = (() => {
 
   function addKill(weaponName, enemyType, isHeadshot) {
     if (!killFeedEl) return;
+    if (typeof Feedback !== 'undefined') return; // Feedback module owns kill feed
     const entry = document.createElement('div');
     entry.className = 'kill-entry' + (isHeadshot ? ' headshot' : '');
     entry.textContent = (isHeadshot ? '💀 HEADSHOT ' : '☠ ') + weaponName + ' → ' + (enemyType || 'ENEMY');

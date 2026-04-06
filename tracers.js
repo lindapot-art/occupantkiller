@@ -6,6 +6,7 @@ const Tracers = (() => {
   let _scene = null;
   const tracers = [];
   const trails = [];
+  const _activeIntervals = [];
 
   function init(scene) { _scene = scene; }
 
@@ -125,6 +126,7 @@ const Tracers = (() => {
     var ringLife = 0.35;
     var ringTarget = radius * 2.5;
     var ringInt = setInterval(function() {
+      if (!ring || !ring.parent) { clearInterval(ringInt); return; }
       ringLife -= 0.016;
       var t = 1 - ringLife / 0.35;
       ring.scale.setScalar(1 + t * ringTarget);
@@ -134,8 +136,11 @@ const Tracers = (() => {
         ringGeo.dispose();
         ringMat.dispose();
         clearInterval(ringInt);
+        var idx = _activeIntervals.indexOf(ringInt);
+        if (idx !== -1) _activeIntervals.splice(idx, 1);
       }
     }, 16);
+    _activeIntervals.push(ringInt);
   }
 
   /* ── Blood Splatter ─────────────────────────────────────────── */
@@ -251,6 +256,8 @@ const Tracers = (() => {
       p.mesh.material.dispose();
     }
     explosionParts.length = 0;
+    for (var ii = 0; ii < _activeIntervals.length; ii++) clearInterval(_activeIntervals[ii]);
+    _activeIntervals.length = 0;
   }
 
   /* ── Block Impact Particles (terrain hit) ─────────────────── */

@@ -358,7 +358,7 @@ const GameManager = (function () {
     var worldPos = new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5);
     // Spawn terrain impact particle debris
     if (typeof Tracers !== 'undefined' && Tracers.spawnBlockImpact) {
-      var BLOCK_COLORS = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getBlockColor) ? VoxelWorld.getBlockColor(blockType) : 0x8B7355;
+      var BLOCK_COLORS = (typeof VoxelWorld !== 'undefined' && VoxelWorld.BLOCK_COLORS) ? (VoxelWorld.BLOCK_COLORS[blockType] || 0x8B7355) : 0x8B7355;
       Tracers.spawnBlockImpact(worldPos, BLOCK_COLORS);
     }
     // 5% chance to spawn 1-2 gold loot particles
@@ -655,6 +655,7 @@ const GameManager = (function () {
     AudioSystem.init();
     WeatherSystem.init(_scene, _camera);
     MLSystem.init();
+    if (typeof StageVFX !== 'undefined') StageVFX.init(_scene);
 
     // ── New feature systems init ──────────────────────────
     if (typeof CombatExtras !== 'undefined') CombatExtras.reset();
@@ -810,8 +811,9 @@ const GameManager = (function () {
           // Priority 2: mission zone interaction
           if (!fHandled && typeof MissionTypes !== 'undefined' && MissionTypes.getActive && MissionTypes.getActive()) {
             var mt = MissionTypes.getActive();
-            var mtDx = player.position.x - mt.zoneX;
-            var mtDz = player.position.z - mt.zoneZ;
+            if (mt && mt.config) {
+            var mtDx = player.position.x - (mt.zoneX || 0);
+            var mtDz = player.position.z - (mt.zoneZ || 0);
             if (mtDx * mtDx + mtDz * mtDz < 64) {
               if (mt.config.id === 'DEMOLITION') {
                 MissionTypes.interact('PLANT_CHARGE', { dt: 0.5 });
@@ -827,6 +829,7 @@ const GameManager = (function () {
                 fHandled = true;
               }
             }
+            } // end mt && mt.config
           }
           // Priority 3: possess nearest drone
           if (!fHandled) {
@@ -1706,6 +1709,11 @@ const GameManager = (function () {
     if (typeof AudioSystem !== 'undefined' && AudioSystem.startAmbientLoop) {
       AudioSystem.startAmbientLoop(stageDef.theme);
     }
+
+    // Start stage-specific environmental VFX
+    if (typeof StageVFX !== 'undefined' && StageVFX.startStageEffects) {
+      StageVFX.startStageEffects(stageDef.theme);
+    }
   }
 
   function getCurrentStage() { return STAGES[currentStage]; }
@@ -1765,6 +1773,7 @@ const GameManager = (function () {
     Enemies.clear();
     Pickups.clear();
     DroneSystem.clear();
+    if (typeof StageVFX !== 'undefined' && StageVFX.clear) StageVFX.clear();
 
     // Respawn NPCs on new terrain
     NPCSystem.clear();
@@ -1830,10 +1839,22 @@ const GameManager = (function () {
     }
 
     // Pass AI strategy to enemies for adaptive behavior
-    Enemies.startWave(w, _scene, stageDef.difficulty * mlDiff, aiStrategy);
+    Enemies.startWave(w, _scene, stageDef.difficulty * mlDiff, aiStrategy, stageDef.id);
     AudioSystem.playWaveStart();
     HUD.setWave(w, stageDef.wavesPerStage);
     HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage);
+
+    // ═══ Stage Boss on final wave ═══
+    if (w === stageDef.wavesPerStage) {
+      var bossType = (typeof EnemyTypes !== 'undefined' && EnemyTypes.getBossForStage)
+        ? EnemyTypes.getBossForStage(stageDef.id) : 'BOSS';
+      Enemies.spawnSingle(bossType, new THREE.Vector3(
+        player.position.x + (Math.random() - 0.5) * 20,
+        0,
+        player.position.z + 30 + Math.random() * 10
+      ));
+      HUD.notifyPickup('⚠ BOSS INCOMING: ' + (typeof EnemyTypes !== 'undefined' && EnemyTypes.TYPES && EnemyTypes.TYPES[bossType] ? EnemyTypes.TYPES[bossType].name : 'COMMANDER'), '#ff0000');
+    }
 
     // ═══ Blood Moon effect on final 2 waves ═══
     var isBloodMoon = (w >= stageDef.wavesPerStage - 1);
@@ -2087,8 +2108,9 @@ const GameManager = (function () {
     if (typeof WeatherSystem !== 'undefined') {
       if (WeatherSystem.generateForecast) WeatherSystem.generateForecast();
       if (WeatherSystem.updateTemperature) {
-        var tod = typeof TimeSystem !== 'undefined' ? TimeSystem.getTimeOfDay() : 0.5;
-        var season = typeof TimeSystem !== 'undefined' ? TimeSystem.getSeason() : 'Summer';
+        var _tsInfo = typeof TimeSystem !== 'undefined' ? TimeSystem.getInfo() : null;
+        var tod = _tsInfo ? _tsInfo.timeOfDay : 0.5;
+        var season = _tsInfo ? _tsInfo.season : 'Summer';
         WeatherSystem.updateTemperature(tod, season);
       }
     }
@@ -3176,6 +3198,7 @@ const GameManager = (function () {
 
       // Update tracers
       if (typeof Tracers !== 'undefined') Tracers.update(delta);
+      if (typeof StageVFX !== 'undefined') StageVFX.update(delta);
 
       // ═══ NEW FEATURE SYSTEM UPDATES (59 features) ═══
 

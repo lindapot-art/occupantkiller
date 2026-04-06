@@ -323,73 +323,224 @@ const AudioSystem = (function () {
   }
 
   // ── Stage-specific ambient loop ───────────────────────────
-  var _ambientNodes = [];
+  var _ambientNodes = [];   // gain nodes for volume kill
+  var _ambientSources = []; // oscillators + buffer sources to .stop()
+  var _ambientTimers = [];  // setInterval IDs
+
   function stopAmbientLoop() {
-    for (var i = 0; i < _ambientNodes.length; i++) {
-      try { _ambientNodes[i].gain.value = 0; } catch(e){}
+    var i;
+    for (i = 0; i < _ambientTimers.length; i++) {
+      clearInterval(_ambientTimers[i]);
+    }
+    for (i = 0; i < _ambientSources.length; i++) {
+      try { _ambientSources[i].stop(); } catch(e){}
+    }
+    for (i = 0; i < _ambientNodes.length; i++) {
+      try { _ambientNodes[i].disconnect(); } catch(e){}
     }
     _ambientNodes = [];
+    _ambientSources = [];
+    _ambientTimers = [];
   }
+
+  // Helper: looping noise source connected through filter → gain → master
+  function _ambientNoise(duration, filterType, filterFreq, filterQ, vol) {
+    var src = createNoise(duration);
+    src.loop = true;
+    var flt = ctx.createBiquadFilter();
+    flt.type = filterType; flt.frequency.value = filterFreq;
+    if (filterQ !== undefined) flt.Q.value = filterQ;
+    var g = ctx.createGain();
+    g.gain.value = vol;
+    src.connect(flt); flt.connect(g); g.connect(masterGain);
+    _ambientSources.push(src);
+    _ambientNodes.push(g, flt);
+    return g;
+  }
+
+  // Helper: LFO-gated oscillator (intermittent tone)
+  function _ambientTone(freq, oscType, lfoFreq, vol) {
+    var osc = ctx.createOscillator();
+    osc.type = oscType; osc.frequency.value = freq;
+    var lfo = ctx.createOscillator();
+    lfo.type = 'square'; lfo.frequency.value = lfoFreq;
+    var amp = ctx.createGain(); amp.gain.value = 0;
+    lfo.connect(amp.gain);
+    var g = ctx.createGain(); g.gain.value = vol;
+    osc.connect(amp); amp.connect(g); g.connect(masterGain);
+    osc.start(); lfo.start();
+    _ambientSources.push(osc, lfo);
+    _ambientNodes.push(g, amp);
+    return g;
+  }
+
+  // Helper: continuous oscillator
+  function _ambientOsc(freq, oscType, vol) {
+    var osc = ctx.createOscillator();
+    osc.type = oscType; osc.frequency.value = freq;
+    var g = ctx.createGain(); g.gain.value = vol;
+    osc.connect(g); g.connect(masterGain);
+    osc.start();
+    _ambientSources.push(osc);
+    _ambientNodes.push(g);
+    return g;
+  }
+
+  // Helper: periodic one-shot event (boom, clank, etc.)
+  function _ambientPeriodicShot(intervalMs, jitterMs, builder) {
+    var id = setInterval(function () {
+      if (!enabled || !ctx) return;
+      var jitter = Math.random() * jitterMs;
+      setTimeout(function () { builder(ctx.currentTime); }, jitter);
+    }, intervalMs);
+    _ambientTimers.push(id);
+  }
+
   function startAmbientLoop(theme) {
     if (!enabled || !ctx) return;
     resume();
     stopAmbientLoop();
-    // Wind layer (all stages)
-    var windNoise = createNoise(10);
-    windNoise.loop = true;
-    var windFilter = ctx.createBiquadFilter();
-    windFilter.type = 'lowpass'; windFilter.frequency.value = 400;
-    var windGain = ctx.createGain();
-    windGain.gain.value = 0.025;
-    windNoise.connect(windFilter);
-    windFilter.connect(windGain);
-    windGain.connect(masterGain);
-    _ambientNodes.push(windGain);
 
-    if (theme === 'urban') {
-      // Low rumble (distant machinery / city)
-      var rumbleNoise = createNoise(8);
-      rumbleNoise.loop = true;
-      var rumbleFilter = ctx.createBiquadFilter();
-      rumbleFilter.type = 'lowpass'; rumbleFilter.frequency.value = 120;
-      var rumbleGain = ctx.createGain();
-      rumbleGain.gain.value = 0.04;
-      rumbleNoise.connect(rumbleFilter);
-      rumbleFilter.connect(rumbleGain);
-      rumbleGain.connect(masterGain);
-      _ambientNodes.push(rumbleGain);
-      // Occasional drip/ping (delayed sine pops via LFO modulation)
-      var pingOsc = ctx.createOscillator();
-      pingOsc.type = 'sine';
-      pingOsc.frequency.value = 2200;
-      var pingLFO = ctx.createOscillator();
-      pingLFO.type = 'square'; pingLFO.frequency.value = 0.15;
-      var pingAmp = ctx.createGain(); pingAmp.gain.value = 0;
-      var pingVol = ctx.createGain(); pingVol.gain.value = 0.008;
-      pingLFO.connect(pingAmp.gain);
-      pingOsc.connect(pingAmp);
-      pingAmp.connect(pingVol);
-      pingVol.connect(masterGain);
-      pingOsc.start(); pingLFO.start();
-      _ambientNodes.push(pingVol);
-    } else {
-      // Grassland: crickets (high-freq filtered noise pulses)
-      var cricketNoise = createNoise(6);
-      cricketNoise.loop = true;
-      var cricketBP = ctx.createBiquadFilter();
-      cricketBP.type = 'bandpass'; cricketBP.frequency.value = 5000; cricketBP.Q.value = 8;
-      var cricketLFO = ctx.createOscillator();
-      cricketLFO.type = 'square'; cricketLFO.frequency.value = 3;
-      var cricketAmp = ctx.createGain(); cricketAmp.gain.value = 0;
-      cricketLFO.connect(cricketAmp.gain);
-      var cricketVol = ctx.createGain(); cricketVol.gain.value = 0.012;
-      cricketNoise.connect(cricketBP);
-      cricketBP.connect(cricketAmp);
-      cricketAmp.connect(cricketVol);
-      cricketVol.connect(masterGain);
-      cricketLFO.start();
-      _ambientNodes.push(cricketVol);
+    // ── Base wind layer (all stages) ──
+    // Gentle lowpassed white noise — always present
+    _ambientNoise(10, 'lowpass', 400, 0.7, 0.025);
+
+    if (theme === 'grassland') {
+      // ── Grassland ──────────────────────────────────────
+      // Bird chirps: high sine blips, LFO-gated at ~0.4 Hz
+      _ambientTone(3800, 'sine', 0.4, 0.010);
+      // Second bird, slightly detuned, slower cadence
+      _ambientTone(4400, 'sine', 0.25, 0.007);
+      // Rustling: bandpassed noise pulsing via LFO
+      _ambientNoise(6, 'bandpass', 2200, 1.5, 0.015);
+
+    } else if (theme === 'urban') {
+      // ── Urban ──────────────────────────────────────────
+      // Low city rumble
+      _ambientNoise(8, 'lowpass', 120, 0.7, 0.045);
+      // Creaking metal: narrow bandpass tone, slow LFO
+      _ambientTone(320, 'sawtooth', 0.12, 0.006);
+      // Distant artillery: periodic booms
+      _ambientPeriodicShot(4000, 3000, function (now) {
+        var n = createNoise(0.4);
+        var f = ctx.createBiquadFilter();
+        f.type = 'lowpass'; f.frequency.setValueAtTime(300, now);
+        f.frequency.exponentialRampToValueAtTime(60, now + 0.4);
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.07, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        n.connect(f); f.connect(g); g.connect(masterGain);
+      });
+
+    } else if (theme === 'industrial') {
+      // ── Industrial ─────────────────────────────────────
+      // Machine hum: low sawtooth drone
+      _ambientOsc(55, 'sawtooth', 0.04);
+      // Steam hiss: high bandpassed noise
+      _ambientNoise(6, 'bandpass', 6000, 3, 0.012);
+      // Metal clanking: periodic sharp transients
+      _ambientPeriodicShot(2500, 2000, function (now) {
+        var osc = ctx.createOscillator();
+        osc.type = 'square'; osc.frequency.value = 1800 + Math.random() * 600;
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.06, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+        osc.connect(g); g.connect(masterGain);
+        osc.start(now); osc.stop(now + 0.07);
+      });
+
+    } else if (theme === 'coastal') {
+      // ── Coastal ────────────────────────────────────────
+      // Ocean waves: filtered noise with slow amplitude LFO
+      var waveSrc = createNoise(10);
+      waveSrc.loop = true;
+      var waveFilter = ctx.createBiquadFilter();
+      waveFilter.type = 'lowpass'; waveFilter.frequency.value = 500;
+      var waveLfo = ctx.createOscillator();
+      waveLfo.type = 'sine'; waveLfo.frequency.value = 0.15;
+      var waveAmp = ctx.createGain(); waveAmp.gain.value = 0.06;
+      waveLfo.connect(waveAmp.gain);
+      var waveVol = ctx.createGain(); waveVol.gain.value = 0.08;
+      waveSrc.connect(waveFilter); waveFilter.connect(waveAmp);
+      waveAmp.connect(waveVol); waveVol.connect(masterGain);
+      waveSrc.start ? void 0 : waveSrc.start(); // already started by createNoise
+      waveLfo.start();
+      _ambientSources.push(waveSrc, waveLfo);
+      _ambientNodes.push(waveVol, waveAmp, waveFilter);
+      // Seagulls: high sine chirps, intermittent
+      _ambientTone(2800, 'sine', 0.3, 0.008);
+      // Wind is already in base layer, boost it slightly for coast
+      _ambientNoise(8, 'bandpass', 350, 0.5, 0.02);
+
+    } else if (theme === 'wasteland') {
+      // ── Wasteland ──────────────────────────────────────
+      // Low ominous drone
+      _ambientOsc(42, 'sine', 0.05);
+      // Eerie detuned wind: narrow bandpass noise
+      _ambientNoise(8, 'bandpass', 800, 4, 0.02);
+      // Geiger crackle: rapid tiny clicks via high-freq LFO-gated noise
+      _ambientPeriodicShot(200, 300, function (now) {
+        if (Math.random() > 0.3) return; // sparse crackle
+        var osc = ctx.createOscillator();
+        osc.type = 'square'; osc.frequency.value = 8000 + Math.random() * 4000;
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.03, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
+        osc.connect(g); g.connect(masterGain);
+        osc.start(now); osc.stop(now + 0.01);
+      });
+
+    } else if (theme === 'cityscape') {
+      // ── Cityscape ──────────────────────────────────────
+      // Distant siren: sine sweep oscillating slowly
+      var sirenOsc = ctx.createOscillator();
+      sirenOsc.type = 'sine';
+      var sirenLfo = ctx.createOscillator();
+      sirenLfo.type = 'sine'; sirenLfo.frequency.value = 0.5;
+      var sirenLfoGain = ctx.createGain(); sirenLfoGain.gain.value = 200;
+      sirenLfo.connect(sirenLfoGain);
+      sirenLfoGain.connect(sirenOsc.frequency);
+      sirenOsc.frequency.value = 700;
+      var sirenVol = ctx.createGain(); sirenVol.gain.value = 0.012;
+      sirenOsc.connect(sirenVol); sirenVol.connect(masterGain);
+      sirenOsc.start(); sirenLfo.start();
+      _ambientSources.push(sirenOsc, sirenLfo);
+      _ambientNodes.push(sirenVol, sirenLfoGain);
+      // Wind through buildings: bandpassed with resonance
+      _ambientNoise(8, 'bandpass', 600, 6, 0.018);
+      // Distant gunfire echoes: periodic muffled cracks
+      _ambientPeriodicShot(3000, 4000, function (now) {
+        var n = createNoise(0.08);
+        var f = ctx.createBiquadFilter();
+        f.type = 'bandpass'; f.frequency.value = 800; f.Q.value = 2;
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.04, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        n.connect(f); f.connect(g); g.connect(masterGain);
+      });
+
+    } else if (theme === 'desert') {
+      // ── Desert ─────────────────────────────────────────
+      // Hot wind: higher-pitched bandpassed noise, slow swell
+      var desertSrc = createNoise(10);
+      desertSrc.loop = true;
+      var desertFilter = ctx.createBiquadFilter();
+      desertFilter.type = 'bandpass'; desertFilter.frequency.value = 500;
+      desertFilter.Q.value = 1.2;
+      var desertLfo = ctx.createOscillator();
+      desertLfo.type = 'sine'; desertLfo.frequency.value = 0.08;
+      var desertAmp = ctx.createGain(); desertAmp.gain.value = 0.04;
+      desertLfo.connect(desertAmp.gain);
+      var desertVol = ctx.createGain(); desertVol.gain.value = 0.06;
+      desertSrc.connect(desertFilter); desertFilter.connect(desertAmp);
+      desertAmp.connect(desertVol); desertVol.connect(masterGain);
+      desertLfo.start();
+      _ambientSources.push(desertSrc, desertLfo);
+      _ambientNodes.push(desertVol, desertAmp, desertFilter);
+      // Sand rustling: very high filtered noise, faint
+      _ambientNoise(4, 'highpass', 4000, 1, 0.010);
     }
+    // Unknown themes get base wind only — silent fallback
   }
 
   function playWaveStart() {

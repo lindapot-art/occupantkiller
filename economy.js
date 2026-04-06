@@ -141,6 +141,22 @@ const Economy = (function () {
 
   /* ── Production cycle (called by automation) ─────────────────────── */
   function produce(buildingType) {
+    // If no buildingType given, produce for ALL placed buildings
+    if (!buildingType) {
+      if (typeof Building !== 'undefined' && Building.getStructures) {
+        const structs = Building.getStructures();
+        for (let i = 0; i < structs.length; i++) {
+          const key = structs[i].autoType || structs[i].template.toLowerCase().replace(/\s+/g, '');
+          const rates = PRODUCTION_RATES[key];
+          if (rates) {
+            for (const [res, amount] of Object.entries(rates)) {
+              add(res, amount);
+            }
+          }
+        }
+      }
+      return;
+    }
     const rates = PRODUCTION_RATES[buildingType];
     if (!rates) return;
     for (const [res, amount] of Object.entries(rates)) {

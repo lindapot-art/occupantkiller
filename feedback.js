@@ -95,8 +95,9 @@ const Feedback = (function () {
     for (let i = killFeed.length - 1; i >= 0; i--) {
       killFeed[i].timer -= dt;
       if (killFeed[i].timer <= 0) {
-        killFeed[i].el.style.opacity = '0';
-        setTimeout(() => { killFeed[i] && killFeed[i].el.remove(); }, 500);
+        var deadEl = killFeed[i].el;
+        deadEl.style.opacity = '0';
+        setTimeout(function() { if (deadEl.parentNode) deadEl.remove(); }, 500);
         killFeed.splice(i, 1);
       }
     }

@@ -25,8 +25,8 @@ jobs:
       - name: Install serve
         run: npm install -g serve@14
 
-      - name: Start static server on port 8080
-        run: nohup serve -l 8080 . > /tmp/serve.log 2>&1 &
+      - name: Start static server on port 3000
+        run: nohup serve -l 3000 . > /tmp/serve.log 2>&1 &
 
       - name: Install cloudflared
         run: |
@@ -37,7 +37,7 @@ jobs:
       - name: Start tunnel and capture URL
         id: tunnel
         run: |
-          cloudflared tunnel --url http://localhost:8080 > /tmp/cf.log 2>&1 &
+          cloudflared tunnel --url http://localhost:3000 > /tmp/cf.log 2>&1 &
           CF_PID=$!
           echo "Waiting for tunnel URL..."
           for i in $(seq 1 40); do

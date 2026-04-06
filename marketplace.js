@@ -258,8 +258,11 @@ const Marketplace = (function () {
     return price;
   }
 
+  var _pendingSells = new Set();
+
   /* ── Sell Weapon for POL (blockchain tx) ───────────────────────── */
   async function sellWeaponForPOL(weaponIdx) {
+    if (_pendingSells.has(weaponIdx)) return 0;
     var info = Weapons.getWeaponInfo(weaponIdx);
     if (!info) return 0;
     var price = WEAPON_PRICES_POL[info.id] || 0;
@@ -267,7 +270,15 @@ const Marketplace = (function () {
     if (!Weapons.isUnlocked(weaponIdx)) return 0;
     if (!Blockchain.isConnected()) return 0;
 
+    _pendingSells.add(weaponIdx);
     /* Send POL from game wallet to player */
+    try {
+      var txResult = await Blockchain.purchaseWithDonation(GAME_WALLET, price);
+      if (!txResult) { _pendingSells.delete(weaponIdx); return 0; }
+    } catch(e) {
+      _pendingSells.delete(weaponIdx); return 0;
+    }
+    _pendingSells.delete(weaponIdx);
     Weapons.lockWeapon(weaponIdx);
     addTx('sell', 'Sold ' + info.name + ' for POL', price, 'POL');
     return price;

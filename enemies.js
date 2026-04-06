@@ -351,6 +351,155 @@ const Enemies = (() => {
       attackDmg: 70, attackRate: 2.0, scoreValue: 800, dropChance: 0.60,
       role: 'sniper_elite', range: 50, rangedDmg: 70, rangedRate: 3.0, accuracy: 0.7,
     },
+    // ── Advanced types (referenced by pickTypeForWave) ──────
+    PARATROOP: {
+      name: 'PARATROOP', hpBase: 75, speedBase: 4.5, scale: 1.0,
+      camoVariant: 'dark', bodyColor: 0x4466aa, headColor: 0xb09070,
+      limbColor: 0x334488, helmetColor: 0x3366aa, eyeColor: 0xffcc00,
+      attackDmg: 28, attackRate: 1.0, scoreValue: 450, dropChance: 0.45,
+      role: 'paratroop', range: 12, rangedDmg: 20, rangedRate: 1.2, accuracy: 0.45,
+    },
+    TANK: {
+      name: 'TANK', hpBase: 1500, speedBase: 1.2, scale: 2.5,
+      camoVariant: 'dark', bodyColor: 0x445533, headColor: 0x445533,
+      limbColor: 0x445533, helmetColor: 0x445533, eyeColor: 0xff0000,
+      attackDmg: 200, attackRate: 4.0, scoreValue: 2000, dropChance: 1.0,
+      role: 'tank', range: 35, rangedDmg: 200, rangedRate: 4.0, accuracy: 0.6,
+    },
+    SPETSNAZ: {
+      name: 'SPETSNAZ', hpBase: 130, speedBase: 5.0, scale: 1.05,
+      camoVariant: 'dark', bodyColor: 0x1a1a1a, headColor: 0xb09070,
+      limbColor: 0x111111, helmetColor: 0x0a0a0a, eyeColor: 0xff2200,
+      attackDmg: 35, attackRate: 0.8, scoreValue: 700, dropChance: 0.65,
+      role: 'spetsnaz', range: 15, rangedDmg: 30, rangedRate: 1.0, accuracy: 0.6,
+    },
+    KADYROVITE: {
+      name: 'KADYROVITE', hpBase: 95, speedBase: 3.0, scale: 1.1,
+      camoVariant: 'dark', bodyColor: 0x334411, headColor: 0xb09070,
+      limbColor: 0x223300, helmetColor: 0x2a2a1a, eyeColor: 0xff4400,
+      attackDmg: 22, attackRate: 1.0, scoreValue: 400, dropChance: 0.50,
+      role: 'kadyrovite', range: 10, rangedDmg: 18, rangedRate: 1.2, accuracy: 0.4,
+    },
+    WAGNER: {
+      name: 'WAGNER', hpBase: 40, speedBase: 5.5, scale: 1.0,
+      camoVariant: 'dark', bodyColor: 0x554433, headColor: 0xb09070,
+      limbColor: 0x443322, helmetColor: 0x333322, eyeColor: 0xff6600,
+      attackDmg: 18, attackRate: 0.6, scoreValue: 200, dropChance: 0.25,
+      role: 'wagner', range: 3, rangedDmg: 0, rangedRate: 0, accuracy: 0,
+    },
+    BTR: {
+      name: 'BTR', hpBase: 600, speedBase: 2.5, scale: 2.0,
+      camoVariant: 'dark', bodyColor: 0x445544, headColor: 0x445544,
+      limbColor: 0x445544, helmetColor: 0x445544, eyeColor: 0xff4400,
+      attackDmg: 30, attackRate: 0.2, scoreValue: 1200, dropChance: 0.90,
+      role: 'btr', range: 20, rangedDmg: 30, rangedRate: 0.2, accuracy: 0.5,
+    },
+    KAMIKAZE_DRONE: {
+      name: 'KAMIKAZE_DRONE', hpBase: 20, speedBase: 8.0, scale: 0.5,
+      camoVariant: 'dark', bodyColor: 0x666666, headColor: 0x666666,
+      limbColor: 0x666666, helmetColor: 0x666666, eyeColor: 0xff0000,
+      attackDmg: 120, attackRate: 999, scoreValue: 300, dropChance: 0.0,
+      role: 'kamikaze_drone', range: 0, rangedDmg: 0, rangedRate: 0, accuracy: 0,
+    },
+    HEAVY_SNIPER: {
+      name: 'HEAVY_SNIPER', hpBase: 90, speedBase: 0.8, scale: 1.1,
+      camoVariant: 'dark', bodyColor: 0x2a3a2a, headColor: 0xb09070,
+      limbColor: 0x1a2a0a, helmetColor: 0x1a2a1a, eyeColor: 0x00ff00,
+      attackDmg: 120, attackRate: 3.0, scoreValue: 900, dropChance: 0.65,
+      role: 'heavy_sniper', range: 60, rangedDmg: 120, rangedRate: 3.0, accuracy: 0.75,
+    },
+    COMMISSAR: {
+      name: 'COMMISSAR', hpBase: 100, speedBase: 1.5, scale: 1.2,
+      camoVariant: 'dark', bodyColor: 0x880000, headColor: 0xd0b090,
+      limbColor: 0x660000, helmetColor: 0x440000, eyeColor: 0xff0000,
+      attackDmg: 20, attackRate: 1.0, scoreValue: 850, dropChance: 0.70,
+      role: 'commissar', range: 10, rangedDmg: 15, rangedRate: 1.2, accuracy: 0.4,
+    },
+    THERMOBARIC: {
+      name: 'THERMOBARIC', hpBase: 80, speedBase: 1.2, scale: 1.15,
+      camoVariant: 'dark', bodyColor: 0xff3300, headColor: 0xd0b090,
+      limbColor: 0xcc2200, helmetColor: 0x992200, eyeColor: 0xff8800,
+      attackDmg: 200, attackRate: 8.0, scoreValue: 1000, dropChance: 0.75,
+      role: 'thermobaric', range: 35, rangedDmg: 200, rangedRate: 8.0, accuracy: 0.5,
+    },
+    EW_OPERATOR: {
+      name: 'EW_OPERATOR', hpBase: 60, speedBase: 2.0, scale: 1.0,
+      camoVariant: 'dark', bodyColor: 0x4488aa, headColor: 0xb09070,
+      limbColor: 0x336688, helmetColor: 0x224466, eyeColor: 0x00ccff,
+      attackDmg: 15, attackRate: 1.4, scoreValue: 700, dropChance: 0.55,
+      role: 'ew_operator', range: 8, rangedDmg: 10, rangedRate: 1.4, accuracy: 0.35,
+    },
+    ASSAULT_MECH: {
+      name: 'ASSAULT_MECH', hpBase: 3000, speedBase: 1.0, scale: 3.0,
+      camoVariant: 'dark', bodyColor: 0x444444, headColor: 0x444444,
+      limbColor: 0x333333, helmetColor: 0x222222, eyeColor: 0xff0000,
+      attackDmg: 80, attackRate: 0.5, scoreValue: 3000, dropChance: 1.0,
+      role: 'assault_mech', range: 25, rangedDmg: 80, rangedRate: 0.5, accuracy: 0.55,
+    },
+    SWARM_OP: {
+      name: 'SWARM_OP', hpBase: 45, speedBase: 1.0, scale: 1.0,
+      camoVariant: 'dark', bodyColor: 0x777777, headColor: 0xb09070,
+      limbColor: 0x555555, helmetColor: 0x444444, eyeColor: 0x00ccff,
+      attackDmg: 8, attackRate: 1.0, scoreValue: 750, dropChance: 0.50,
+      role: 'swarm_op', range: 5, rangedDmg: 5, rangedRate: 1.0, accuracy: 0.3,
+    },
+    // ── Stage Boss Types (meshes reuse humanoid but scaled) ─
+    BOSS_MARIUPOL: {
+      name: 'BOSS_MARIUPOL', hpBase: 800, speedBase: 1.8, scale: 1.8,
+      camoVariant: 'dark', bodyColor: 0xff4400, headColor: 0xd0b090,
+      limbColor: 0xcc3300, helmetColor: 0x992200, eyeColor: 0xff0000,
+      attackDmg: 55, attackRate: 1.2, scoreValue: 5000, dropChance: 1.0,
+      role: 'boss', range: 10, rangedDmg: 40, rangedRate: 1.5, accuracy: 0.5,
+    },
+    BOSS_CRIMEA: {
+      name: 'BOSS_CRIMEA', hpBase: 1000, speedBase: 1.2, scale: 1.7,
+      camoVariant: 'dark', bodyColor: 0x2244aa, headColor: 0xd0b090,
+      limbColor: 0x113388, helmetColor: 0x002266, eyeColor: 0x00ccff,
+      attackDmg: 40, attackRate: 1.0, scoreValue: 6000, dropChance: 1.0,
+      role: 'boss', range: 30, rangedDmg: 100, rangedRate: 2.0, accuracy: 0.6,
+    },
+    BOSS_CHORNOBYL: {
+      name: 'BOSS_CHORNOBYL', hpBase: 1200, speedBase: 2.0, scale: 2.0,
+      camoVariant: 'dark', bodyColor: 0x44ff22, headColor: 0xaacc88,
+      limbColor: 0x33cc11, helmetColor: 0x228800, eyeColor: 0x00ff00,
+      attackDmg: 50, attackRate: 1.0, scoreValue: 7000, dropChance: 1.0,
+      role: 'boss', range: 12, rangedDmg: 35, rangedRate: 1.2, accuracy: 0.45,
+    },
+    BOSS_MOSCOW: {
+      name: 'BOSS_MOSCOW', hpBase: 1800, speedBase: 3.0, scale: 1.6,
+      camoVariant: 'dark', bodyColor: 0x111111, headColor: 0xd0b090,
+      limbColor: 0x0a0a0a, helmetColor: 0x050505, eyeColor: 0xff4400,
+      attackDmg: 65, attackRate: 0.8, scoreValue: 8000, dropChance: 1.0,
+      role: 'boss', range: 18, rangedDmg: 50, rangedRate: 1.0, accuracy: 0.65,
+    },
+    BOSS_SEVASTOPOL: {
+      name: 'BOSS_SEVASTOPOL', hpBase: 2000, speedBase: 1.0, scale: 2.2,
+      camoVariant: 'dark', bodyColor: 0x335588, headColor: 0xd0b090,
+      limbColor: 0x224477, helmetColor: 0x113366, eyeColor: 0x00aaff,
+      attackDmg: 80, attackRate: 1.5, scoreValue: 10000, dropChance: 1.0,
+      role: 'boss', range: 35, rangedDmg: 150, rangedRate: 2.5, accuracy: 0.55,
+    },
+    BOSS_DONBAS: {
+      name: 'BOSS_DONBAS', hpBase: 2500, speedBase: 1.4, scale: 2.0,
+      camoVariant: 'dark', bodyColor: 0x553322, headColor: 0xd0b090,
+      limbColor: 0x442211, helmetColor: 0x331100, eyeColor: 0xff2200,
+      attackDmg: 60, attackRate: 1.0, scoreValue: 12000, dropChance: 1.0,
+      role: 'boss', range: 15, rangedDmg: 120, rangedRate: 2.0, accuracy: 0.5,
+    },
+    BOSS_BELGOROD: {
+      name: 'BOSS_BELGOROD', hpBase: 3000, speedBase: 1.2, scale: 2.5,
+      camoVariant: 'dark', bodyColor: 0x445533, headColor: 0xd0b090,
+      limbColor: 0x334422, helmetColor: 0x223311, eyeColor: 0xff0000,
+      attackDmg: 90, attackRate: 1.2, scoreValue: 15000, dropChance: 1.0,
+      role: 'boss', range: 25, rangedDmg: 130, rangedRate: 2.0, accuracy: 0.6,
+    },
+    BOSS_KREMLIN: {
+      name: 'BOSS_KREMLIN', hpBase: 5000, speedBase: 1.5, scale: 3.0,
+      camoVariant: 'dark', bodyColor: 0xcc0000, headColor: 0xd0b090,
+      limbColor: 0xaa0000, helmetColor: 0x880000, eyeColor: 0xff0000,
+      attackDmg: 100, attackRate: 1.0, scoreValue: 25000, dropChance: 1.0,
+      role: 'boss', range: 20, rangedDmg: 250, rangedRate: 2.5, accuracy: 0.7,
+    },
   };
 
   // ── Enemy Roles for Assault Groups ──────────────────────
@@ -460,6 +609,11 @@ const Enemies = (() => {
   const DETECTION_ANGLE = 1.2;  // ~70° half-cone FOV for detection
   const SPOT_TIME = 1.5;        // seconds to fully spot player
 
+  // ── Reusable temp vectors (avoids GC pressure in hot loop) ──
+  const _tmpVec3 = new THREE.Vector3();
+  const _tmpVec3b = new THREE.Vector3();
+  const _tmpVec3c = new THREE.Vector3();
+
   // ── Enemy grenade system ─────────────────────────────────
   const _enemyGrenades = [];
   const _grenadeGeo = new THREE.SphereGeometry(0.12, 6, 4);
@@ -515,8 +669,13 @@ const Enemies = (() => {
     }
 
     const r = Math.random();
-    // Boss every 5th wave
-    if (w % 5 === 0 && w >= 5 && r < 0.08) return 'BOSS';
+    // Stage boss on final wave, mini-boss every 5th wave
+    if (w % 5 === 0 && w >= 5 && r < 0.08) {
+      if (typeof EnemyTypes !== 'undefined' && EnemyTypes.getBossForStage) {
+        return EnemyTypes.getBossForStage(_stageId);
+      }
+      return 'BOSS';
+    }
     // Endgame enemy types (stages 9-12, wave ~15+)
     if (w >= 20 && r < 0.04) return 'ASSAULT_MECH';
     if (w >= 16 && r < 0.07) return 'THERMOBARIC';
@@ -838,7 +997,7 @@ const Enemies = (() => {
     fgMesh.position.z = 0.002;
 
     group.add(bgMesh, fgMesh);
-    scene.add(group);
+    if (scene) scene.add(group);
     return { group, fg: fgMesh };
   }
 
@@ -868,7 +1027,7 @@ const Enemies = (() => {
     attachWeaponVisual(mesh, typeCfg);
     mesh.position.set(sx, sy, sz);
     mesh.scale.setScalar(0.01); // start tiny for spawn animation
-    scene.add(mesh);
+    if (scene) scene.add(mesh);
 
     // Build alert icon as child of mesh (auto-positioned above head)
     var _alertIcon = buildAlertIcon();
@@ -967,10 +1126,13 @@ const Enemies = (() => {
   }
 
   // ── Initialise a wave ─────────────────────────────────────
-  function startWave(w, sc, stageMultiplier, aiStrategy) {
+  var _stageId = 1;
+
+  function startWave(w, sc, stageMultiplier, aiStrategy, stageId) {
     wave      = w;
     scene     = sc;
     stageMult = stageMultiplier || 1;
+    _stageId  = stageId || 1;
     enemies   = [];
     allDead   = false;
     assaultGroups.length = 0;
@@ -1167,7 +1329,7 @@ const Enemies = (() => {
       }
 
       // ── Detection system: enemies must spot the player ──
-      const dirToPlayer = new THREE.Vector3()
+      const dirToPlayer = _tmpVec3
         .subVectors(playerPos, e.mesh.position).setY(0);
       const distToPlayer = dirToPlayer.length();
 
@@ -1280,7 +1442,7 @@ const Enemies = (() => {
 
       // ── Movement toward target with obstacle avoidance + strategic flanking ──
       if (moveTarget && targetDist > 1.0) {
-        const dir = new THREE.Vector3().subVectors(moveTarget, e.mesh.position).setY(0).normalize();
+        const dir = _tmpVec3b.subVectors(moveTarget, e.mesh.position).setY(0).normalize();
 
         // ── AI Smart Learning: ML-guided flanking and tactical behavior ──
         if (e.playerSpotted && !targetIsNPC && _aiStrategy) {
@@ -1410,7 +1572,7 @@ const Enemies = (() => {
         e._retreatTimer -= delta;
         // Run away from player
         if (playerPos) {
-          var awayDir = new THREE.Vector3().subVectors(e.mesh.position, playerPos).setY(0).normalize();
+          var awayDir = _tmpVec3c.subVectors(e.mesh.position, playerPos).setY(0).normalize();
           e.mesh.position.addScaledVector(awayDir, e.speed * 1.5 * delta);
           e.mesh.lookAt(e.mesh.position.clone().add(awayDir));
         }
