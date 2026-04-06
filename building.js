@@ -4,7 +4,7 @@
 const Building = (function () {
   'use strict';
 
-  const B = VoxelWorld.BLOCK;
+  const B = (typeof VoxelWorld !== 'undefined' && VoxelWorld.BLOCK) ? VoxelWorld.BLOCK : {};
 
   /* ── Structure Templates ─────────────────────────────────────────── */
   const TEMPLATES = {

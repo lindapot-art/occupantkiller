@@ -2198,11 +2198,24 @@ const Weapons = (() => {
     _scopeSwayTime = 0;
     _holdingBreath = false;
     _inspectTimer = 0;
-    // Remove lingering projectiles
+    // Remove lingering projectiles with proper disposal
     for (let i = projectiles.length - 1; i >= 0; i--) {
       if (_scene) _scene.remove(projectiles[i].mesh);
+      if (projectiles[i].mesh) {
+        if (projectiles[i].mesh.geometry) projectiles[i].mesh.geometry.dispose();
+        if (projectiles[i].mesh.material) projectiles[i].mesh.material.dispose();
+      }
     }
     projectiles.length = 0;
+    // Clear smoke clouds with proper disposal
+    for (let i = _smokeClouds.length - 1; i >= 0; i--) {
+      var sc = _smokeClouds[i];
+      if (sc.group) {
+        sc.group.children.forEach(function (c) { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+        if (_scene) _scene.remove(sc.group);
+      }
+    }
+    _smokeClouds.length = 0;
     gunMeshes.forEach(function (m, i) { if (m) m.visible = (i === 0); });
     const st = curState();
     HUD.setAmmo('∞', '—');

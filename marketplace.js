@@ -245,6 +245,7 @@ const Marketplace = (function () {
 
   /* ── Sell Weapon for OKC ───────────────────────────────────────── */
   function sellWeaponForOKC(weaponIdx) {
+    if (typeof Weapons === 'undefined') return 0;
     var info = Weapons.getWeaponInfo(weaponIdx);
     if (!info) return 0;
     var price = WEAPON_PRICES_OKC[info.id] || 0;
@@ -262,6 +263,7 @@ const Marketplace = (function () {
 
   /* ── Sell Weapon for POL (blockchain tx) ───────────────────────── */
   async function sellWeaponForPOL(weaponIdx) {
+    if (typeof Weapons === 'undefined') return 0;
     if (_pendingSells.has(weaponIdx)) return 0;
     var info = Weapons.getWeaponInfo(weaponIdx);
     if (!info) return 0;
@@ -286,6 +288,7 @@ const Marketplace = (function () {
 
   /* ── Sell Ammo ─────────────────────────────────────────────────── */
   function sellAmmoForOKC(weaponIdx, amount) {
+    if (typeof Weapons === 'undefined') return 0;
     var state = Weapons.getWeaponState(weaponIdx);
     if (!state || state.reserve < amount) return 0;
     Weapons.removeAmmo(weaponIdx, amount);
@@ -374,6 +377,7 @@ const Marketplace = (function () {
   const OKC_TO_GOLD = 10; // 1 OKC = 10 gold
   function convertOKCToGold(okcAmount) {
     if (okcBalance < okcAmount) return 0;
+    if (typeof Economy === 'undefined' || !Economy.addCurrency) return 0;
     okcBalance -= okcAmount;
     var gold = okcAmount * OKC_TO_GOLD;
     Economy.addCurrency(gold);
@@ -382,6 +386,7 @@ const Marketplace = (function () {
   }
 
   function convertGoldToOKC(goldAmount) {
+    if (typeof Economy === 'undefined' || !Economy.spendCurrency) return 0;
     if (!Economy.spendCurrency(goldAmount)) return 0;
     var okc = Math.floor(goldAmount / OKC_TO_GOLD);
     okcBalance += okc;

@@ -27,6 +27,7 @@ const GameManager = (function () {
   var _gmTmp2 = new THREE.Vector3();
   var _gmTmp3 = new THREE.Vector3();
   var _gmNewPos = new THREE.Vector3();
+  var _waveStartTimer = null;
 
   /* ── Player State ────────────────────────────────────────────────── */
   const GOD_MODE_HP = 999999;
@@ -195,9 +196,9 @@ const GameManager = (function () {
         Weapons.addAmmo(20);
         break;
       case 'ARMOR_PUSH':
-        // Spawn armored enemies in formation
+        // Spawn armored enemies in formation (full 360° around player)
         for (let i = 0; i < 4; i++) {
-          const fa = (Math.random() - 0.5) * 1.5;
+          const fa = Math.random() * Math.PI * 2;
           const fd = 15 + Math.random() * 6;
           Enemies.spawnSingle('ARMORED', new THREE.Vector3(
             player.position.x + Math.cos(fa) * fd, 0,
@@ -322,18 +323,16 @@ const GameManager = (function () {
         AudioSystem.playPickup();
         continue;
       }
+      // Blink before despawning (last 3 seconds)
+      if (lp.userData.age > LOOT_CONFIG.LIFETIME - 3) {
+        lp.visible = Math.floor(lp.userData.age * 6) % 2 === 0;
+      }
       // Despawn after lifetime
       if (lp.userData.age > LOOT_CONFIG.LIFETIME) {
-        // Blink before despawning
-        if (lp.userData.age > LOOT_CONFIG.LIFETIME - 3) {
-          lp.visible = Math.floor(lp.userData.age * 6) % 2 === 0;
-        }
-        if (lp.userData.age > LOOT_CONFIG.LIFETIME) {
-          _scene.remove(lp);
-          lp.geometry.dispose();
-          lp.material.dispose();
-          _lootParticles.splice(i, 1);
-        }
+        _scene.remove(lp);
+        lp.geometry.dispose();
+        lp.material.dispose();
+        _lootParticles.splice(i, 1);
       }
     }
   }
@@ -1668,7 +1667,8 @@ const GameManager = (function () {
 
     // Announce first stage then begin first wave after delay
     HUD.announceStage(STAGES[0].id, STAGES[0].name, STAGES[0].description);
-    setTimeout(function () {
+    if (_waveStartTimer) clearTimeout(_waveStartTimer);
+    _waveStartTimer = setTimeout(function () {
       beginWave(1);
     }, 3200);
 
@@ -1833,7 +1833,8 @@ const GameManager = (function () {
 
     // Announce new stage then begin first wave after delay
     HUD.announceStage(stageDef.id, stageDef.name, stageDef.description);
-    setTimeout(function () {
+    if (_waveStartTimer) clearTimeout(_waveStartTimer);
+    _waveStartTimer = setTimeout(function () {
       beginWave(1);
     }, 3200);
   }
@@ -2428,7 +2429,7 @@ const GameManager = (function () {
           var isExplosive = ['AT', 'ATGM', 'AT_HEAVY', 'AT_LIGHT', 'AA', 'GRENADE', 'INCENDIARY', 'THERMOBARIC'].indexOf(weaponType) >= 0;
           if (!isExplosive) {
             _gmNewPos.copy(_gmTmp2).addScaledVector(_gmTmp3, 0.5);
-            Tracers.spawnTracer(_gmNewPos.clone(), _gmTmp3, isHeavy ? 0xff4400 : 0xffcc44, 120);
+            Tracers.spawnTracer(_gmNewPos, _gmTmp3, isHeavy ? 0xff4400 : 0xffcc44, 120);
           }
           // Muzzle flash on every shot
           if (Tracers.spawnMuzzleFlash) {
@@ -2734,7 +2735,8 @@ const GameManager = (function () {
     if (HUD.addCombatLog) HUD.addCombatLog('Hit vehicle (-' + dmg + ')', '#ff8800');
     // Spawn sparks on vehicle hit
     if (typeof Tracers !== 'undefined' && Tracers.spawnMuzzleFlash) {
-      Tracers.spawnMuzzleFlash(vehicle.position, new THREE.Vector3(0, 1, 0));
+      _gmTmp1.set(0, 1, 0);
+      Tracers.spawnMuzzleFlash(vehicle.position, _gmTmp1);
     }
     // Check if destroyed
     if (vehicle.health <= 0) {
@@ -2752,6 +2754,7 @@ const GameManager = (function () {
   }
 
   function onPlayerHit(dmg, attackerPos) {
+    if (gameState !== STATE.PLAYING) return; // can't take damage when dead/paused
     if (player.godMode) return; // God mode: immune to damage
     // Shield absorbs damage
     if (player.shieldTimer > 0) {

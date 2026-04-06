@@ -86,17 +86,20 @@ var StageVFX = (function () {
       p = pool.pop();
       // Swap geometry and material
       p.mesh.geometry = geometry;
-      p.mesh.material = material;
+      // Clone material so per-particle opacity doesn't mutate shared material
+      if (p.mesh.material) p.mesh.material.dispose();
+      p.mesh.material = material.clone();
       p.mesh.visible = true;
     } else if (active.length >= MAX_PARTICLES) {
       // steal oldest active particle
       p = active.shift();
       p.mesh.geometry = geometry;
-      p.mesh.material = material;
+      if (p.mesh.material) p.mesh.material.dispose();
+      p.mesh.material = material.clone();
       p.mesh.visible = true;
     } else {
-      // create new
-      var mesh = new THREE.Mesh(geometry, material);
+      // create new — clone material for per-particle opacity
+      var mesh = new THREE.Mesh(geometry, material.clone());
       mesh.frustumCulled = false;
       groupMesh.add(mesh);
       p = { mesh: mesh };
@@ -540,6 +543,7 @@ var StageVFX = (function () {
   function _clearParticles() {
     var i;
     for (i = active.length - 1; i >= 0; i--) {
+      if (active[i].mesh.material) active[i].mesh.material.dispose();
       active[i].mesh.visible = false;
       pool.push(active[i]);
     }
@@ -558,9 +562,10 @@ var StageVFX = (function () {
     _flashTimer = 0;
     _flashActive = false;
 
-    // Dispose all pooled meshes
+    // Dispose all pooled meshes (including cloned materials)
     var i;
     for (i = 0; i < pool.length; i++) {
+      if (pool[i].mesh.material) pool[i].mesh.material.dispose();
       if (pool[i].mesh.parent) pool[i].mesh.parent.remove(pool[i].mesh);
     }
     pool.length = 0;

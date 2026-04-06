@@ -103,10 +103,11 @@ const RankSystem = (function () {
   function getProgress() {
     const current = RANKS[rankIndex].xpRequired;
     const next = rankIndex < RANKS.length - 1 ? RANKS[rankIndex + 1].xpRequired : totalXP;
+    const denom = next - current;
     return {
       current: totalXP - current,
-      needed: next - current,
-      percent: Math.min(100, ((totalXP - current) / (next - current)) * 100),
+      needed: denom,
+      percent: denom > 0 ? Math.min(100, ((totalXP - current) / denom) * 100) : 100,
     };
   }
 

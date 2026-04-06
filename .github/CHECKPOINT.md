@@ -4,29 +4,35 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-06 — Session 8: Memory Leaks + Bug Fixes + Testing
+- **Timestamp**: 2026-04-06 — Session 9: Deep Gameplay Bug Fixes
 - **Agent**: KING
-- **Status**: QA PASSED, PUSHED TO GITHUB (commit bb3b652)
+- **Status**: QA PASSED, PENDING COMMIT
 
 ## Current Task
-- COMPLETED: Memory leak fixes, vehicle optimization, death handler bug, test suite, README
+- COMPLETED: 10 gameplay bugs fixed (2 CRITICAL, 4 HIGH, 3 MEDIUM, 1 pre-existing)
 
 ## Steps Completed This Session
-1. [x] Performance batch 1: drone/enemies/npc/game-manager vectors (commit 22ce5c9)
-2. [x] Performance batch 2: deep clone elimination in 5 files (commit c874351)
-3. [x] Server gzip + cache headers (commit 07bd333)
-4. [x] Test suite expanded to 31 tests (commit 2e1b921)
-5. [x] Memory leak: building.js — added clear() function
-6. [x] Memory leak: pickups.js — added geometry/material disposal in clear() + update()
-7. [x] Memory leak: world-features.js — added _disposeMesh() traversal helper
-8. [x] Wired Building.clear() into game-manager.js startGame() + nextStage()
-9. [x] Committed memory leak fixes (commit fff792c)
-10. [x] Vehicle waypoint copy-or-clone optimization (commit 0f539e4/dfb9c39)
-11. [x] Test suite Phase 7: disposal pattern checks — 32/32 PASS
-12. [x] README updated (commit 33add13)
-13. [x] Bug fix: force vehicle exit + drone release on player death (commit bb3b652)
-14. [x] Identified Old Eden source: D:\antiruscist\oldeden (auto-starts from VS Code terminal)
-15. [x] All QA gates passed: 5/5 specialists, 32/32 tests
+1. [x] Session recovery from CHECKPOINT.md + TASK_QUEUE.md
+2. [x] Baseline verified: HTTP 200, 34/34 syntax, 32/32 tests
+3. [x] Phase 1: .clone() hot-path optimization (game-manager.js, enemies.js, npc-system.js)
+4. [x] Phase 2: setInterval/setTimeout leak audit — all clean except weapons.js
+5. [x] Phase 3: weapons.js reset() memory leak fix (projectile + smoke disposal)
+6. [x] Phase 4: 15 HIGH + 5 MEDIUM robustness bugs fixed across 8 files (typeof guards)
+7. [x] Phase 5: stage-vfx.js shared material mutation fix
+8. [x] Phase 6: Deep gameplay logic audit — 10 bugs identified
+9. [x] CRITICAL BUG 1: enemies.splice→null (preserves assault group indices)
+10. [x] CRITICAL BUG 2: wave double-start prevention (_waveStartTimer)
+11. [x] HIGH BUG 3: onPlayerHit state guard
+12. [x] HIGH BUG 4: grenade terrain-aware ground detection
+13. [x] HIGH BUG 5: retreating enemies snap to terrain
+14. [x] HIGH BUG 6: cache invalidation on death + removal
+15. [x] MEDIUM BUG 7: loot blink before despawn (reordered check)
+16. [x] MEDIUM BUG 8: surrender helmet visual (parts[2] direct access)
+17. [x] MEDIUM BUG 9: ARMOR_PUSH 360° spawn angle
+18. [x] Fixed wave completion check (removed enemies.length===0 check)
+19. [x] Fixed _scene→scene typo in sniper laser
+20. [x] Fixed enemy-types.js null guards + ally.mesh.position fix
+21. [x] All 5 QA specialists passed, 32/32 tests PASS
 
 ## Files Changed This Session (10 total)
 - `building.js` — Added clear() function for ghost mesh disposal + structures reset

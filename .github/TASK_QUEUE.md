@@ -16,6 +16,12 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [HIGH] Deep Gameplay Bug Fix Batch
+Status: DONE
+Requested: 2026-04-06
+Completed: 2026-04-06
+Details: Fixed 10 gameplay bugs across 3 files. CRITICAL: enemy index corruption (splice→null), wave double-start. HIGH: onPlayerHit state guard, grenade terrain, retreat terrain, cache staleness. MEDIUM: loot blink, surrender helmet, ARMOR_PUSH arc. Plus: wave completion fix, _scene typo, enemy-types.js null guards + position fix.
+
 ### [HIGH] Full QA Testing — "u test all, im not your qa guy"
 Status: DONE
 Requested: 2026-04-06

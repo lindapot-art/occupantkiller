@@ -133,6 +133,7 @@ const MissionTypes = (function () {
 
   function update(dt, playerPos) {
     if (!activeMission || activeMission.state !== 'ACTIVE') return null;
+    if (!playerPos) return null;
     const m = activeMission;
     const cfg = m.config;
     const result = { type: m.type, state: 'ACTIVE' };

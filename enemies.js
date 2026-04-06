@@ -651,7 +651,8 @@ const Enemies = (() => {
       g.vy -= 15 * delta; // gravity
       g.life -= delta;
       // Explode on ground or timeout
-      if (g.mesh.position.y <= 0.2 || g.life <= 0) {
+      var terrainY = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(g.mesh.position.x, g.mesh.position.z) : 0;
+      if (g.mesh.position.y <= terrainY + 0.2 || g.life <= 0) {
         var pos = g.mesh.position;
         if (typeof Tracers !== 'undefined' && Tracers.spawnExplosion) Tracers.spawnExplosion(pos, 2);
         if (typeof AudioSystem !== 'undefined') AudioSystem.playExplosion();
@@ -1237,6 +1238,7 @@ const Enemies = (() => {
 
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
+      if (!e) continue; // null = removed corpse, skip
 
       if (!e.alive) {
         // Hide HP bar, sink corpse with topple animation, then remove
@@ -1271,7 +1273,8 @@ const Enemies = (() => {
             scene.remove(e.hpBar.group);
             e.hpBar = null;
           }
-          enemies.splice(i, 1);
+          enemies[i] = null;
+          _cacheFrame = -1; // force cache rebuild
         }
         continue;
       }
@@ -1417,33 +1420,31 @@ const Enemies = (() => {
       if (!moveTarget) {
         // Tactical patrol: enemies patrol toward strategic objectives instead of wandering
         if (!e._wanderTarget || e.mesh.position.distanceTo(e._wanderTarget) < 2) {
+          if (!e._wanderTarget) e._wanderTarget = new THREE.Vector3();
           // Prioritize patrolling toward friendly positions, buildings, or roads
-          var strategicTarget = null;
+          var gotTarget = false;
           // Try to target friendly NPCs in area
           if (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) {
             var friendlies = NPCSystem.getAll();
             if (friendlies.length > 0) {
               var picked = friendlies[Math.floor(Math.random() * friendlies.length)];
-              if (picked.alive) strategicTarget = picked.position.clone();
+              if (picked.alive) { e._wanderTarget.copy(picked.position); gotTarget = true; }
             }
           }
           // Try road waypoints for flanking maneuvers
-          if (!strategicTarget && typeof VoxelWorld !== 'undefined' && VoxelWorld.getRoadWaypoints) {
+          if (!gotTarget && typeof VoxelWorld !== 'undefined' && VoxelWorld.getRoadWaypoints) {
             var roadWPs = VoxelWorld.getRoadWaypoints();
             if (roadWPs.length > 0) {
-              strategicTarget = roadWPs[Math.floor(Math.random() * roadWPs.length)].clone();
+              e._wanderTarget.copy(roadWPs[Math.floor(Math.random() * roadWPs.length)]);
+              gotTarget = true;
             }
           }
           // Fallback to directed patrol toward center with spread
-          if (!strategicTarget) {
+          if (!gotTarget) {
             var wa = Math.random() * Math.PI * 2;
             var wd = 6 + Math.random() * 10;
-            strategicTarget = new THREE.Vector3(
-              Math.cos(wa) * wd, 0,
-              Math.sin(wa) * wd
-            );
+            e._wanderTarget.set(Math.cos(wa) * wd, 0, Math.sin(wa) * wd);
           }
-          e._wanderTarget = strategicTarget;
         }
         moveTarget = e._wanderTarget;
         targetDist = e.mesh.position.distanceTo(moveTarget);
@@ -1583,6 +1584,10 @@ const Enemies = (() => {
         if (playerPos) {
           var awayDir = _tmpVec3c.subVectors(e.mesh.position, playerPos).setY(0).normalize();
           e.mesh.position.addScaledVector(awayDir, e.speed * 1.5 * delta);
+          // Snap to terrain height
+          if (typeof VoxelWorld !== 'undefined') {
+            e.mesh.position.y = VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z);
+          }
           e.mesh.lookAt(e.mesh.position.x + awayDir.x, e.mesh.position.y, e.mesh.position.z + awayDir.z);
         }
         if (e._retreatTimer <= 0) e.retreating = false;
@@ -1607,12 +1612,14 @@ const Enemies = (() => {
           }
           // Kneel: lower body slightly
           e.mesh.position.y -= 0.3;
-          // White flag: change helmet to white
-          e.mesh.traverse(function(child) {
-            if (child.material && child.userData && child.userData.isHelmet) {
-              child.material.color.setHex(0xffffff);
-            }
-          });
+          // White flag: change helmet to white (parts[2] is helmet)
+          var parts = e.mesh.userData.parts;
+          if (parts && parts[2] && parts[2].material) {
+            parts[2].material = parts[2].material.clone();
+            parts[2].material.map = null;
+            parts[2].material.color.setHex(0xffffff);
+            parts[2].material.needsUpdate = true;
+          }
         }
       }
       // Surrendered enemies don't attack — give bonus score if player walks close
@@ -1806,7 +1813,7 @@ const Enemies = (() => {
                 var laserMat = new THREE.LineBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.6 });
                 e._laserLine = new THREE.Line(laserGeo, laserMat);
                 e._laserLine._posArr = _laserPositions;
-                _scene.add(e._laserLine);
+                scene.add(e._laserLine);
               }
               var lp = e._laserLine._posArr;
               lp[0] = e.mesh.position.x; lp[1] = e.mesh.position.y; lp[2] = e.mesh.position.z;
@@ -1963,8 +1970,8 @@ const Enemies = (() => {
       updateHpBar(e, playerPos);
     }
 
-    // Wave complete?
-    if (spawnQueue.length === 0 && alive === 0 && enemies.length === 0 && !allDead) {
+    // Wave complete? (alive counter tracks living enemies; null entries are cleaned corpses)
+    if (spawnQueue.length === 0 && alive === 0 && !allDead) {
       allDead = true;
       onEnemyDied(true);
     }
@@ -1992,7 +1999,7 @@ const Enemies = (() => {
     let wounded = null;
     let wDist = Infinity;
     for (const e of enemies) {
-      if (!e.alive || e === medic || e.groupId !== medic.groupId) continue;
+      if (!e || !e.alive || e === medic || e.groupId !== medic.groupId) continue;
       if (e.hp < e.maxHp * 0.6) {
         const d = medic.mesh.position.distanceTo(e.mesh.position);
         if (d < wDist) { wDist = d; wounded = e; }
@@ -2223,6 +2230,7 @@ const Enemies = (() => {
       var tiltX = (Math.random() > 0.5 ? 1 : -1) * (1.0 + Math.random() * 0.5);
       enemy._deathTiltX = tiltX;
       enemy._deathPopY = 1.5; // brief upward pop velocity
+      _cacheFrame = -1; // invalidate cache on death
     }
     return enemy.hp;
   }
@@ -2231,7 +2239,7 @@ const Enemies = (() => {
   function findByMesh(mesh) {
     let obj = mesh;
     while (obj) {
-      const found = enemies.find(e => e.mesh === obj);
+      const found = enemies.find(e => e && e.mesh === obj);
       if (found) return found;
       obj = obj.parent;
     }
@@ -2246,6 +2254,7 @@ const Enemies = (() => {
     _cachedMeshes.length = 0;
     for (var ci = 0; ci < enemies.length; ci++) {
       var ce = enemies[ci];
+      if (!ce) continue; // null = removed
       if (ce.alive) {
         _cachedAlive.push(ce);
         var pp = ce.mesh.userData.parts;
@@ -2281,6 +2290,7 @@ const Enemies = (() => {
     _enemyGrenades.length = 0;
 
     enemies.forEach(e => {
+      if (!e) return; // null = already removed
       if (scene) {
         disposeMeshTree(e.mesh);
         scene.remove(e.mesh);
@@ -2300,7 +2310,7 @@ const Enemies = (() => {
   function damageInRadius(pos, radius, amount) {
     const results = [];
     for (const e of enemies) {
-      if (!e.alive) continue;
+      if (!e || !e.alive) continue;
       const dist = e.mesh.position.distanceTo(pos);
       if (dist <= radius) {
         const falloff = 1 - (dist / radius) * 0.5;
@@ -2313,7 +2323,7 @@ const Enemies = (() => {
 
   function stunInRadius(pos, radius, duration) {
     for (const e of enemies) {
-      if (!e.alive) continue;
+      if (!e || !e.alive) continue;
       const dist = e.mesh.position.distanceTo(pos);
       if (dist <= radius) {
         e._stunTimer = duration * Math.max(0.3, 1 - dist / radius);
@@ -2333,7 +2343,7 @@ const Enemies = (() => {
   function getAssaultGroups() { return assaultGroups; }
 
   function getSurrenderCount() {
-    return enemies.filter(e => e.alive && e.surrendered).length;
+    return enemies.filter(e => e && e.alive && e.surrendered).length;
   }
 
   return {

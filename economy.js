@@ -119,24 +119,28 @@ const Economy = (function () {
     marketMultiplier = 0.7 + Math.random() * 0.6;
 
     // Feed NPCs
-    const npcCount = NPCSystem.getCount();
-    const foodNeeded = npcCount * 2;
-    if (resources.food >= foodNeeded) {
-      resources.food -= foodNeeded;
-      // Feed all NPCs
-      NPCSystem.getAll().forEach(npc => NPCSystem.feedNPC(npc.id, 40));
-    } else {
-      // Starvation: reduce morale
-      NPCSystem.getAll().forEach(npc => {
-        npc.morale = Math.max(0, npc.morale - 20);
-        npc.hunger = Math.max(0, npc.hunger - 30);
-      });
+    if (typeof NPCSystem !== 'undefined' && NPCSystem.getCount && NPCSystem.getAll) {
+      const npcCount = NPCSystem.getCount();
+      const foodNeeded = npcCount * 2;
+      if (resources.food >= foodNeeded) {
+        resources.food -= foodNeeded;
+        // Feed all NPCs
+        NPCSystem.getAll().forEach(function (npc) { if (NPCSystem.feedNPC) NPCSystem.feedNPC(npc.id, 40); });
+      } else {
+        // Starvation: reduce morale
+        NPCSystem.getAll().forEach(function (npc) {
+          npc.morale = Math.max(0, npc.morale - 20);
+          npc.hunger = Math.max(0, npc.hunger - 30);
+        });
+      }
     }
 
     // Fuel consumption for drones/vehicles
-    const activeDrones = DroneSystem.getActive().length;
-    const fuelNeeded = activeDrones * 1;
-    resources.fuel = Math.max(0, resources.fuel - fuelNeeded);
+    if (typeof DroneSystem !== 'undefined' && DroneSystem.getActive) {
+      const activeDrones = DroneSystem.getActive().length;
+      const fuelNeeded = activeDrones * 1;
+      resources.fuel = Math.max(0, resources.fuel - fuelNeeded);
+    }
   }
 
   /* ── Production cycle (called by automation) ─────────────────────── */

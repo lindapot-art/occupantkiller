@@ -41,11 +41,12 @@ const MissionSystem = (function () {
         return {
           type: MISSION_TYPE.EXPAND,
           targetCount: 1 + Math.floor(Math.random() * 2),
-          startCount: Building.getStructures().length,
+          startCount: (typeof Building !== 'undefined' && Building.getStructures) ? Building.getStructures().length : 0,
         };
       },
       check(mission) {
-        return Building.getStructures().length >= mission.startCount + mission.targetCount;
+        var cur = (typeof Building !== 'undefined' && Building.getStructures) ? Building.getStructures().length : 0;
+        return cur >= mission.startCount + mission.targetCount;
       },
     },
 
@@ -157,8 +158,8 @@ const MissionSystem = (function () {
         activeMissions.splice(i, 1);
 
         // Reward
-        const reward = Economy.missionReward(m.tier);
-        RankSystem.onMissionComplete(m.tier);
+        var reward = (typeof Economy !== 'undefined' && Economy.missionReward) ? Economy.missionReward(m.tier) : 0;
+        if (typeof RankSystem !== 'undefined' && RankSystem.onMissionComplete) RankSystem.onMissionComplete(m.tier);
 
         if (_onComplete) _onComplete(m, reward);
       }

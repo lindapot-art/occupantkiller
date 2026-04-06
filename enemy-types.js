@@ -451,8 +451,8 @@ const EnemyTypes = (function () {
     // find wounded ally in range
     const range = TYPES.MEDIC.healRange;
     for (const ally of allEnemies) {
-      if (ally === enemy || !ally.alive) continue;
-      const dx = ally.x - enemy.x, dz = ally.z - enemy.z;
+      if (!ally || ally === enemy || !ally.alive) continue;
+      const dx = ally.mesh.position.x - enemy.mesh.position.x, dz = ally.mesh.position.z - enemy.mesh.position.z;
       if (dx * dx + dz * dz < range * range) {
         const cfg = getTypeConfig(ally.type) || { hp: 50 };
         if (ally.hp < cfg.hp) {
@@ -682,8 +682,8 @@ const EnemyTypes = (function () {
     const range = TYPES.KADYROVITE.rallyRadius;
     let rallied = 0;
     for (const ally of allEnemies) {
-      if (ally === enemy || !ally.alive) continue;
-      const dx = ally.x - enemy.x, dz = ally.z - enemy.z;
+      if (!ally || ally === enemy || !ally.alive) continue;
+      const dx = ally.mesh.position.x - enemy.mesh.position.x, dz = ally.mesh.position.z - enemy.mesh.position.z;
       if (dx * dx + dz * dz < range * range) {
         ally._rallyBuff = TYPES.KADYROVITE.rallyBuff;
         rallied++;
@@ -751,8 +751,8 @@ const EnemyTypes = (function () {
     const range = TYPES.OFFICER.buffRadius;
     let buffed = 0;
     for (const ally of allEnemies) {
-      if (ally === enemy || !ally.alive) continue;
-      const dx = ally.x - enemy.x, dz = ally.z - enemy.z;
+      if (!ally || ally === enemy || !ally.alive) continue;
+      const dx = ally.mesh.position.x - enemy.mesh.position.x, dz = ally.mesh.position.z - enemy.mesh.position.z;
       if (dx * dx + dz * dz < range * range) {
         ally._officerBuffDmg = TYPES.OFFICER.buffDamage;
         ally._officerBuffSpd = TYPES.OFFICER.buffSpeed;

@@ -569,7 +569,8 @@ const NPCSystem = (function () {
             for (const npc of aliveMembers) {
               if (npc.job === JOB.ASSAULT || npc.job === JOB.IDLE) {
                 npc.job = JOB.ASSAULT;
-                npc.target = grp.guardPoint.clone();
+                if (npc.target) npc.target.copy(grp.guardPoint);
+                else npc.target = grp.guardPoint.clone();
               }
             }
           }
@@ -585,7 +586,8 @@ const NPCSystem = (function () {
             for (const npc of aliveMembers) {
               if (npc.job === JOB.ASSAULT) {
                 npc.job = JOB.GUARD;
-                npc.guardPos = grp.guardPoint.clone();
+                if (npc.guardPos) npc.guardPos.copy(grp.guardPoint);
+                else npc.guardPos = grp.guardPoint.clone();
               }
             }
           }
@@ -612,7 +614,8 @@ const NPCSystem = (function () {
             for (const npc of aliveMembers) {
               if (npc.job === JOB.GUARD) {
                 npc.job = JOB.ASSAULT;
-                npc.target = grp.guardPoint.clone();
+                if (npc.target) npc.target.copy(grp.guardPoint);
+                else npc.target = grp.guardPoint.clone();
               }
             }
           }
@@ -822,7 +825,8 @@ const NPCSystem = (function () {
       if (wounded) {
         const d = npc.position.distanceTo(wounded.position);
         if (d > 2) {
-          npc.target = wounded.position.clone();
+          if (npc.target) npc.target.copy(wounded.position);
+          else npc.target = wounded.position.clone();
         } else {
           npc.target = null;
           wounded.health = Math.min(100, wounded.health + delta * 12);
@@ -845,7 +849,8 @@ const NPCSystem = (function () {
     if (npc.job === JOB.GUARD && npc.guardPos) {
       const gDist = npc.position.distanceTo(npc.guardPos);
       if (gDist > 3 && !npc.combatTarget) {
-        npc.target = npc.guardPos.clone();
+        if (npc.target) npc.target.copy(npc.guardPos);
+        else npc.target = npc.guardPos.clone();
       }
     }
 

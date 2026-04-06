@@ -49,7 +49,7 @@ const Automation = (function () {
     if (!task) return false;
 
     const cost = task.level * 50;
-    if (!Economy.spendCurrency(cost)) return false;
+    if (typeof Economy === 'undefined' || !Economy.spendCurrency || !Economy.spendCurrency(cost)) return false;
 
     task.level++;
     task.interval = BASE_INTERVAL * Math.pow(UPGRADE_MULTIPLIER, task.level - 1);
@@ -58,7 +58,7 @@ const Automation = (function () {
 
   /* ── Update ──────────────────────────────────────────────────────── */
   function update(delta) {
-    const effMod = SkillSystem.getAutomationMod();
+    var effMod = (typeof SkillSystem !== 'undefined' && SkillSystem.getAutomationMod) ? SkillSystem.getAutomationMod() : 1;
 
     for (const task of tasks) {
       if (!task.active) continue;
@@ -94,22 +94,25 @@ const Automation = (function () {
   }
 
   function executeGather(task) {
+    if (typeof Economy === 'undefined') return;
     const resource = task.config.resource || 'wood';
     const amount = task.level * 2;
     Economy.add(resource, amount);
-    SkillSystem.onAutomation();
+    if (typeof SkillSystem !== 'undefined' && SkillSystem.onAutomation) SkillSystem.onAutomation();
   }
 
   function executeCraft(task) {
+    if (typeof Economy === 'undefined') return;
     // Convert raw resources into processed goods
     if (Economy.has('metal', 5)) {
       Economy.spend('metal', 5);
       Economy.add('electronics', 1 * task.level);
-      SkillSystem.onAutomation();
+      if (typeof SkillSystem !== 'undefined' && SkillSystem.onAutomation) SkillSystem.onAutomation();
     }
   }
 
   function executeRepair(task) {
+    if (typeof Building === 'undefined' || !Building.getStructures) return;
     // Repair structures
     const structures = Building.getStructures();
     for (const s of structures) {
@@ -121,17 +124,21 @@ const Automation = (function () {
   }
 
   function executeTrain(task) {
+    if (typeof NPCSystem === 'undefined' || !NPCSystem.getAll) return;
     // Improve NPC skills
     const npcs = NPCSystem.getAll();
     for (let i = 0; i < task.level && i < npcs.length; i++) {
       const npc = npcs[i];
+      if (!npc.skills) continue;
       const skillKeys = Object.keys(npc.skills);
+      if (skillKeys.length === 0) continue;
       const key = skillKeys[Math.floor(Math.random() * skillKeys.length)];
       npc.skills[key] = Math.min(100, npc.skills[key] + 0.5);
     }
   }
 
   function executeDeploy(task) {
+    if (typeof DroneSystem === 'undefined' || !DroneSystem.getAll) return;
     // Auto-deploy drones on patrol
     const drones = DroneSystem.getAll();
     for (const drone of drones) {
