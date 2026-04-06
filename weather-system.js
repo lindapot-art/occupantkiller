@@ -348,10 +348,34 @@ const WeatherSystem = (function () {
     return { staminaDrain: staminaDrain, healRate: healRate };
   }
 
+  function clear() {
+    if (particles) {
+      if (_scene) _scene.remove(particles);
+      if (particles.geometry) particles.geometry.dispose();
+      if (particles.material) particles.material.dispose();
+      particles = null;
+    }
+    if (_lightningFlash) {
+      if (_scene) _scene.remove(_lightningFlash);
+      _lightningFlash.dispose();
+      _lightningFlash = null;
+    }
+    particleCount = 0;
+    currentWeather = WEATHER.CLEAR;
+    weatherTimer = 0;
+    targetFogDensity = 0;
+    _lightningTimer = 0;
+    _extremeEvent = null;
+    _extremeTimer = 0;
+    _forecast = [];
+    _temperature = 20;
+  }
+
   return {
     WEATHER: WEATHER,
     init: init,
     update: update,
+    clear: clear,
     setWeather: setWeather,
     getWeather: getWeather,
     getModifiers: getModifiers,

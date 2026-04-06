@@ -39,6 +39,7 @@ const DroneSystem = (function () {
   let _camera = null;
   let nextId = 1;
   let _possessedDrone = null;
+  var _explosionIntervals = [];
 
   /* ── Create Drone Mesh ───────────────────────────────────────────── */
   function addRussianFlag(group) {
@@ -488,12 +489,15 @@ const DroneSystem = (function () {
       flash.material.opacity = Math.max(0, t / 0.3) * 0.9;
       flash.scale.setScalar(1 + (0.3 - t) * 4);
       if (t <= 0) {
-        _scene.remove(flash);
+        if (_scene) _scene.remove(flash);
         flashGeo.dispose();
         flashMat.dispose();
         clearInterval(fadeInterval);
+        var idx = _explosionIntervals.indexOf(fadeInterval);
+        if (idx >= 0) _explosionIntervals.splice(idx, 1);
       }
     }, 16);
+    _explosionIntervals.push(fadeInterval);
   }
 
   function setPatrol(droneId, points) {
@@ -544,6 +548,11 @@ const DroneSystem = (function () {
   function getByType(type) { return drones.filter(d => d.alive && d.type === type); }
 
   function clear() {
+    // Clear any active explosion fade intervals
+    for (var ei = 0; ei < _explosionIntervals.length; ei++) {
+      clearInterval(_explosionIntervals[ei]);
+    }
+    _explosionIntervals.length = 0;
     for (const drone of drones) {
       if (drone.mesh) {
         drone.mesh.traverse(function (child) {

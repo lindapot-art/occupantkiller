@@ -1631,6 +1631,8 @@ const GameManager = (function () {
     if (typeof Building !== 'undefined' && Building.clear) Building.clear();
     if (typeof Tracers !== 'undefined') Tracers.clear();
     if (typeof StageVFX !== 'undefined' && StageVFX.clear) StageVFX.clear();
+    if (typeof WeatherSystem !== 'undefined' && WeatherSystem.clear) WeatherSystem.clear();
+    if (typeof WeatherSystem !== 'undefined' && WeatherSystem.init) WeatherSystem.init(_scene, _camera);
 
     // Respawn vehicle fleet on roads for first stage
     var _rwps = (VoxelWorld.getRoadWaypoints ? VoxelWorld.getRoadWaypoints() : []);
@@ -1790,6 +1792,8 @@ const GameManager = (function () {
     if (typeof Traversal !== 'undefined' && Traversal.reset) Traversal.reset();
     if (typeof MissionTypes !== 'undefined' && MissionTypes.clear) MissionTypes.clear();
     if (typeof Feedback !== 'undefined' && Feedback.clear) Feedback.clear();
+    if (typeof WeatherSystem !== 'undefined' && WeatherSystem.clear) WeatherSystem.clear();
+    if (typeof WeatherSystem !== 'undefined' && WeatherSystem.init) WeatherSystem.init(_scene, _camera);
 
     // Respawn NPCs on new terrain
     NPCSystem.clear();

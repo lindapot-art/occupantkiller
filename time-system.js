@@ -88,8 +88,8 @@ const TimeSystem = (function () {
     // Advance time
     timeOfDay += (delta * speed) / DAY_DURATION;
 
-    // Day rollover
-    if (timeOfDay >= 1.0) {
+    // Day rollover (while loop handles large delta from ALT-TAB or lag spikes)
+    while (timeOfDay >= 1.0) {
       timeOfDay -= 1.0;
       dayNumber++;
 

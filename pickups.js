@@ -77,10 +77,11 @@ const Pickups = (() => {
       p.boxMesh.rotation.y  += ROTATE_SPEED * delta;
       p.ringMesh.rotation.z += ROTATE_SPEED * 0.6 * delta;
 
-      // Proximity collection
+      // Proximity collection (XZ + Y check to prevent through-floor collection)
       const dx = p.group.position.x - playerPos.x;
       const dz = p.group.position.z - playerPos.z;
-      if (dx * dx + dz * dz < COLLECT_DIST_SQ) {
+      const dy = Math.abs(p.group.position.y - playerPos.y);
+      if (dx * dx + dz * dz < COLLECT_DIST_SQ && dy < 3) {
         scene.remove(p.group);
         if (p.boxMesh)  { if (p.boxMesh.geometry) p.boxMesh.geometry.dispose(); if (p.boxMesh.material) p.boxMesh.material.dispose(); }
         if (p.ringMesh) { if (p.ringMesh.geometry) p.ringMesh.geometry.dispose(); if (p.ringMesh.material) p.ringMesh.material.dispose(); }

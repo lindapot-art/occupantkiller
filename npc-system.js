@@ -1037,9 +1037,11 @@ const NPCSystem = (function () {
   /* ── NPC Death ───────────────────────────────────────────────────── */
   function killNPC(npc) {
     npc.alive = false;
+    _npcById.delete(npc.id);
     if (npc.mesh) {
       disposeMesh(npc.mesh);
       if (_scene) _scene.remove(npc.mesh);
+      npc.mesh = null;
     }
   }
 
