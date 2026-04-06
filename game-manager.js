@@ -2425,6 +2425,12 @@ const GameManager = (function () {
         MLSystem.onShot(weaponId);
         player.totalShots++;
         player.waveShots++;
+        // Register heat + maintenance per shot (not per hit, to avoid shotgun 8x issue)
+        if (typeof CombatExtras !== 'undefined') {
+          CombatExtras.registerShot();
+          var isAutoWep = ['ASSAULT', 'NATO', 'NATO_HEAVY', 'LMG', 'HMG', 'SMG', 'HMG_HEAVY', 'MACHINEGUN', 'MINIGUN'].indexOf(weaponType) >= 0;
+          CombatExtras.addHeat(isAutoWep);
+        }
         // Spawn bullet tracer
         if (typeof Tracers !== 'undefined' && weaponType !== 'MELEE') {
           _gmTmp2.copy(_camera.position);
@@ -2473,12 +2479,6 @@ const GameManager = (function () {
     if (typeof CombatExtras !== 'undefined') {
       var ammoMods = CombatExtras.getAmmoModifiers();
       baseDmg = Math.round(baseDmg * ammoMods.dmgMult);
-      // Register shot for maintenance tracking
-      CombatExtras.registerShot();
-      // Add heat for auto weapons
-      var weaponType = Weapons.getCurrentType();
-      var isAuto = ['AR', 'LMG', 'HMG', 'SMG', 'HMG_HEAVY', 'MACHINEGUN', 'MINIGUN'].indexOf(weaponType) >= 0;
-      CombatExtras.addHeat(isAuto);
     }
     // Dead eye crit check
     if (typeof Perks !== 'undefined' && Perks.isDeadEyeShot()) {
@@ -3383,9 +3383,10 @@ const GameManager = (function () {
         }
       }
 
-      // ── B30: Combat roll update ──
-      if (typeof CombatExtras !== 'undefined' && CombatExtras.isRolling && CombatExtras.isRolling()) {
-        CombatExtras.updateRoll(delta);
+      // ── B30: Combat roll update (uses result from CombatExtras.update above) ──
+      if (combatResult && combatResult.roll && combatResult.roll.active) {
+        player.position.x += combatResult.roll.moveX;
+        player.position.z += combatResult.roll.moveZ;
       }
 
       // ── B29: Hazard zone check ──

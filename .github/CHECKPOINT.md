@@ -4,45 +4,35 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-06 — Session 9: Deep Gameplay Bug Fixes
+- **Timestamp**: 2026-04-06 — Session 10: Traversal Integration + Edge Cases
 - **Agent**: KING
-- **Status**: QA PASSED, PENDING COMMIT
+- **Status**: ALL QA PASSED, COMMITTED
 
 ## Current Task
-- COMPLETED: 10 gameplay bugs fixed (2 CRITICAL, 4 HIGH, 3 MEDIUM, 1 pre-existing)
+- COMPLETED: Traversal integration fixes + blood pooling + edge case hardening
 
 ## Steps Completed This Session
-1. [x] Session recovery from CHECKPOINT.md + TASK_QUEUE.md
-2. [x] Baseline verified: HTTP 200, 34/34 syntax, 32/32 tests
-3. [x] Phase 1: .clone() hot-path optimization (game-manager.js, enemies.js, npc-system.js)
-4. [x] Phase 2: setInterval/setTimeout leak audit — all clean except weapons.js
-5. [x] Phase 3: weapons.js reset() memory leak fix (projectile + smoke disposal)
-6. [x] Phase 4: 15 HIGH + 5 MEDIUM robustness bugs fixed across 8 files (typeof guards)
-7. [x] Phase 5: stage-vfx.js shared material mutation fix
-8. [x] Phase 6: Deep gameplay logic audit — 10 bugs identified
-9. [x] CRITICAL BUG 1: enemies.splice→null (preserves assault group indices)
-10. [x] CRITICAL BUG 2: wave double-start prevention (_waveStartTimer)
-11. [x] HIGH BUG 3: onPlayerHit state guard
-12. [x] HIGH BUG 4: grenade terrain-aware ground detection
-13. [x] HIGH BUG 5: retreating enemies snap to terrain
-14. [x] HIGH BUG 6: cache invalidation on death + removal
-15. [x] MEDIUM BUG 7: loot blink before despawn (reordered check)
-16. [x] MEDIUM BUG 8: surrender helmet visual (parts[2] direct access)
-17. [x] MEDIUM BUG 9: ARMOR_PUSH 360° spawn angle
-18. [x] Fixed wave completion check (removed enemies.length===0 check)
-19. [x] Fixed _scene→scene typo in sniper laser
-20. [x] Fixed enemy-types.js null guards + ally.mesh.position fix
-21. [x] All 5 QA specialists passed, 32/32 tests PASS
+1. [x] Session recovery — killed Old Eden imposter, restored server
+2. [x] Baseline verified: HTTP 200, 34/34 syntax, 34/34 tests
+3. [x] Blood particle pooling (shared geo/materials, scale-based fade) — commit b2570d7
+4. [x] Phase 9 test suite (13 edge case fix checks) — commit b2570d7
+5. [x] Deep traversal integration audit — 3 HIGH, 1 MEDIUM found
+6. [x] HIGH: Mantle horizontal push (store forward dir, return x/z in updateMantle)
+7. [x] HIGH: Dolphin dive movement not applied (added moveX/moveZ/heightOffset)
+8. [x] HIGH: Vault movement not applied (added vault position application)
+9. [x] MEDIUM: Wall run double-update (removed duplicate updateWallRun call)
+10. [x] CombatExtras: added init/clear aliases for pattern compliance
+11. [x] Vehicles: eliminated per-frame THREE.Vector2 allocation
+12. [x] Phase 10 test suite (14 traversal integration checks) — commit 694dbe0
+13. [x] All 5 QA specialists PASS, 35/35 tests across 10 phases
 
-## Files Changed This Session (10 total)
-- `building.js` — Added clear() function for ghost mesh disposal + structures reset
-- `pickups.js` — Fixed clear() and update() to dispose geometry/materials
-- `world-features.js` — Added _disposeMesh() helper, updated clear() to dispose all feature meshes
-- `game-manager.js` — Added Building.clear(), death handler vehicle/drone exit
-- `vehicles.js` — Copy-or-clone for waypoint/patrol allocations
-- `tools/test-master.js` — Phase 7 disposal checks (32 tests total)
-- `README.md` — Comprehensive update for 12-stage, 33-module game
-- (earlier: drone-system.js, enemies.js, npc-system.js, camera-system.js, server.js)
+## Files Changed This Session
+- `enemies.js` — Blood particle pooling (shared geometry + materials, scale fade)
+- `traversal.js` — Mantle horizontal push (forward dir + start position in state)
+- `game-manager.js` — Apply mantle XYZ, dive movement, vault position, wall run dedup
+- `combat-extras.js` — Added init/clear aliases
+- `vehicles.js` — Math.sqrt replaces per-frame Vector2 allocation
+- `tools/test-master.js` — Phase 9 (13 checks) + Phase 10 (14 checks)
 
 ## Last Known Good State
 - Server: HTTP 200 (58,041 bytes)

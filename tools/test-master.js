@@ -15,6 +15,7 @@
  *   Phase 8: Gameplay Bug Fix Verification
  *   Phase 9: Edge Case & Resource Fixes
  *   Phase 10: Traversal & Integration Fixes
+ *   Phase 11: Weapon & Combat System Fixes
  */
 
 const http = require('http');
@@ -539,6 +540,71 @@ function phase10() {
   else ok(p10pass + '/' + p10total + ' traversal & integration fixes verified');
 }
 
+/* ══════════════════════════════════════════════════════════════════
+ *  Phase 11 — Weapon & Combat System Fixes
+ * ══════════════════════════════════════════════════════════════════ */
+function phase11() {
+  console.log('\n══ Phase 11: Weapon & Combat System Fixes ══');
+  var p11pass = 0, p11total = 0;
+  function check(name, ok) { p11total++; if (ok) p11pass++; else fail(name); }
+
+  var wepSrc = fs.readFileSync(path.join(ROOT, 'weapons.js'), 'utf8');
+  var gmSrc = fs.readFileSync(path.join(ROOT, 'game-manager.js'), 'utf8');
+  var ceSrc = fs.readFileSync(path.join(ROOT, 'combat-extras.js'), 'utf8');
+
+  // #1 CRITICAL: bulletDir crash fixed — uses _wTmp1 instead
+  check('Weapons: no undefined bulletDir reference',
+    !wepSrc.includes('calcRicochet(blockType, bulletDir)'));
+  check('Weapons: ricochet uses _wTmp1 for direction',
+    wepSrc.includes('calcRicochet(blockType, _wTmp1)'));
+
+  // #2 CRITICAL: per-frame Vector3 allocations removed
+  check('Weapons: hoisted _wTmp3 for bullet holes',
+    wepSrc.includes('const _wTmp3 = new THREE.Vector3()'));
+  check('Weapons: no per-frame new Vector3 in bullet hole path',
+    !wepSrc.includes('var holePos = new THREE.Vector3(bRay'));
+
+  // #3 HIGH: weapon type mismatch for heat
+  check('GM: heat uses ASSAULT type (not AR)',
+    gmSrc.includes("'ASSAULT', 'NATO', 'NATO_HEAVY'"));
+  check('GM: heat does NOT use incorrect AR type',
+    !gmSrc.includes("['AR',"));
+
+  // #5 HIGH: weapon switch cancels reload
+  check('Weapons: switchTo cancels old weapon reload',
+    wepSrc.includes('oldState.reloading = false'));
+
+  // #6 HIGH: overheat blocks firing
+  check('Weapons: tryFire checks CombatExtras.isOverheated',
+    wepSrc.includes('CombatExtras.isOverheated()'));
+
+  // #7 MEDIUM: getClip returns Infinity not string
+  check('Weapons: getClip returns Infinity for melee',
+    wepSrc.includes('Infinity') && !wepSrc.includes("'∞' : curState().clip"));
+
+  // #8 MEDIUM: quickSwap _trackWeaponSwap wired
+  check('Weapons: switchTo calls _trackWeaponSwap',
+    wepSrc.includes('_trackWeaponSwap'));
+
+  // #11/#12: combat roll dedup + movement applied
+  check('GM: no duplicate CombatExtras.updateRoll call',
+    !gmSrc.includes('CombatExtras.updateRoll(delta)'));
+  check('GM: combat roll applies movement from combatResult.roll',
+    gmSrc.includes('combatResult.roll') && gmSrc.includes('roll.moveX'));
+
+  // #13: blind fire cleared on weapon switch
+  check('Weapons: blind fire cleared on weapon switch',
+    wepSrc.includes('isBlindFiring') && wepSrc.includes('toggleBlindFire'));
+
+  // #17: heat/maintenance per shot not per hit
+  check('GM: registerShot called in didFire block not onEnemyHit',
+    gmSrc.includes('if (Weapons.didFire())') &&
+    gmSrc.indexOf('CombatExtras.registerShot()') > gmSrc.indexOf('if (Weapons.didFire())'));
+
+  if (p11pass === p11total) ok(p11pass + '/' + p11total + ' weapon & combat fixes verified');
+  else ok(p11pass + '/' + p11total + ' weapon & combat fixes verified');
+}
+
 async function main() {
   console.log('╔══════════════════════════════════════════════╗');
   console.log('║     OccupantKiller Master QA Test Suite      ║');
@@ -555,6 +621,7 @@ async function main() {
   phase8();
   phase9();
   phase10();
+  phase11();
 
   console.log('\n══════════════════════════════════════════════');
   console.log(`  Results: ${passed} passed, ${failed} failed, ${warned} warnings`);

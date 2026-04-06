@@ -1473,7 +1473,19 @@ const Weapons = (() => {
     if (!unlocked[idx]) return;
     if (idx === currentIdx) return;
     if (zoomed) exitZoom();
+    // Cancel reload on old weapon before switching
+    var oldState = states[currentIdx];
+    if (oldState && oldState.reloading) {
+      oldState.reloading = false;
+      oldState.reloadTimer = 0;
+    }
     if (gunMeshes[currentIdx]) gunMeshes[currentIdx].visible = false;
+    // Track weapon swap for CombatExtras quick-swap feature
+    if (typeof CombatExtras !== 'undefined') {
+      if (CombatExtras._trackWeaponSwap) CombatExtras._trackWeaponSwap(currentIdx);
+      // Clear blind fire on weapon switch
+      if (CombatExtras.isBlindFiring && CombatExtras.isBlindFiring()) CombatExtras.toggleBlindFire();
+    }
     currentIdx = idx;
     if (gunMeshes[currentIdx]) gunMeshes[currentIdx].visible = true;
     recoilOffset = 0;
@@ -1818,6 +1830,9 @@ const Weapons = (() => {
   const _wTmp1 = new THREE.Vector3(); // reusable temp vectors for fire/projectile paths
   const _wTmp2 = new THREE.Vector3();
   const _wTmpFakePos = new THREE.Vector3();
+  const _wTmp3 = new THREE.Vector3(); // bullet hole position
+  const _wTmp4 = new THREE.Vector3(); // bullet hole normal
+  const _wTmpSpark = new THREE.Vector3(); // ricochet spark position
 
   // Track whether a shot was actually fired this frame (for sound)
   let _firedThisFrame = false;
@@ -1830,6 +1845,8 @@ const Weapons = (() => {
     if (st.reloading) return;
     if (st.fireCooldown > 0) return;
     if (!wep.auto && !newPress) return;
+    // Block firing when weapon is overheated
+    if (typeof CombatExtras !== 'undefined' && CombatExtras.isOverheated()) return;
     st.fireCooldown = wep.fireRate;
     _firedThisFrame = true;
 
@@ -1999,24 +2016,24 @@ const Weapons = (() => {
       if (bRay) {
         // Bullet hole decal on terrain
         if (typeof Tracers !== 'undefined' && Tracers.spawnBulletHole) {
-          var holePos = new THREE.Vector3(bRay.hit.x + 0.5, bRay.hit.y + 0.5, bRay.hit.z + 0.5);
-          var holeNormal = new THREE.Vector3(
+          _wTmp3.set(bRay.hit.x + 0.5, bRay.hit.y + 0.5, bRay.hit.z + 0.5);
+          _wTmp4.set(
             bRay.place.x - bRay.hit.x,
             bRay.place.y - bRay.hit.y,
             bRay.place.z - bRay.hit.z
           ).normalize();
-          if (holeNormal.lengthSq() > 0) {
-            holePos.addScaledVector(holeNormal, 0.5);
-            Tracers.spawnBulletHole(holePos, holeNormal);
+          if (_wTmp4.lengthSq() > 0) {
+            _wTmp3.addScaledVector(_wTmp4, 0.5);
+            Tracers.spawnBulletHole(_wTmp3, _wTmp4);
           }
         }
         // Ricochet check on metal/reinforced surfaces
         if (typeof CombatExtras !== 'undefined') {
           var blockType = VoxelWorld.getBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z);
-          var ric = CombatExtras.calcRicochet(blockType, bulletDir);
+          var ric = CombatExtras.calcRicochet(blockType, _wTmp1);
           if (ric) {
             if (typeof AudioSystem !== 'undefined') AudioSystem.playRicochet();
-            if (typeof Tracers !== 'undefined') Tracers.spawnSparks(new THREE.Vector3(bRay.hit.x, bRay.hit.y, bRay.hit.z));
+            if (typeof Tracers !== 'undefined') Tracers.spawnSparks(_wTmpSpark.set(bRay.hit.x, bRay.hit.y, bRay.hit.z));
           }
         }
         destroyBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z, false);
@@ -2243,7 +2260,7 @@ const Weapons = (() => {
   function isJammed() { return curState().jammed; }
 
   function isReloading() { return curState().reloading; }
-  function getClip()     { return cur().type === 'MELEE' ? '∞' : curState().clip; }
+  function getClip()     { return cur().type === 'MELEE' ? Infinity : curState().clip; }
   function getReserve()  { return cur().type === 'MELEE' ? '—' : curState().reserve; }
   function getClipSize() { return cur().clipSize || 0; }
   function getDamage()   { return cur().damage; }
