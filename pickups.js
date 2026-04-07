@@ -26,6 +26,19 @@ const Pickups = (() => {
   let pickups = [];
   let time    = 0;
 
+  // Shared geometry instances (reused across all pickups)
+  var _boxGeos = {};   // keyed by size
+  var _ringGeo = null; // single torus shared by all
+
+  function _getBoxGeo(size) {
+    if (!_boxGeos[size]) _boxGeos[size] = new THREE.BoxGeometry(size, size, size);
+    return _boxGeos[size];
+  }
+  function _getRingGeo() {
+    if (!_ringGeo) _ringGeo = new THREE.TorusGeometry(0.25, 0.025, 8, 20);
+    return _ringGeo;
+  }
+
   function init(sc) { scene = sc; }
 
   function spawn(worldPos, type) {
@@ -36,7 +49,7 @@ const Pickups = (() => {
     const group = new THREE.Group();
 
     const boxMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(cfg.size, cfg.size, cfg.size),
+      _getBoxGeo(cfg.size),
       new THREE.MeshLambertMaterial({
         color:             cfg.color,
         emissive:          cfg.emissive,
@@ -46,7 +59,7 @@ const Pickups = (() => {
 
     // Decorative spinning ring
     const ringMesh = new THREE.Mesh(
-      new THREE.TorusGeometry(0.25, 0.025, 8, 20),
+      _getRingGeo(),
       new THREE.MeshBasicMaterial({ color: cfg.color, transparent: true, opacity: 0.75 })
     );
     ringMesh.rotation.x = Math.PI / 2;
@@ -83,8 +96,8 @@ const Pickups = (() => {
       const dy = Math.abs(p.group.position.y - playerPos.y);
       if (dx * dx + dz * dz < COLLECT_DIST_SQ && dy < 3) {
         scene.remove(p.group);
-        if (p.boxMesh)  { if (p.boxMesh.geometry) p.boxMesh.geometry.dispose(); if (p.boxMesh.material) p.boxMesh.material.dispose(); }
-        if (p.ringMesh) { if (p.ringMesh.geometry) p.ringMesh.geometry.dispose(); if (p.ringMesh.material) p.ringMesh.material.dispose(); }
+        if (p.boxMesh && p.boxMesh.material) p.boxMesh.material.dispose();
+        if (p.ringMesh && p.ringMesh.material) p.ringMesh.material.dispose();
         pickups.splice(i, 1);
         onCollect(p.type);
       }
@@ -95,11 +108,15 @@ const Pickups = (() => {
     for (let i = 0; i < pickups.length; i++) {
       const p = pickups[i];
       if (scene) scene.remove(p.group);
-      if (p.boxMesh)  { if (p.boxMesh.geometry) p.boxMesh.geometry.dispose(); if (p.boxMesh.material) p.boxMesh.material.dispose(); }
-      if (p.ringMesh) { if (p.ringMesh.geometry) p.ringMesh.geometry.dispose(); if (p.ringMesh.material) p.ringMesh.material.dispose(); }
+      if (p.boxMesh && p.boxMesh.material) p.boxMesh.material.dispose();
+      if (p.ringMesh && p.ringMesh.material) p.ringMesh.material.dispose();
     }
     pickups = [];
     time    = 0;
+    // Dispose shared geometry on full clear (stage transition)
+    for (var k in _boxGeos) { _boxGeos[k].dispose(); }
+    _boxGeos = {};
+    if (_ringGeo) { _ringGeo.dispose(); _ringGeo = null; }
   }
 
   return { init, spawn, update, clear, getAll: function () { return pickups; } };
