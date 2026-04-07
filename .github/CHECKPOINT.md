@@ -4,13 +4,14 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-08 — Session 18: Batch 6 complete
+- **Timestamp**: 2026-04-08 — Session 18: Batch 7 complete
 - **Agent**: KING
-- **Status**: COMPLETE — Commit f8317d1 pushed to origin/main
+- **Status**: COMPLETE — Commit b75669c pushed to origin/main
 
 ## Current Task
-- DONE: Batch 6 shipped — surface impacts, explosive barrels, kill cam, ambient props, server security blocklist
-- NEXT: Batch 7 — Mr. Jopa audit then implement
+- DONE: Batch 6 — surface impacts, explosive barrels, kill cam, ambient props, server security blocklist (f8317d1)
+- DONE: Batch 7 — viewmodel inertia, fire kick, strafe roll, weapon-type death variations (b75669c)
+- NEXT: Batch 8 — Mr. Jopa audit then implement
 
 ## Steps Completed This Session
 1. [x] Investigated user-reported issues: ledge hang trap, missing weapons/god mode visibility, chaotic enemy rush behavior, weak NPC presence

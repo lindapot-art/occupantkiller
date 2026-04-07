@@ -566,6 +566,34 @@ const GameManager = (function () {
   /* ── Last-kill camera tracking ───────────────────────────────── */
   var _lastKillPos = null;  // position of most recent enemy kill
 
+  /* ── Suppression System (near-miss visual response) ──────────── */
+  var _suppressionLevel = 0;  // 0→1
+  var _suppressionDecay = 0.5; // per second
+  var _suppressionCanvas = null;
+
+  function addSuppression(amount) {
+    _suppressionLevel = Math.min(1, _suppressionLevel + (amount || 0.15));
+  }
+
+  function updateSuppression(delta) {
+    if (_suppressionLevel <= 0) return;
+    _suppressionLevel = Math.max(0, _suppressionLevel - _suppressionDecay * delta);
+    if (!_suppressionCanvas) {
+      _suppressionCanvas = document.querySelector('canvas');
+    }
+    if (_suppressionCanvas) {
+      var bl = _suppressionLevel * 1.5;
+      var sat = 1 - _suppressionLevel * 0.4;
+      _suppressionCanvas.style.filter = _suppressionLevel > 0.01
+        ? 'blur(' + bl.toFixed(2) + 'px) saturate(' + sat.toFixed(2) + ')'
+        : '';
+    }
+    // Micro-shake from suppression
+    if (_suppressionLevel > 0.2 && typeof CameraSystem !== 'undefined' && CameraSystem.shake) {
+      CameraSystem.shake(_suppressionLevel * 0.008, 0.05);
+    }
+  }
+
   /* ── FOV Kick State (sprint widens, ADS narrows) ─────────────── */
   const _baseFOV = 75;
   var _currentFOV = 75;
@@ -1605,6 +1633,9 @@ const GameManager = (function () {
     player.buildMaterials = { wood: 0, stone: 0, metal: 0, dirt: 0, sand: 0, brick: 0 };
     // Clear desaturation filter
     if (_renderer && _renderer.domElement) _renderer.domElement.style.filter = '';
+    // Clear suppression on restart
+    _suppressionLevel = 0;
+    if (_suppressionCanvas) _suppressionCanvas.style.filter = '';
     // Clear shop countdown
     if (window._shopCountdownId) { clearInterval(window._shopCountdownId); window._shopCountdownId = null; }
     // Clear loot particles (shared _lootGeo — only dispose cloned materials)
@@ -2511,12 +2542,22 @@ const GameManager = (function () {
     CameraSystem.update(delta, player.position, isMoving, player.onGround);
     // Update kill cam override (blocks mouse-look while active)
     if (CameraSystem.updateKillCam) CameraSystem.updateKillCam(delta);
+    // Update suppression visual
+    updateSuppression(delta);
 
     // Player footstep sounds
     if (isMoving && player.onGround && typeof AudioSystem !== 'undefined') {
       player._footstepTimer = (player._footstepTimer || 0) - delta;
       if (player._footstepTimer <= 0) {
-        AudioSystem.playFootstep();
+        var _fsType = 0;
+        if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getBlock) {
+          _fsType = VoxelWorld.getBlock(
+            Math.floor(player.position.x),
+            Math.floor(player.position.y - 1),
+            Math.floor(player.position.z)
+          ) || 0;
+        }
+        AudioSystem.playFootstep(_fsType);
         player._footstepTimer = player.sprinting ? 0.28 : 0.42;
       }
     }
@@ -4815,5 +4856,6 @@ const GameManager = (function () {
     healPlayer: healPlayer,
     addArmor: addArmor,
     addStimBuff: addStimBuff,
+    addSuppression: addSuppression,
   };
 })();

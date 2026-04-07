@@ -1757,6 +1757,10 @@ const Enemies = (() => {
                 var angleToEnemy = Math.atan2(dx, dz);
                 var relAngle = angleToEnemy - camYaw;
                 AudioSystem.playBulletSnap(Math.sin(relAngle));
+                // Suppression: near-miss bullets stress the player
+                if (typeof GameManager !== 'undefined' && GameManager.addSuppression) {
+                  GameManager.addSuppression(0.12);
+                }
               }
             }
             // Firing arm raise animation

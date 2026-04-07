@@ -1500,6 +1500,10 @@ const Weapons = (() => {
   let _fireKickRot = 0;   // upward barrel kick (radians)
   let _fireKickZ = 0;     // backward snap offset
 
+  // ── Smooth ADS transition ─────────────────────────────────
+  let _adsLerp = 0;       // 0 = hip, 1 = fully zoomed
+  let _adsTarget = 0;     // 0 or 1
+
   function applyLandingBob(intensity) {
     recoilOffsetY = -0.04 * intensity;
     recoilOffsetZ = -0.02 * intensity;
@@ -1589,15 +1593,13 @@ const Weapons = (() => {
   function enterZoom() {
     if (!_camera || !cur().hasScope) return;
     zoomed = true;
-    _camera.fov = FOV_ZOOMED;
-    _camera.updateProjectionMatrix();
+    _adsTarget = 1;
   }
 
   function exitZoom() {
     if (!_camera) return;
     zoomed = false;
-    _camera.fov = FOV_DEFAULT;
-    _camera.updateProjectionMatrix();
+    _adsTarget = 0;
   }
 
   function handleRightDown() {
@@ -2049,8 +2051,29 @@ const Weapons = (() => {
     showMuzzle();
     recoilOffset = 0.02;
 
+    // Bullet drop: for long-range weapons, distant hits drift downward
+    var _dropTypes = { SNIPER: 0.5, AMR: 0.3, ASSAULT: 1.0, NATO: 0.9, LMG: 1.2, HMG: 1.0 };
+    var _dropG = _dropTypes[wep.type];
+
     if (hits.length > 0) {
-      onHit(hits[0], wep.damage);
+      var hitDist = hits[0].distance;
+      // Bullet drop: check if gravity would cause a miss at this distance
+      var dropMiss = false;
+      if (_dropG && hitDist > 40) {
+        var travelTime = hitDist / 200; // bullet speed ~200 units/s
+        var dropAmount = 0.5 * _dropG * travelTime * travelTime;
+        // If drop exceeds enemy hitbox height (~2 units), it's a miss
+        if (dropAmount > 1.8) {
+          dropMiss = true;
+        } else if (dropAmount > 0.3) {
+          // Partial drop: reduce damage proportionally for marginal hits
+          var dropPenalty = 1 - (dropAmount - 0.3) / 1.5;
+          hits[0]._dropDamageMult = Math.max(0.3, dropPenalty);
+        }
+      }
+      if (!dropMiss) {
+        var dropDmgMult = hits[0]._dropDamageMult || 1;
+        onHit(hits[0], Math.round(wep.damage * dropDmgMult));
       // Bullet penetration for high-caliber weapons — hit 2nd target at reduced damage
       var penTypes = ['SNIPER', 'LMG', 'HMG', 'HMG_HEAVY', 'MINIGUN', 'AMR', 'MACHINEGUN'];
       if (penTypes.indexOf(wep.type) >= 0 && hits.length > 1) {
@@ -2066,6 +2089,7 @@ const Weapons = (() => {
           }
         }
       }
+      } // end !dropMiss
     } else if (typeof VoxelWorld !== 'undefined') {
       // Bullet missed enemies — dig terrain on impact using bullet's spread direction
       _wTmp1.copy(raycaster.ray.direction);
@@ -2171,6 +2195,15 @@ const Weapons = (() => {
     if (recoilOffsetY > 0) recoilOffsetY = Math.max(0, recoilOffsetY - delta * 12 * 0.02);
     if (recoilOffset > 0) recoilOffset = Math.max(0, recoilOffset - delta * 0.3);
 
+    // Smooth ADS FOV transition
+    if (_camera) {
+      var adsSpeed = 8;
+      _adsLerp += (_adsTarget - _adsLerp) * Math.min(1, delta * adsSpeed);
+      if (Math.abs(_adsLerp - _adsTarget) < 0.005) _adsLerp = _adsTarget;
+      _camera.fov = FOV_DEFAULT + (FOV_ZOOMED - FOV_DEFAULT) * _adsLerp;
+      _camera.updateProjectionMatrix();
+    }
+
     // Camera recoil recovery: pitch/yaw return after firing stops
     var timeSinceFire = (performance.now() / 1000) - _lastFireTime;
     if (timeSinceFire > RECOIL_RECOVERY_DELAY && _recoilPitchAccum > 0.001 && typeof CameraSystem !== 'undefined') {
@@ -2247,9 +2280,9 @@ const Weapons = (() => {
       _fireKickRot *= (1 - Math.min(1, delta * 15));
       _fireKickZ *= (1 - Math.min(1, delta * 12));
 
-      mesh.position.x = swayX + _inertiaX;
+      mesh.position.x = swayX + _inertiaX - _adsLerp * swayX * 0.8;
       mesh.position.z = recoilOffsetZ + recoilOffset + _sprintLowerZ + _fireKickZ;
-      mesh.position.y = recoilOffsetY + switchY + swayY + _sprintLowerY + _inertiaY;
+      mesh.position.y = recoilOffsetY + switchY + swayY + _sprintLowerY + _inertiaY + _adsLerp * 0.03;
       mesh.rotation.x = reloadAnimAngle + _sprintLowerRotX - _fireKickRot;
     }
 
@@ -2432,6 +2465,8 @@ const Weapons = (() => {
     _sprintLowerY = 0;
     _sprintLowerRotX = 0;
     _sprintLowerZ = 0;
+    _adsLerp = 0;
+    _adsTarget = 0;
     // Remove lingering projectiles with proper disposal
     for (let i = projectiles.length - 1; i >= 0; i--) {
       if (_scene) _scene.remove(projectiles[i].mesh);

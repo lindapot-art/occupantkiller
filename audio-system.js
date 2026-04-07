@@ -69,6 +69,42 @@ const AudioSystem = (function () {
 
     osc.start(now);
     osc.stop(now + params.decay);
+
+    // Environmental echo: check for ceiling above player
+    var isIndoor = false;
+    if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getBlock && typeof GameManager !== 'undefined' && GameManager.getPlayer) {
+      var pp = GameManager.getPlayer().position;
+      if (pp) isIndoor = VoxelWorld.getBlock(Math.floor(pp.x), Math.floor(pp.y) + 4, Math.floor(pp.z)) !== 0;
+    }
+    if (isIndoor) {
+      // Indoor reverb: two short delayed reflections
+      [0.05, 0.12].forEach(function(del, i) {
+        var echo = createNoise(del + 0.08);
+        var eGain = ctx.createGain();
+        var eFilt = ctx.createBiquadFilter();
+        eFilt.type = 'lowpass';
+        eFilt.frequency.value = params.filterFreq * 0.6;
+        eGain.gain.setValueAtTime(0, now);
+        eGain.gain.setValueAtTime((i === 0 ? 0.12 : 0.06), now + del);
+        eGain.gain.exponentialRampToValueAtTime(0.001, now + del + 0.06);
+        echo.connect(eFilt);
+        eFilt.connect(eGain);
+        eGain.connect(masterGain);
+      });
+    } else {
+      // Outdoor: single distant echo
+      var outEcho = createNoise(0.55);
+      var outGain = ctx.createGain();
+      var outFilt = ctx.createBiquadFilter();
+      outFilt.type = 'lowpass';
+      outFilt.frequency.value = 400;
+      outGain.gain.setValueAtTime(0, now);
+      outGain.gain.setValueAtTime(0.04, now + 0.3);
+      outGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      outEcho.connect(outFilt);
+      outFilt.connect(outGain);
+      outGain.connect(masterGain);
+    }
   }
 
   function playExplosion() {
@@ -242,17 +278,29 @@ const AudioSystem = (function () {
     osc.stop(now + 0.35);
   }
 
-  function playFootstep() {
+  function playFootstep(surfaceType) {
     if (!enabled || !ctx) return;
     resume();
     const now = ctx.currentTime;
-    const noise = createNoise(0.04);
+    var sp = {
+      5:  { freq: 2000, dur: 0.02, vol: 0.08 },  // metal
+      9:  { freq: 1000, dur: 0.04, vol: 0.06 },  // concrete
+      10: { freq: 900,  dur: 0.04, vol: 0.06 },  // brick
+      4:  { freq: 600,  dur: 0.05, vol: 0.05 },  // wood
+      8:  { freq: 1500, dur: 0.03, vol: 0.04 },  // glass
+      3:  { freq: 700,  dur: 0.05, vol: 0.05 },  // stone
+      7:  { freq: 300,  dur: 0.07, vol: 0.04 },  // sand
+      1:  { freq: 400,  dur: 0.06, vol: 0.04 },  // dirt
+      2:  { freq: 350,  dur: 0.06, vol: 0.04 },  // grass
+      6:  { freq: 200,  dur: 0.08, vol: 0.05 },  // water
+    }[surfaceType] || { freq: 800, dur: 0.04, vol: 0.06 };
+    const noise = createNoise(sp.dur);
     const gain = ctx.createGain();
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = 800;
-    gain.gain.setValueAtTime(0.06, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    filter.frequency.value = sp.freq;
+    gain.gain.setValueAtTime(sp.vol, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + sp.dur);
     noise.connect(filter);
     filter.connect(gain);
     gain.connect(masterGain);
