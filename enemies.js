@@ -1859,7 +1859,8 @@ const Enemies = (() => {
               onPlayerHit(etResult.damage, e.mesh.position);
               // Tracer line from sniper to player on fire
               if (typeof Tracers !== 'undefined' && Tracers.spawnTracer) {
-                Tracers.spawnTracer(e.mesh.position, playerPos, 0xff2222);
+                var _sniperDir = _tmpVec3f.copy(playerPos).sub(e.mesh.position).normalize();
+                Tracers.spawnTracer(e.mesh.position, _sniperDir, 0xff2222);
               }
             }
             // Sniper laser sight while aiming

@@ -250,7 +250,7 @@ const DroneSystem = (function () {
             if (distToPlayer < 6 && gm) {
               var dmg = Math.max(1, Math.floor(drone.damage * (1 - distToPlayer / 6)));
               var p = gm.getPlayer();
-              if (p) p.hp -= dmg;
+              if (p && !p.godMode) p.hp -= dmg;
             }
           }
           // Terrain destruction
@@ -283,7 +283,7 @@ const DroneSystem = (function () {
         // Impact! Explode and damage player
         if (gm) {
           var p = gm.getPlayer();
-          if (p) p.hp -= drone.damage;
+          if (p && !p.godMode) p.hp -= drone.damage;
         }
         // Terrain destruction at impact
         var ix = Math.floor(drone.position.x);
@@ -297,7 +297,7 @@ const DroneSystem = (function () {
           }
         }
         if (typeof Tracers !== 'undefined' && Tracers.spawnSmoke) {
-          Tracers.spawnSmoke(drone.position.clone());
+          Tracers.spawnSmoke(drone.position);
         }
         destroyDrone(drone);
         return;
