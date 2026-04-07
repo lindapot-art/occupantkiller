@@ -79,6 +79,18 @@ const server = http.createServer((req, res) => {
     return res.end('Forbidden');
   }
 
+  // Block sensitive files from being served
+  const rel = safePath.replace(/\\/g, '/').replace(/^\//, '');
+  if (/^\.git(\/|$)/.test(rel) || /^\.github(\/|$)/.test(rel) ||
+      /^memories(\/|$)/.test(rel) || /^tools(\/|$)/.test(rel) ||
+      /^node_modules(\/|$)/.test(rel) ||
+      rel === 'server.js' || rel === 'package.json' || rel === 'package-lock.json' ||
+      rel === 'wrangler.toml' || rel === 'render.yaml' || rel === '.env' ||
+      rel === 'start.bat' || rel === 'automation.js') {
+    res.writeHead(403, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });
+    return res.end('Forbidden');
+  }
+
   fs.readFile(filePath, (err, data) => {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });

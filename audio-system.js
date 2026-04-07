@@ -365,6 +365,62 @@ const AudioSystem = (function () {
     osc.stop(now + 0.13);
   }
 
+  // ── Surface-aware bullet impact sounds ──────────────────────
+  // Block types: 5=METAL, 14=REINFORCED, 11=GLASS, 4=WOOD, 9=CONCRETE, 10=BRICK, 3=STONE, 7=SAND, 1=DIRT
+  function playImpact(blockType) {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    if (blockType === 5 || blockType === 14) {
+      // Metal: high-freq ping + noise
+      var osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(2500 + Math.random() * 1500, now);
+      osc.frequency.exponentialRampToValueAtTime(500, now + 0.08);
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0.06, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      osc.connect(g); g.connect(masterGain);
+      osc.start(now); osc.stop(now + 0.09);
+    } else if (blockType === 11) {
+      // Glass: bright shatter burst
+      var src = createNoise(0.06);
+      var hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 4000;
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0.1, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+      src.connect(hp); hp.connect(g); g.connect(masterGain);
+    } else if (blockType === 4) {
+      // Wood: low thunk
+      var src = createNoise(0.05);
+      var lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 800;
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0.08, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      src.connect(lp); lp.connect(g); g.connect(masterGain);
+    } else if (blockType === 9 || blockType === 10 || blockType === 3) {
+      // Concrete/brick/stone: mid-freq crunch
+      var src = createNoise(0.04);
+      var bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 1200; bp.Q.value = 1.5;
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0.06, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+      src.connect(bp); bp.connect(g); g.connect(masterGain);
+    } else {
+      // Default (dirt, sand, etc): soft thud
+      var src = createNoise(0.03);
+      var lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 400;
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0.04, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+      src.connect(lp); lp.connect(g); g.connect(masterGain);
+    }
+  }
+
   // Drone motor buzz — continuous oscillator pair, call update to change volume
   var _droneOsc1 = null, _droneOsc2 = null, _droneGain = null;
   function startDroneMotor() {
@@ -1423,5 +1479,6 @@ const AudioSystem = (function () {
     playHeartbeat: playHeartbeat,
     playLandingThud: playLandingThud,
     playBulletSnap: playBulletSnap,
+    playImpact: playImpact,
   };
 })();

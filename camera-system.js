@@ -94,6 +94,7 @@ const CameraSystem = (function () {
 
   /* ── Mouse input ─────────────────────────────────────────────────── */
   function handleMouseMove(dx, dy, sensitivity) {
+    if (_killCamActive) return; // block mouse-look during kill cam
     sensitivity = sensitivity || 0.002;
 
     if (currentMode === MODE.FIRST_PERSON || currentMode === MODE.DRONE) {
@@ -293,6 +294,54 @@ const CameraSystem = (function () {
     return _tmpVec3a.set(-Math.sin(yaw), 0, -Math.cos(yaw));
   }
 
+  /* ── Wave Last-Kill Camera ──────────────────────────────────────── */
+  var _killCamActive = false;
+  var _killCamTimer = 0;
+  var _killCamDuration = 1.2;
+  var _killCamSavedYaw = 0;
+  var _killCamSavedPitch = 0;
+  var _killCamTargetYaw = 0;
+  var _killCamTargetPitch = 0;
+
+  function playLastKillCam(targetPos, camPos) {
+    if (!targetPos || !camPos) return;
+    _killCamSavedYaw = yaw;
+    _killCamSavedPitch = pitch;
+    // Calculate yaw/pitch to look at target
+    var dx = targetPos.x - camPos.x;
+    var dz = targetPos.z - camPos.z;
+    var dy = targetPos.y - camPos.y;
+    var dist = Math.sqrt(dx * dx + dz * dz);
+    _killCamTargetYaw = Math.atan2(-dx, -dz);
+    _killCamTargetPitch = Math.atan2(dy, dist);
+    _killCamActive = true;
+    _killCamTimer = _killCamDuration;
+  }
+
+  function updateKillCam(delta) {
+    if (!_killCamActive) return false;
+    _killCamTimer -= delta;
+    if (_killCamTimer <= 0) {
+      // Revert to saved camera orientation
+      yaw = _killCamSavedYaw;
+      pitch = _killCamSavedPitch;
+      _killCamActive = false;
+      return false;
+    }
+    var t = 1 - _killCamTimer / _killCamDuration;
+    if (t < 0.3) {
+      // Phase 1: lerp toward target
+      var p = t / 0.3;
+      yaw = _killCamSavedYaw + (_killCamTargetYaw - _killCamSavedYaw) * p;
+      pitch = _killCamSavedPitch + (_killCamTargetPitch - _killCamSavedPitch) * p;
+    }
+    // Phase 2: hold on target (t 0.3-0.8) — yaw/pitch stay at target
+    // Phase 3: auto-revert happens when timer expires
+    return true; // camera is overridden
+  }
+
+  function isKillCamActive() { return _killCamActive; }
+
   return {
     MODE,
     init,
@@ -313,5 +362,8 @@ const CameraSystem = (function () {
     getForwardDir,
     getMoveDir,
     shake,
+    playLastKillCam,
+    updateKillCam,
+    isKillCamActive,
   };
 })();

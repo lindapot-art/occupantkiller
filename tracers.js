@@ -394,9 +394,24 @@ const Tracers = (() => {
     depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1
   });
   var MAX_HOLES = 60;
-  function spawnBulletHole(pos, normal) {
+  // Surface type → impact color for bullet holes
+  const _surfaceColors = {
+    5:  0xC0C0C0,  // METAL → bright silver
+    9:  0x888888,  // CONCRETE → gray dust
+    10: 0x8B3020,  // BRICK → reddish
+    4:  0x8B6914,  // WOOD → brown splinters
+    11: 0xCCEEFF,  // GLASS → blue-white
+    3:  0x666666,  // STONE → dark gray
+    7:  0xD4B896,  // SAND → tan
+    1:  0x6B4410,  // DIRT → dark brown
+    14: 0x404850,  // REINFORCED → dark steel
+  };
+  function spawnBulletHole(pos, normal, surfaceType) {
     if (!_scene) return;
-    var mesh = new THREE.Mesh(_holeGeo, _holeMat.clone());
+    var holeColor = _surfaceColors[surfaceType] || 0x111111;
+    var mat = _holeMat.clone();
+    mat.color.set(holeColor);
+    var mesh = new THREE.Mesh(_holeGeo, mat);
     mesh.position.copy(pos);
     // Offset slightly along normal to prevent z-fighting
     mesh.position.addScaledVector(normal, 0.02);

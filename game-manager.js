@@ -563,6 +563,9 @@ const GameManager = (function () {
 
   let currentStage = 0;  // 0-based index into STAGES
 
+  /* ── Last-kill camera tracking ───────────────────────────────── */
+  var _lastKillPos = null;  // position of most recent enemy kill
+
   /* ── FOV Kick State (sprint widens, ADS narrows) ─────────────── */
   const _baseFOV = 75;
   var _currentFOV = 75;
@@ -2066,6 +2069,10 @@ const GameManager = (function () {
 
     // Slow-mo on wave clear (dramatic final-kill moment)
     if (typeof Feedback !== 'undefined' && Feedback.triggerSlowMo) Feedback.triggerSlowMo(0.4, 0.2);
+    // Kill cam: brief camera override toward last killed enemy
+    if (_lastKillPos && CameraSystem.playLastKillCam) {
+      CameraSystem.playLastKillCam(_lastKillPos, _camera.position);
+    }
 
     // Show wave stats (Feature 50)
     if (HUD.showWaveStats) {
@@ -2496,6 +2503,8 @@ const GameManager = (function () {
 
     // Update camera
     CameraSystem.update(delta, player.position, isMoving, player.onGround);
+    // Update kill cam override (blocks mouse-look while active)
+    if (CameraSystem.updateKillCam) CameraSystem.updateKillCam(delta);
 
     // Player footstep sounds
     if (isMoving && player.onGround && typeof AudioSystem !== 'undefined') {
@@ -2665,6 +2674,8 @@ const GameManager = (function () {
 
     if (remaining <= 0) {
       AudioSystem.playDeath();
+      // Track last kill position for kill cam
+      _lastKillPos = enemy.mesh ? enemy.mesh.position.clone() : null;
       // Death explosion effect
       if (typeof Tracers !== 'undefined' && Tracers.spawnExplosion) {
         Tracers.spawnExplosion(enemy.mesh.position, 1.5);

@@ -535,6 +535,52 @@ const WorldFeatures = (function () {
     return { fireDmg, landedDrops, mineExplosions, sandbagResult };
   }
 
+  // ── Explosive barrel detonation + chain reaction ──────────
+  var _barrelCooldown = {};  // prevent infinite chain loops
+  function detonateBarrel(bx, by, bz) {
+    var key = bx + ',' + by + ',' + bz;
+    if (_barrelCooldown[key]) return;
+    _barrelCooldown[key] = true;
+    // Remove the barrel block
+    if (typeof VoxelWorld !== 'undefined' && VoxelWorld.setBlock) {
+      VoxelWorld.setBlock(bx, by, bz, 0);
+    }
+    // Spawn fire at barrel location
+    ignite(bx, by, bz);
+    // Explosion VFX + audio
+    if (typeof Tracers !== 'undefined' && Tracers.spawnExplosion) {
+      Tracers.spawnExplosion(new THREE.Vector3(bx + 0.5, by + 0.5, bz + 0.5));
+    }
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.playExplosion) {
+      AudioSystem.playExplosion();
+    }
+    // Camera shake
+    if (typeof CameraSystem !== 'undefined' && CameraSystem.shake) {
+      CameraSystem.shake(0.05, 0.4);
+    }
+    // Destroy nearby blocks
+    applyExplosionDamage(bx, by, bz, 3, 60);
+    // Damage enemies in blast radius
+    if (typeof Enemies !== 'undefined' && Enemies.damageInRadius) {
+      Enemies.damageInRadius(new THREE.Vector3(bx + 0.5, by + 0.5, bz + 0.5), 5, 80);
+    }
+    // Chain reaction — find nearby barrels
+    for (var dx = -2; dx <= 2; dx++) {
+      for (var dy = -2; dy <= 2; dy++) {
+        for (var dz = -2; dz <= 2; dz++) {
+          if (dx === 0 && dy === 0 && dz === 0) continue;
+          var nx = bx + dx, ny = by + dy, nz = bz + dz;
+          if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getBlock(nx, ny, nz) === 12) {
+            // Delay chain reaction slightly for dramatic effect
+            setTimeout(function(x, y, z) { return function() { detonateBarrel(x, y, z); }; }(nx, ny, nz), 150 + Math.random() * 200);
+          }
+        }
+      }
+    }
+    // Clean up cooldown after chain is done
+    setTimeout(function() { delete _barrelCooldown[key]; }, 2000);
+  }
+
   return {
     CFG, init, clear, update,
     // Fire
@@ -575,6 +621,7 @@ const WorldFeatures = (function () {
     getMines: () => landmines,
     getWire: () => barbedWire,
     getSandbags: () => sandbags,
-    getSmokeZones: () => smokeZones
+    getSmokeZones: () => smokeZones,
+    detonateBarrel: detonateBarrel,
   };
 })();

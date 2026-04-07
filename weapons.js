@@ -2059,7 +2059,8 @@ const Weapons = (() => {
       };
       const bRay = VoxelWorld.raycastBlock(bulletCam, 80);
       if (bRay) {
-        // Bullet hole decal on terrain
+        var hitBlockType = VoxelWorld.getBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z);
+        // Bullet hole decal on terrain (surface-aware)
         if (typeof Tracers !== 'undefined' && Tracers.spawnBulletHole) {
           _wTmp3.set(bRay.hit.x + 0.5, bRay.hit.y + 0.5, bRay.hit.z + 0.5);
           _wTmp4.set(
@@ -2069,19 +2070,40 @@ const Weapons = (() => {
           ).normalize();
           if (_wTmp4.lengthSq() > 0) {
             _wTmp3.addScaledVector(_wTmp4, 0.5);
-            Tracers.spawnBulletHole(_wTmp3, _wTmp4);
+            Tracers.spawnBulletHole(_wTmp3, _wTmp4, hitBlockType);
           }
+        }
+        // Surface-aware impact audio
+        if (typeof AudioSystem !== 'undefined' && AudioSystem.playImpact) {
+          AudioSystem.playImpact(hitBlockType);
+        }
+        // Surface-aware impact particles
+        if (typeof Tracers !== 'undefined' && Tracers.spawnBlockImpact) {
+          var impactPos = _wTmpSpark.set(bRay.hit.x + 0.5, bRay.hit.y + 0.5, bRay.hit.z + 0.5);
+          var impactColor = (hitBlockType === 5 || hitBlockType === 14) ? 0xC0C0C0 :
+                            (hitBlockType === 11) ? 0xCCEEFF :
+                            (hitBlockType === 4) ? 0x8B6914 : undefined;
+          Tracers.spawnBlockImpact(impactPos, impactColor);
+        }
+        // Metal/glass sparks
+        if ((hitBlockType === 5 || hitBlockType === 14 || hitBlockType === 11) && typeof Tracers !== 'undefined') {
+          Tracers.spawnSparks(_wTmpSpark.set(bRay.hit.x + 0.5, bRay.hit.y + 0.5, bRay.hit.z + 0.5));
         }
         // Ricochet check on metal/reinforced surfaces
         if (typeof CombatExtras !== 'undefined') {
-          var blockType = VoxelWorld.getBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z);
+          var blockType = hitBlockType;
           var ric = CombatExtras.calcRicochet(blockType, _wTmp1);
           if (ric) {
             if (typeof AudioSystem !== 'undefined') AudioSystem.playRicochet();
             if (typeof Tracers !== 'undefined') Tracers.spawnSparks(_wTmpSpark.set(bRay.hit.x, bRay.hit.y, bRay.hit.z));
           }
         }
-        destroyBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z, false);
+        // Fuel barrel detonation (block type 12 = FUEL_BARREL)
+        if (hitBlockType === 12 && typeof WorldFeatures !== 'undefined' && WorldFeatures.detonateBarrel) {
+          WorldFeatures.detonateBarrel(bRay.hit.x, bRay.hit.y, bRay.hit.z);
+        } else {
+          destroyBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z, false);
+        }
       }
     }
     if (st.clip === 0 && st.reserve > 0) startReload();

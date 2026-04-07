@@ -442,6 +442,9 @@ var StageVFX = (function () {
       case 'urban':      _setupUrban();      break;
       case 'desert':     _setupDesert();     break;
     }
+    // Spawn ambient world props for all themes
+    clearAmbientProps();
+    spawnAmbientProps();
   }
 
   function update(delta) {
@@ -460,6 +463,9 @@ var StageVFX = (function () {
         s.timer = s.interval;
       }
     }
+
+    // Update ambient world props (fire glow, flickering lights)
+    updateAmbientProps(delta);
 
     // Wasteland green flash logic
     if (_activeTheme === 'wasteland') {
@@ -555,12 +561,61 @@ var StageVFX = (function () {
     }
   }
 
+  // ── Ambient world motion: persistent animated props ────────────
+  var _ambientProps = [];  // { mesh, type, timer }
+
+  function spawnAmbientProps() {
+    // Smoke columns at random positions near spawn area
+    for (var i = 0; i < 4; i++) {
+      var sx = (Math.random() - 0.5) * 80;
+      var sz = (Math.random() - 0.5) * 80;
+      var smokeLight = new THREE.PointLight(0xff6600, 0.5, 8);
+      smokeLight.position.set(sx, 2, sz);
+      if (groupMesh) groupMesh.add(smokeLight);
+      _ambientProps.push({ mesh: smokeLight, type: 'fire-glow', timer: Math.random() * 6.28 });
+    }
+    // Flickering window lights
+    for (var j = 0; j < 6; j++) {
+      var lx = (Math.random() - 0.5) * 60;
+      var ly = 3 + Math.random() * 8;
+      var lz = (Math.random() - 0.5) * 60;
+      var windowLight = new THREE.PointLight(0xffcc66, 0.3, 6);
+      windowLight.position.set(lx, ly, lz);
+      if (groupMesh) groupMesh.add(windowLight);
+      _ambientProps.push({ mesh: windowLight, type: 'flicker', timer: Math.random() * 6.28 });
+    }
+  }
+
+  function updateAmbientProps(delta) {
+    for (var i = 0; i < _ambientProps.length; i++) {
+      var p = _ambientProps[i];
+      p.timer += delta;
+      if (p.type === 'fire-glow') {
+        // Pulsing fire glow
+        p.mesh.intensity = 0.3 + Math.sin(p.timer * 3) * 0.2 + Math.sin(p.timer * 7.3) * 0.1;
+      } else if (p.type === 'flicker') {
+        // Random window flicker
+        p.mesh.intensity = 0.15 + Math.sin(p.timer * 5) * 0.1 + (Math.sin(p.timer * 13.7) > 0.7 ? 0.2 : 0);
+      }
+    }
+  }
+
+  function clearAmbientProps() {
+    for (var i = 0; i < _ambientProps.length; i++) {
+      var p = _ambientProps[i];
+      if (p.mesh.parent) p.mesh.parent.remove(p.mesh);
+      if (p.mesh.dispose) p.mesh.dispose();
+    }
+    _ambientProps.length = 0;
+  }
+
   function clear() {
     _clearParticles();
     _spawners.length = 0;
     _activeTheme = null;
     _flashTimer = 0;
     _flashActive = false;
+    clearAmbientProps();
 
     // Dispose all pooled meshes (including cloned materials)
     var i;
