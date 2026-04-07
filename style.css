@@ -153,6 +153,22 @@ canvas {
   opacity: 1;
 }
 
+/* Blood drops on damage */
+.blood-drop {
+  position: absolute;
+  pointer-events: none;
+  background: radial-gradient(ellipse, rgba(140,0,0,0.7) 30%, rgba(80,0,0,0.3) 100%);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  opacity: 0;
+  animation: bloodFade 2.5s ease-out forwards;
+}
+@keyframes bloodFade {
+  0%   { opacity: 0; transform: scale(0.5) translateY(0); }
+  10%  { opacity: 0.85; transform: scale(1) translateY(0); }
+  40%  { opacity: 0.6; transform: scale(1) translateY(8px); }
+  100% { opacity: 0; transform: scale(0.9) translateY(20px); }
+}
+
 /* Hit marker */
 #hit-marker {
   position: absolute;

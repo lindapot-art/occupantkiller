@@ -275,6 +275,30 @@ const AudioSystem = (function () {
     gain.connect(masterGain);
   }
 
+  // ── Bullet snap / near-miss whizz ───────────────────────────
+  function playBulletSnap(pan) {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    var source = createNoise(0.04);
+    var hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 6000 + Math.random() * 4000;
+    var gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    source.connect(hp);
+    hp.connect(gain);
+    var panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    if (panner) {
+      panner.pan.value = Math.max(-1, Math.min(1, pan || 0));
+      gain.connect(panner);
+      panner.connect(masterGain);
+    } else {
+      gain.connect(masterGain);
+    }
+  }
+
   // Enemy footstep sound — distance-attenuated
   function playEnemyFootstep(distance) {
     if (!enabled || !ctx || distance > 25) return;
@@ -1398,5 +1422,6 @@ const AudioSystem = (function () {
     resetFirstBlood: resetFirstBlood,
     playHeartbeat: playHeartbeat,
     playLandingThud: playLandingThud,
+    playBulletSnap: playBulletSnap,
   };
 })();

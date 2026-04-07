@@ -1748,6 +1748,16 @@ const Enemies = (() => {
               if (e._officerBuffDmg) { eDmg *= e._officerBuffDmg; e._officerBuffDmg = 0; }
               if (e._rallyBuff) { eDmg *= e._rallyBuff; e._rallyBuff = 0; }
               onPlayerHit(eDmg, e.mesh.position);
+            } else {
+              // Near-miss: bullet snap audio with stereo pan from attacker direction
+              if (typeof AudioSystem !== 'undefined' && AudioSystem.playBulletSnap && distToPlayer < 30) {
+                var camYaw = (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) ? CameraSystem.getYaw() : 0;
+                var dx = e.mesh.position.x - playerPos.x;
+                var dz = e.mesh.position.z - playerPos.z;
+                var angleToEnemy = Math.atan2(dx, dz);
+                var relAngle = angleToEnemy - camYaw;
+                AudioSystem.playBulletSnap(Math.sin(relAngle));
+              }
             }
             // Firing arm raise animation
             var eParts = e.mesh.userData.parts;

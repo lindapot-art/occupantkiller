@@ -1453,9 +1453,26 @@ const Weapons = (() => {
   let recoilOffsetY = 0;
   let recoilOffsetZ = 0;
   let switchAnimTimer = 0;  // weapon switch bob animation
-  const SWITCH_ANIM_DUR = 0.22;
+  const SWITCH_ANIM_DUR_DEFAULT = 0.22;
+  const SWITCH_SPEED_BY_TYPE = {
+    MELEE: 0.12, PISTOL: 0.16, SMG: 0.20, SILENT: 0.20,
+    ASSAULT: 0.24, NATO: 0.24, SHOTGUN: 0.24,
+    SNIPER: 0.35, AMR: 0.35,
+    LMG: 0.40, HMG: 0.40, MACHINEGUN: 0.40, NATO_HEAVY: 0.35, HMG_HEAVY: 0.45,
+    AT: 0.45, ATGM: 0.45, AT_HEAVY: 0.50, AT_LIGHT: 0.40, AA: 0.45,
+    MINIGUN: 0.55, THERMOBARIC: 0.50,
+    GRENADE: 0.18, SMOKE: 0.18, FLASHBANG: 0.18, MINE: 0.20,
+    INCENDIARY: 0.22, EXPLOSIVE: 0.30
+  };
+  function getSwitchDur() {
+    var w = cur();
+    return SWITCH_SPEED_BY_TYPE[w.type] || SWITCH_ANIM_DUR_DEFAULT;
+  }
   let walkSwayTime = 0;    // weapon walk sway accumulator
   let _playerSpeed = 0;    // fed from game-manager
+  let _sprintLowerY = 0;     // current sprint lower offset (lerped)
+  let _sprintLowerRotX = 0;  // current sprint tilt (lerped)
+  let _sprintLowerZ = 0;     // current sprint forward offset (lerped)
   let _scopeSwayTime = 0;  // scope idle drift accumulator
   let _holdingBreath = false;
   let _inspectTimer = 0;   // weapon inspect animation timer
@@ -1519,7 +1536,7 @@ const Weapons = (() => {
     recoilOffsetY = 0;
     recoilOffsetZ = 0;
     reloadAnimAngle = 0;
-    switchAnimTimer = SWITCH_ANIM_DUR; // trigger bob-up animation
+    switchAnimTimer = getSwitchDur(); // trigger bob-up animation (per-type speed)
     if (typeof AudioSystem !== 'undefined' && AudioSystem.playWeaponSwitch) AudioSystem.playWeaponSwitch();
     const st = curState();
     HUD.setWeapon(cur().name, currentIdx);
@@ -2135,7 +2152,7 @@ const Weapons = (() => {
         switchAnimTimer -= delta;
         if (switchAnimTimer < 0) switchAnimTimer = 0;
         // Smooth ease-out: weapon rises from below
-        const t = switchAnimTimer / SWITCH_ANIM_DUR;
+        const t = switchAnimTimer / getSwitchDur();
         switchY = -0.12 * t * t;
       }
       // Weapon walk sway (figure-8 pattern)
@@ -2158,9 +2175,20 @@ const Weapons = (() => {
         swayX += Math.sin(_scopeSwayTime * 1.3) * 0.004 * breathMult;
         swayY += Math.cos(_scopeSwayTime * 0.9) * 0.003 * breathMult;
       }
+      // Sprint weapon lowering (lerp down when sprinting, up when not)
+      var isSprint = typeof GameManager !== 'undefined' && GameManager.isSprinting && GameManager.isSprinting() && !zoomed;
+      var sprintTargY = isSprint ? -0.08 : 0;
+      var sprintTargRotX = isSprint ? 0.3 : 0;
+      var sprintTargZ = isSprint ? 0.04 : 0;
+      var sprintLerp = 1 - Math.pow(0.001, delta); // ~6.9/s
+      _sprintLowerY += (sprintTargY - _sprintLowerY) * sprintLerp;
+      _sprintLowerRotX += (sprintTargRotX - _sprintLowerRotX) * sprintLerp;
+      _sprintLowerZ += (sprintTargZ - _sprintLowerZ) * sprintLerp;
+
       mesh.position.x = swayX;
-      mesh.position.z = recoilOffsetZ + recoilOffset;
-      mesh.position.y = recoilOffsetY + switchY + swayY;
+      mesh.position.z = recoilOffsetZ + recoilOffset + _sprintLowerZ;
+      mesh.position.y = recoilOffsetY + switchY + swayY + _sprintLowerY;
+      mesh.rotation.x = reloadAnimAngle + _sprintLowerRotX;
     }
 
     // Weapon inspect animation
@@ -2223,15 +2251,91 @@ const Weapons = (() => {
     const st  = curState();
     if (st.reloading) {
       st.reloadTimer -= delta;
-      // Reload animation: tilt down then back
+      // Per-type reload animation
       if (mesh) {
         const progress = 1 - st.reloadTimer / wep.reloadTime;
-        if (progress < 0.5) {
-          reloadAnimAngle = progress * 2 * (Math.PI / 12);
+        var rType = wep.type;
+        var rRotX = 0, rRotZ = 0, rPosY = 0;
+        if (rType === 'PISTOL' || rType === 'SMG' || rType === 'SILENT') {
+          // Slide rack: quick Z snap at 60%, brief tilt
+          if (progress < 0.4) {
+            rRotX = progress / 0.4 * 0.15;
+            rPosY = -progress / 0.4 * 0.03;
+          } else if (progress < 0.6) {
+            var t2 = (progress - 0.4) / 0.2;
+            rRotZ = Math.sin(t2 * Math.PI) * 0.2;
+            rRotX = 0.15;
+            rPosY = -0.03;
+          } else {
+            var t2 = (progress - 0.6) / 0.4;
+            rRotX = 0.15 * (1 - t2);
+            rPosY = -0.03 * (1 - t2);
+          }
+        } else if (rType === 'LMG' || rType === 'HMG' || rType === 'HMG_HEAVY' || rType === 'MACHINEGUN' || rType === 'MINIGUN') {
+          // Belt feed: slow roll + longer hold at bottom
+          if (progress < 0.3) {
+            rRotX = progress / 0.3 * (Math.PI / 8);
+            rPosY = -progress / 0.3 * 0.06;
+          } else if (progress < 0.7) {
+            rRotX = Math.PI / 8;
+            rPosY = -0.06;
+            rRotZ = Math.sin((progress - 0.3) / 0.4 * Math.PI) * 0.12;
+          } else {
+            var t2 = (progress - 0.7) / 0.3;
+            rRotX = Math.PI / 8 * (1 - t2);
+            rPosY = -0.06 * (1 - t2);
+          }
+        } else if (rType === 'SNIPER' || rType === 'AMR') {
+          // Bolt action: X rotation + Z offset pull
+          if (progress < 0.25) {
+            rRotX = progress / 0.25 * 0.1;
+          } else if (progress < 0.5) {
+            var t2 = (progress - 0.25) / 0.25;
+            rRotX = 0.1;
+            rRotZ = t2 * 0.25;
+          } else if (progress < 0.75) {
+            var t2 = (progress - 0.5) / 0.25;
+            rRotZ = 0.25 * (1 - t2);
+            rRotX = 0.1;
+          } else {
+            rRotX = 0.1 * (1 - (progress - 0.75) / 0.25);
+          }
+        } else if (rType === 'AT' || rType === 'ATGM' || rType === 'AT_HEAVY' || rType === 'AT_LIGHT' || rType === 'AA' || rType === 'THERMOBARIC') {
+          // Tube load: full Y drop + slow rise
+          if (progress < 0.4) {
+            rPosY = -progress / 0.4 * 0.1;
+            rRotX = progress / 0.4 * (Math.PI / 6);
+          } else if (progress < 0.6) {
+            rPosY = -0.1;
+            rRotX = Math.PI / 6;
+          } else {
+            var t2 = (progress - 0.6) / 0.4;
+            rPosY = -0.1 * (1 - t2);
+            rRotX = Math.PI / 6 * (1 - t2);
+          }
+        } else if (rType === 'SHOTGUN') {
+          // Pump action: tilt + Z-pull snap
+          if (progress < 0.3) {
+            rRotX = progress / 0.3 * 0.12;
+          } else if (progress < 0.6) {
+            var t2 = (progress - 0.3) / 0.3;
+            rRotX = 0.12;
+            rRotZ = Math.sin(t2 * Math.PI) * 0.15;
+          } else {
+            rRotX = 0.12 * (1 - (progress - 0.6) / 0.4);
+          }
         } else {
-          reloadAnimAngle = (1 - (progress - 0.5) * 2) * (Math.PI / 12);
+          // Default (ASSAULT, NATO, GRENADE, etc): magazine swap
+          if (progress < 0.5) {
+            rRotX = progress * 2 * (Math.PI / 12);
+          } else {
+            rRotX = (1 - (progress - 0.5) * 2) * (Math.PI / 12);
+          }
         }
-        mesh.rotation.x = reloadAnimAngle;
+        reloadAnimAngle = rRotX;
+        mesh.rotation.x = rRotX + _sprintLowerRotX;
+        mesh.rotation.z = (mesh.rotation.z || 0) * 0.5 + rRotZ * 0.5; // smooth Z
+        mesh.position.y += rPosY;
       }
       if (st.reloadTimer <= 0) {
         const need = wep.clipSize - st.clip;
@@ -2240,7 +2344,7 @@ const Weapons = (() => {
         st.reserve -= fill;
         st.reloading = false;
         reloadAnimAngle = 0;
-        if (mesh) mesh.rotation.x = 0;
+        if (mesh) { mesh.rotation.x = _sprintLowerRotX; mesh.rotation.z = 0; }
         HUD.showReload(false);
         HUD.setAmmo(st.clip, st.reserve);
       }
@@ -2263,6 +2367,9 @@ const Weapons = (() => {
     _scopeSwayTime = 0;
     _holdingBreath = false;
     _inspectTimer = 0;
+    _sprintLowerY = 0;
+    _sprintLowerRotX = 0;
+    _sprintLowerZ = 0;
     // Remove lingering projectiles with proper disposal
     for (let i = projectiles.length - 1; i >= 0; i--) {
       if (_scene) _scene.remove(projectiles[i].mesh);

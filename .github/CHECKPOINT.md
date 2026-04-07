@@ -4,12 +4,12 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-06 — Session 14: Gameplay + NPC Polish + QA Script Fixes
-- **Agent**: QA
-- **Status**: COMPLETE (proxy QA reviewed current changed batch: FAIL, stage-progression verification remains unproven in the extended gameplay harness)
+- **Timestamp**: 2026-04-07 — Session 17: Core Gunplay Feel (Batch 4)
+- **Agent**: KING
+- **Status**: COMPLETE — Commit debf5e7 pushed to origin/main
 
 ## Current Task
-- DONE: Proxy QA review of the current gameplay/NPC polish batch
+- DONE: Batch 4 shipped — enemy flinch, recoil recovery, landing impact, kill momentum
 
 ## Steps Completed This Session
 1. [x] Investigated user-reported issues: ledge hang trap, missing weapons/god mode visibility, chaotic enemy rush behavior, weak NPC presence

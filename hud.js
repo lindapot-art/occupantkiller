@@ -119,6 +119,29 @@ const HUD = (() => {
     vignetteTimer = setTimeout(() => el.vignette.classList.remove('hit'), 300);
   }
 
+  // ── Persistent blood drops on damage ──────────────────────
+  function showBloodDrops(severity) {
+    // severity 0-1: 0 = light scratch, 1 = heavy hit
+    var count = Math.max(2, Math.min(6, Math.round(severity * 5 + 1)));
+    var container = document.getElementById('hud');
+    if (!container) return;
+    for (var i = 0; i < count; i++) {
+      var drop = document.createElement('div');
+      drop.className = 'blood-drop';
+      var size = 10 + Math.random() * 25 * severity;
+      drop.style.width = size + 'px';
+      drop.style.height = (size * (1.2 + Math.random() * 0.6)) + 'px';
+      drop.style.left = (5 + Math.random() * 90) + '%';
+      drop.style.top = (5 + Math.random() * 90) + '%';
+      drop.style.transform = 'rotate(' + (Math.random() * 360) + 'deg)';
+      container.appendChild(drop);
+      // Auto-remove after animation completes
+      (function(d) {
+        setTimeout(function() { if (d.parentNode) d.parentNode.removeChild(d); }, 2600);
+      })(drop);
+    }
+  }
+
   function showHeadshot() {
     el.headshotNotif.classList.remove('visible');
     void el.headshotNotif.offsetWidth;
@@ -1101,7 +1124,7 @@ const HUD = (() => {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
     setHealth, setAmmo, setWeapon, showReload,
-    flashHit, flashDamage,
+    flashHit, flashDamage, showBloodDrops,
     showHeadshot, notifyPickup,
     announceWave, announceStage,
     addKill, showHitDirection, updateMinimap,

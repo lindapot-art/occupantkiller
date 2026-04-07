@@ -2995,6 +2995,8 @@ const GameManager = (function () {
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
+    // Blood drops — severity scales with damage as fraction of max HP
+    if (HUD.showBloodDrops) HUD.showBloodDrops(Math.min(1, dmg / player.maxHp));
     // Low HP radio chatter
     if (player.hp > 0 && player.hp <= player.maxHp * 0.25) {
       if (typeof Feedback !== 'undefined' && Feedback.radioChatter) Feedback.radioChatter('low_hp');
