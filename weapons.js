@@ -2396,6 +2396,7 @@ const Weapons = (() => {
       const s = states[i];
       return { id: WEAPONS[i].id, name: WEAPONS[i].name, damage: WEAPONS[i].damage, clip: s.clip, reserve: s.reserve, type: WEAPONS[i].type };
     },
+    getWeaponDef: function (i) { return WEAPONS[i] || null; },
     isUnlocked:     function (i) { return !!unlocked[i]; },
     lockWeapon:     function (i) {
       if (i < 2) return;  // can't lock starter weapons

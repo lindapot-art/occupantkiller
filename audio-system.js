@@ -1205,6 +1205,94 @@ const AudioSystem = (function () {
     osc.stop(now + 0.03);
   }
 
+  // ── Kill confirm chime — short rising tone on every kill ──
+  function playKillConfirm() {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    var osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, now);
+    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.07);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.07, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    osc.connect(g);
+    g.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  }
+
+  // ── Multi-kill chord burst — escalating layers for 2+ rapid kills ──
+  function playMultiKill(count) {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    var baseFreq = 600 + Math.min(count, 6) * 100;
+    // Layer 1: base tone
+    var osc1 = ctx.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.value = baseFreq;
+    var g1 = ctx.createGain();
+    g1.gain.setValueAtTime(0.08, now);
+    g1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    osc1.connect(g1); g1.connect(masterGain);
+    osc1.start(now); osc1.stop(now + 0.16);
+    // Layer 2: major third above
+    var osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.value = baseFreq * 1.25;
+    var g2 = ctx.createGain();
+    g2.gain.setValueAtTime(0.06, now + 0.02);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    osc2.connect(g2); g2.connect(masterGain);
+    osc2.start(now); osc2.stop(now + 0.16);
+    // Layer 3: fifth above (only for 3+ kills)
+    if (count >= 3) {
+      var osc3 = ctx.createOscillator();
+      osc3.type = 'sine';
+      osc3.frequency.value = baseFreq * 1.5;
+      var g3 = ctx.createGain();
+      g3.gain.setValueAtTime(0.05, now + 0.03);
+      g3.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc3.connect(g3); g3.connect(masterGain);
+      osc3.start(now); osc3.stop(now + 0.16);
+    }
+  }
+
+  // ── First blood — deep powerful confirm on first kill of session ──
+  var _firstBloodPlayed = false;
+  function playFirstBlood() {
+    if (!enabled || !ctx || _firstBloodPlayed) return;
+    _firstBloodPlayed = true;
+    resume();
+    var now = ctx.currentTime;
+    // Low power tone
+    var osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.exponentialRampToValueAtTime(600, now + 0.2);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.12, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    var filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 2000;
+    osc.connect(filter); filter.connect(g); g.connect(masterGain);
+    osc.start(now); osc.stop(now + 0.31);
+    // Bright harmonic on top
+    var osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(800, now + 0.05);
+    osc2.frequency.exponentialRampToValueAtTime(1600, now + 0.15);
+    var g2 = ctx.createGain();
+    g2.gain.setValueAtTime(0.08, now + 0.05);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    osc2.connect(g2); g2.connect(masterGain);
+    osc2.start(now); osc2.stop(now + 0.26);
+  }
+  function resetFirstBlood() { _firstBloodPlayed = false; }
+
   return {
     init: init,
     resume: resume,
@@ -1261,5 +1349,9 @@ const AudioSystem = (function () {
     playFortificationBuild: playFortificationBuild,
     playWeaponSwitch: playWeaponSwitch,
     playDryFire: playDryFire,
+    playKillConfirm: playKillConfirm,
+    playMultiKill: playMultiKill,
+    playFirstBlood: playFirstBlood,
+    resetFirstBlood: resetFirstBlood,
   };
 })();

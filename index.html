@@ -432,6 +432,14 @@
     <h1>ZOMBIELAND</h1>
     <p>Avdiivka sector. Voxel world. Build. Command. Fight.</p>
     <p class="subtitle">Clear 4 stages across different battlefields to achieve victory.</p>
+    <!-- Quick start for new players -->
+    <div id="quick-start-section" style="display:none;margin:16px 0">
+      <button class="btn" id="quick-start-btn" style="font-size:18px;padding:12px 36px;border-color:#44ff88;color:#44ff88;text-shadow:0 0 10px rgba(68,255,136,0.4)">▶ QUICK START</button>
+      <p style="color:#666;font-size:11px;margin:6px 0">First time? Jump straight into action!</p>
+      <p style="color:#555;font-size:10px;cursor:pointer;text-decoration:underline" id="show-advanced-start">Show advanced options</p>
+    </div>
+    <!-- Advanced options (hidden for new players) -->
+    <div id="advanced-start-section">
     <div id="start-role-select" style="margin:10px 0">
       <p style="color:#ccc;font-size:14px;margin:4px 0">Choose your role:</p>
       <button class="btn" id="start-role-brigade" style="font-size:13px;padding:6px 16px;border-color:#0af;color:#0af;display:inline-block;margin:0 6px">🎖 ASSAULT BRIGADE</button>
@@ -457,6 +465,7 @@
       <p id="challenge-desc" style="color:#666;font-size:11px;margin:4px 0"></p>
     </div>
     <button class="btn" id="start-btn">▶ START MISSION</button>
+    </div>
     <div id="start-wallet-row" style="margin:8px 0;display:none">
       <button class="btn" id="start-connect-wallet" style="font-size:12px;padding:5px 14px;border-color:#8247e5;color:#8247e5;display:inline-block">🦊 Connect MetaMask (Polygon)</button>
       <span id="start-wallet-status" style="font-size:11px;color:#888;margin-left:8px"></span>
@@ -685,6 +694,26 @@
   GameManager.init();
 
   // ── Button wiring ──────────────────────────────────────
+  // ── Quick-start for new players ───────────────────────
+  (function () {
+    var hasPlayed = localStorage.getItem('ok_has_played');
+    var quickSection = document.getElementById('quick-start-section');
+    var advSection = document.getElementById('advanced-start-section');
+    if (!hasPlayed && quickSection && advSection) {
+      quickSection.style.display = 'block';
+      advSection.style.display = 'none';
+      document.getElementById('show-advanced-start').addEventListener('click', function () {
+        quickSection.style.display = 'none';
+        advSection.style.display = 'block';
+      });
+      document.getElementById('quick-start-btn').addEventListener('click', function () {
+        GameManager.startGame();
+      });
+    } else if (quickSection) {
+      quickSection.style.display = 'none';
+    }
+  })();
+
   document.getElementById('start-btn').addEventListener('click', function () {
     GameManager.startGame();
   });

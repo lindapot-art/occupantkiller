@@ -1557,6 +1557,7 @@ const GameManager = (function () {
     AudioSystem.resume();
     // Start battle music
     if (AudioSystem.playMusic) AudioSystem.playMusic('battle');
+    if (AudioSystem.resetFirstBlood) AudioSystem.resetFirstBlood();
     gameState = STATE.PLAYING;
     player.hp = player.maxHp;
     player.score = 0;
@@ -1772,6 +1773,7 @@ const GameManager = (function () {
       if (!Weapons.isUnlocked(rewards[ri])) {
         Weapons.unlockWeapon(rewards[ri]);
         HUD.notifyPickup('WEAPON UNLOCKED: ' + Weapons.getWeaponName(rewards[ri]), '#ff8800');
+        if (HUD.showWeaponUnlockCard && Weapons.getWeaponDef) HUD.showWeaponUnlockCard(Weapons.getWeaponDef(rewards[ri]));
       }
     }
     // Refresh HUD weapon bar after stage unlocks
@@ -1870,6 +1872,7 @@ const GameManager = (function () {
     AudioSystem.playWaveStart();
     HUD.setWave(w, stageDef.wavesPerStage);
     HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage);
+    if (typeof Feedback !== 'undefined' && Feedback.radioChatter) Feedback.radioChatter('wave_start');
 
     // ═══ Stage Boss on final wave ═══
     if (w === stageDef.wavesPerStage) {
@@ -2056,6 +2059,8 @@ const GameManager = (function () {
     }
 
     // ═══ NEW: Wave-complete integrations for 59 features ═══
+    // Mark player as experienced (for quick-start flow)
+    try { localStorage.setItem('ok_has_played', '1'); } catch (e) {}
     // Progression stats (BEFORE resetting wave stats so values are accurate)
     if (typeof Progression !== 'undefined') {
       Progression.trackStat('wavesCleared', 1);
@@ -2070,6 +2075,8 @@ const GameManager = (function () {
       Progression.updateBounty('low_damage', Math.round(player.waveDamageTaken));
       Progression.save();
     }
+    // Radio chatter on wave clear
+    if (typeof Feedback !== 'undefined' && Feedback.radioChatter) Feedback.radioChatter('wave_clear');
     // Achievement checks
     if (typeof Feedback !== 'undefined') {
       if (currentWave >= 5) Feedback.unlockAchievement('SURVIVOR');
@@ -2096,6 +2103,7 @@ const GameManager = (function () {
     var newWep = Weapons.unlockNext();
     if (newWep >= 0) {
       HUD.setWeapon(Weapons.getCurrentName(), Weapons.getCurrentIdx());
+      if (HUD.showWeaponUnlockCard && Weapons.getWeaponDef) HUD.showWeaponUnlockCard(Weapons.getWeaponDef(newWep));
     }
 
     // ── NPC reinforcement: replace losses, keep force viable ──
@@ -2179,6 +2187,7 @@ const GameManager = (function () {
       // Stage clear bonus
       player.score += 1000; // Stage clear bonus
       HUD.setScore(player.score);
+      if (typeof Feedback !== 'undefined' && Feedback.radioChatter) Feedback.radioChatter('stage_clear');
 
       // Track highest stage reached for save/load
       if (typeof Progression !== 'undefined' && Progression.setHighestStage) {
@@ -2580,7 +2589,12 @@ const GameManager = (function () {
         if (HUD.showStreakBanner) HUD.showStreakBanner('LEVEL UP! LVL ' + player.level, player.level);
         if (typeof AudioSystem !== 'undefined' && AudioSystem.playLevelUp) AudioSystem.playLevelUp();
         // Unlock a weapon every 3 levels
-        if (player.level % 3 === 0) Weapons.unlockNext();
+        if (player.level % 3 === 0) {
+          var newWepIdx = Weapons.unlockNext();
+          if (newWepIdx >= 0 && HUD.showWeaponUnlockCard && Weapons.getWeaponDef) {
+            HUD.showWeaponUnlockCard(Weapons.getWeaponDef(newWepIdx));
+          }
+        }
       }
       if (HUD.updateXPBar) HUD.updateXPBar(player.xp, xpNeeded, player.level);
       if (Feedback.showXPGain) Feedback.showXPGain(xpGain);
@@ -2597,6 +2611,13 @@ const GameManager = (function () {
       // ── B23: Kill confirm effect ──
       if (Feedback.showKillConfirm) Feedback.showKillConfirm();
       if (isHeadshot && AudioSystem.playHeadshotDing) AudioSystem.playHeadshotDing();
+
+      // ── Kill audio feedback ──
+      if (typeof AudioSystem !== 'undefined') {
+        if (player.kills === 1 && AudioSystem.playFirstBlood) AudioSystem.playFirstBlood();
+        else if (AudioSystem.playKillConfirm) AudioSystem.playKillConfirm();
+        if (player.multikillCount >= 2 && AudioSystem.playMultiKill) AudioSystem.playMultiKill(player.multikillCount);
+      }
 
       // ── B22: Boss bar update ──
       if (enemy.type === 'BOSS') {
@@ -2672,6 +2693,11 @@ const GameManager = (function () {
       // Kill streak tracking
       player.killStreak++;
       if (player.killStreak > player.bestStreak) player.bestStreak = player.killStreak;
+      // Radio chatter on milestones
+      if (typeof Feedback !== 'undefined' && Feedback.radioChatter) {
+        if (player.kills === 1) Feedback.radioChatter('first_blood');
+        if (player.killStreak === 5 || player.killStreak === 10) Feedback.radioChatter('kill_streak');
+      }
 
       // ── B30: Weapon Mastery tracking ──
       if (typeof CombatExtras !== 'undefined' && CombatExtras.addWeaponKill) {
@@ -2834,6 +2860,10 @@ const GameManager = (function () {
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
+    // Low HP radio chatter
+    if (player.hp > 0 && player.hp <= player.maxHp * 0.25) {
+      if (typeof Feedback !== 'undefined' && Feedback.radioChatter) Feedback.radioChatter('low_hp');
+    }
     // Player-hit audio feedback
     if (typeof AudioSystem !== 'undefined' && AudioSystem.playHit) AudioSystem.playHit();
     // Screen shake on hit

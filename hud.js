@@ -1052,6 +1052,51 @@ const HUD = (() => {
   }
   function getSettings() { return _settings; }
 
+  // ── Weapon Unlock Card ────────────────────────────────────────────
+  var _weaponCardEl = null;
+  var _weaponCardTimer = null;
+  var _shownWeapons = {}; // track which weapons have shown the big card
+  // Restore shown weapons from localStorage
+  try { var _sw = localStorage.getItem('ok_shown_weapons'); if (_sw) _shownWeapons = JSON.parse(_sw); } catch(e){}
+
+  function showWeaponUnlockCard(weaponDef) {
+    if (!weaponDef || !weaponDef.name) return;
+    // Only show the big card on FIRST ever unlock of this weapon
+    if (_shownWeapons[weaponDef.id]) return;
+    _shownWeapons[weaponDef.id] = true;
+    try { localStorage.setItem('ok_shown_weapons', JSON.stringify(_shownWeapons)); } catch(e){}
+
+    if (!_weaponCardEl) {
+      _weaponCardEl = document.createElement('div');
+      _weaponCardEl.style.cssText = 'position:fixed;top:25%;left:50%;transform:translateX(-50%) scale(0.6);' +
+        'background:rgba(10,10,10,0.92);border:2px solid #ffcc00;border-radius:8px;padding:16px 28px;' +
+        'z-index:300;pointer-events:none;text-align:center;font-family:monospace;' +
+        'transition:transform 0.25s ease-out, opacity 0.3s;opacity:0;min-width:240px;' +
+        'box-shadow:0 0 30px rgba(255,200,0,0.3),inset 0 0 20px rgba(255,200,0,0.05);';
+      document.body.appendChild(_weaponCardEl);
+    }
+    var typeLabel = weaponDef.type || '';
+    var dmg = weaponDef.damage || 0;
+    var rpm = weaponDef.fireRate ? Math.round(60 / weaponDef.fireRate) : 0;
+    var clipStr = weaponDef.clipSize ? weaponDef.clipSize + ' / ' + weaponDef.maxReserve : '∞';
+    _weaponCardEl.innerHTML =
+      '<div style="color:#ffcc00;font-size:10px;letter-spacing:3px;margin-bottom:4px">🔓 NEW WEAPON UNLOCKED</div>' +
+      '<div style="color:#fff;font-size:20px;font-weight:bold;margin:6px 0;text-shadow:0 0 8px rgba(255,200,0,0.4)">' + weaponDef.name + '</div>' +
+      '<div style="color:#888;font-size:11px;margin-bottom:8px">' + typeLabel + '</div>' +
+      '<div style="display:flex;justify-content:center;gap:18px;color:#aaa;font-size:11px">' +
+        '<span>⚔ ' + dmg + ' DMG</span>' +
+        (rpm ? '<span>🔥 ' + rpm + ' RPM</span>' : '') +
+        '<span>📦 ' + clipStr + '</span>' +
+      '</div>';
+    _weaponCardEl.style.opacity = '1';
+    _weaponCardEl.style.transform = 'translateX(-50%) scale(1)';
+    clearTimeout(_weaponCardTimer);
+    _weaponCardTimer = setTimeout(function () {
+      _weaponCardEl.style.opacity = '0';
+      _weaponCardEl.style.transform = 'translateX(-50%) scale(0.8)';
+    }, 2800);
+  }
+
   return {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
@@ -1084,5 +1129,6 @@ const HUD = (() => {
     // ── B26: QoL ──
     toggleFPS, updateFPS, toggleSettings, getSettings,
     refreshIndicators,
+    showWeaponUnlockCard,
   };
 })();

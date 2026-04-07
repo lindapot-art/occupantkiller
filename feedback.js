@@ -469,6 +469,60 @@ const Feedback = (function () {
     achievementQueue = [];
   }
 
+  // ── Battlefield Radio Chatter ────────────────────────────────────
+  var _radioLines = {
+    wave_start: [
+      '📻 Command: Contacts bearing north, engage at will',
+      '📻 Spotter: Movement ahead, multiple hostiles',
+      '📻 Command: Wave inbound, weapons free',
+      '📻 Intel: Enemy force mobilizing, stand ready',
+    ],
+    mid_wave: [
+      '📻 Spotter: Heavy armor moving up the road',
+      '📻 Recon: Flankers spotted, watch your six',
+      '📻 Command: Keep pushing, they\'re faltering',
+      '📻 Intel: Enemy reinforcements en route',
+    ],
+    low_hp: [
+      '📻 Medic: Soldier, get to cover NOW!',
+      '📻 Command: We see you\'re hit, find cover and patch up',
+      '📻 Medic: Stay alive, don\'t be a hero',
+    ],
+    kill_streak: [
+      '📻 Command: Outstanding work, keep it up',
+      '📻 Spotter: They\'re running scared',
+      '📻 Command: That\'s how it\'s done, soldier',
+    ],
+    wave_clear: [
+      '📻 All clear. Good shooting, soldier.',
+      '📻 Command: Area secured, standby for next wave',
+      '📻 Recon: Hostiles eliminated. Take a breath.',
+    ],
+    stage_clear: [
+      '📻 Command: Sector secured! Outstanding performance.',
+      '📻 HQ: Move to next objective, soldier. Glory to Ukraine.',
+      '📻 Command: All units, advance to next sector.',
+    ],
+    first_blood: [
+      '📻 Spotter: First contact confirmed. Good kill.',
+      '📻 Command: First blood. Let\'s keep the pressure on.',
+    ],
+  };
+  var _lastRadioTime = 0;
+  var _radioCooldown = 8000; // min ms between radio lines
+
+  function radioChatter(context) {
+    var now = Date.now();
+    if (now - _lastRadioTime < _radioCooldown) return;
+    var lines = _radioLines[context];
+    if (!lines || lines.length === 0) return;
+    var line = lines[Math.floor(Math.random() * lines.length)];
+    _lastRadioTime = now;
+    if (typeof HUD !== 'undefined' && HUD.addCombatLog) {
+      HUD.addCombatLog(line, '#7cb342');
+    }
+  }
+
   return {
     CFG, ACHIEVEMENTS,
     init, clear, update,
@@ -499,6 +553,7 @@ const Feedback = (function () {
     // Weapon pickup
     showWeaponPickup,
     // Environment warning
-    showEnvironmentWarning
+    showEnvironmentWarning,
+    radioChatter,
   };
 })();
