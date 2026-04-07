@@ -1578,13 +1578,15 @@ const GameManager = (function () {
     player._lastPos = null;
     player.playStartTime = performance.now();
     player.buildMaterials = { wood: 0, stone: 0, metal: 0, dirt: 0, sand: 0, brick: 0 };
-    // Clear loot particles
+    // Clear loot particles (shared _lootGeo — only dispose cloned materials)
     for (var li = _lootParticles.length - 1; li >= 0; li--) {
       if (_scene) _scene.remove(_lootParticles[li]);
-      _lootParticles[li].geometry.dispose();
       _lootParticles[li].material.dispose();
     }
     _lootParticles.length = 0;
+
+    // Reset skills on new game (skills are designed to accrue per-run, not persist)
+    if (typeof SkillSystem !== 'undefined' && SkillSystem.init) SkillSystem.init();
 
     // Reset god mode effects on game start
     if (player.godMode) {

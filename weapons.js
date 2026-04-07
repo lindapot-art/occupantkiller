@@ -89,8 +89,8 @@ const Weapons = (() => {
     },
     // ── 7 new weapons ──────────────────────────────────────
     {
-      id: 'MG3', name: 'MG3 Machine Gun', damage: 32,
-      fireRate: 0.05, clipSize: 120, maxReserve: 360, reloadTime: 5.5,
+      id: 'MG3', name: 'MG3 Machine Gun', damage: 24,
+      fireRate: 0.065, clipSize: 120, maxReserve: 360, reloadTime: 5.5,
       spread: 0.055, auto: true, type: 'MACHINEGUN', recoilY: 0.022, recoilX: 0.011,
     },
     {
@@ -109,7 +109,7 @@ const Weapons = (() => {
       spread: 0.08, auto: true, type: 'MINIGUN', recoilY: 0.012, recoilX: 0.008,
     },
     {
-      id: 'CROSSBOW', name: 'Tactical Crossbow', damage: 65,
+      id: 'CROSSBOW', name: 'Tactical Crossbow', damage: 130,
       fireRate: 1.2, clipSize: 1, maxReserve: 15, reloadTime: 1.8,
       spread: 0.006, auto: false, type: 'SILENT', recoilY: 0, recoilX: 0,
     },
@@ -166,9 +166,9 @@ const Weapons = (() => {
       spread: 0.10, auto: false, type: 'SHOTGUN', recoilY: 0.040, recoilX: 0.018,
     },
     {
-      id: 'AGS17', name: 'AGS-17 Grenade MG', damage: 120,
-      fireRate: 0.25, clipSize: 29, maxReserve: 58, reloadTime: 5.0,
-      spread: 0.04, auto: true, type: 'GRENADE', blastRadius: 3.5, recoilY: 0.030, recoilX: 0.015,
+      id: 'AGS17', name: 'AGS-17 Grenade MG', damage: 80,
+      fireRate: 0.35, clipSize: 6, maxReserve: 30, reloadTime: 4.0,
+      spread: 0.04, auto: false, type: 'GRENADE', blastRadius: 3.5, recoilY: 0.030, recoilX: 0.015,
     },
     {
       id: 'VSS', name: 'VSS Vintorez', damage: 42,
@@ -1924,10 +1924,10 @@ const Weapons = (() => {
       return;
     }
 
-    // ── Projectile weapons (AT/ATGM/AT_HEAVY/AT_LIGHT/AA/GRENADE/INCENDIARY/THERMOBARIC) ──
+    // ── Projectile weapons (AT/ATGM/AT_HEAVY/AT_LIGHT/AA/GRENADE/INCENDIARY/THERMOBARIC/EXPLOSIVE) ──
     if (wep.type === 'AT' || wep.type === 'ATGM' || wep.type === 'AT_HEAVY' ||
         wep.type === 'AT_LIGHT' || wep.type === 'AA' || wep.type === 'GRENADE' ||
-        wep.type === 'INCENDIARY' || wep.type === 'THERMOBARIC') {
+        wep.type === 'INCENDIARY' || wep.type === 'THERMOBARIC' || wep.type === 'EXPLOSIVE') {
       if (st.clip <= 0) { startReload(); _firedThisFrame = false; return; }
       st.clip--;
       HUD.setAmmo(st.clip, st.reserve);
@@ -1990,7 +1990,7 @@ const Weapons = (() => {
     if (hits.length > 0) {
       onHit(hits[0], wep.damage);
       // Bullet penetration for high-caliber weapons — hit 2nd target at reduced damage
-      var penTypes = ['SNIPER', 'LMG', 'HMG', 'HMG_HEAVY', 'MINIGUN', 'ANTI_MATERIAL'];
+      var penTypes = ['SNIPER', 'LMG', 'HMG', 'HMG_HEAVY', 'MINIGUN', 'AMR', 'MACHINEGUN'];
       if (penTypes.indexOf(wep.type) >= 0 && hits.length > 1) {
         // Find next hit that belongs to a different root enemy mesh
         var firstRoot = hits[0].object;
