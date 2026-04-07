@@ -1393,6 +1393,9 @@ const Enemies = (() => {
       // If player shot this enemy, immediately spot them
       if (e.flashTimer > 0.07) {
         e.spotLevel = SPOT_TIME + 0.5;
+        if (!e.playerSpotted && typeof AudioSystem !== 'undefined' && AudioSystem.playEnemyAlert) {
+          AudioSystem.playEnemyAlert();
+        }
         e.playerSpotted = true;
       }
 
@@ -1633,7 +1636,10 @@ const Enemies = (() => {
           const surrenderDist = e.mesh.position.distanceTo(playerPos);
           if (surrenderDist < 3 && !e._surrenderClaimed) {
             e._surrenderClaimed = true;
-            e.scoreValue += 200; // Bonus for POW capture
+            // Award POW capture bonus directly (scoreValue on death won't fire for surrendered)
+            if (typeof onEnemyDied === 'function') {
+              onEnemyDied({ scoreValue: 200, typeName: e.typeName, mesh: e.mesh, alive: false, hp: 0 }, false);
+            }
           }
         }
         continue;
@@ -1664,7 +1670,9 @@ const Enemies = (() => {
           }
 
           if (e._rangedTimer <= 0) {
-            e._rangedTimer = e.typeCfg.rangedRate * fireRateMod;
+            // Apply boss rage multiplier (faster attacks when low HP)
+            var rageMod = e._rageMult || 1.0;
+            e._rangedTimer = e.typeCfg.rangedRate * fireRateMod / rageMod;
 
             // Chance to throw grenade instead of shooting (8% when dist 8-20)
             if (distToPlayer > 8 && distToPlayer < 20 && Math.random() < 0.08) {
@@ -1691,6 +1699,10 @@ const Enemies = (() => {
               tOrigin.y += 1.2;
               var tDir = _tmpVec3e.set(playerPos.x, playerPos.y + 0.8, playerPos.z).sub(tOrigin).normalize();
               Tracers.spawnTracer(tOrigin, tDir, 0xff4400, 80);
+            }
+            // Enemy gunshot audio (distance-attenuated)
+            if (typeof AudioSystem !== 'undefined' && AudioSystem.playGunshot) {
+              AudioSystem.playGunshot('rifle', distToPlayer);
             }
             }
           }
@@ -1831,6 +1843,14 @@ const Enemies = (() => {
             }
             break;
           case 'BOSS':
+          case 'BOSS_MARIUPOL':
+          case 'BOSS_CRIMEA':
+          case 'BOSS_CHORNOBYL':
+          case 'BOSS_MOSCOW':
+          case 'BOSS_SEVASTOPOL':
+          case 'BOSS_DONBAS':
+          case 'BOSS_BELGOROD':
+          case 'BOSS_KREMLIN':
             etResult = EnemyTypes.updateBoss(e, playerPos, delta, wave || 1);
             if (etResult) {
               if (etResult.summon) {
@@ -2168,6 +2188,14 @@ const Enemies = (() => {
         enemy.flashTimer = 0.04;
         return enemy.hp;
       }
+    }
+    // Tank armor: route damage through directional armor reduction
+    if (typeof EnemyTypes !== 'undefined' && enemy.typeCfg && enemy.typeCfg.name === 'TANK') {
+      var tankAngle = 0;
+      if (_playerPos) {
+        tankAngle = Math.atan2(_playerPos.x - enemy.mesh.position.x, _playerPos.z - enemy.mesh.position.z);
+      }
+      amount = EnemyTypes.applyTankArmor(enemy, amount, tankAngle);
     }
 
     enemy.hp = Math.max(0, enemy.hp - amount);

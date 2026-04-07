@@ -139,6 +139,8 @@ const Feedback = (function () {
   }
 
   function updateCompass(dt, yaw) {
+    // Defer to HUD compass if available (avoid duplicate writes to #tactical-compass)
+    if (typeof HUD !== 'undefined' && HUD.updateCompass) return;
     compassTimer -= dt;
     if (compassTimer > 0) return;
     compassTimer = CFG.COMPASS_UPDATE_RATE;
@@ -233,6 +235,7 @@ const Feedback = (function () {
     unlockedAchievements.add(id);
     achievementQueue.push({ ...ach, timer: CFG.ACHIEVEMENT_DISPLAY });
     showAchievementPopup(ach);
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.playAchievementUnlock) AudioSystem.playAchievementUnlock();
     return true;
   }
 

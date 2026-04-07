@@ -262,6 +262,8 @@ const GameManager = (function () {
 
   /* ── Loot Particle System (Sonic-style gold rings from terrain) ── */
   const _lootParticles = [];
+  const _lootGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+  const _lootMat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0xaa8800 });
   const LOOT_CONFIG = {
     VALUE: 5,             // gold per loot particle collected
     COLLECT_RANGE: 2.5,   // distance to auto-collect
@@ -272,9 +274,7 @@ const GameManager = (function () {
   function spawnLootParticle(worldPos, count) {
     if (!_scene) return;
     for (var i = 0; i < (count || 1); i++) {
-      var geo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
-      var mat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0xaa8800 });
-      var mesh = new THREE.Mesh(geo, mat);
+      var mesh = new THREE.Mesh(_lootGeo, _lootMat.clone());
       // Scatter slightly from source
       mesh.position.set(
         worldPos.x + (Math.random() - 0.5) * 1.5,
@@ -2170,6 +2170,7 @@ const GameManager = (function () {
 
       // Show stage clear overlay
       gameState = STATE.STAGE_CLEAR;
+      if (typeof AudioSystem !== 'undefined' && AudioSystem.playLevelComplete) AudioSystem.playLevelComplete();
       showOverlay('stageclear');
       document.getElementById('stageclear-num').textContent = stageDef.id;
       document.getElementById('stageclear-name').textContent = stageDef.name;
@@ -2511,6 +2512,7 @@ const GameManager = (function () {
 
     if (isHeadshot) {
       HUD.showHeadshot();
+      if (typeof AudioSystem !== 'undefined' && AudioSystem.playCriticalHit) AudioSystem.playCriticalHit();
       player.score += 50;
       player.totalHeadshots++;
       player.waveHeadshots++;
@@ -2541,6 +2543,7 @@ const GameManager = (function () {
         player.xp -= xpNeeded;
         player.level++;
         if (HUD.showStreakBanner) HUD.showStreakBanner('LEVEL UP! LVL ' + player.level, player.level);
+        if (typeof AudioSystem !== 'undefined' && AudioSystem.playLevelUp) AudioSystem.playLevelUp();
         // Unlock a weapon every 3 levels
         if (player.level % 3 === 0) Weapons.unlockNext();
       }
@@ -2613,6 +2616,7 @@ const GameManager = (function () {
         for (var cbi = 0; cbi < completedBounties.length; cbi++) {
           HUD.notifyPickup('💰 BOUNTY COMPLETE! +' + completedBounties[cbi].reward + ' OKC', '#ffaa00');
           if (typeof Marketplace !== 'undefined') Marketplace.addOKC(completedBounties[cbi].reward);
+          if (typeof AudioSystem !== 'undefined' && AudioSystem.playBountyComplete) AudioSystem.playBountyComplete();
         }
         // Achievement checks
         if (typeof Feedback !== 'undefined') {
@@ -2795,6 +2799,8 @@ const GameManager = (function () {
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
+    // Player-hit audio feedback
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.playHit) AudioSystem.playHit();
     // Screen shake on hit
     if (CameraSystem.shake) {
       CameraSystem.shake(dmg * 0.004, 0.2);
@@ -3245,7 +3251,7 @@ const GameManager = (function () {
       }
 
       // Update tracers
-      if (typeof Tracers !== 'undefined') Tracers.update(delta);
+      if (typeof Tracers !== 'undefined') Tracers.update(delta, player.position);
       if (typeof StageVFX !== 'undefined') StageVFX.update(delta);
 
       // ═══ NEW FEATURE SYSTEM UPDATES (59 features) ═══

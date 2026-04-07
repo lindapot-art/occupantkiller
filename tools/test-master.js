@@ -16,6 +16,7 @@
  *   Phase 9: Edge Case & Resource Fixes
  *   Phase 10: Traversal & Integration Fixes
  *   Phase 11: Weapon & Combat System Fixes
+ *   Phase 12: Enemy AI, Audio, VFX & GPU Fixes
  */
 
 const http = require('http');
@@ -605,6 +606,99 @@ function phase11() {
   else ok(p11pass + '/' + p11total + ' weapon & combat fixes verified');
 }
 
+function phase12() {
+  console.log('\n══ Phase 12: Enemy AI, Audio, VFX & GPU Fixes ══');
+  var p12pass = 0, p12total = 0;
+  function check(name, ok) { p12total++; if (ok) p12pass++; else fail(name); }
+
+  var enSrc = fs.readFileSync(path.join(ROOT, 'enemies.js'), 'utf8');
+  var etSrc = fs.readFileSync(path.join(ROOT, 'enemy-types.js'), 'utf8');
+  var trSrc = fs.readFileSync(path.join(ROOT, 'tracers.js'), 'utf8');
+  var gmSrc = fs.readFileSync(path.join(ROOT, 'game-manager.js'), 'utf8');
+  var fbSrc = fs.readFileSync(path.join(ROOT, 'feedback.js'), 'utf8');
+
+  // C1: Stage boss case labels
+  check('Enemies: BOSS_MARIUPOL case label exists',
+    enSrc.includes("case 'BOSS_MARIUPOL':"));
+  check('Enemies: BOSS_KREMLIN case label exists',
+    enSrc.includes("case 'BOSS_KREMLIN':"));
+
+  // C2: Tank armor routing
+  check('Enemies: damage() routes through applyTankArmor',
+    enSrc.includes('applyTankArmor(enemy, amount, tankAngle)'));
+
+  // C3: Boss rage modifier applied to fire rate
+  check('Enemies: rage multiplier applied to ranged timer',
+    enSrc.includes('e.typeCfg.rangedRate * fireRateMod / rageMod'));
+
+  // VFX: Tracers.clear cleans casings/sparks/holes
+  check('Tracers: clear() cleans casings',
+    trSrc.includes('casings.forEach') && trSrc.includes('casings.length = 0'));
+  check('Tracers: clear() cleans sparks',
+    trSrc.includes('sparks.forEach') && trSrc.includes('sparks.length = 0'));
+  check('Tracers: clear() cleans bullet holes',
+    trSrc.includes('_bulletHoles.forEach') && trSrc.includes('_bulletHoles.length = 0'));
+
+  // VFX: Tracers.update passes playerPos for rain
+  check('GM: Tracers.update passes player.position',
+    gmSrc.includes('Tracers.update(delta, player.position)'));
+
+  // VFX: Bullet hole material dispose on cap eviction
+  check('Tracers: bullet hole cap eviction disposes material',
+    trSrc.includes('old.mesh.material.dispose()'));
+
+  // Audio: Enemy gunshot sound
+  check('Enemies: ranged attack plays AudioSystem.playGunshot',
+    enSrc.includes('AudioSystem.playGunshot'));
+
+  // Audio: Player hit sound
+  check('GM: onPlayerHit plays AudioSystem.playHit',
+    gmSrc.includes('AudioSystem.playHit'));
+
+  // Audio: Stage clear sound
+  check('GM: stage clear plays AudioSystem.playLevelComplete',
+    gmSrc.includes('AudioSystem.playLevelComplete'));
+
+  // Audio: Level up sound
+  check('GM: level up plays AudioSystem.playLevelUp',
+    gmSrc.includes('AudioSystem.playLevelUp'));
+
+  // Audio: Headshot critical hit sound
+  check('GM: headshot plays AudioSystem.playCriticalHit',
+    gmSrc.includes('AudioSystem.playCriticalHit'));
+
+  // Audio: Bounty complete sound
+  check('GM: bounty complete plays AudioSystem.playBountyComplete',
+    gmSrc.includes('AudioSystem.playBountyComplete'));
+
+  // Audio: Achievement unlock sound
+  check('Feedback: achievement plays AudioSystem.playAchievementUnlock',
+    fbSrc.includes('AudioSystem.playAchievementUnlock'));
+
+  // Audio: Enemy alert sound
+  check('Enemies: spotted enemy plays AudioSystem.playEnemyAlert',
+    enSrc.includes('AudioSystem.playEnemyAlert'));
+
+  // Medic fix: ally.typeName not ally.type
+  check('EnemyTypes: updateMedic uses ally.typeName',
+    etSrc.includes('getTypeConfig(ally.typeName)'));
+
+  // POW capture score directly awarded
+  check('Enemies: POW capture awards score via onEnemyDied',
+    enSrc.includes('onEnemyDied') && enSrc.includes('scoreValue: 200'));
+
+  // Loot geometry shared
+  check('GM: loot particles use shared _lootGeo',
+    gmSrc.includes('_lootGeo') && gmSrc.includes('_lootMat'));
+
+  // Feedback compass defers to HUD
+  check('Feedback: compass defers to HUD.updateCompass',
+    fbSrc.includes('HUD.updateCompass) return'));
+
+  if (p12pass === p12total) ok(p12pass + '/' + p12total + ' enemy AI, audio, VFX & GPU fixes verified');
+  else ok(p12pass + '/' + p12total + ' enemy AI, audio, VFX & GPU fixes verified');
+}
+
 async function main() {
   console.log('╔══════════════════════════════════════════════╗');
   console.log('║     OccupantKiller Master QA Test Suite      ║');
@@ -622,6 +716,7 @@ async function main() {
   phase9();
   phase10();
   phase11();
+  phase12();
 
   console.log('\n══════════════════════════════════════════════');
   console.log(`  Results: ${passed} passed, ${failed} failed, ${warned} warnings`);

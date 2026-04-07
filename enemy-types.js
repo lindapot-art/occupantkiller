@@ -454,7 +454,7 @@ const EnemyTypes = (function () {
       if (!ally || ally === enemy || !ally.alive) continue;
       const dx = ally.mesh.position.x - enemy.mesh.position.x, dz = ally.mesh.position.z - enemy.mesh.position.z;
       if (dx * dx + dz * dz < range * range) {
-        const cfg = getTypeConfig(ally.type) || { hp: 50 };
+        const cfg = getTypeConfig(ally.typeName) || { hp: 50 };
         if (ally.hp < cfg.hp) {
           return { heal: true, target: ally, amount: TYPES.MEDIC.healRate };
         }

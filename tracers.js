@@ -403,6 +403,7 @@ const Tracers = (() => {
     if (_bulletHoles.length > MAX_HOLES) {
       var old = _bulletHoles.shift();
       _scene.remove(old.mesh);
+      old.mesh.material.dispose();
     }
   }
   function updateBulletHoles(delta) {
@@ -412,6 +413,7 @@ const Tracers = (() => {
       if (h.life < 2) h.mesh.material.opacity = h.life / 2 * 0.7;
       if (h.life <= 0) {
         _scene.remove(h.mesh);
+        h.mesh.material.dispose();
         _bulletHoles.splice(i, 1);
       }
     }
@@ -563,6 +565,13 @@ const Tracers = (() => {
       _shockwaves.length = 0;
       _fireParticles.forEach(f => { if (_scene) _scene.remove(f.mesh); f.mesh.material.dispose(); });
       _fireParticles.length = 0;
+      // Clean casings, sparks, bullet holes (GPU leak fix)
+      casings.forEach(c => { if (_scene) _scene.remove(c.mesh); });
+      casings.length = 0;
+      sparks.forEach(s => { if (_scene) _scene.remove(s.mesh); s.mesh.material.dispose(); });
+      sparks.length = 0;
+      _bulletHoles.forEach(h => { if (_scene) _scene.remove(h.mesh); h.mesh.material.dispose(); });
+      _bulletHoles.length = 0;
     }
   };
 })();
