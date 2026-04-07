@@ -134,32 +134,8 @@ const Tracers = (() => {
     if (typeof CameraSystem !== 'undefined' && CameraSystem.shake) {
       CameraSystem.shake(radius * 0.06, 0.4);
     }
-    // Shockwave ring
-    var ringMat = new THREE.MeshBasicMaterial({
-      color: 0xffaa44, transparent: true, opacity: 0.6,
-      blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false,
-    });
-    var ring = new THREE.Mesh(_ringGeoShock, ringMat);
-    ring.position.copy(pos);
-    ring.rotation.x = -Math.PI / 2; // lay flat
-    _scene.add(ring);
-    var ringLife = 0.35;
-    var ringTarget = radius * 2.5;
-    var ringInt = setInterval(function() {
-      if (!ring || !ring.parent) { clearInterval(ringInt); return; }
-      ringLife -= 0.016;
-      var t = 1 - ringLife / 0.35;
-      ring.scale.setScalar(1 + t * ringTarget);
-      ring.material.opacity = 0.6 * (1 - t);
-      if (ringLife <= 0) {
-        _scene.remove(ring);
-        ringMat.dispose();
-        clearInterval(ringInt);
-        var idx = _activeIntervals.indexOf(ringInt);
-        if (idx !== -1) _activeIntervals.splice(idx, 1);
-      }
-    }, 16);
-    _activeIntervals.push(ringInt);
+    // Shockwave ring (render-loop driven, not setInterval)
+    spawnShockwave(pos, radius * 2.5, 0xffaa44);
   }
 
   /* ── Blood Splatter ─────────────────────────────────────────── */

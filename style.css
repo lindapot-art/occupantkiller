@@ -30,6 +30,7 @@ canvas {
   height: 100%;
   pointer-events: none;
   user-select: none;
+  z-index: 10;
 }
 
 #crosshair {
@@ -144,11 +145,12 @@ canvas {
   inset: 0;
   border-radius: 0;
   pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 60%, rgba(200,0,0,0.0) 100%);
-  transition: background 0.1s;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(200,0,0,0.55) 100%);
+  opacity: 0;
+  transition: opacity 0.1s;
 }
 #damage-vignette.hit {
-  background: radial-gradient(ellipse at center, transparent 40%, rgba(200,0,0,0.55) 100%);
+  opacity: 1;
 }
 
 /* Hit marker */
@@ -199,7 +201,7 @@ canvas {
   align-items: center;
   justify-content: center;
   background: rgba(0,0,0,0.82);
-  z-index: 10;
+  z-index: 300;
 }
 .overlay h1 {
   font-size: 52px;
@@ -217,10 +219,10 @@ canvas {
 .overlay .subtitle { font-size: 13px; color: #666; margin-top: 4px; }
 .overlay .stat { color: #ffcc00; font-size: 18px; margin: 4px 0; }
 
-#start-screen h1  { color: #ff4444; }
-#dead-screen h1   { color: #ff2222; }
-#wave-screen h1   { color: #ffaa00; }
-#win-screen h1    { color: #44ff88; }
+#overlay-start h1  { color: #ff4444; }
+#overlay-dead h1   { color: #ff2222; }
+#overlay-waveclear h1   { color: #ffaa00; }
+#overlay-win h1    { color: #44ff88; }
 
 .btn {
   margin-top: 24px;
@@ -257,7 +259,7 @@ canvas {
   text-align: center;
   pointer-events: none;
   display: none;
-  z-index: 5;
+  z-index: 50;
 }
 #wave-announce.visible { display: block; animation: fadeInOut 2s forwards; }
 #wave-announce h2 { font-size: 40px; color: #ffaa00; text-shadow: 0 0 20px #ffaa00; letter-spacing: 4px; }
@@ -320,8 +322,8 @@ canvas {
   animation: hitPopKill 0.3s ease-out forwards;
 }
 
-/* Pause screen title override */
-#pause-screen .btn:hover {
+/* Pause screen button styles */
+#overlay-pause .btn:hover {
   background: #fff;
   color: #000;
 }
@@ -577,7 +579,7 @@ canvas {
   border: 2px solid rgba(0,255,0,0.4);
   border-radius: 50%;
   background: rgba(0,0,0,0.6);
-  z-index: 5;
+  z-index: 20;
   pointer-events: none;
 }
 
@@ -587,7 +589,7 @@ canvas {
   top: 70px;
   right: 12px;
   width: 260px;
-  z-index: 5;
+  z-index: 20;
   pointer-events: none;
   display: flex;
   flex-direction: column;
@@ -617,7 +619,7 @@ canvas {
   height: 200px;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  z-index: 5;
+  z-index: 20;
 }
 .hit-arc {
   position: absolute;
