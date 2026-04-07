@@ -29,8 +29,14 @@ const GameManager = (function () {
   var _gmNewPos = new THREE.Vector3();
   var _waveStartTimer = null;
   var _hudSlowTimer = 0; // throttle slow HUD updates (dailies, bounties, prestige)
+  var _musicIntTimer = 0; // throttle music intensity calc
   var _buildMatHud = null; // cached DOM ref for build materials HUD
   var _buildMatList = null;
+  // Cached per-frame HUD indicator DOM refs
+  var _domLean = null, _domInspect = null, _domBayonet = null;
+  var _domHeatBar = null, _domOverheat = null, _domMaint = null;
+  var _domSwim = null, _domBreathContainer = null, _domBreathBar = null;
+  var _domMantle = null;
 
   /* ── Player State ────────────────────────────────────────────────── */
   const GOD_MODE_HP = 999999;
@@ -3102,8 +3108,10 @@ const GameManager = (function () {
         }
       }
 
-      // Dynamic music intensity based on nearby enemies
-      if (AudioSystem.setMusicIntensity && AudioSystem.isMusicPlaying()) {
+      // Dynamic music intensity based on nearby enemies (throttled to every 0.5s)
+      _musicIntTimer -= delta;
+      if (_musicIntTimer <= 0 && AudioSystem.setMusicIntensity && AudioSystem.isMusicPlaying()) {
+        _musicIntTimer = 0.5;
         var nearEnemies = 0;
         var allEn = Enemies.getAll();
         for (var mei = 0; mei < allEn.length; mei++) {
@@ -3295,16 +3303,16 @@ const GameManager = (function () {
         var combatResult = CombatExtras.update(delta);
 
         // Lean HUD indicator
-        var leanInd = document.getElementById('lean-indicator');
-        if (leanInd) leanInd.style.display = CombatExtras.isLeaning() ? 'block' : 'none';
+        if (!_domLean) _domLean = document.getElementById('lean-indicator');
+        if (_domLean) _domLean.style.display = CombatExtras.isLeaning() ? 'block' : 'none';
 
         // Inspect overlay
-        var inspInd = document.getElementById('inspect-overlay');
-        if (inspInd) inspInd.style.display = CombatExtras.isInspecting() ? 'block' : 'none';
+        if (!_domInspect) _domInspect = document.getElementById('inspect-overlay');
+        if (_domInspect) _domInspect.style.display = CombatExtras.isInspecting() ? 'block' : 'none';
 
         // Bayonet indicator
-        var bayInd = document.getElementById('bayonet-indicator');
-        if (bayInd) bayInd.style.display = CombatExtras.isBayonetCharging() ? 'block' : 'none';
+        if (!_domBayonet) _domBayonet = document.getElementById('bayonet-indicator');
+        if (_domBayonet) _domBayonet.style.display = CombatExtras.isBayonetCharging() ? 'block' : 'none';
 
         // Bayonet charge damage
         if (combatResult.bayonet && combatResult.bayonet.active) {
@@ -3322,15 +3330,15 @@ const GameManager = (function () {
 
         // Heat bar HUD
         if (combatResult.heat) {
-          var heatBar = document.getElementById('heat-bar');
-          if (heatBar) heatBar.style.width = (combatResult.heat.heat * 100) + '%';
-          var ovhInd = document.getElementById('overheat-indicator');
-          if (ovhInd) ovhInd.style.display = combatResult.heat.overheated ? 'block' : 'none';
+          if (!_domHeatBar) _domHeatBar = document.getElementById('heat-bar');
+          if (_domHeatBar) _domHeatBar.style.width = (combatResult.heat.heat * 100) + '%';
+          if (!_domOverheat) _domOverheat = document.getElementById('overheat-indicator');
+          if (_domOverheat) _domOverheat.style.display = combatResult.heat.overheated ? 'block' : 'none';
         }
 
         // Maintenance indicator
-        var maintInd = document.getElementById('maintenance-indicator');
-        if (maintInd) maintInd.style.display = CombatExtras.isMaintaining() ? 'block' : 'none';
+        if (!_domMaint) _domMaint = document.getElementById('maintenance-indicator');
+        if (_domMaint) _domMaint.style.display = CombatExtras.isMaintaining() ? 'block' : 'none';
 
         // Ammo type display
         if (CombatExtras.getAmmoType && HUD.updateAmmoType) {
@@ -3373,27 +3381,27 @@ const GameManager = (function () {
         );
         var inWater = blockUnderPlayer === 8; // WATER
         var swimResult = Traversal.updateSwimming(delta, inWater, player.stamina);
-        var swimInd = document.getElementById('swim-indicator');
-        var breathBar = document.getElementById('breath-bar-container');
+        if (!_domSwim) _domSwim = document.getElementById('swim-indicator');
+        if (!_domBreathContainer) _domBreathContainer = document.getElementById('breath-bar-container');
         if (swimResult && swimResult.active) {
-          if (swimInd) swimInd.style.display = 'block';
-          if (breathBar) {
-            breathBar.style.display = 'block';
-            var bBar = document.getElementById('breath-bar');
-            if (bBar) bBar.style.width = (swimResult.breath / 10 * 100) + '%';
+          if (_domSwim) _domSwim.style.display = 'block';
+          if (_domBreathContainer) {
+            _domBreathContainer.style.display = 'block';
+            if (!_domBreathBar) _domBreathBar = document.getElementById('breath-bar');
+            if (_domBreathBar) _domBreathBar.style.width = (swimResult.breath / 10 * 100) + '%';
           }
-          if (swimResult.drowning) {
+          if (swimResult.drowning && !player.godMode) {
             player.hp = Math.max(0, player.hp - swimResult.drownDmg);
             HUD.setHealth(player.hp, player.maxHp);
           }
         } else {
-          if (swimInd) swimInd.style.display = 'none';
-          if (breathBar) breathBar.style.display = 'none';
+          if (_domSwim) _domSwim.style.display = 'none';
+          if (_domBreathContainer) _domBreathContainer.style.display = 'none';
         }
 
         // Mantle indicator
-        var mantleInd = document.getElementById('mantle-indicator');
-        if (mantleInd) mantleInd.style.display = Traversal.isMantling() ? 'block' : 'none';
+        if (!_domMantle) _domMantle = document.getElementById('mantle-indicator');
+        if (_domMantle) _domMantle.style.display = Traversal.isMantling() ? 'block' : 'none';
 
         // ── B30: Grapple hook update ──
         if (Traversal.isGrappling && Traversal.isGrappling()) {
