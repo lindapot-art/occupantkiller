@@ -101,20 +101,24 @@ const puppeteer = require('puppeteer');
     if (roundState.state === 'waveClear' || roundState.state === 'stageClear') {
       console.log('>>> Transition detected: ' + roundState.state);
 
-      // Click the corresponding button
+      // Click the corresponding button via JS (more reliable in headless)
       if (roundState.state === 'waveClear') {
         try {
-          await page.click('#next-wave-btn');
-          console.log('  Clicked NEXT WAVE');
+          await page.evaluate(() => {
+            GameManager.hideOverlays();
+            GameManager.setState(GameManager.STATE.PLAYING);
+            GameManager.beginWave(GameManager.getCurrentWave() + 1);
+          });
+          console.log('  Advanced to NEXT WAVE');
         } catch (e) {
-          console.log('  Could not click next wave:', e.message);
+          console.log('  Could not advance wave:', e.message);
         }
       } else if (roundState.state === 'stageClear') {
         try {
-          await page.click('#next-stage-btn');
-          console.log('  Clicked NEXT STAGE');
+          await page.evaluate(() => { GameManager.nextStage(); });
+          console.log('  Advanced to NEXT STAGE');
         } catch (e) {
-          console.log('  Could not click next stage:', e.message);
+          console.log('  Could not advance stage:', e.message);
         }
       }
     }

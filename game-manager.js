@@ -29,6 +29,8 @@ const GameManager = (function () {
   var _gmNewPos = new THREE.Vector3();
   var _waveStartTimer = null;
   var _hudSlowTimer = 0; // throttle slow HUD updates (dailies, bounties, prestige)
+  var _buildMatHud = null; // cached DOM ref for build materials HUD
+  var _buildMatList = null;
 
   /* ── Player State ────────────────────────────────────────────────── */
   const GOD_MODE_HP = 999999;
@@ -2957,11 +2959,13 @@ const GameManager = (function () {
       MLSystem.trackPlayerPosition(player.position.x, player.position.z, delta);
       updatePlayer(delta);
 
-      // Bleed DOT
+      // Bleed DOT (skipped in god mode)
       if (player.bleeding && player.bleedTimer > 0) {
         player.bleedTimer -= delta;
-        player.hp = Math.max(1, player.hp - 3 * delta); // 3 HP/sec bleed
-        HUD.setHealth(player.hp, player.maxHp);
+        if (!player.godMode) {
+          player.hp = Math.max(1, player.hp - 3 * delta); // 3 HP/sec bleed
+          HUD.setHealth(player.hp, player.maxHp);
+        }
         if (player.bleedTimer <= 0) {
           player.bleeding = false;
           if (HUD.showBleed) HUD.showBleed(false);
@@ -2983,14 +2987,16 @@ const GameManager = (function () {
         }
       }
 
-      // Chornobyl Zone radiation damage (stage 7)
+      // Chornobyl Zone radiation damage (stage 7, skipped in god mode)
       if (STAGES[currentStage] && STAGES[currentStage].id === 7) {
         player._radTimer = (player._radTimer || 0) + delta;
         if (player._radTimer >= 3.0) {  // 2 HP every 3 seconds
           player._radTimer = 0;
-          player.hp = Math.max(1, player.hp - 2);
-          HUD.setHealth(player.hp, player.maxHp);
-          if (HUD.showDamageFlash) HUD.showDamageFlash(0x44ff00, 0.15); // green flash
+          if (!player.godMode) {
+            player.hp = Math.max(1, player.hp - 2);
+            HUD.setHealth(player.hp, player.maxHp);
+            if (HUD.showDamageFlash) HUD.showDamageFlash(0x44ff00, 0.15); // green flash
+          }
         }
         // Geiger tick sounds
         player._geigerTimer = (player._geigerTimer || 0) + delta;
@@ -3074,11 +3080,12 @@ const GameManager = (function () {
       if (HUD.showJam && Weapons.isJammed) HUD.showJam(Weapons.isJammed());
 
       // Build materials HUD (show when holding shovel)
-      var buildMatHud = document.getElementById('build-materials-hud');
-      if (buildMatHud) {
+      if (!_buildMatHud) _buildMatHud = document.getElementById('build-materials-hud');
+      if (_buildMatHud) {
         if (Weapons.getCurrentType() === 'MELEE') {
-          buildMatHud.style.display = 'block';
-          var matList = document.getElementById('build-mat-list');
+          _buildMatHud.style.display = 'block';
+          if (!_buildMatList) _buildMatList = document.getElementById('build-mat-list');
+          var matList = _buildMatList;
           if (matList) {
             var mats = player.buildMaterials;
             var eco = Economy.getResources();
@@ -3091,7 +3098,7 @@ const GameManager = (function () {
               '🧱 Brick: ' + (mats.brick || 0);
           }
         } else {
-          buildMatHud.style.display = 'none';
+          _buildMatHud.style.display = 'none';
         }
       }
 
