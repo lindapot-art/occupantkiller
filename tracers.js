@@ -20,6 +20,7 @@ const Tracers = (() => {
   // ── Pre-allocated tracer buffer ─────────────────────────
   const _tracerPositions = new Float32Array(6);
   const _tTmp = new THREE.Vector3();
+  const _tracerPool = [];  // recycled tracer line objects
 
   function init(scene) { _scene = scene; }
 
@@ -35,19 +36,34 @@ const Tracers = (() => {
     _tracerPositions[3] = origin.x + direction.x * len;
     _tracerPositions[4] = origin.y + direction.y * len;
     _tracerPositions[5] = origin.z + direction.z * len;
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(_tracerPositions), 3));
-    const mat = new THREE.LineBasicMaterial({
-      color: color, transparent: true, opacity: 0.8,
-      blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const line = new THREE.Line(geom, mat);
-    _scene.add(line);
+    // Reuse pooled tracer or create new one
+    var entry;
+    if (_tracerPool.length > 0) {
+      entry = _tracerPool.pop();
+      var posArr = entry.line.geometry.attributes.position.array;
+      posArr[0] = _tracerPositions[0]; posArr[1] = _tracerPositions[1]; posArr[2] = _tracerPositions[2];
+      posArr[3] = _tracerPositions[3]; posArr[4] = _tracerPositions[4]; posArr[5] = _tracerPositions[5];
+      entry.line.geometry.attributes.position.needsUpdate = true;
+      entry.line.material.color.set(color);
+      entry.line.material.opacity = 0.8;
+      entry.line.visible = true;
+      _scene.add(entry.line);
+    } else {
+      var geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(_tracerPositions), 3));
+      var mat = new THREE.LineBasicMaterial({
+        color: color, transparent: true, opacity: 0.8,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      entry = { line: new THREE.Line(geom, mat) };
+      _scene.add(entry.line);
+    }
     _tTmp.copy(direction);
-    tracers.push({
-      line: line, dir: _tTmp.clone(), speed: speed,
-      life: 0.15, maxLife: 0.15,
-    });
+    entry.dir = _tTmp.clone();
+    entry.speed = speed;
+    entry.life = 0.15;
+    entry.maxLife = 0.15;
+    tracers.push(entry);
   }
 
   function spawnSmoke(pos) {
@@ -181,8 +197,13 @@ const Tracers = (() => {
       t.line.material.opacity = Math.max(0, t.life / t.maxLife * 0.8);
       if (t.life <= 0) {
         _scene.remove(t.line);
-        t.line.geometry.dispose();
-        t.line.material.dispose();
+        t.line.visible = false;
+        if (_tracerPool.length < 50) {
+          _tracerPool.push(t);
+        } else {
+          t.line.geometry.dispose();
+          t.line.material.dispose();
+        }
         tracers.splice(i, 1);
       }
     }

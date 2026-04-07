@@ -563,16 +563,25 @@ const AudioSystem = (function () {
     osc.stop(now + 0.8);
   }
 
-  // ── Noise generator helper ──────────────────────────────
-  function createNoise(duration) {
-    var bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
-    var buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    var data = buffer.getChannelData(0);
-    for (var i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
+  // ── Noise generator helper (pooled buffers) ──────────────────
+  var _noisePool = {};
+  function _getNoiseBuffer(duration) {
+    // Round to nearest 0.01 to maximize cache hits
+    var key = Math.round(duration * 100);
+    if (!_noisePool[key]) {
+      var bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
+      var buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      var data = buffer.getChannelData(0);
+      for (var i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      _noisePool[key] = buffer;
     }
+    return _noisePool[key];
+  }
+  function createNoise(duration) {
     var source = ctx.createBufferSource();
-    source.buffer = buffer;
+    source.buffer = _getNoiseBuffer(duration);
     source.start();
     return source;
   }

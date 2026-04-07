@@ -249,6 +249,7 @@ const VehicleSystem = (function () {
     }
     CameraSystem.setVehicleTarget(v.mesh);
     if (typeof HUD !== 'undefined' && HUD.showVehicleHUD) HUD.showVehicleHUD(v);
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.startEngine) AudioSystem.startEngine();
     return true;
   }
 
@@ -288,6 +289,7 @@ const VehicleSystem = (function () {
       if (HUD.showVehicleHUD) HUD.showVehicleHUD(v);
       if (HUD.showHijackProgress) HUD.showHijackProgress(0);
     }
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.startEngine) AudioSystem.startEngine();
     return true;
   }
 

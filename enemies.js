@@ -1534,7 +1534,10 @@ const Enemies = (() => {
           }
         }
 
-        const stepDist = e.speed * delta * (e._staggerTimer > 0 ? 0 : 1);
+        var speedMult = 1;
+        if (e._officerBuffSpd) { speedMult *= e._officerBuffSpd; e._officerBuffSpd = 0; }
+        if (e._rallyBuff && !e._officerBuffDmg) { speedMult *= e._rallyBuff; } // rally also boosts speed
+        const stepDist = e.speed * speedMult * delta * (e._staggerTimer > 0 ? 0 : 1);
         const nextX = e.mesh.position.x + dir.x * stepDist * 2;
         const nextZ = e.mesh.position.z + dir.z * stepDist * 2;
         let blocked = false;
@@ -1685,7 +1688,10 @@ const Enemies = (() => {
               hitChance = Math.min(0.85, hitChance * 1.15);
             }
             if (Math.random() < hitChance) {
-              onPlayerHit(e.typeCfg.rangedDmg, e.mesh.position);
+              var eDmg = e.typeCfg.rangedDmg;
+              if (e._officerBuffDmg) { eDmg *= e._officerBuffDmg; e._officerBuffDmg = 0; }
+              if (e._rallyBuff) { eDmg *= e._rallyBuff; e._rallyBuff = 0; }
+              onPlayerHit(eDmg, e.mesh.position);
             }
             // Firing arm raise animation
             var eParts = e.mesh.userData.parts;
@@ -2202,7 +2208,8 @@ const Enemies = (() => {
 
     // Floating damage number + white flash on hit
     if (enemy.mesh) {
-      spawnDmgNumber(enemy.mesh.position, amount, !!isHeadshot);
+      // 3D damage numbers disabled — Feedback.spawnDamageNumber (CSS DOM) handles this
+      // spawnDmgNumber(enemy.mesh.position, amount, !!isHeadshot);
 
       // White flash on hit — start timer; update() resets colors
       if (enemy.mesh.userData && enemy.mesh.userData.parts) {
