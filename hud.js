@@ -533,11 +533,12 @@ const HUD = (() => {
   const interactEl = document.getElementById('interaction-prompt');
   let _interactTimer = null;
 
-  function showInteractionPrompt(text) {
+  function showInteractionPrompt(text, persist) {
     if (!interactEl) return;
     interactEl.textContent = text;
     interactEl.style.display = 'block';
     clearTimeout(_interactTimer);
+    if (persist) return;
     _interactTimer = setTimeout(function () {
       interactEl.style.display = 'none';
     }, 2000);

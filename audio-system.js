@@ -811,7 +811,7 @@ const AudioSystem = (function () {
   /* ── New Audio Features (B21) ──────────────────────────── */
 
   // Enemy bark / shout SFX
-  function playEnemyBark() {
+  function playEnemyBark(npcId, bark) {
     if (!enabled || !ctx) return;
     var osc = ctx.createOscillator();
     var g = ctx.createGain();

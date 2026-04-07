@@ -56,6 +56,15 @@ const server = http.createServer((req, res) => {
   }
   if (url === '/') url = '/index.html';
 
+  // Browsers may auto-request /favicon.ico; avoid noisy 404 console errors.
+  if (url === '/favicon.ico') {
+    res.writeHead(204, {
+      'Cache-Control': 'public, max-age=86400',
+      ...SECURITY_HEADERS,
+    });
+    return res.end();
+  }
+
   // Block null bytes (prevents ERR_INVALID_ARG_VALUE crash)
   if (url.indexOf('\0') !== -1) {
     res.writeHead(400, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });

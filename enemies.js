@@ -1458,7 +1458,20 @@ const Enemies = (() => {
       }
 
       // ── Movement toward target with obstacle avoidance + strategic flanking ──
-      if (moveTarget && targetDist > 1.0) {
+      // Enemies with ranged weapons hold position at firing distance instead of rushing
+      var engageDist = 1.0; // default: close to melee
+      if (e.playerSpotted && !targetIsNPC && e.typeCfg.rangedDmg > 0) {
+        // Ranged enemies stop at their preferred engagement distance
+        var typeName = e.typeCfg.name;
+        if (typeName === 'SNIPER' || typeName === 'HEAVY_SNIPER') engageDist = 25;
+        else if (typeName === 'MORTAR' || typeName === 'THERMOBARIC') engageDist = 20;
+        else if (typeName === 'SUPPORT' || typeName === 'PKM') engageDist = 15;
+        else engageDist = 8 + (e.id % 5) * 2; // regular troops: 8-16 range, staggered by ID
+        // Squad role modifiers
+        if (e.squadRole === SQUAD_ROLE.SUPPORT) engageDist = Math.max(engageDist, 14);
+        if (e.squadRole === SQUAD_ROLE.POINTMAN) engageDist = Math.min(engageDist, 5);
+      }
+      if (moveTarget && targetDist > engageDist) {
         const dir = _tmpVec3b.subVectors(moveTarget, e.mesh.position).setY(0).normalize();
 
         // ── AI Smart Learning: ML-guided flanking and tactical behavior ──
@@ -1571,6 +1584,22 @@ const Enemies = (() => {
           var eDist = e.mesh.position.distanceTo(playerPos);
           AudioSystem.playEnemyFootstep(eDist);
         }
+      } else if (e.playerSpotted && engageDist > 1 && targetDist <= engageDist) {
+        // At engage distance: strafe sideways while facing player
+        if (!e._strafeDir) e._strafeDir = (e.id % 2 === 0) ? 1 : -1;
+        e._strafeTimer = (e._strafeTimer || 0) + delta;
+        if (e._strafeTimer > 2 + Math.random()) { e._strafeDir *= -1; e._strafeTimer = 0; }
+        var sDir = _tmpVec3b.subVectors(playerPos, e.mesh.position).setY(0).normalize();
+        var strafe = _tmpVec3d.set(-sDir.z * e._strafeDir, 0, sDir.x * e._strafeDir);
+        var sStep = e.speed * 0.4 * delta;
+        e.mesh.position.addScaledVector(strafe, sStep);
+        e.mesh.lookAt(playerPos.x, e.mesh.position.y, playerPos.z);
+        // Subtle leg animation at half speed
+        e.legAngle += e.legDir * (e.speed / 4.4) * 4 * delta;
+        if (Math.abs(e.legAngle) > 0.3) e.legDir *= -1;
+      }
+      // Shared animation for both moving and strafing
+      {
         const parts = e.mesh.userData.parts;
         if (parts[3]) parts[3].rotation.x =  e.legAngle;
         if (parts[4]) parts[4].rotation.x = -e.legAngle;

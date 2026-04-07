@@ -2270,6 +2270,16 @@ const Weapons = (() => {
   function startInspect() { if (_inspectTimer <= 0 && !curState().reloading) _inspectTimer = INSPECT_DUR; }
   function getWeaponName(idx) { return WEAPONS[idx] ? WEAPONS[idx].name : ''; }
 
+  function refillAllAmmo() {
+    for (var i = 0; i < states.length; i++) {
+      var w = WEAPONS[i];
+      if (w && w.type !== 'MELEE') {
+        states[i].clip = w.clipSize;
+        states[i].reserve = w.maxReserve;
+      }
+    }
+  }
+
   // ── B24: Unlock next locked weapon ──
   function unlockNext() {
     for (var i = 0; i < WEAPONS.length; i++) {
@@ -2358,6 +2368,7 @@ const Weapons = (() => {
     switchNext,
     switchPrev,
     unlockWeapon,
+    refillAllAmmo,
     handleRightDown,
     handleRightUp,
     exitZoom,
@@ -2371,6 +2382,8 @@ const Weapons = (() => {
     getCurrentType: function () { return cur().type; },
     getCurrentId:   function () { return cur().id; },
     getCurrentName: function () { return cur().name; },
+    getCurrent:     function () { return cur(); },
+    getState:       function () { return curState(); },
     getWeaponName:  getWeaponName,
     getWeaponInfo:  function (i) {
       if (!WEAPONS[i]) return null;

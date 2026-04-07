@@ -461,7 +461,7 @@ function phase9() {
   // NPC cleanup
   const npcSrc = fs.readFileSync(path.join(ROOT, 'npc-system.js'), 'utf8');
   check('NPCSystem: killNPC deletes from _npcById',
-    npcSrc.includes('_npcById.delete'));
+    npcSrc.includes('delete _npcById[') || npcSrc.includes('_npcById.delete('));
   check('NPCSystem: killNPC nulls mesh',
     npcSrc.includes('npc.mesh = null'));
 

@@ -719,15 +719,8 @@ const GameManager = (function () {
     const spawnH = VoxelWorld.getTerrainHeight(0, 0);
     player.position.set(0, spawnH + player.height, 0);
 
-    // Spawn initial NPCs
-    for (let i = 0; i < 4; i++) {
-      const angle = (i / 4) * Math.PI * 2;
-      const dist = 5 + Math.random() * 5;
-      const nx = Math.cos(angle) * dist;
-      const nz = Math.sin(angle) * dist;
-      const nh = VoxelWorld.getTerrainHeight(nx, nz);
-      NPCSystem.spawn(nx, nh, nz, i < 2 ? 'civilian' : 'trainee');
-    }
+    // Spawn organized assault groups (4 squads of 4-5 armed NPCs)
+    NPCSystem.spawnAssaultGroups();
 
     // Spawn starter vehicle fleet on roads (road-level positions)
     var roadWPs = (VoxelWorld.getRoadWaypoints ? VoxelWorld.getRoadWaypoints() : []);
@@ -1589,14 +1582,10 @@ const GameManager = (function () {
     // Reset skills on new game (skills are designed to accrue per-run, not persist)
     if (typeof SkillSystem !== 'undefined' && SkillSystem.init) SkillSystem.init();
 
-    // Reset god mode effects on game start
+    // Preserve scalar god-mode effects across a new run.
     if (player.godMode) {
       player.maxHp = GOD_MODE_HP;
       player.hp = GOD_MODE_HP;
-      // Unlock all weapons in god mode
-      for (var i = 0; i < Weapons.getWeaponCount(); i++) {
-        Weapons.unlockWeapon(i);
-      }
       player.stealth = true;
     }
 
@@ -1627,6 +1616,12 @@ const GameManager = (function () {
     player.position.set(0, spawnH + player.height, 0);
 
     Weapons.reset();
+    if (player.godMode) {
+      for (var gi = 0; gi < Weapons.getWeaponCount(); gi++) {
+        Weapons.unlockWeapon(gi);
+      }
+      Weapons.refillAllAmmo();
+    }
     Enemies.clear();
     Pickups.clear();
     VehicleSystem.clear();
@@ -1637,6 +1632,9 @@ const GameManager = (function () {
     if (typeof StageVFX !== 'undefined' && StageVFX.clear) StageVFX.clear();
     if (typeof WeatherSystem !== 'undefined' && WeatherSystem.clear) WeatherSystem.clear();
     if (typeof WeatherSystem !== 'undefined' && WeatherSystem.init) WeatherSystem.init(_scene, _camera);
+
+    // Respawn organized assault groups for the real gameplay start path.
+    NPCSystem.spawnAssaultGroups();
 
     // Respawn vehicle fleet on roads for first stage
     var _rwps = (VoxelWorld.getRoadWaypoints ? VoxelWorld.getRoadWaypoints() : []);
@@ -1665,6 +1663,7 @@ const GameManager = (function () {
     HUD.setWave(0);
     HUD.setKills(0);
     HUD.setStage(STAGES[0].id, STAGES[0].name);
+    HUD.setWeapon(Weapons.getCurrentName(), Weapons.getCurrentIdx());
 
     // Delay pointer lock slightly so the button click doesn't interfere
     setTimeout(function () {
@@ -1767,6 +1766,8 @@ const GameManager = (function () {
         HUD.notifyPickup('WEAPON UNLOCKED: ' + Weapons.getWeaponName(rewards[ri]), '#ff8800');
       }
     }
+    // Refresh HUD weapon bar after stage unlocks
+    if (rewards.length > 0) HUD.setWeapon(Weapons.getCurrentName(), Weapons.getCurrentIdx());
 
     const stageDef = STAGES[currentStage];
     applyStage(currentStage);
@@ -1799,16 +1800,9 @@ const GameManager = (function () {
     if (typeof WeatherSystem !== 'undefined' && WeatherSystem.clear) WeatherSystem.clear();
     if (typeof WeatherSystem !== 'undefined' && WeatherSystem.init) WeatherSystem.init(_scene, _camera);
 
-    // Respawn NPCs on new terrain
+    // Respawn organized assault groups on new terrain
     NPCSystem.clear();
-    for (let i = 0; i < 4; i++) {
-      const angle = (i / 4) * Math.PI * 2;
-      const dist = 5 + Math.random() * 5;
-      const nx = Math.cos(angle) * dist;
-      const nz = Math.sin(angle) * dist;
-      const nh = VoxelWorld.getTerrainHeight(nx, nz);
-      NPCSystem.spawn(nx, nh, nz, i < 2 ? 'civilian' : 'trainee');
-    }
+    NPCSystem.spawnAssaultGroups();
 
     // Respawn vehicle fleet on roads
     var _nsWps = (VoxelWorld.getRoadWaypoints ? VoxelWorld.getRoadWaypoints() : []);
@@ -2089,6 +2083,30 @@ const GameManager = (function () {
     player.waveHits = 0;
     player.waveHeadshots = 0;
     player.waveDamageTaken = 0;
+
+    // ── Weapon unlock on wave clear: 1 new weapon per wave ──
+    var newWep = Weapons.unlockNext();
+    if (newWep >= 0) {
+      HUD.setWeapon(Weapons.getCurrentName(), Weapons.getCurrentIdx());
+    }
+
+    // ── NPC reinforcement: replace losses, keep force viable ──
+    if (typeof NPCSystem !== 'undefined') {
+      var aliveNPCs = NPCSystem.getCount();
+      if (aliveNPCs < 12) {
+        var reinforceCount = Math.min(3, 12 - aliveNPCs);
+        for (var ri = 0; ri < reinforceCount; ri++) {
+          var rAngle = Math.random() * Math.PI * 2;
+          var rDist = 6 + Math.random() * 8;
+          var rnx = player.position.x + Math.cos(rAngle) * rDist;
+          var rnz = player.position.z + Math.sin(rAngle) * rDist;
+          var rnh = VoxelWorld.getTerrainHeight(rnx, rnz);
+          var rRank = Math.random() < 0.3 ? 'veteran' : 'infantry';
+          NPCSystem.spawn(rnx, rnh, rnz, rRank);
+        }
+        HUD.notifyPickup('🔄 Reinforcements arrived! (+' + reinforceCount + ')', '#44ff88');
+      }
+    }
 
     // ── B27: Economy wave hooks ──
     if (typeof Economy !== 'undefined') {
@@ -3391,11 +3409,31 @@ const GameManager = (function () {
           var ledgeUp = Traversal.updateLedgeHang(delta);
           if (ledgeUp && ledgeUp.hanging) {
             player.velocity.y = 0;
+            player._ledgeTimer = (player._ledgeTimer || 0) + delta;
+            // Space = pull up onto ledge, Ctrl/C = drop down, auto-drop after 5s
+            if (keys['Space'] || touch.jumping) {
+              var pullPos = Traversal.pullUp();
+              if (pullPos) {
+                player.position.set(pullPos.x, pullPos.y, pullPos.z);
+                player.onGround = true;
+              }
+              touch.jumping = false;
+              player._ledgeTimer = 0;
+            } else if (keys['ControlLeft'] || keys['ControlRight'] || player._ledgeTimer > 5) {
+              Traversal.dropDown();
+              player.velocity.y = -2;
+              player._ledgeTimer = 0;
+            }
+            // Show ledge hang prompt
+            HUD.showInteractionPrompt('[SPACE] Pull Up  [CTRL] Drop', true);
           }
-        } else if (player.velocity.y < -2 && Traversal.checkLedgeGrab) {
-          Traversal.checkLedgeGrab(player.position, player.velocity, function (bx, by, bz) {
-            return VoxelWorld.getBlock(bx, by, bz);
-          });
+        } else {
+          if (player._ledgeTimer > 0) { player._ledgeTimer = 0; HUD.hideInteractionPrompt(); }
+          if (player.velocity.y < -2 && Traversal.checkLedgeGrab) {
+            Traversal.checkLedgeGrab(player.position, player.velocity, function (bx, by, bz) {
+              return VoxelWorld.getBlock(bx, by, bz);
+            });
+          }
         }
       }
 
@@ -3653,11 +3691,17 @@ const GameManager = (function () {
       // Sync stealth state to enemy detection system
       Enemies.setPlayerStealth(player.stealth);
 
-      // God mode: keep health maxed and stealth on
+      // God mode: keep health maxed, stealth on, ammo infinite
       if (player.godMode) {
         player.hp = player.maxHp;
         player.stealth = true;
         Enemies.setPlayerStealth(true);
+        // Refill current weapon ammo every frame
+        var gs = Weapons.getState ? Weapons.getState() : null;
+        if (gs && !gs.reloading) {
+          var gw = Weapons.getCurrent ? Weapons.getCurrent() : null;
+          if (gw && gw.type !== 'MELEE') { gs.clip = gw.clipSize; gs.reserve = gw.maxReserve; }
+        }
       }
     }
 
@@ -4010,6 +4054,10 @@ const GameManager = (function () {
       for (var i = 0; i < Weapons.getWeaponCount(); i++) {
         Weapons.unlockWeapon(i);
       }
+      // Refresh HUD weapon bar to show all unlocked slots
+      HUD.setWeapon(Weapons.getCurrentName(), Weapons.getCurrentIdx());
+      // Refill all ammo in god mode
+      Weapons.refillAllAmmo();
       // Set infinite health
       player.maxHp = GOD_MODE_HP;
       player.hp = GOD_MODE_HP;

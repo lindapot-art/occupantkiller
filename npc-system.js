@@ -715,8 +715,22 @@ const NPCSystem = (function () {
     // Civilians and unarmed NPCs cannot fight
     if (!npc.weapon) return;
 
-    const dist = target.dist;
     const enemy = target.enemy;
+    if (!enemy || !enemy.mesh) { npc.combatTarget = null; return; }
+
+    // Apply morale effects
+    var moraleFx = applyMoraleEffects(npc);
+    if (moraleFx.fleeing) {
+      // Fleeing NPC runs away from enemy
+      var awayFlee = _nTmp1.subVectors(npc.position, enemy.mesh.position).setY(0).normalize();
+      _nTmp2.copy(npc.position).addScaledVector(awayFlee, 10);
+      if (npc.target) npc.target.copy(_nTmp2);
+      else npc.target = _nTmp2.clone();
+      npc.combatTarget = null;
+      return;
+    }
+
+    const dist = target.dist;
     const wep = npc.weapon;
 
     if (dist > wep.range * 0.7) {
@@ -737,16 +751,26 @@ const NPCSystem = (function () {
       npc.combatCooldown -= delta;
       if (npc.combatCooldown <= 0) {
         npc.combatCooldown = Math.max(0.3, wep.fireRate - npc.skills.combat * 0.005);
-        // Weapon damage + skill bonus
-        const dmg = wep.damage + npc.skills.combat * 0.15;
+        // Weapon damage + skill bonus, morale accuracy modifier
+        var baseDmg = wep.damage + npc.skills.combat * 0.15;
+        var hitChance = moraleFx.accuracyMult * (0.5 + npc.skills.combat * 0.005);
+        var dmg = Math.random() < hitChance ? baseDmg : 0; // miss on low morale/skill
 
-        if (typeof Enemies !== 'undefined' && Enemies.damage) {
+        if (dmg > 0 && typeof Enemies !== 'undefined' && Enemies.damage) {
           const remaining = Enemies.damage(enemy, dmg);
           if (remaining <= 0) {
             npc.stress = Math.max(0, npc.stress - 5);
             npc.morale = Math.min(100, npc.morale + 5);
             npc.combatTarget = null;
           }
+        }
+
+        // NPC tracer VFX
+        if (typeof Tracers !== 'undefined' && Tracers.spawnTracer) {
+          var muzzlePos = _nTmp3.copy(npc.position);
+          muzzlePos.y += 0.8;
+          var tracerDir = _nTmp1.subVectors(enemy.mesh.position, muzzlePos).normalize();
+          Tracers.spawnTracer(muzzlePos, tracerDir, 0xffcc44, 100);
         }
 
         // Play NPC gunshot sound
@@ -898,16 +922,34 @@ const NPCSystem = (function () {
       improveSkill(npc);
     }
 
-    // Wander if idle — patrol toward battle areas, not random
+    // Wander if idle — follow player loosely, not wander to center
     if (npc.job === JOB.IDLE && !npc.target) {
-      // Move toward center where enemies likely are, with randomness
-      _nTmp1.set(-npc.position.x, 0, -npc.position.z).normalize();
-      _nTmp2.copy(npc.position).addScaledVector(_nTmp1, 3 + Math.random() * 8);
-      _nTmp2.x += (Math.random() - 0.5) * 8;
-      _nTmp2.z += (Math.random() - 0.5) * 8;
-      _nTmp2.y = 0;
-      if (npc.target) npc.target.copy(_nTmp2);
-      else npc.target = _nTmp2.clone();
+      // Follow player at a loose distance
+      var playerPos = (typeof GameManager !== 'undefined' && GameManager.getPlayer) ? GameManager.getPlayer().position : null;
+      if (playerPos) {
+        var pDist = npc.position.distanceTo(playerPos);
+        if (pDist > 10) {
+          // Move toward player, stop at ~6-8 units away
+          var followDist = 6 + (npc.id % 3) * 2; // stagger follow distance by NPC id
+          var followAngle = ((npc.id % 6) / 6) * Math.PI * 2; // spread around player
+          _nTmp2.set(
+            playerPos.x + Math.sin(followAngle) * followDist,
+            0,
+            playerPos.z + Math.cos(followAngle) * followDist
+          );
+          if (npc.target) npc.target.copy(_nTmp2);
+          else npc.target = _nTmp2.clone();
+        }
+      } else {
+        // Fallback: patrol toward center
+        _nTmp1.set(-npc.position.x, 0, -npc.position.z).normalize();
+        _nTmp2.copy(npc.position).addScaledVector(_nTmp1, 3 + Math.random() * 8);
+        _nTmp2.x += (Math.random() - 0.5) * 8;
+        _nTmp2.z += (Math.random() - 0.5) * 8;
+        _nTmp2.y = 0;
+        if (npc.target) npc.target.copy(_nTmp2);
+        else npc.target = _nTmp2.clone();
+      }
     }
   }
 
@@ -980,7 +1022,9 @@ const NPCSystem = (function () {
     }
 
     dir.normalize();
-    const move = dir.multiplyScalar(npc.speed * delta);
+    // Apply morale speed modifier
+    var moraleFx = applyMoraleEffects(npc);
+    const move = dir.multiplyScalar(npc.speed * moraleFx.speedMult * delta);
     npc.position.add(move);
 
     // Terrain follow
@@ -1037,7 +1081,7 @@ const NPCSystem = (function () {
   /* ── NPC Death ───────────────────────────────────────────────────── */
   function killNPC(npc) {
     npc.alive = false;
-    _npcById.delete(npc.id);
+    delete _npcById[npc.id];
     if (npc.mesh) {
       disposeMesh(npc.mesh);
       if (_scene) _scene.remove(npc.mesh);
