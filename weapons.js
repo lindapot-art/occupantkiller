@@ -1410,6 +1410,7 @@ const Weapons = (() => {
   // ── Muzzle flash ──────────────────────────────────────────
   let muzzleFlash = null;
   let muzzleTimer = 0;
+  let _muzzleLight = null;
 
   function createMuzzleFlash(scene, camera) {
     _scene = scene;
@@ -1425,6 +1426,12 @@ const Weapons = (() => {
     muzzleFlash = new THREE.Mesh(geo, mat);
     muzzleFlash.position.set(0.17, -0.11, -0.60);
     camera.add(muzzleFlash);
+
+    // Dynamic point light for muzzle flash illumination
+    _muzzleLight = new THREE.PointLight(0xff8833, 0, 8);
+    _muzzleLight.position.set(0, -0.05, -0.7);
+    camera.add(_muzzleLight);
+
     scene.add(camera);
   }
 
@@ -1433,6 +1440,8 @@ const Weapons = (() => {
     muzzleFlash.material.opacity = 1;
     muzzleFlash.rotation.z = Math.random() * Math.PI * 2;
     muzzleTimer = 0.06;
+    // Flash point light burst
+    if (_muzzleLight) _muzzleLight.intensity = 2.5;
     // Shell casing eject for hitscan/shotgun weapons
     if (_camera && typeof Tracers !== 'undefined' && Tracers.spawnCasing) {
       Tracers.spawnCasing(_camera);
@@ -2077,6 +2086,7 @@ const Weapons = (() => {
     if (muzzleTimer > 0) {
       muzzleTimer -= delta;
       if (muzzleFlash) muzzleFlash.material.opacity = Math.max(0, muzzleTimer / 0.06);
+      if (_muzzleLight) _muzzleLight.intensity = Math.max(0, (muzzleTimer / 0.06) * 2.5);
     }
 
     // Projectiles

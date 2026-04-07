@@ -413,6 +413,7 @@ const GameManager = (function () {
       bgColor:      0x4a5a3a,
       sunColor:     0xff8833,
       sunIntensity: 0.85,
+      exposure:     0.9,
       description:  'Stop the airborne assault at Hostomel Airport.',
     },
     {
@@ -425,6 +426,7 @@ const GameManager = (function () {
       bgColor:      0x3a3028,
       sunColor:     0xccccdd,
       sunIntensity: 0.7,
+      exposure:     0.8,
       description:  'Industrial ruins of Avdiivka. Defend the coking plant.',
     },
     {
@@ -437,6 +439,7 @@ const GameManager = (function () {
       bgColor:      0x2a2a2a,
       sunColor:     0xccccdd,
       sunIntensity: 0.65,
+      exposure:     0.7,
       description:  'Total destruction in Bakhmut. The city is a graveyard.',
     },
     {
@@ -449,6 +452,7 @@ const GameManager = (function () {
       bgColor:      0x4a5a3a,
       sunColor:     0xffcc55,
       sunIntensity: 0.9,
+      exposure:     0.9,
       description:  'Cross the Dnipro at Kherson. Liberate the bridgehead.',
     },
     {
@@ -461,6 +465,7 @@ const GameManager = (function () {
       bgColor:      0x1a1a20,
       sunColor:     0xff6622,
       sunIntensity: 0.5,
+      exposure:     0.65,
       description:  'Fight through the burning Azovstal steelworks. No retreat.',
     },
     {
@@ -473,6 +478,7 @@ const GameManager = (function () {
       bgColor:      0x5577aa,
       sunColor:     0xffddaa,
       sunIntensity: 0.95,
+      exposure:     0.9,
       description:  'Assault the Kerch Strait bridge. Cut off their supply line.',
     },
     {
@@ -485,6 +491,7 @@ const GameManager = (function () {
       bgColor:      0x3a3520,
       sunColor:     0xaacc44,
       sunIntensity: 0.55,
+      exposure:     0.75,
       description:  'The irradiated exclusion zone. Radiation adds periodic damage.',
     },
     {
@@ -497,6 +504,7 @@ const GameManager = (function () {
       bgColor:      0x222228,
       sunColor:     0xeeeeff,
       sunIntensity: 0.4,
+      exposure:     0.6,
       description:  'The final push to the Kremlin. End it here.',
     },
     {
@@ -509,6 +517,7 @@ const GameManager = (function () {
       bgColor:      0x3355aa,
       sunColor:     0xddccaa,
       sunIntensity: 0.85,
+      exposure:     0.85,
       description:  'Destroy the Black Sea Fleet at Sevastopol. Sink them all.',
     },
     {
@@ -521,6 +530,7 @@ const GameManager = (function () {
       bgColor:      0x2a2020,
       sunColor:     0xdd6633,
       sunIntensity: 0.6,
+      exposure:     0.7,
       description:  'Liberate the last occupied stronghold in Donbas.',
     },
     {
@@ -533,6 +543,7 @@ const GameManager = (function () {
       bgColor:      0x3a4a2a,
       sunColor:     0xffaa44,
       sunIntensity: 0.75,
+      exposure:     0.85,
       description:  'Cross into enemy territory. Take the fight to them.',
     },
     {
@@ -545,11 +556,17 @@ const GameManager = (function () {
       bgColor:      0x111118,
       sunColor:     0xff3322,
       sunIntensity: 0.3,
+      exposure:     0.5,
       description:  'The ultimate battle for peace. Storm the Kremlin. End the war.',
     },
   ];
 
   let currentStage = 0;  // 0-based index into STAGES
+
+  /* ── FOV Kick State (sprint widens, ADS narrows) ─────────────── */
+  const _baseFOV = 75;
+  var _currentFOV = 75;
+  var _targetFOV = 75;
 
   /* ── Physics Constants ───────────────────────────────────────────── */
   const MOVE_SPEED   = 6.0;
@@ -595,6 +612,8 @@ const GameManager = (function () {
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     _renderer.shadowMap.enabled = true;
     _renderer.shadowMap.type = THREE.PCFShadowMap;
+    _renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    _renderer.toneMappingExposure = 0.85;
     document.getElementById('game-container').appendChild(_renderer.domElement);
 
     // Create scene — Ukrainian theme (golden sky)
@@ -1732,6 +1751,9 @@ const GameManager = (function () {
       sunLight.intensity = stageDef.sunIntensity;
     }
 
+    // Update tone mapping exposure per stage
+    if (_renderer) _renderer.toneMappingExposure = stageDef.exposure || 0.85;
+
     // Start stage-specific ambient sound loop
     if (typeof AudioSystem !== 'undefined' && AudioSystem.startAmbientLoop) {
       AudioSystem.startAmbientLoop(stageDef.theme);
@@ -2041,6 +2063,9 @@ const GameManager = (function () {
     MLSystem.onWaveComplete(currentWave, currentStage, player.hp / player.maxHp);
     RankSystem.onWaveComplete(currentWave);
     MissionSystem.onWaveCompleted();
+
+    // Slow-mo on wave clear (dramatic final-kill moment)
+    if (typeof Feedback !== 'undefined' && Feedback.triggerSlowMo) Feedback.triggerSlowMo(0.4, 0.2);
 
     // Show wave stats (Feature 50)
     if (HUD.showWaveStats) {
@@ -2681,6 +2706,11 @@ const GameManager = (function () {
         else Feedback.triggerHitStop(1);
       }
 
+      // ── Slow-mo on triple+ multikill ──
+      if (player.multikillCount >= 3 && typeof Feedback !== 'undefined' && Feedback.triggerSlowMo) {
+        Feedback.triggerSlowMo(0.25, 0.3);
+      }
+
       // ── B22: Boss bar update ──
       if (enemy.type === 'BOSS') {
         if (HUD.hideBossBar) HUD.hideBossBar();
@@ -3004,6 +3034,36 @@ const GameManager = (function () {
       document.getElementById('dead-score').textContent = player.score;
       document.getElementById('dead-kills').textContent = player.kills;
       document.getElementById('dead-wave').textContent = currentWave;
+
+      // ── Death Screen: Letter Grade + Personal Best ──
+      var gradeScore = 0;
+      gradeScore += Math.min(player.kills * 2, 40); // kills: max 40 pts
+      var acc = player.totalShots > 0 ? (player.totalHits / player.totalShots) : 0;
+      gradeScore += Math.min(Math.round(acc * 30), 30); // accuracy: max 30 pts
+      gradeScore += Math.min(currentWave * 3, 30); // wave survival: max 30 pts
+      var grades = [{min:90,g:'S',c:'#ffd700'},{min:75,g:'A',c:'#44ff88'},{min:55,g:'B',c:'#4488ff'},{min:35,g:'C',c:'#ffaa44'},{min:0,g:'D',c:'#ff4444'}];
+      var letterGrade = grades[grades.length - 1];
+      for (var gi = 0; gi < grades.length; gi++) { if (gradeScore >= grades[gi].min) { letterGrade = grades[gi]; break; } }
+      var gradeEl = document.getElementById('dead-grade');
+      if (gradeEl) {
+        gradeEl.textContent = letterGrade.g;
+        gradeEl.style.color = letterGrade.c;
+      }
+      // Personal best tracking
+      var pbEl = document.getElementById('dead-pb');
+      if (pbEl) {
+        try {
+          var bestKills = parseInt(localStorage.getItem('ok_best_kills') || '0', 10);
+          var bestWave  = parseInt(localStorage.getItem('ok_best_wave') || '0', 10);
+          var bestScore = parseInt(localStorage.getItem('ok_best_score') || '0', 10);
+          var pbLines = [];
+          if (player.kills > bestKills) { localStorage.setItem('ok_best_kills', String(player.kills)); pbLines.push('\u2B06 NEW BEST KILLS: ' + player.kills + ' (prev ' + bestKills + ')'); }
+          if (currentWave > bestWave)   { localStorage.setItem('ok_best_wave', String(currentWave)); pbLines.push('\u2B06 NEW BEST WAVE: ' + currentWave + ' (prev ' + bestWave + ')'); }
+          if (player.score > bestScore) { localStorage.setItem('ok_best_score', String(player.score)); pbLines.push('\u2B06 NEW BEST SCORE: ' + player.score + ' (prev ' + bestScore + ')'); }
+          if (pbLines.length === 0) pbLines.push('BEST: ' + bestKills + ' kills \u2022 wave ' + bestWave + ' \u2022 ' + bestScore + ' pts');
+          pbEl.innerHTML = pbLines.join('<br>');
+        } catch (e) { pbEl.textContent = ''; }
+      }
       // Death statistics (Feature 43)
       if (HUD.showDeathStats) {
         var playTime = Math.floor((performance.now() - player.playStartTime) / 1000);
@@ -3037,6 +3097,9 @@ const GameManager = (function () {
     // Hitstop: update timer with real time, zero delta while frozen
     if (typeof Feedback !== 'undefined' && Feedback.updateHitStop) Feedback.updateHitStop(rawDelta);
     var delta = (typeof Feedback !== 'undefined' && Feedback.isHitStopped && Feedback.isHitStopped()) ? 0 : rawDelta;
+
+    // Slow-mo: scale delta by slow-mo rate (triggered on multikills / wave clears)
+    if (typeof Feedback !== 'undefined' && Feedback.getSlowMoRate) delta *= Feedback.getSlowMoRate();
 
     // Adaptive quality: measure FPS, reduce quality if below 30
     _fpsAccum += delta;
@@ -3244,6 +3307,18 @@ const GameManager = (function () {
       // Hold breath: Shift while zoomed and not moving steadies scope
       if (Weapons.setHoldBreath) Weapons.setHoldBreath(Weapons.isZoomed() && keys['ShiftLeft'] && player.velocity.length() < 0.5);
       Weapons.update(delta);
+
+      // ── FOV kick: sprint widens (+5), ADS narrows (weapons handles its own) ──
+      if (!Weapons.isZoomed()) {
+        _targetFOV = _baseFOV + (player.sprinting ? 5 : 0);
+        _currentFOV += (_targetFOV - _currentFOV) * Math.min(1, delta * 10);
+        _camera.fov = _currentFOV;
+        _camera.updateProjectionMatrix();
+      } else {
+        // While zoomed, let weapons.js handle FOV, but track for smooth unzoom
+        _currentFOV = _camera.fov;
+      }
+
       Enemies.update(delta, player.position, onPlayerHit, function (waveDone) {
         if (waveDone) onWaveComplete();
       });
