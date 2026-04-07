@@ -1486,6 +1486,20 @@ const Weapons = (() => {
   const RECOIL_RECOVERY_DELAY = 0.12;
   const RECOIL_RECOVERY_RATE = 4;
 
+  // ── Viewmodel inertia (mouse-look lag) ────────────────────
+  let _prevYaw = 0;
+  let _prevPitch = 0;
+  let _inertiaX = 0;  // horizontal lag offset
+  let _inertiaY = 0;  // vertical lag offset
+  const INERTIA_MAX = 0.06;
+  const INERTIA_WEIGHT = { PISTOL: 0.75, SMG: 0.7, ASSAULT: 0.6, NATO: 0.6, SILENT: 0.65,
+    SHOTGUN: 0.55, SNIPER: 0.45, AMR: 0.4, LMG: 0.35, HMG: 0.3, MACHINEGUN: 0.35,
+    MINIGUN: 0.25, AT: 0.35, ATGM: 0.35, MELEE: 0.85, GRENADE: 0.8 };
+
+  // ── Viewmodel fire kick rotation ──────────────────────────
+  let _fireKickRot = 0;   // upward barrel kick (radians)
+  let _fireKickZ = 0;     // backward snap offset
+
   function applyLandingBob(intensity) {
     recoilOffsetY = -0.04 * intensity;
     recoilOffsetZ = -0.02 * intensity;
@@ -1509,6 +1523,9 @@ const Weapons = (() => {
     const intensity = Math.min(1, (w.recoilY || 0) / 0.04);
     recoilOffsetZ = -0.02 - intensity * 0.04;
     recoilOffsetY = 0.01 + intensity * 0.02;
+    // Viewmodel fire kick: barrel snaps up + backward
+    _fireKickRot += (w.recoilY || 0.01) * 12;
+    _fireKickZ -= intensity * 0.02;
   }
 
   // ── Weapon switching ──────────────────────────────────────
@@ -2207,10 +2224,33 @@ const Weapons = (() => {
       _sprintLowerRotX += (sprintTargRotX - _sprintLowerRotX) * sprintLerp;
       _sprintLowerZ += (sprintTargZ - _sprintLowerZ) * sprintLerp;
 
-      mesh.position.x = swayX;
-      mesh.position.z = recoilOffsetZ + recoilOffset + _sprintLowerZ;
-      mesh.position.y = recoilOffsetY + switchY + swayY + _sprintLowerY;
-      mesh.rotation.x = reloadAnimAngle + _sprintLowerRotX;
+      // Viewmodel inertia: weapon lags behind camera rotation
+      if (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) {
+        var curYaw = CameraSystem.getYaw();
+        var curPitch = CameraSystem.getPitch();
+        var dY = curYaw - _prevYaw;
+        var dP = curPitch - _prevPitch;
+        _prevYaw = curYaw;
+        _prevPitch = curPitch;
+        var wType = cur().type;
+        var follow = INERTIA_WEIGHT[wType] || 0.6;
+        var inertiaLerp = 1 - Math.pow(1 - follow, delta * 60);
+        _inertiaX += dY * 0.4;
+        _inertiaY += dP * 0.3;
+        _inertiaX *= (1 - inertiaLerp);
+        _inertiaY *= (1 - inertiaLerp);
+        _inertiaX = Math.max(-INERTIA_MAX, Math.min(INERTIA_MAX, _inertiaX));
+        _inertiaY = Math.max(-INERTIA_MAX, Math.min(INERTIA_MAX, _inertiaY));
+      }
+
+      // Fire kick decay
+      _fireKickRot *= (1 - Math.min(1, delta * 15));
+      _fireKickZ *= (1 - Math.min(1, delta * 12));
+
+      mesh.position.x = swayX + _inertiaX;
+      mesh.position.z = recoilOffsetZ + recoilOffset + _sprintLowerZ + _fireKickZ;
+      mesh.position.y = recoilOffsetY + switchY + swayY + _sprintLowerY + _inertiaY;
+      mesh.rotation.x = reloadAnimAngle + _sprintLowerRotX - _fireKickRot;
     }
 
     // Weapon inspect animation

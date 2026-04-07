@@ -86,7 +86,7 @@ const server = http.createServer((req, res) => {
       /^node_modules(\/|$)/.test(rel) ||
       rel === 'server.js' || rel === 'package.json' || rel === 'package-lock.json' ||
       rel === 'wrangler.toml' || rel === 'render.yaml' || rel === '.env' ||
-      rel === 'start.bat' || rel === 'automation.js') {
+      rel === 'start.bat') {
     res.writeHead(403, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });
     return res.end('Forbidden');
   }

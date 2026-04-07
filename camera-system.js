@@ -53,6 +53,10 @@ const CameraSystem = (function () {
   let shakeOffsetX   = 0;
   let shakeOffsetY   = 0;
 
+  /* ── Strafe Camera Roll ─────────────────────────────────────────── */
+  let _strafeTilt = 0;   // current roll in radians
+  let _strafeDir  = 0;   // -1/0/1 from game manager
+
   /* ── Reusable temp objects (avoid per-frame allocation) ──────────── */
   const _tmpEuler = new THREE.Euler(0, 0, 0, 'YXZ');
   const _tmpVec3a = new THREE.Vector3();
@@ -202,6 +206,10 @@ const CameraSystem = (function () {
       yaw + shakeOffsetX * 0.5,
       0, 'YXZ'
     );
+    // Strafe camera roll
+    var strafeTarg = _strafeDir * 0.035;
+    _strafeTilt += (strafeTarg - _strafeTilt) * Math.min(1, delta * 8);
+    euler.z = _strafeTilt;
     _camera.quaternion.setFromEuler(euler);
   }
 
@@ -342,6 +350,8 @@ const CameraSystem = (function () {
 
   function isKillCamActive() { return _killCamActive; }
 
+  function setStrafeDir(dir) { _strafeDir = dir; }
+
   return {
     MODE,
     init,
@@ -365,5 +375,6 @@ const CameraSystem = (function () {
     playLastKillCam,
     updateKillCam,
     isKillCamActive,
+    setStrafeDir,
   };
 })();

@@ -4,12 +4,13 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-07 — Session 17: Core Gunplay Feel (Batch 4)
+- **Timestamp**: 2026-04-08 — Session 18: Batch 6 complete
 - **Agent**: KING
-- **Status**: COMPLETE — Commit debf5e7 pushed to origin/main
+- **Status**: COMPLETE — Commit f8317d1 pushed to origin/main
 
 ## Current Task
-- DONE: Batch 4 shipped — enemy flinch, recoil recovery, landing impact, kill momentum
+- DONE: Batch 6 shipped — surface impacts, explosive barrels, kill cam, ambient props, server security blocklist
+- NEXT: Batch 7 — Mr. Jopa audit then implement
 
 ## Steps Completed This Session
 1. [x] Investigated user-reported issues: ledge hang trap, missing weapons/god mode visibility, chaotic enemy rush behavior, weak NPC presence

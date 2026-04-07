@@ -2357,6 +2357,12 @@ const GameManager = (function () {
     if (keys['KeyA'] || keys['ArrowLeft'])  moveDir.sub(right);
     if (keys['KeyD'] || keys['ArrowRight']) moveDir.add(right);
 
+    // Strafe direction for camera roll
+    var _sDir = 0;
+    if (keys['KeyA'] || keys['ArrowLeft']) _sDir -= 1;
+    if (keys['KeyD'] || keys['ArrowRight']) _sDir += 1;
+    if (CameraSystem.setStrafeDir) CameraSystem.setStrafeDir(_sDir);
+
     // Touch joystick movement (additive)
     if (isMobile && touch.moveActive) {
       moveDir.addScaledVector(forward, -touch.moveY);
@@ -2648,7 +2654,8 @@ const GameManager = (function () {
     }
     const dmg = isHeadshot ? baseDmg * 2 : baseDmg;
 
-    const remaining = Enemies.damage(enemy, dmg, isHeadshot);
+    var _wepType = (typeof Weapons !== 'undefined' && Weapons.getCurrent) ? Weapons.getCurrent().type : '';
+    const remaining = Enemies.damage(enemy, dmg, isHeadshot, _wepType);
 
     // Floating damage number on hit (not just kill)
     if (typeof Feedback !== 'undefined') {

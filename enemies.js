@@ -2387,7 +2387,7 @@ const Enemies = (() => {
   function setPlayerStealth(val) { _playerStealth = !!val; }
 
   // ── Apply damage, return remaining HP ─────────────────────
-  function damage(enemy, amount, isHeadshot) {
+  function damage(enemy, amount, isHeadshot, weaponType) {
     if (!enemy.alive) return 0;
 
     // Shield bearer: route damage through EnemyTypes shield check
@@ -2494,14 +2494,34 @@ const Enemies = (() => {
         else if (t === 'BOSS') kbForce = 0.5;
       }
       if (isHeadshot) { kbForce *= 1.4; enemy._deathPopY = 2.5; }
-      if (_playerPos) {
+      // Weapon-type death variations
+      var wt = weaponType || '';
+      if (wt === 'SHOTGUN') {
+        kbForce *= 3; enemy._deathPopY *= 2.5;
+        enemy._deathSpinY = (Math.random() - 0.5) * 8;
+        enemy._deathTiltX *= 2;
+      } else if (wt === 'SNIPER' || wt === 'AMR') {
+        enemy._deathTiltX *= 2;
+        enemy._deathPopY = 0.5;
+        kbForce *= 1.8;
+      } else if (wt === 'AT' || wt === 'ATGM' || wt === 'THERMOBARIC' || wt === 'EXPLOSIVE' || wt === 'INCENDIARY') {
+        kbForce *= 2.5; enemy._deathPopY *= 4;
+        enemy._deathSpinY = (Math.random() - 0.5) * 10;
+        enemy._deathTiltX = (Math.random() - 0.5) * 3;
+      } else if (wt === 'MELEE') {
+        kbForce = 0.5; enemy._deathPopY = 0;
+        enemy._deathTiltX = 1.8; // crumple forward
+      }
+      if (_playerPos && enemy.mesh) {
         var dx = enemy.mesh.position.x - _playerPos.x;
         var dz = enemy.mesh.position.z - _playerPos.z;
         var dist = Math.sqrt(dx * dx + dz * dz) || 1;
         enemy._deathVelX = (dx / dist) * kbForce;
         enemy._deathVelZ = (dz / dist) * kbForce;
-        // Spin in knockback direction
-        enemy._deathSpinY = (Math.random() - 0.5) * 3;
+        // Spin in knockback direction (only if weapon didn't set a specific spin)
+        if (enemy._deathSpinY === undefined) {
+          enemy._deathSpinY = (Math.random() - 0.5) * 3;
+        }
       } else {
         enemy._deathVelX = 0;
         enemy._deathVelZ = 0;
