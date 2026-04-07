@@ -769,6 +769,150 @@ const EnemyTypes = (function () {
     return result.buffing || result.reinforce ? result : null;
   }
 
+  /* ── B19 update functions: 6 new enemy types ── */
+
+  function updateHeavySniper(enemy, playerPos, dt) {
+    if (!enemy.alive) return null;
+    var cfg = TYPES.HEAVY_SNIPER;
+    var dx = playerPos.x - enemy.x, dz = playerPos.z - enemy.z;
+    var dist = Math.sqrt(dx * dx + dz * dz);
+    // Relocating after shot
+    if (enemy._relocating) {
+      enemy._relocateTimer = (enemy._relocateTimer || 0) + dt;
+      if (enemy._relocateTimer >= 2) {
+        enemy._relocating = false;
+        enemy._relocateTimer = 0;
+      }
+      return { relocating: true };
+    }
+    // Aim charge-up
+    enemy._aimTimer = (enemy._aimTimer || 0) + dt;
+    if (enemy._aimTimer < cfg.aimTime) {
+      return { aiming: true, aimProgress: enemy._aimTimer / cfg.aimTime };
+    }
+    // Fire
+    enemy._aimTimer = 0;
+    enemy._shotCount = (enemy._shotCount || 0) + 1;
+    if (enemy._shotCount >= cfg.relocateAfterShots) {
+      enemy._shotCount = 0;
+      enemy._relocating = true;
+      enemy.x += (Math.random() - 0.5) * 20;
+      enemy.z += (Math.random() - 0.5) * 20;
+    }
+    return { fire: true, damage: cfg.damage, penetration: cfg.penetration };
+  }
+
+  function updateCommissar(enemy, allEnemies, dt) {
+    if (!enemy.alive) return null;
+    var cfg = TYPES.COMMISSAR;
+    var range = cfg.fearRadius;
+    var buffed = 0, executed = false;
+    for (var i = 0; i < allEnemies.length; i++) {
+      var ally = allEnemies[i];
+      if (!ally || ally === enemy || !ally.alive) continue;
+      var dx = ally.mesh.position.x - enemy.mesh.position.x;
+      var dz = ally.mesh.position.z - enemy.mesh.position.z;
+      if (dx * dx + dz * dz > range * range) continue;
+      // Prevent retreat and buff morale
+      ally._noRetreat = true;
+      ally._moraleBuff = cfg.moraleBuff;
+      buffed++;
+      // Execute deserters
+      if (ally._retreating) {
+        ally.hp = 0;
+        ally.alive = false;
+        executed = true;
+      }
+    }
+    if (executed) return { executed: true };
+    return buffed > 0 ? { commanding: true, buffed: buffed } : null;
+  }
+
+  function updateThermobaric(enemy, playerPos, dt) {
+    if (!enemy.alive) return null;
+    var cfg = TYPES.THERMOBARIC;
+    // Setup phase
+    enemy._setupTimer = (enemy._setupTimer || 0) + dt;
+    if (enemy._setupTimer < cfg.setupTime) {
+      return { settingUp: true, progress: enemy._setupTimer / cfg.setupTime };
+    }
+    // Fire timer
+    enemy._fireTimer = (enemy._fireTimer || 0) + dt;
+    if (enemy._fireTimer >= cfg.thermobaricInterval) {
+      enemy._fireTimer = 0;
+      return {
+        fire: true, damage: cfg.thermobaricDamage, radius: cfg.thermobaricRadius,
+        targetX: playerPos.x + (Math.random() - 0.5) * 4,
+        targetZ: playerPos.z + (Math.random() - 0.5) * 4,
+        burn: { duration: cfg.burnDuration, dps: cfg.burnDPS }
+      };
+    }
+    return null;
+  }
+
+  function updateEWOperator(enemy, playerPos, dt) {
+    if (!enemy.alive) return null;
+    var cfg = TYPES.EW_OPERATOR;
+    var dx = playerPos.x - enemy.x, dz = playerPos.z - enemy.z;
+    var dist = Math.sqrt(dx * dx + dz * dz);
+    // Run away if player too close
+    if (dist < 12) {
+      var nx = -dx / dist, nz = -dz / dist;
+      enemy.x += nx * cfg.speed * dt * 2;
+      enemy.z += nz * cfg.speed * dt * 2;
+      return { fleeing: true };
+    }
+    // Jam if in range
+    if (dist < cfg.jamRadius) {
+      return { jamming: true, disablesMinimap: cfg.disablesMinimap, disablesCompass: cfg.disablesCompass };
+    }
+    return null;
+  }
+
+  function updateAssaultMech(enemy, playerPos, dt) {
+    if (!enemy.alive) return null;
+    var cfg = TYPES.ASSAULT_MECH;
+    var dx = playerPos.x - enemy.x, dz = playerPos.z - enemy.z;
+    var dist = Math.sqrt(dx * dx + dz * dz);
+    var result = {};
+    // Shield regen
+    enemy._shieldHP = (enemy._shieldHP !== undefined) ? enemy._shieldHP : cfg.shieldHP;
+    if (enemy._shieldHP < cfg.shieldHP) {
+      enemy._shieldHP = Math.min(cfg.shieldHP, enemy._shieldHP + cfg.shieldRegenRate * dt);
+    }
+    result.shieldActive = enemy._shieldHP > 0;
+    result.shieldHP = enemy._shieldHP;
+    // Rotate toward player
+    enemy.rotation = Math.atan2(dx, dz);
+    // MG fire
+    enemy._mgTimer = (enemy._mgTimer || 0) + dt;
+    if (dist < cfg.attackRange && enemy._mgTimer >= cfg.mgRate) {
+      enemy._mgTimer = 0;
+      result.mg = true;
+      result.mgDamage = cfg.mgDamage;
+    }
+    // Rocket salvo
+    enemy._rocketTimer = (enemy._rocketTimer || 0) + dt;
+    if (dist < cfg.attackRange && enemy._rocketTimer >= cfg.rocketInterval) {
+      enemy._rocketTimer = 0;
+      result.rockets = true;
+      result.rocketDamage = cfg.rocketSalvoDmg;
+      result.count = cfg.rocketSalvoCount;
+    }
+    return (result.mg || result.rockets || result.shieldActive) ? result : null;
+  }
+
+  function updateSwarmOp(enemy, playerPos, dt) {
+    if (!enemy.alive) return null;
+    var cfg = TYPES.SWARM_OP;
+    enemy._swarmTimer = (enemy._swarmTimer || 0) + dt;
+    if (enemy._swarmTimer >= cfg.swarmInterval) {
+      enemy._swarmTimer = 0;
+      return { launchSwarm: true, count: cfg.swarmSize, droneDamage: cfg.droneDamage, droneSpeed: cfg.droneSpeed };
+    }
+    return null;
+  }
+
   /* ── Tank armor damage reduction ──────────── */
   function applyTankArmor(enemy, damage, fromAngle) {
     if (enemy.type !== 'TANK') return damage;
@@ -792,6 +936,8 @@ const EnemyTypes = (function () {
     updateFlamethrower, updateParatroop, updateTank, updateDroneOp,
     updateSpetsnaz, updateKadyrovite, updateWagner, updateBTR,
     updateKamikazeDrone, updateOfficer,
+    updateHeavySniper, updateCommissar, updateThermobaric,
+    updateEWOperator, updateAssaultMech, updateSwarmOp,
     applyDamage, applyTankArmor, getBossHP,
     getBossForStage, getStageBossHP
   };

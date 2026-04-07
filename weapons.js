@@ -13,14 +13,15 @@ const Weapons = (() => {
       spread: 0, auto: true, type: 'MELEE', recoilY: 0, recoilX: 0,
     },
     {
-      id: 'MAKAROV', name: 'Makarov PM', damage: 15,
-      fireRate: 0.15, clipSize: 8, maxReserve: 40, reloadTime: 1.5,
-      spread: 0.03, auto: false, type: 'PISTOL', recoilY: 0.008, recoilX: 0.003,
+      id: 'MAKAROV', name: 'Makarov PM', damage: 18,
+      fireRate: 0.12, clipSize: 8, maxReserve: 48, reloadTime: 1.0,
+      spread: 0.02, auto: false, type: 'PISTOL', recoilY: 0.006, recoilX: 0.002,
+      quickDraw: true,
     },
     {
-      id: 'AK74', name: 'AK-74M', damage: 28,
-      fireRate: 0.10, clipSize: 30, maxReserve: 120, reloadTime: 2.2,
-      spread: 0.022, auto: true, type: 'ASSAULT', recoilY: 0.015, recoilX: 0.006,
+      id: 'AK74', name: 'AK-74M', damage: 30,
+      fireRate: 0.095, clipSize: 30, maxReserve: 150, reloadTime: 1.8,
+      spread: 0.018, auto: true, type: 'ASSAULT', recoilY: 0.013, recoilX: 0.005,
     },
     {
       id: 'RPK74', name: 'RPK-74', damage: 22,

@@ -17,6 +17,7 @@
  *   Phase 10: Traversal & Integration Fixes
  *   Phase 11: Weapon & Combat System Fixes
  *   Phase 12: Enemy AI, Audio, VFX & GPU Fixes
+ *   Phase 13: Advanced Enemy AI, Spatial Audio & Weapon Balance
  */
 
 const http = require('http');
@@ -699,6 +700,60 @@ function phase12() {
   else ok(p12pass + '/' + p12total + ' enemy AI, audio, VFX & GPU fixes verified');
 }
 
+function phase13() {
+  console.log('\n══ Phase 13: Advanced Enemy AI, Spatial Audio & Weapon Balance ══');
+  var p13pass = 0, p13total = 0;
+  function check(desc, result) { p13total++; if (result) p13pass++; else fail(desc); }
+
+  // 6 new enemy AI update functions in enemy-types.js
+  var etSrc = fs.readFileSync(path.join(ROOT, 'enemy-types.js'), 'utf8');
+  check('updateHeavySniper function', etSrc.includes('function updateHeavySniper'));
+  check('updateCommissar function', etSrc.includes('function updateCommissar'));
+  check('updateThermobaric function', etSrc.includes('function updateThermobaric'));
+  check('updateEWOperator function', etSrc.includes('function updateEWOperator'));
+  check('updateAssaultMech function', etSrc.includes('function updateAssaultMech'));
+  check('updateSwarmOp function', etSrc.includes('function updateSwarmOp'));
+  check('updateHeavySniper exported', etSrc.includes('updateHeavySniper,') || etSrc.includes('updateHeavySniper:'));
+  check('updateAssaultMech exported', etSrc.includes('updateAssaultMech,') || etSrc.includes('updateAssaultMech:'));
+
+  // 6 new cases wired in enemies.js
+  var enSrc = fs.readFileSync(path.join(ROOT, 'enemies.js'), 'utf8');
+  check('HEAVY_SNIPER case wired', enSrc.includes("case 'HEAVY_SNIPER'"));
+  check('COMMISSAR case wired', enSrc.includes("case 'COMMISSAR'"));
+  check('THERMOBARIC case wired', enSrc.includes("case 'THERMOBARIC'"));
+  check('EW_OPERATOR case wired', enSrc.includes("case 'EW_OPERATOR'"));
+  check('ASSAULT_MECH case wired', enSrc.includes("case 'ASSAULT_MECH'"));
+  check('SWARM_OP case wired', enSrc.includes("case 'SWARM_OP'"));
+
+  // Flashbang blind effect
+  check('Flashbang overlay used', enSrc.includes('flashbang-overlay'));
+  check('Flashbang stun timer set', enSrc.includes('_flashbangStun'));
+
+  // Spatial audio
+  var asSrc = fs.readFileSync(path.join(ROOT, 'audio-system.js'), 'utf8');
+  check('playSpatialGunshot function', asSrc.includes('function playSpatialGunshot'));
+  check('createStereoPanner used', asSrc.includes('createStereoPanner'));
+  check('playSpatialGunshot exported', asSrc.includes('playSpatialGunshot:') || asSrc.includes('playSpatialGunshot,'));
+  check('Enemy gunshots use spatial', enSrc.includes('playSpatialGunshot'));
+
+  // Weapon balance
+  var wpSrc = fs.readFileSync(path.join(ROOT, 'weapons.js'), 'utf8');
+  check('Makarov damage 18', wpSrc.includes("id: 'MAKAROV'") && wpSrc.includes('damage: 18'));
+  check('AK-74 damage 30', wpSrc.includes("id: 'AK74'") && wpSrc.includes('damage: 30'));
+
+  // Flashbang stun consumed in game-manager.js
+  var gmSrc = fs.readFileSync(path.join(ROOT, 'game-manager.js'), 'utf8');
+  check('Flashbang stun timer decrement', gmSrc.includes('_flashbangStun -= delta'));
+  check('Mouse sensitivity reduced during stun', gmSrc.includes('stunScale'));
+
+  // Noise buffer pool
+  check('Noise buffer pool', asSrc.includes('_noisePool'));
+  check('Noise buffer cache lookup', asSrc.includes('_getNoiseBuffer'));
+
+  if (p13pass === p13total) ok(p13pass + '/' + p13total + ' advanced AI, audio & balance fixes verified');
+  else ok(p13pass + '/' + p13total + ' advanced AI, audio & balance fixes verified');
+}
+
 async function main() {
   console.log('╔══════════════════════════════════════════════╗');
   console.log('║     OccupantKiller Master QA Test Suite      ║');
@@ -717,6 +772,7 @@ async function main() {
   phase10();
   phase11();
   phase12();
+  phase13();
 
   console.log('\n══════════════════════════════════════════════');
   console.log(`  Results: ${passed} passed, ${failed} failed, ${warned} warnings`);

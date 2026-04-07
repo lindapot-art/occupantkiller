@@ -4,50 +4,43 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-06 — Session 10: Traversal Integration + Edge Cases
+- **Timestamp**: 2026-04-06 — Session 12: Performance Batch (Audio/Tracers/Buffs/Vehicle)
 - **Agent**: KING
-- **Status**: ALL QA PASSED, COMMITTED
+- **Status**: ALL QA PASSED, COMMITTED, PUSHED
 
 ## Current Task
-- COMPLETED: Traversal integration fixes + blood pooling + edge case hardening
+- COMPLETED: Audio noise pool, tracer recycling, vehicle engine wiring, officer/rally buffs
 
 ## Steps Completed This Session
-1. [x] Session recovery — killed Old Eden imposter, restored server
-2. [x] Baseline verified: HTTP 200, 34/34 syntax, 34/34 tests
-3. [x] Blood particle pooling (shared geo/materials, scale-based fade) — commit b2570d7
-4. [x] Phase 9 test suite (13 edge case fix checks) — commit b2570d7
-5. [x] Deep traversal integration audit — 3 HIGH, 1 MEDIUM found
-6. [x] HIGH: Mantle horizontal push (store forward dir, return x/z in updateMantle)
-7. [x] HIGH: Dolphin dive movement not applied (added moveX/moveZ/heightOffset)
-8. [x] HIGH: Vault movement not applied (added vault position application)
-9. [x] MEDIUM: Wall run double-update (removed duplicate updateWallRun call)
-10. [x] CombatExtras: added init/clear aliases for pattern compliance
-11. [x] Vehicles: eliminated per-frame THREE.Vector2 allocation
-12. [x] Phase 10 test suite (14 traversal integration checks) — commit 694dbe0
-13. [x] All 5 QA specialists PASS, 35/35 tests across 10 phases
+1. [x] Session recovery from conversation summary
+2. [x] Audio noise buffer pooling — createNoise() reuses cached AudioBuffers (commit 31693f3)
+3. [x] Disabled duplicate 3D canvas damage numbers in enemies.js (commit 31693f3)
+4. [x] Vehicle engine sound wired — startEngine() on enter() + completeHijack() (commit 31693f3)
+5. [x] Tracer BufferGeometry pooling — recycle up to 50 tracers (commit 31693f3)
+6. [x] Officer damage/speed buff + Kadyrovite rally buff consumed in combat (commit 31693f3)
+7. [x] QA-runtime fix: startEngine() calls stopEngine() first (commit b2f22e5)
+8. [x] QA-runtime fix: clear() drains _tracerPool (commit b2f22e5)
+9. [x] All 5 QA specialists PASS, 37/37 tests across 12 phases
 
 ## Files Changed This Session
-- `enemies.js` — Blood particle pooling (shared geometry + materials, scale fade)
-- `traversal.js` — Mantle horizontal push (forward dir + start position in state)
-- `game-manager.js` — Apply mantle XYZ, dive movement, vault position, wall run dedup
-- `combat-extras.js` — Added init/clear aliases
-- `vehicles.js` — Math.sqrt replaces per-frame Vector2 allocation
-- `tools/test-master.js` — Phase 9 (13 checks) + Phase 10 (14 checks)
+- `audio-system.js` — Noise buffer pool (_noisePool), startEngine() leak guard
+- `enemies.js` — Officer/rally buff consumption in damage + speed, 3D damage numbers disabled
+- `vehicles.js` — AudioSystem.startEngine() wired on enter/hijack
+- `tracers.js` — _tracerPool recycling (cap 50), pool drained on clear()
 
 ## Last Known Good State
 - Server: HTTP 200 (58,041 bytes)
 - Syntax: 33/33 PASS
-- Test Suite: 32/32 PASS (7 phases)
+- Test Suite: 37/37 PASS (12 phases)
 - QA: All 5 specialists PASS
-- GitHub: pushed (commit bb3b652)
-- Render.com: TIMEOUT (free tier, code works locally)
-- Old Eden imposter: D:\antiruscist\oldeden — kills needed before server start
+- GitHub: pushed (commits 31693f3, b2f22e5)
 
 ## Next Steps
-- [ ] Scan remaining .clone() calls in hot paths
-- [ ] Deep code robustness audit
-- [ ] Game balance review
-- [ ] Render.com recheck when free tier wakes up
+- [ ] 6 enemy types with no AI (COMMISSAR, THERMOBARIC, EW_OPERATOR, ASSAULT_MECH, SWARM_OP, HEAVY_SNIPER)
+- [ ] Spetsnaz flashbang blind/stun player effect
+- [ ] Spatial audio (StereoPannerNode)
+- [ ] AK-74/Makarov weapon niche protection
+- [ ] Inline style cleanup in index.html
 
 ## Recovery Instructions
 If you are reading this after a crash:

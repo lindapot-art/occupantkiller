@@ -1706,9 +1706,14 @@ const Enemies = (() => {
               var tDir = _tmpVec3e.set(playerPos.x, playerPos.y + 0.8, playerPos.z).sub(tOrigin).normalize();
               Tracers.spawnTracer(tOrigin, tDir, 0xff4400, 80);
             }
-            // Enemy gunshot audio (distance-attenuated)
-            if (typeof AudioSystem !== 'undefined' && AudioSystem.playGunshot) {
-              AudioSystem.playGunshot('rifle', distToPlayer);
+            // Enemy gunshot audio (spatial panning)
+            if (typeof AudioSystem !== 'undefined') {
+              if (AudioSystem.playSpatialGunshot) {
+                var camAngle = (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) ? CameraSystem.getYaw() : 0;
+                AudioSystem.playSpatialGunshot('rifle', e.mesh.position, playerPos, camAngle);
+              } else if (AudioSystem.playGunshot) {
+                AudioSystem.playGunshot('rifle');
+              }
             }
             }
           }
@@ -1919,6 +1924,20 @@ const Enemies = (() => {
             if (etResult && etResult.flashbang) {
               if (typeof AudioSystem !== 'undefined' && AudioSystem.playFlashbang) AudioSystem.playFlashbang();
               if (typeof HUD !== 'undefined' && HUD.showGrenadeWarning) HUD.showGrenadeWarning();
+              // Actual flashbang blind effect
+              var fbOverlay = document.getElementById('flashbang-overlay');
+              if (fbOverlay) {
+                fbOverlay.style.transition = 'opacity 0.05s';
+                fbOverlay.style.opacity = '1';
+                setTimeout(function() {
+                  fbOverlay.style.transition = 'opacity 2.5s';
+                  fbOverlay.style.opacity = '0';
+                }, 200);
+              }
+              // Stun: reduce player input sensitivity for 2s
+              if (typeof GameManager !== 'undefined') {
+                GameManager._flashbangStun = 2.0;
+              }
             }
             break;
           case 'KADYROVITE':
@@ -1963,6 +1982,122 @@ const Enemies = (() => {
             if (etResult && etResult.reinforce) {
               for (var oi = 0; oi < etResult.reinforceCount; oi++) {
                 spawnQueue.push(pickTypeForWave(wave || 1));
+              }
+              if (typeof AudioSystem !== 'undefined' && AudioSystem.playEnemyBark) AudioSystem.playEnemyBark();
+            }
+            break;
+          case 'HEAVY_SNIPER':
+            etResult = EnemyTypes.updateHeavySniper ? EnemyTypes.updateHeavySniper(e, playerPos, delta) : null;
+            if (etResult) {
+              if (etResult.fire && onPlayerHit) {
+                onPlayerHit(etResult.damage, e.mesh.position);
+                if (typeof Tracers !== 'undefined' && Tracers.spawnTracer) {
+                  var hsOrigin = _tmpVec3d.copy(e.mesh.position); hsOrigin.y += 1.2;
+                  var hsDir = _tmpVec3e.set(playerPos.x, playerPos.y + 0.8, playerPos.z).sub(hsOrigin).normalize();
+                  Tracers.spawnTracer(hsOrigin, hsDir, 0x00ff00, 200);
+                }
+                if (typeof AudioSystem !== 'undefined') {
+                  if (AudioSystem.playSpatialGunshot) {
+                    var hsYaw = (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) ? CameraSystem.getYaw() : 0;
+                    AudioSystem.playSpatialGunshot('heavy_sniper', e.mesh.position, playerPos, hsYaw);
+                  } else AudioSystem.playGunshot('sniper');
+                }
+              }
+              if (etResult.relocating && e.mesh) {
+                e.mesh.position.x += (Math.random() - 0.5) * 0.5;
+                e.mesh.position.z += (Math.random() - 0.5) * 0.5;
+              }
+            }
+            break;
+          case 'COMMISSAR':
+            etResult = EnemyTypes.updateCommissar ? EnemyTypes.updateCommissar(e, enemies, delta) : null;
+            if (etResult && etResult.executed) {
+              if (typeof AudioSystem !== 'undefined' && AudioSystem.playGunshot) AudioSystem.playGunshot('pistol');
+            }
+            break;
+          case 'THERMOBARIC':
+            etResult = EnemyTypes.updateThermobaric ? EnemyTypes.updateThermobaric(e, playerPos, delta) : null;
+            if (etResult && etResult.fire) {
+              if (typeof Tracers !== 'undefined' && Tracers.spawnExplosion) {
+                var tbTarget = _tmpVec3d.set(etResult.targetX, playerPos.y, etResult.targetZ);
+                Tracers.spawnExplosion(tbTarget, etResult.radius * 0.4);
+              }
+              if (typeof AudioSystem !== 'undefined') AudioSystem.playExplosion();
+              // AoE damage — check distance from target to player
+              var tbdx = playerPos.x - etResult.targetX, tbdz = playerPos.z - etResult.targetZ;
+              var tbDist = Math.sqrt(tbdx * tbdx + tbdz * tbdz);
+              if (tbDist < etResult.radius && onPlayerHit) {
+                var tbFalloff = 1 - (tbDist / etResult.radius);
+                onPlayerHit(Math.round(etResult.damage * tbFalloff), e.mesh.position);
+              }
+            }
+            break;
+          case 'EW_OPERATOR':
+            etResult = EnemyTypes.updateEWOperator ? EnemyTypes.updateEWOperator(e, playerPos, delta) : null;
+            if (etResult && etResult.jamming) {
+              // Jam player HUD — disable minimap and compass temporarily
+              if (typeof HUD !== 'undefined') {
+                if (HUD.setMinimapJammed) HUD.setMinimapJammed(true);
+                if (HUD.setCompassJammed) HUD.setCompassJammed(true);
+              }
+              e._isJamming = true;
+            } else if (e._isJamming) {
+              // Un-jam when out of range
+              e._isJamming = false;
+              if (typeof HUD !== 'undefined') {
+                if (HUD.setMinimapJammed) HUD.setMinimapJammed(false);
+                if (HUD.setCompassJammed) HUD.setCompassJammed(false);
+              }
+            }
+            if (etResult && etResult.fleeing && e.mesh) {
+              e.mesh.position.x = e.x;
+              e.mesh.position.z = e.z;
+            }
+            break;
+          case 'ASSAULT_MECH':
+            etResult = EnemyTypes.updateAssaultMech ? EnemyTypes.updateAssaultMech(e, playerPos, delta) : null;
+            if (etResult) {
+              if (etResult.mg && onPlayerHit) {
+                var mechHitChance = e.typeCfg.accuracy * (1 - distToPlayer / (e.typeCfg.range * 1.5));
+                if (Math.random() < mechHitChance) onPlayerHit(etResult.mgDamage, e.mesh.position);
+                if (typeof AudioSystem !== 'undefined') {
+                  if (AudioSystem.playSpatialGunshot) {
+                    var mechYaw = (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) ? CameraSystem.getYaw() : 0;
+                    AudioSystem.playSpatialGunshot('hmg', e.mesh.position, playerPos, mechYaw);
+                  } else AudioSystem.playGunshot('hmg');
+                }
+              }
+              if (etResult.rockets) {
+                for (var ri = 0; ri < etResult.count; ri++) {
+                  if (typeof Tracers !== 'undefined' && Tracers.spawnExplosion) {
+                    var rTarget = _tmpVec3d.set(
+                      playerPos.x + (Math.random() - 0.5) * 6,
+                      playerPos.y,
+                      playerPos.z + (Math.random() - 0.5) * 6
+                    );
+                    Tracers.spawnExplosion(rTarget, 1.5);
+                  }
+                }
+                if (typeof AudioSystem !== 'undefined') AudioSystem.playExplosion();
+                if (onPlayerHit && distToPlayer < 8) onPlayerHit(etResult.rocketDamage, e.mesh.position);
+              }
+              // Show boss bar for mech
+              if (typeof HUD !== 'undefined' && HUD.showBossBar) HUD.showBossBar('ASSAULT WALKER', e.hp, e.maxHp);
+            }
+            break;
+          case 'SWARM_OP':
+            etResult = EnemyTypes.updateSwarmOp ? EnemyTypes.updateSwarmOp(e, playerPos, delta) : null;
+            if (etResult && etResult.launchSwarm) {
+              // Spawn enemy drones as the swarm
+              if (typeof DroneSystem !== 'undefined' && DroneSystem.spawnEnemyDrone) {
+                for (var si = 0; si < etResult.count; si++) {
+                  DroneSystem.spawnEnemyDrone(
+                    e.mesh.position.x + (Math.random() - 0.5) * 3,
+                    e.mesh.position.y + 4 + Math.random() * 3,
+                    e.mesh.position.z + (Math.random() - 0.5) * 3,
+                    'enemy_fpv'
+                  );
+                }
               }
               if (typeof AudioSystem !== 'undefined' && AudioSystem.playEnemyBark) AudioSystem.playEnemyBark();
             }

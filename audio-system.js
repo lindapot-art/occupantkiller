@@ -120,6 +120,59 @@ const AudioSystem = (function () {
     ring.stop(now + 2.0);
   }
 
+  // ── Spatial panning helper ─────────────────────────────
+  // pos = {x,z} sound source, listener = {x,z} camera, angle = camera Y rotation
+  function _calcPan(pos, listener, angle) {
+    if (!pos || !listener) return 0;
+    var dx = pos.x - listener.x, dz = pos.z - listener.z;
+    var dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < 0.1) return 0;
+    // Angle from listener to source relative to listener facing direction
+    var toSource = Math.atan2(dx, dz);
+    var rel = toSource - (angle || 0);
+    return Math.max(-1, Math.min(1, Math.sin(rel)));
+  }
+
+  function playSpatialGunshot(type, worldPos, listenerPos, listenerAngle) {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    var osc = ctx.createOscillator();
+    var noise = createNoise(0.08);
+    var gain = ctx.createGain();
+    var filter = ctx.createBiquadFilter();
+    var params = {
+      pistol:       { freq: 800, decay: 0.06, noiseVol: 0.4, filterFreq: 3000 },
+      rifle:        { freq: 400, decay: 0.10, noiseVol: 0.6, filterFreq: 2000 },
+      sniper:       { freq: 200, decay: 0.15, noiseVol: 0.8, filterFreq: 1500 },
+      heavy_sniper: { freq: 120, decay: 0.22, noiseVol: 0.95, filterFreq: 1000 },
+      hmg:          { freq: 300, decay: 0.08, noiseVol: 0.7, filterFreq: 1800 },
+    }[type] || { freq: 400, decay: 0.10, noiseVol: 0.6, filterFreq: 2000 };
+    filter.type = 'lowpass';
+    filter.frequency.value = params.filterFreq;
+    osc.frequency.setValueAtTime(params.freq, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + params.decay);
+    osc.type = 'sawtooth';
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + params.decay);
+    // Spatial panning
+    var panner = ctx.createStereoPanner();
+    panner.pan.value = _calcPan(worldPos, listenerPos, listenerAngle);
+    // Distance attenuation
+    if (listenerPos && worldPos) {
+      var ddx = worldPos.x - listenerPos.x, ddz = worldPos.z - listenerPos.z;
+      var dd = Math.sqrt(ddx * ddx + ddz * ddz);
+      gain.gain.setValueAtTime(0.3 * Math.max(0.05, 1 - dd / 80), now);
+    }
+    osc.connect(filter);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(panner);
+    panner.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + params.decay);
+  }
+
   function playHit() {
     if (!enabled || !ctx) return;
     resume();
@@ -1120,6 +1173,7 @@ const AudioSystem = (function () {
     init: init,
     resume: resume,
     playGunshot: playGunshot,
+    playSpatialGunshot: playSpatialGunshot,
     playExplosion: playExplosion,
     playHit: playHit,
     playReload: playReload,

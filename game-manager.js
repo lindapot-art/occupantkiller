@@ -1365,7 +1365,8 @@ const GameManager = (function () {
 
     document.addEventListener('mousemove', function (e) {
       if (document.pointerLockElement) {
-        CameraSystem.handleMouseMove(e.movementX, e.movementY);
+        var stunScale = GameManager._flashbangStun > 0 ? 0.15 : 1;
+        CameraSystem.handleMouseMove(e.movementX * stunScale, e.movementY * stunScale);
       }
     });
 
@@ -2947,6 +2948,12 @@ const GameManager = (function () {
           player.bleeding = false;
           if (HUD.showBleed) HUD.showBleed(false);
         }
+      }
+
+      // Flashbang stun timer
+      if (GameManager._flashbangStun > 0) {
+        GameManager._flashbangStun -= delta;
+        if (GameManager._flashbangStun <= 0) GameManager._flashbangStun = 0;
       }
 
       // Kill streak decay
