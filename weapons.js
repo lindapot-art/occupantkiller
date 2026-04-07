@@ -1462,15 +1462,32 @@ const Weapons = (() => {
   const INSPECT_DUR = 1.8; // seconds for full inspect cycle
   let reloadAnimAngle = 0;
 
+  // ── Recoil recovery (camera returns after spray) ──────────
+  let _recoilPitchAccum = 0;
+  let _recoilYawAccum = 0;
+  let _lastFireTime = 0;
+  const RECOIL_RECOVERY_DELAY = 0.12;
+  const RECOIL_RECOVERY_RATE = 4;
+
+  function applyLandingBob(intensity) {
+    recoilOffsetY = -0.04 * intensity;
+    recoilOffsetZ = -0.02 * intensity;
+  }
+
   function applyRecoil() {
     const w = cur();
     if (!w.recoilY && !w.recoilX) return;
     const recoilMod = (typeof SkillSystem !== 'undefined' && typeof SkillSystem.getRecoilMod === 'function')
       ? SkillSystem.getRecoilMod() : 1.0;
+    var appliedYaw = (Math.random() - 0.5) * w.recoilX * 2 * recoilMod;
     if (typeof CameraSystem !== 'undefined') {
       CameraSystem.setPitch(CameraSystem.getPitch() + w.recoilY * recoilMod);
-      CameraSystem.setYaw(CameraSystem.getYaw() + (Math.random() - 0.5) * w.recoilX * 2 * recoilMod);
+      CameraSystem.setYaw(CameraSystem.getYaw() + appliedYaw);
     }
+    // Track accumulated recoil for auto-recovery
+    _recoilPitchAccum += w.recoilY * recoilMod;
+    _recoilYawAccum += appliedYaw;
+    _lastFireTime = performance.now() / 1000;
     // Scale visual kick with weapon recoil intensity
     const intensity = Math.min(1, (w.recoilY || 0) / 0.04);
     recoilOffsetZ = -0.02 - intensity * 0.04;
@@ -2097,6 +2114,20 @@ const Weapons = (() => {
     if (recoilOffsetZ < 0) recoilOffsetZ = Math.min(0, recoilOffsetZ + delta * 12 * 0.04);
     if (recoilOffsetY > 0) recoilOffsetY = Math.max(0, recoilOffsetY - delta * 12 * 0.02);
     if (recoilOffset > 0) recoilOffset = Math.max(0, recoilOffset - delta * 0.3);
+
+    // Camera recoil recovery: pitch/yaw return after firing stops
+    var timeSinceFire = (performance.now() / 1000) - _lastFireTime;
+    if (timeSinceFire > RECOIL_RECOVERY_DELAY && _recoilPitchAccum > 0.001 && typeof CameraSystem !== 'undefined') {
+      var recoveryAmt = RECOIL_RECOVERY_RATE * delta;
+      var pitchRecover = Math.min(_recoilPitchAccum, recoveryAmt);
+      CameraSystem.setPitch(CameraSystem.getPitch() - pitchRecover);
+      _recoilPitchAccum = Math.max(0, _recoilPitchAccum - pitchRecover);
+      // Yaw recovery (gentler, 60% rate)
+      var yawRecover = Math.min(Math.abs(_recoilYawAccum), recoveryAmt * 0.6);
+      CameraSystem.setYaw(CameraSystem.getYaw() - Math.sign(_recoilYawAccum) * yawRecover);
+      _recoilYawAccum *= (1 - delta * 3);
+      if (Math.abs(_recoilYawAccum) < 0.001) _recoilYawAccum = 0;
+    }
     if (mesh) {
       // Weapon switch bob-up animation
       let switchY = 0;
@@ -2425,6 +2456,7 @@ const Weapons = (() => {
     getWeaponId:    function (i) { return WEAPONS[i] ? WEAPONS[i].id : ''; },
     didFire:        function () { return _firedThisFrame; },
     applyRecoil:    applyRecoil,
+    applyLandingBob: applyLandingBob,
     clearJam:       clearJam,
     isJammed:       isJammed,
     getBlastRadius: function () { return cur().blastRadius || 0; },

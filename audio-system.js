@@ -258,6 +258,23 @@ const AudioSystem = (function () {
     gain.connect(masterGain);
   }
 
+  // Landing thud — low-frequency impact sound scaled by intensity
+  function playLandingThud(intensity) {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    var noise = createNoise(0.1 + intensity * 0.1);
+    var gain = ctx.createGain();
+    var filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 200 + intensity * 300;
+    gain.gain.setValueAtTime(0.15 * intensity, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGain);
+  }
+
   // Enemy footstep sound — distance-attenuated
   function playEnemyFootstep(distance) {
     if (!enabled || !ctx || distance > 25) return;
@@ -1380,5 +1397,6 @@ const AudioSystem = (function () {
     playFirstBlood: playFirstBlood,
     resetFirstBlood: resetFirstBlood,
     playHeartbeat: playHeartbeat,
+    playLandingThud: playLandingThud,
   };
 })();

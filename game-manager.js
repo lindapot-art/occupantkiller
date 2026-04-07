@@ -2367,6 +2367,11 @@ const GameManager = (function () {
       let speed = MOVE_SPEED * (player.sprinting ? SPRINT_MULT : 1) * (player.prone ? 0.3 : 1);
       // Stim boost: +60% speed while active
       if (player._stimTimer && player._stimTimer > 0) speed *= 1.6;
+      // Kill momentum speed boost
+      if (player._killSpeedTimer && player._killSpeedTimer > 0) {
+        player._killSpeedTimer -= delta;
+        speed *= (1 + (player._killSpeedBoost || 0));
+      }
       // Weather speed modifier
       if (typeof WeatherSystem !== 'undefined' && WeatherSystem.getModifiers) {
         speed *= WeatherSystem.getModifiers().speedMod;
@@ -2379,6 +2384,11 @@ const GameManager = (function () {
       if (player.isCrouching) speed *= 0.5;
       // ── B32: Blizzard slow ──
       if (player._blizzardSlow) speed *= player._blizzardSlow;
+      // ── Landing impact slow ──
+      if (player._landSlowTimer && player._landSlowTimer > 0) {
+        player._landSlowTimer -= delta;
+        speed *= 0.4;
+      }
       moveDir.multiplyScalar(speed * delta);
 
       // Stamina drain on sprint
@@ -2465,6 +2475,17 @@ const GameManager = (function () {
 
     if (newPos.y <= terrainH) {
       newPos.y = terrainH;
+      // Landing impact detection
+      if (!player.onGround && player.velocity.y < -2) {
+        var fallSpeed = Math.abs(player.velocity.y);
+        var landIntensity = Math.min(1, fallSpeed / 15);
+        if (landIntensity > 0.1) {
+          if (CameraSystem.shake) CameraSystem.shake(landIntensity * 0.03, 0.2);
+          if (Weapons.applyLandingBob) Weapons.applyLandingBob(landIntensity);
+          if (AudioSystem.playLandingThud) AudioSystem.playLandingThud(landIntensity);
+          if (landIntensity > 0.6) player._landSlowTimer = 0.3;
+        }
+      }
       player.velocity.y = 0;
       player.onGround = true;
     } else {
@@ -2709,6 +2730,28 @@ const GameManager = (function () {
       // ── Slow-mo on triple+ multikill ──
       if (player.multikillCount >= 3 && typeof Feedback !== 'undefined' && Feedback.triggerSlowMo) {
         Feedback.triggerSlowMo(0.25, 0.3);
+      }
+
+      // ── Kill Momentum: HP regen + speed burst + mag refill ──
+      var killHeal = 5 + Math.min(player.killStreak * 2, 15);
+      player.hp = Math.min(player.maxHp, player.hp + killHeal);
+      HUD.setHealth(player.hp, player.maxHp);
+      // Streak 3+: partial armor regen
+      if (player.killStreak >= 3) {
+        player.armor = Math.min(100, player.armor + 5);
+        if (HUD.updateArmor) HUD.updateArmor(player.armor / 100);
+      }
+      // Speed burst after kill
+      player._killSpeedBoost = Math.min(0.4, 0.1 + player.killStreak * 0.03);
+      player._killSpeedTimer = 1.5;
+      // Streak 5+: refill 20% of magazine
+      if (player.killStreak >= 5) {
+        var kst = Weapons.getState ? Weapons.getState() : null;
+        var kwep = Weapons.getCurrent ? Weapons.getCurrent() : null;
+        if (kst && kwep && kwep.clipSize > 0 && !kst.reloading) {
+          kst.clip = Math.min(kwep.clipSize, kst.clip + Math.ceil(kwep.clipSize * 0.2));
+          HUD.setAmmo(kst.clip, kst.reserve, kwep.clipSize);
+        }
       }
 
       // ── B22: Boss bar update ──

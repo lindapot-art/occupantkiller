@@ -1328,6 +1328,20 @@ const Enemies = (() => {
         e._staggerTimer -= delta;
       }
 
+      // Flinch rotation: visual kick on hit, decays back to neutral
+      if (e._flinchTimer && e._flinchTimer > 0) {
+        e._flinchTimer -= delta;
+        var ft = Math.max(0, e._flinchTimer / 0.25);
+        if (e.mesh) {
+          e.mesh.rotation.x = (e._flinchRotX || 0) * ft;
+          e.mesh.rotation.z = (e._flinchRotZ || 0) * ft;
+        }
+        if (e._flinchTimer <= 0 && e.mesh) {
+          e.mesh.rotation.x = 0;
+          e.mesh.rotation.z = 0;
+        }
+      }
+
       // Stun timer (flashbang): skip all AI while stunned
       if (e._stunTimer && e._stunTimer > 0) {
         e._stunTimer -= delta;
@@ -2414,9 +2428,20 @@ const Enemies = (() => {
       _tmpVec3f.subVectors(enemy.mesh.position, _playerPos).setY(0).normalize();
       var flinchDist = amount > 30 ? 0.5 : 0.3;
       enemy.mesh.position.addScaledVector(_tmpVec3f, flinchDist);
+      // Rotational flinch: kick mesh backward + sideways
+      var flinchIntensity = Math.min(1, amount / 60);
+      enemy._flinchTimer = 0.15 + flinchIntensity * 0.1;
+      enemy._flinchRotX = -0.15 * flinchIntensity;
+      enemy._flinchRotZ = (Math.random() - 0.5) * 0.2 * flinchIntensity;
+      if (isHeadshot) {
+        enemy._flinchTimer = 0.3;
+        enemy._flinchRotX = -0.35;
+      }
       // Heavy hit stagger: pause movement briefly
       if (amount > 30) {
         enemy._staggerTimer = 0.3;
+      } else if (amount > 15) {
+        enemy._staggerTimer = 0.12;
       }
     }
 
