@@ -58,8 +58,9 @@ const Tracers = (() => {
       entry = { line: new THREE.Line(geom, mat) };
       _scene.add(entry.line);
     }
-    _tTmp.copy(direction);
-    entry.dir = _tTmp.clone();
+    entry.dx = direction.x;
+    entry.dy = direction.y;
+    entry.dz = direction.z;
     entry.speed = speed;
     entry.life = 0.15;
     entry.maxLife = 0.15;
@@ -188,11 +189,11 @@ const Tracers = (() => {
       t.life -= delta;
       // Move the line forward
       const positions = t.line.geometry.attributes.position.array;
-      for (let j = 0; j < 6; j += 3) {
-        positions[j]     += t.dir.x * t.speed * delta;
-        positions[j + 1] += t.dir.y * t.speed * delta;
-        positions[j + 2] += t.dir.z * t.speed * delta;
-      }
+      const dx = t.dx * t.speed * delta;
+      const dy = t.dy * t.speed * delta;
+      const dz = t.dz * t.speed * delta;
+      positions[0] += dx; positions[1] += dy; positions[2] += dz;
+      positions[3] += dx; positions[4] += dy; positions[5] += dz;
       t.line.geometry.attributes.position.needsUpdate = true;
       t.line.material.opacity = Math.max(0, t.life / t.maxLife * 0.8);
       if (t.life <= 0) {
@@ -363,6 +364,7 @@ const Tracers = (() => {
       s.mesh.material.opacity = Math.max(0, s.life / 0.35);
       if (s.life <= 0) {
         _scene.remove(s.mesh);
+        s.mesh.material.dispose();
         sparks.splice(i, 1);
       }
     }
@@ -377,7 +379,6 @@ const Tracers = (() => {
       c.mesh.rotation.y += c.spin.y * delta;
       c.mesh.rotation.z += c.spin.z * delta;
       c.life -= delta;
-      if (c.life <= 0.3) c.mesh.material.opacity = c.life / 0.3;
       if (c.life <= 0) {
         _scene.remove(c.mesh);
         casings.splice(i, 1);
@@ -450,6 +451,7 @@ const Tracers = (() => {
     if (_rainMesh && _scene) {
       _scene.remove(_rainMesh);
       _rainMesh.geometry.dispose();
+      _rainMesh.material.dispose();
       _rainMesh = null;
     }
     _rainActive = false;
@@ -496,6 +498,7 @@ const Tracers = (() => {
       s.mesh.material.opacity = (1 - t) * 0.8;
       if (s.life <= 0) {
         _scene.remove(s.mesh);
+        s.mesh.material.dispose();
         _shockwaves.splice(i, 1);
       }
     }
