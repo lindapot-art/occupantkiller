@@ -3251,7 +3251,8 @@ const GameManager = (function () {
         var dz = player.position.z - player._lastPos.z;
         player.distanceWalked += Math.sqrt(dx * dx + dz * dz);
       }
-      player._lastPos = player.position.clone();
+      if (!player._lastPos) player._lastPos = new THREE.Vector3();
+      player._lastPos.copy(player.position);
 
       // Build mode ghost update
       if (gameState === STATE.BUILD_MODE && Building.getSelectedTemplate()) {
