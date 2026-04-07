@@ -496,11 +496,33 @@
     <button class="btn" id="restart-btn">↺ TRY AGAIN</button>
   </div>
 
-  <!-- Wave clear screen -->
+  <!-- Wave clear screen with intermission shop -->
   <div id="overlay-waveclear" class="overlay" style="display:none">
     <h1>WAVE CLEAR!</h1>
     <p class="stat">WAVE <span id="waveclear-num">1</span> OF <span id="waveclear-total">5</span> COMPLETED</p>
     <p class="subtitle" id="waveclear-stage-info"></p>
+    <div id="wave-shop" style="display:flex;gap:12px;justify-content:center;margin:12px 0;flex-wrap:wrap">
+      <div style="background:rgba(0,0,0,0.6);border:1px solid #444;border-radius:6px;padding:10px 14px;min-width:140px;text-align:center">
+        <p style="color:#aaa;font-size:11px;margin:0 0 6px">SUPPLIES</p>
+        <button class="btn shop-buy-btn" data-item="health" style="font-size:11px;padding:4px 10px;border-color:#44ff88;color:#44ff88;display:block;width:100%;margin:4px 0">❤️ Health +50 · 40 OKC</button>
+        <button class="btn shop-buy-btn" data-item="armor" style="font-size:11px;padding:4px 10px;border-color:#4fc3f7;color:#4fc3f7;display:block;width:100%;margin:4px 0">🛡️ Armor Pack · 60 OKC</button>
+        <button class="btn shop-buy-btn" data-item="ammo" style="font-size:11px;padding:4px 10px;border-color:#ffcc00;color:#ffcc00;display:block;width:100%;margin:4px 0">🔫 Full Ammo · 30 OKC</button>
+        <button class="btn shop-buy-btn" data-item="stim" style="font-size:11px;padding:4px 10px;border-color:#ff8a65;color:#ff8a65;display:block;width:100%;margin:4px 0">💉 Stim Pack · 50 OKC</button>
+      </div>
+      <div style="background:rgba(0,0,0,0.6);border:1px solid #444;border-radius:6px;padding:10px 14px;min-width:160px;text-align:center">
+        <p style="color:#aaa;font-size:11px;margin:0 0 6px">WAVE STATS</p>
+        <p id="shop-kills" style="color:#ff4444;font-size:13px;margin:2px 0">Kills: 0</p>
+        <p id="shop-accuracy" style="color:#ffcc00;font-size:13px;margin:2px 0">Accuracy: 0%</p>
+        <p id="shop-time" style="color:#4fc3f7;font-size:13px;margin:2px 0">Time: 0s</p>
+        <p id="shop-balance" style="color:#44ff88;font-size:15px;font-weight:bold;margin:8px 0">💰 0 OKC</p>
+      </div>
+      <div style="background:rgba(0,0,0,0.6);border:1px solid #444;border-radius:6px;padding:10px 14px;min-width:140px;text-align:center">
+        <p style="color:#aaa;font-size:11px;margin:0 0 6px">NEXT WAVE</p>
+        <p id="shop-next-wave" style="color:#ff8a65;font-size:14px;font-weight:bold;margin:4px 0">Wave 2</p>
+        <p id="shop-next-enemies" style="color:#ccc;font-size:12px;margin:2px 0"></p>
+        <p id="shop-auto-timer" style="color:#888;font-size:11px;margin:8px 0">Auto-start in <span id="shop-countdown">15</span>s</p>
+      </div>
+    </div>
     <button class="btn" id="next-wave-btn">NEXT WAVE →</button>
   </div>
 
@@ -723,11 +745,48 @@
   });
 
   document.getElementById('next-wave-btn').addEventListener('click', function () {
+    if (window._shopCountdownId) { clearInterval(window._shopCountdownId); window._shopCountdownId = null; }
     GameManager.hideOverlays();
     GameManager.setState(GameManager.STATE.PLAYING);
     GameManager.requestPointerLock();
     GameManager.beginWave(GameManager.getCurrentWave() + 1);
   });
+
+  // ── Wave Shop purchase logic ──────────────────────────────
+  (function () {
+    var shopItems = {
+      health: { cost: 40, label: '❤️ Health +50', apply: function () { GameManager.healPlayer(50); } },
+      armor:  { cost: 60, label: '🛡️ Armor Pack', apply: function () { GameManager.addArmor(50); } },
+      ammo:   { cost: 30, label: '🔫 Full Ammo', apply: function () { if (typeof Weapons !== 'undefined' && Weapons.refillAllAmmo) Weapons.refillAllAmmo(); } },
+      stim:   { cost: 50, label: '💉 Stim Pack', apply: function () { GameManager.addStimBuff(30); } },
+    };
+    var btns = document.querySelectorAll('.shop-buy-btn');
+    for (var i = 0; i < btns.length; i++) {
+      (function (btn) {
+        btn.addEventListener('click', function () {
+          var itemId = btn.getAttribute('data-item');
+          var item = shopItems[itemId];
+          if (!item) return;
+          if (typeof Economy !== 'undefined' && Economy.spendCurrency(item.cost)) {
+            item.apply();
+            btn.textContent = '✅ PURCHASED';
+            btn.style.borderColor = '#666';
+            btn.style.color = '#666';
+            btn.disabled = true;
+            var balEl = document.getElementById('shop-balance');
+            if (balEl) balEl.textContent = '💰 ' + Economy.getCurrency() + ' OKC';
+          } else {
+            btn.style.borderColor = '#ff4444';
+            btn.style.color = '#ff4444';
+            setTimeout(function () {
+              btn.style.borderColor = '';
+              btn.style.color = '';
+            }, 500);
+          }
+        });
+      })(btns[i]);
+    }
+  })();
 
   document.getElementById('next-stage-btn').addEventListener('click', function () {
     GameManager.nextStage();

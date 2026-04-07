@@ -1293,6 +1293,32 @@ const AudioSystem = (function () {
   }
   function resetFirstBlood() { _firstBloodPlayed = false; }
 
+  /* ── Heartbeat effect for low HP ───── */
+  var _heartbeatTimer = 0;
+  function playHeartbeat(intensity) {
+    // intensity: 0-1 (0 = barely low, 1 = near death)
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    // BPM: 80 at intensity 0, 160 at intensity 1
+    var interval = 60 / (80 + intensity * 80);
+    if ((now - _heartbeatTimer) < interval) return;
+    _heartbeatTimer = now;
+    var vol = 0.06 + intensity * 0.12;
+    // Two-thump heartbeat: lub...dub
+    for (var i = 0; i < 2; i++) {
+      var osc = ctx.createOscillator();
+      var g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(55 - i * 10, now + i * 0.12);
+      g.gain.setValueAtTime(vol, now + i * 0.12);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.08);
+      osc.connect(g); g.connect(masterGain);
+      osc.start(now + i * 0.12);
+      osc.stop(now + i * 0.12 + 0.09);
+    }
+  }
+
   return {
     init: init,
     resume: resume,
@@ -1353,5 +1379,6 @@ const AudioSystem = (function () {
     playMultiKill: playMultiKill,
     playFirstBlood: playFirstBlood,
     resetFirstBlood: resetFirstBlood,
+    playHeartbeat: playHeartbeat,
   };
 })();

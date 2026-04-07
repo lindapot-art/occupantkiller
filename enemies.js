@@ -1253,6 +1253,19 @@ const Enemies = (() => {
           e.mesh.rotation.x += e._deathTiltX * delta * 2.5;
           e.mesh.rotation.x = Math.max(-1.8, Math.min(1.8, e.mesh.rotation.x));
         }
+        // Directional knockback movement
+        if (e._deathVelX !== undefined && e.deathTimer > 0.8) {
+          e.mesh.position.x += e._deathVelX * delta;
+          e.mesh.position.z += e._deathVelZ * delta;
+          // Friction decay
+          e._deathVelX *= (1 - 3 * delta);
+          e._deathVelZ *= (1 - 3 * delta);
+        }
+        // Spin on Y axis
+        if (e._deathSpinY) {
+          e.mesh.rotation.y += e._deathSpinY * delta;
+          e._deathSpinY *= (1 - 2 * delta);
+        }
         // Upward pop then sink
         if (e._deathPopY !== undefined) {
           e._deathPopY -= 12 * delta; // gravity on corpse
@@ -2438,6 +2451,27 @@ const Enemies = (() => {
       var tiltX = (Math.random() > 0.5 ? 1 : -1) * (1.0 + Math.random() * 0.5);
       enemy._deathTiltX = tiltX;
       enemy._deathPopY = 1.5; // brief upward pop velocity
+      // Directional knockback from player shot
+      var kbForce = 3;
+      if (enemy.typeCfg) {
+        var t = enemy.typeCfg.name;
+        if (t === 'HEAVY_ARMOR' || t === 'SHIELD_BEARER') kbForce = 1.5;
+        else if (t === 'BOSS') kbForce = 0.5;
+      }
+      if (isHeadshot) { kbForce *= 1.4; enemy._deathPopY = 2.5; }
+      if (_playerPos) {
+        var dx = enemy.mesh.position.x - _playerPos.x;
+        var dz = enemy.mesh.position.z - _playerPos.z;
+        var dist = Math.sqrt(dx * dx + dz * dz) || 1;
+        enemy._deathVelX = (dx / dist) * kbForce;
+        enemy._deathVelZ = (dz / dist) * kbForce;
+        // Spin in knockback direction
+        enemy._deathSpinY = (Math.random() - 0.5) * 3;
+      } else {
+        enemy._deathVelX = 0;
+        enemy._deathVelZ = 0;
+        enemy._deathSpinY = 0;
+      }
       _cacheFrame = -1; // invalidate cache on death
     }
     return enemy.hp;

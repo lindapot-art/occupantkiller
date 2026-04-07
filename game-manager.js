@@ -1581,6 +1581,10 @@ const GameManager = (function () {
     player._lastPos = null;
     player.playStartTime = performance.now();
     player.buildMaterials = { wood: 0, stone: 0, metal: 0, dirt: 0, sand: 0, brick: 0 };
+    // Clear desaturation filter
+    if (_renderer && _renderer.domElement) _renderer.domElement.style.filter = '';
+    // Clear shop countdown
+    if (window._shopCountdownId) { clearInterval(window._shopCountdownId); window._shopCountdownId = null; }
     // Clear loot particles (shared _lootGeo — only dispose cloned materials)
     for (var li = _lootParticles.length - 1; li >= 0; li--) {
       if (_scene) _scene.remove(_lootParticles[li]);
@@ -2243,6 +2247,57 @@ const GameManager = (function () {
     document.getElementById('waveclear-total').textContent = stageDef.wavesPerStage;
     document.getElementById('waveclear-stage-info').textContent =
       'Stage ' + stageDef.id + ': ' + stageDef.name;
+
+    // Populate wave shop stats
+    var shopKills = document.getElementById('shop-kills');
+    var shopAcc = document.getElementById('shop-accuracy');
+    var shopTime = document.getElementById('shop-time');
+    var shopBal = document.getElementById('shop-balance');
+    var shopNext = document.getElementById('shop-next-wave');
+    var shopEnemies = document.getElementById('shop-next-enemies');
+    if (shopKills) shopKills.textContent = 'Kills: ' + (player.waveKills || 0);
+    if (shopAcc) {
+      var acc = player.waveShots > 0 ? Math.round((player.waveHits / player.waveShots) * 100) : 0;
+      shopAcc.textContent = 'Accuracy: ' + acc + '%';
+    }
+    if (shopTime) {
+      var wt = Math.round((performance.now() - (player.waveStartTime || performance.now())) / 1000);
+      shopTime.textContent = 'Time: ' + wt + 's';
+    }
+    if (shopBal && typeof Economy !== 'undefined') shopBal.textContent = '\u{1F4B0} ' + Economy.getCurrency() + ' OKC';
+    if (shopNext) shopNext.textContent = 'Wave ' + (currentWave + 1);
+    if (shopEnemies) {
+      var nextCount = 3 + currentWave * 2;
+      shopEnemies.textContent = nextCount + ' enemies incoming';
+    }
+    // Reset shop buttons
+    var shopBtns = document.querySelectorAll('.shop-buy-btn');
+    for (var si = 0; si < shopBtns.length; si++) {
+      shopBtns[si].disabled = false;
+      shopBtns[si].style.borderColor = '';
+      shopBtns[si].style.color = '';
+    }
+    // Restore button text
+    var btnTexts = { health: '\u2764\uFE0F Health +50 \u00B7 40 OKC', armor: '\uD83D\uDEE1\uFE0F Armor Pack \u00B7 60 OKC', ammo: '\uD83D\uDD2B Full Ammo \u00B7 30 OKC', stim: '\uD83D\uDC89 Stim Pack \u00B7 50 OKC' };
+    for (var si2 = 0; si2 < shopBtns.length; si2++) {
+      var itemId = shopBtns[si2].getAttribute('data-item');
+      if (btnTexts[itemId]) shopBtns[si2].textContent = btnTexts[itemId];
+    }
+    // Auto-start countdown (15s)
+    if (window._shopCountdownId) clearInterval(window._shopCountdownId);
+    var _shopSec = 15;
+    var countdownEl = document.getElementById('shop-countdown');
+    if (countdownEl) countdownEl.textContent = _shopSec;
+    window._shopCountdownId = setInterval(function () {
+      _shopSec--;
+      if (countdownEl) countdownEl.textContent = _shopSec;
+      if (_shopSec <= 0) {
+        clearInterval(window._shopCountdownId);
+        window._shopCountdownId = null;
+        var nwBtn = document.getElementById('next-wave-btn');
+        if (nwBtn) nwBtn.click();
+      }
+    }, 1000);
   }
 
   /* ── Player Movement ─────────────────────────────────────────────── */
@@ -2619,6 +2674,13 @@ const GameManager = (function () {
         if (player.multikillCount >= 2 && AudioSystem.playMultiKill) AudioSystem.playMultiKill(player.multikillCount);
       }
 
+      // ── Hitstop on kill (micro-freeze for impact feel) ──
+      if (typeof Feedback !== 'undefined' && Feedback.triggerHitStop) {
+        if (player.multikillCount >= 3) Feedback.triggerHitStop(4);
+        else if (isHeadshot) Feedback.triggerHitStop(3);
+        else Feedback.triggerHitStop(1);
+      }
+
       // ── B22: Boss bar update ──
       if (enemy.type === 'BOSS') {
         if (HUD.hideBossBar) HUD.hideBossBar();
@@ -2969,8 +3031,12 @@ const GameManager = (function () {
     requestAnimationFrame(update);
 
     const now = performance.now();
-    const delta = Math.min((now - prevTime) / 1000, 0.1);
+    const rawDelta = Math.min((now - prevTime) / 1000, 0.1);
     prevTime = now;
+
+    // Hitstop: update timer with real time, zero delta while frozen
+    if (typeof Feedback !== 'undefined' && Feedback.updateHitStop) Feedback.updateHitStop(rawDelta);
+    var delta = (typeof Feedback !== 'undefined' && Feedback.isHitStopped && Feedback.isHitStopped()) ? 0 : rawDelta;
 
     // Adaptive quality: measure FPS, reduce quality if below 30
     _fpsAccum += delta;
@@ -3085,9 +3151,21 @@ const GameManager = (function () {
         HUD.updateWeatherDisplay(WeatherSystem.getModifiers().label);
       }
 
-      // Low HP vignette pulse
+      // Contextual input tips
+      if (typeof Feedback !== 'undefined' && Feedback.checkTips) Feedback.checkTips(currentWave);
+
+      // Low HP vignette pulse + heartbeat + desaturation
       if (HUD.showLowHP) {
-        HUD.showLowHP(player.hp > 0 && player.hp <= player.maxHp * 0.25);
+        var isLow = player.hp > 0 && player.hp <= player.maxHp * 0.25;
+        HUD.showLowHP(isLow);
+        if (isLow) {
+          var intensity = 1 - (player.hp / (player.maxHp * 0.25));
+          intensity = Math.max(0, Math.min(1, intensity));
+          if (AudioSystem.playHeartbeat) AudioSystem.playHeartbeat(intensity);
+          if (_renderer) _renderer.domElement.style.filter = 'saturate(' + (0.3 + 0.7 * (1 - intensity)) + ')';
+        } else {
+          if (_renderer && _renderer.domElement.style.filter) _renderer.domElement.style.filter = '';
+        }
       }
 
       // Shield timer countdown
@@ -4543,6 +4621,26 @@ const GameManager = (function () {
     }
   }
 
+  /* ── Wave Shop Helper Functions ────────────────────────────── */
+  function healPlayer(amount) {
+    if (!player) return;
+    player.hp = Math.min(player.hp + amount, player.maxHp);
+    if (HUD.setHealth) HUD.setHealth(player.hp, player.maxHp);
+    if (HUD.notifyPickup) HUD.notifyPickup('❤️ +' + amount + ' HP', '#44ff88');
+  }
+
+  function addArmor(amount) {
+    if (!player) return;
+    player.armor = Math.min((player.armor || 0) + amount, 100);
+    if (HUD.notifyPickup) HUD.notifyPickup('🛡️ Armor +' + amount, '#4fc3f7');
+  }
+
+  function addStimBuff(duration) {
+    if (!player) return;
+    player._stimTimer = (player._stimTimer || 0) + duration;
+    if (HUD.notifyPickup) HUD.notifyPickup('💉 Speed Boost ' + duration + 's', '#ff8a65');
+  }
+
   /* ── Public API ──────────────────────────────────────────────────── */
   return {
     STATE,
@@ -4576,5 +4674,8 @@ const GameManager = (function () {
     _activateStreak: _activateStreak,
     _openPerksMenu: _openPerksMenu,
     _openJournal: _openJournal,
+    healPlayer: healPlayer,
+    addArmor: addArmor,
+    addStimBuff: addStimBuff,
   };
 })();

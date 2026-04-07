@@ -401,6 +401,23 @@ const Feedback = (function () {
     if (_slowMoTimer > 0) _slowMoTimer -= dt;
   }
 
+  /* ── Feature: Hitstop (Kill Impact Freeze) ───── */
+  var _hitStopTimer = 0;
+
+  function triggerHitStop(frames) {
+    // frames: 1 = normal kill (~16ms), 3 = headshot (~50ms), 4 = explosive multi (~66ms)
+    var duration = (frames || 1) * 0.016;
+    if (duration > _hitStopTimer) _hitStopTimer = duration;
+  }
+
+  function isHitStopped() {
+    return _hitStopTimer > 0;
+  }
+
+  function updateHitStop(realDt) {
+    if (_hitStopTimer > 0) _hitStopTimer -= realDt;
+  }
+
   /* ── Feature: Weapon Pickup Notification ───── */
   function showWeaponPickup(weaponName) {
     let el = document.getElementById('weapon-pickup-notify');
@@ -462,6 +479,7 @@ const Feedback = (function () {
     _shakeIntensity = 0;
     _killConfirmTimer = 0;
     _slowMoTimer = 0;
+    _hitStopTimer = 0;
   }
 
   function resetAchievements() {
@@ -523,6 +541,58 @@ const Feedback = (function () {
     }
   }
 
+  /* ── Contextual Input Tips (adaptive tutorial) ───── */
+  var _tips = [
+    { id: 'lean',     wave: 2, text: '💡 Press Q/E to lean around cover' },
+    { id: 'build',    wave: 3, text: '💡 Press B to enter Build Mode — place walls & turrets' },
+    { id: 'sprint',   wave: 1, text: '💡 Hold SHIFT to sprint' },
+    { id: 'drone',    wave: 4, text: '💡 Press F to deploy your recon drone' },
+    { id: 'vehicle',  wave: 5, text: '💡 Press G near a vehicle to drive it' },
+    { id: 'ammo',     wave: 3, text: '💡 Press T to switch ammo types' },
+    { id: 'reload',   wave: 1, text: '💡 Press R to reload your weapon' },
+  ];
+  var _shownTips = {};
+  var _tipCheckTimer = 0;
+  var _tipEl = null;
+  var _tipFadeTimer = null;
+  try {
+    var _st = localStorage.getItem('ok_tips_shown');
+    if (_st) _shownTips = JSON.parse(_st) || {};
+  } catch (e) { _shownTips = {}; }
+
+  function showTip(text) {
+    if (!_tipEl) {
+      _tipEl = document.createElement('div');
+      _tipEl.style.cssText = 'position:fixed;bottom:18%;left:50%;transform:translateX(-50%);color:#4fc3f7;font-size:14px;font-weight:bold;text-shadow:0 0 8px rgba(79,195,247,0.4);pointer-events:none;z-index:250;transition:opacity 0.6s;text-align:center;max-width:500px;';
+      document.body.appendChild(_tipEl);
+    }
+    _tipEl.textContent = text;
+    _tipEl.style.opacity = '1';
+    if (_tipFadeTimer) clearTimeout(_tipFadeTimer);
+    _tipFadeTimer = setTimeout(function () { _tipEl.style.opacity = '0'; }, 5000);
+  }
+
+  function checkTips(currentWave) {
+    _tipCheckTimer += 0.016; // roughly per-frame, throttled by caller
+    if (_tipCheckTimer < 1.0) return; // check every 1s
+    _tipCheckTimer = 0;
+    for (var i = 0; i < _tips.length; i++) {
+      var tip = _tips[i];
+      if (_shownTips[tip.id]) continue;
+      if (currentWave >= tip.wave) {
+        _shownTips[tip.id] = true;
+        try { localStorage.setItem('ok_tips_shown', JSON.stringify(_shownTips)); } catch (e) {}
+        showTip(tip.text);
+        return; // only one tip per check
+      }
+    }
+  }
+
+  function resetTips() {
+    _shownTips = {};
+    try { localStorage.removeItem('ok_tips_shown'); } catch (e) {}
+  }
+
   return {
     CFG, ACHIEVEMENTS,
     init, clear, update,
@@ -550,10 +620,14 @@ const Feedback = (function () {
     showXPGain,
     // Slow-mo
     triggerSlowMo, getSlowMoRate,
+    // Hitstop
+    triggerHitStop, isHitStopped, updateHitStop,
     // Weapon pickup
     showWeaponPickup,
     // Environment warning
     showEnvironmentWarning,
     radioChatter,
+    // Contextual tips
+    checkTips, resetTips, showTip,
   };
 })();
