@@ -192,11 +192,28 @@ const HUD = (() => {
   const MM_SIZE = 180;
   const MM_HALF = MM_SIZE / 2;
   const MM_SCALE = 2.5;
+  var _minimapJammed = false;
+  var _compassJammed = false;
+
+  function setMinimapJammed(jammed) { _minimapJammed = !!jammed; }
+  function setCompassJammed(jammed) { _compassJammed = !!jammed; }
 
   function updateMinimap(px, pz, pyaw, enemies, npcs, vehicles, drones) {
     if (!minimapCtx) return;
     const ctx = minimapCtx;
     ctx.clearRect(0, 0, MM_SIZE, MM_SIZE);
+    if (_minimapJammed) {
+      var imgData = ctx.createImageData(MM_SIZE, MM_SIZE);
+      for (var pi = 0; pi < imgData.data.length; pi += 4) {
+        var v = Math.random() * 100 | 0;
+        imgData.data[pi] = v; imgData.data[pi+1] = v + 20; imgData.data[pi+2] = v;
+        imgData.data[pi+3] = 220;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      ctx.fillStyle = '#ff0000'; ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('JAMMED', MM_HALF, MM_HALF);
+      return;
+    }
     ctx.save();
 
     // Clip to circle
@@ -333,6 +350,10 @@ const HUD = (() => {
 
   function updateCompass(yaw) {
     if (!compassEl) return;
+    if (_compassJammed) {
+      compassEl.innerHTML = '<span style="position:absolute;left:50%;transform:translateX(-50%);color:#ff0000;font-weight:bold;font-size:13px">EW JAMMED</span>';
+      return;
+    }
     // Throttle to ~10fps (100ms) to avoid per-frame innerHTML rebuild
     var now = performance.now();
     if (now - _compassLastUpdate < 100) return;
@@ -956,6 +977,7 @@ const HUD = (() => {
     announceWave, announceStage,
     addKill, showHitDirection, updateMinimap,
     updateCompass, showStreak, showBleed, showProne, showJam,
+    setMinimapJammed, setCompassJammed,
     showVehicleHUD, hideVehicleHUD, updateVehicleHUD, showHijackProgress,
     updateStamina, showNightVision, updateWeatherDisplay,
     showInteractionPrompt, hideInteractionPrompt,

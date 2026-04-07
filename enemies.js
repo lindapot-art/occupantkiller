@@ -1751,6 +1751,8 @@ const Enemies = (() => {
       // ── EnemyTypes special AI behaviors ──
       if (typeof EnemyTypes !== 'undefined') {
         var etResult = null;
+        // Sync shorthand position props for EnemyTypes functions
+        e.x = e.mesh.position.x; e.y = e.mesh.position.y; e.z = e.mesh.position.z;
         switch (e.typeCfg.name) {
           case 'BOMBER':
             etResult = EnemyTypes.updateBomber(e, playerPos, delta);
@@ -1946,7 +1948,8 @@ const Enemies = (() => {
           case 'WAGNER':
             etResult = EnemyTypes.updateWagner ? EnemyTypes.updateWagner(e, playerPos, delta) : null;
             if (etResult && etResult.berserker) {
-              e.speed = (e._baseSpeed || e.speed) * etResult.speedMult;
+              if (!e._baseSpeed) e._baseSpeed = e.speed;
+              e.speed = e._baseSpeed * etResult.speedMult;
               // Visual: make mesh red-tinted
               if (e.mesh && e.mesh.children[0] && e.mesh.children[0].material) {
                 e.mesh.children[0].material.emissive = new THREE.Color(0x660000);
@@ -2103,6 +2106,8 @@ const Enemies = (() => {
             }
             break;
         }
+        // Sync position writes back to mesh
+        e.mesh.position.x = e.x; e.mesh.position.y = e.y; e.mesh.position.z = e.z;
       }
 
       // ── Anti-drone combat: enemies shoot at nearby drones ──

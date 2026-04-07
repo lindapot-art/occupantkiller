@@ -155,9 +155,9 @@ const AudioSystem = (function () {
     osc.type = 'sawtooth';
     gain.gain.setValueAtTime(0.3, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + params.decay);
-    // Spatial panning
-    var panner = ctx.createStereoPanner();
-    panner.pan.value = _calcPan(worldPos, listenerPos, listenerAngle);
+    // Spatial panning (guarded for Safari < 14.1)
+    var panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    if (panner) panner.pan.value = _calcPan(worldPos, listenerPos, listenerAngle);
     // Distance attenuation
     if (listenerPos && worldPos) {
       var ddx = worldPos.x - listenerPos.x, ddz = worldPos.z - listenerPos.z;
@@ -167,8 +167,8 @@ const AudioSystem = (function () {
     osc.connect(filter);
     noise.connect(filter);
     filter.connect(gain);
-    gain.connect(panner);
-    panner.connect(masterGain);
+    if (panner) { gain.connect(panner); panner.connect(masterGain); }
+    else { gain.connect(masterGain); }
     osc.start(now);
     osc.stop(now + params.decay);
   }
