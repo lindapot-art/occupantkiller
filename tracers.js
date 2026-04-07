@@ -248,6 +248,12 @@ const Tracers = (() => {
   }
 
   function clear() {
+    // Drain pool
+    for (const p of _tracerPool) {
+      p.line.geometry.dispose();
+      p.line.material.dispose();
+    }
+    _tracerPool.length = 0;
     for (const t of tracers) {
       _scene.remove(t.line);
       t.line.geometry.dispose();

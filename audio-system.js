@@ -228,6 +228,7 @@ const AudioSystem = (function () {
   var _engineGain = null;
   function startEngine() {
     if (!enabled || !ctx) return;
+    stopEngine(); // prevent orphaned oscillator leak
     resume();
     _engineOsc = ctx.createOscillator();
     _engineOsc.type = 'sawtooth';
