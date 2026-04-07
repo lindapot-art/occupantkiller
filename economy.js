@@ -96,6 +96,7 @@ const Economy = (function () {
     return false;
   }
   function getCurrency() { return currency; }
+  function setCurrency(val) { if (typeof val === 'number' && val >= 0) currency = val; }
 
   /* ── Trading ─────────────────────────────────────────────────────── */
   function sellResource(type, amount) {
@@ -358,6 +359,7 @@ const Economy = (function () {
     addCurrency,
     spendCurrency,
     getCurrency,
+    setCurrency,
     sellResource,
     buyResource,
     weeklyUpdate,

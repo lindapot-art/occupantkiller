@@ -1494,6 +1494,7 @@ const Weapons = (() => {
     recoilOffsetZ = 0;
     reloadAnimAngle = 0;
     switchAnimTimer = SWITCH_ANIM_DUR; // trigger bob-up animation
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.playWeaponSwitch) AudioSystem.playWeaponSwitch();
     const st = curState();
     HUD.setWeapon(cur().name, currentIdx);
     if (cur().type === 'MELEE') {
@@ -2047,7 +2048,12 @@ const Weapons = (() => {
     const wep = cur();
     const st  = curState();
     if (wep.type === 'MELEE') return;
-    if (st.reloading || st.reserve <= 0 || st.clip === wep.clipSize) return;
+    if (st.reloading || st.clip === wep.clipSize) return;
+    if (st.reserve <= 0) {
+      // No ammo — dry fire click
+      if (typeof AudioSystem !== 'undefined' && AudioSystem.playDryFire) AudioSystem.playDryFire();
+      return;
+    }
     st.reloading   = true;
     st.reloadTimer = wep.reloadTime;
     reloadAnimAngle = 0;

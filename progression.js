@@ -21,6 +21,7 @@ const Progression = (function () {
 
   let prestigeLevel = 0;
   let prestigeXPRequired = 50000; // XP needed to prestige
+  var _highestStage = 0;
 
   function canPrestige(totalXP) { return totalXP >= prestigeXPRequired && prestigeLevel < PRESTIGE.MAX_LEVEL; }
 
@@ -480,10 +481,22 @@ const Progression = (function () {
   /* ── Save/Load ─────────────────────────────── */
   function save() {
     try {
-      localStorage.setItem('ok_progression', JSON.stringify({
+      var saveData = {
         prestigeLevel, stats, unlockedEntries: [...unlockedEntries],
-        unlockedAchievements: typeof Feedback !== 'undefined' ? Feedback.getUnlocked() : []
-      }));
+        unlockedAchievements: typeof Feedback !== 'undefined' ? Feedback.getUnlocked() : [],
+        highestStage: _highestStage || 0,
+      };
+      // Save weapon unlocks
+      if (typeof Weapons !== 'undefined' && Weapons.getWeaponCount && Weapons.isUnlocked) {
+        var wUnlocks = [];
+        for (var wi = 0; wi < Weapons.getWeaponCount(); wi++) wUnlocks.push(Weapons.isUnlocked(wi));
+        saveData.weaponUnlocks = wUnlocks;
+      }
+      // Save economy currency
+      if (typeof Economy !== 'undefined' && Economy.getCurrency) {
+        saveData.currency = Economy.getCurrency();
+      }
+      localStorage.setItem('ok_progression', JSON.stringify(saveData));
     } catch (_e) { /* noop */ }
   }
 
@@ -493,6 +506,17 @@ const Progression = (function () {
       if (data.prestigeLevel !== undefined) prestigeLevel = data.prestigeLevel;
       if (data.stats) Object.assign(stats, data.stats);
       if (data.unlockedEntries) data.unlockedEntries.forEach(id => unlockedEntries.add(id));
+      if (data.highestStage !== undefined) _highestStage = data.highestStage;
+      // Restore weapon unlocks
+      if (data.weaponUnlocks && typeof Weapons !== 'undefined' && Weapons.unlockWeapon) {
+        for (var wi = 0; wi < data.weaponUnlocks.length; wi++) {
+          if (data.weaponUnlocks[wi]) Weapons.unlockWeapon(wi);
+        }
+      }
+      // Restore economy currency
+      if (data.currency !== undefined && typeof Economy !== 'undefined' && Economy.setCurrency) {
+        Economy.setCurrency(data.currency);
+      }
     } catch (_e) { /* noop */ }
     loadLeaderboard();
   }
@@ -547,6 +571,9 @@ const Progression = (function () {
     // Combat Rating
     calculateCombatRating,
     // Loadout Presets
-    saveLoadout, loadLoadout, getLoadouts, deleteLoadout
+    saveLoadout, loadLoadout, getLoadouts, deleteLoadout,
+    // Stage persistence
+    getHighestStage: function () { return _highestStage; },
+    setHighestStage: function (s) { if (s > _highestStage) _highestStage = s; }
   };
 })();

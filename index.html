@@ -457,7 +457,7 @@
       <p id="challenge-desc" style="color:#666;font-size:11px;margin:4px 0"></p>
     </div>
     <button class="btn" id="start-btn">▶ START MISSION</button>
-    <div style="margin:8px 0">
+    <div id="start-wallet-row" style="margin:8px 0;display:none">
       <button class="btn" id="start-connect-wallet" style="font-size:12px;padding:5px 14px;border-color:#8247e5;color:#8247e5;display:inline-block">🦊 Connect MetaMask (Polygon)</button>
       <span id="start-wallet-status" style="font-size:11px;color:#888;margin-left:8px"></span>
     </div>
@@ -832,6 +832,9 @@
       updateWalletUI();
     }
   });
+
+  // Show wallet button on start screen only for returning players
+  try { if (localStorage.getItem('ok_progression')) { var wr = document.getElementById('start-wallet-row'); if (wr) wr.style.display = ''; } } catch(_e){}
 
   document.getElementById('start-connect-wallet').addEventListener('click', function () {
     Blockchain.connect().then(updateWalletUI);

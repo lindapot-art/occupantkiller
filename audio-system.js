@@ -1169,6 +1169,42 @@ const AudioSystem = (function () {
     osc.stop(now + 0.21);
   }
 
+  // ── Weapon switch click — sharp metallic tick ──
+  function playWeaponSwitch() {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    var osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(2400, now);
+    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.03);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.08, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    osc.connect(g);
+    g.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 0.05);
+  }
+
+  // ── Dry fire click — empty chamber ──
+  function playDryFire() {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    var osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(1800, now);
+    osc.frequency.exponentialRampToValueAtTime(600, now + 0.02);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.06, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+    osc.connect(g);
+    g.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 0.03);
+  }
+
   return {
     init: init,
     resume: resume,
@@ -1223,5 +1259,7 @@ const AudioSystem = (function () {
     playEnemyAlert: playEnemyAlert,
     playBountyComplete: playBountyComplete,
     playFortificationBuild: playFortificationBuild,
+    playWeaponSwitch: playWeaponSwitch,
+    playDryFire: playDryFire,
   };
 })();

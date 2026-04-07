@@ -2167,7 +2167,7 @@ const GameManager = (function () {
     }
 
     // Trigger a random battlefield event between waves (from wave 2+)
-    if (currentWave >= 2) {
+    if (currentWave >= 3) {
       setTimeout(triggerBattlefieldEvent, 1500);
     }
 
@@ -2179,6 +2179,12 @@ const GameManager = (function () {
       // Stage clear bonus
       player.score += 1000; // Stage clear bonus
       HUD.setScore(player.score);
+
+      // Track highest stage reached for save/load
+      if (typeof Progression !== 'undefined' && Progression.setHighestStage) {
+        Progression.setHighestStage(currentStage + 1);
+        Progression.save();
+      }
 
       // Play-to-Earn: OKC for stage clear
       if (typeof Marketplace !== 'undefined') {
@@ -2955,6 +2961,9 @@ const GameManager = (function () {
 
     // ── B26: FPS counter ──
     if (HUD.updateFPS) HUD.updateFPS();
+
+    // ── Indicator priority stack refresh (picks up direct DOM changes) ──
+    if (HUD.refreshIndicators) HUD.refreshIndicators();
 
     if (gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE) {
       // Core systems

@@ -411,12 +411,93 @@ const HUD = (() => {
     streakEl.style.textShadow = '0 0 10px ' + color;
   }
 
+  // ── Indicator Priority Stack ─────────────────────────────────
+  // Limits bottom-center indicators to MAX_VISIBLE at once.
+  // Priority: 1=critical (always show), 2=action, 3=info
+  var MAX_VISIBLE_INDICATORS = 3;
+  var INDICATOR_STACK_BOTTOM = 95; // starting bottom px
+  var INDICATOR_STACK_GAP = 28;    // px between stacked indicators
+  var _indicatorRegistry = [
+    // { id, el, priority, wanted }
+    { id: 'bleed-indicator',    el: null, priority: 1, wanted: false },
+    { id: 'jam-indicator',      el: null, priority: 1, wanted: false },
+    { id: 'overheat-indicator', el: null, priority: 1, wanted: false },
+    { id: 'laststand-indicator',el: null, priority: 1, wanted: false },
+    { id: 'slide-indicator',    el: null, priority: 2, wanted: false },
+    { id: 'wallrun-indicator',  el: null, priority: 2, wanted: false },
+    { id: 'tacsprint-indicator',el: null, priority: 2, wanted: false },
+    { id: 'bayonet-indicator',  el: null, priority: 2, wanted: false },
+    { id: 'swim-indicator',     el: null, priority: 2, wanted: false },
+    { id: 'mantle-indicator',   el: null, priority: 2, wanted: false },
+    { id: 'prone-indicator',    el: null, priority: 3, wanted: false },
+    { id: 'dual-wield-indicator',el: null, priority: 3, wanted: false },
+    { id: 'blindfire-indicator', el: null, priority: 3, wanted: false },
+    { id: 'maintenance-indicator', el: null, priority: 3, wanted: false },
+    { id: 'adrenaline-indicator',el: null, priority: 3, wanted: false },
+  ];
+  // Lazy-init element refs
+  function _getIndEl(entry) {
+    if (!entry.el) entry.el = document.getElementById(entry.id);
+    return entry.el;
+  }
+  // Set wanted state for a registered indicator
+  function _setIndicatorWanted(id, active) {
+    for (var i = 0; i < _indicatorRegistry.length; i++) {
+      if (_indicatorRegistry[i].id === id) { _indicatorRegistry[i].wanted = !!active; break; }
+    }
+  }
+  // Refresh: show top N by priority, hide rest, reposition dynamically
+  function _refreshIndicatorStack() {
+    // Collect wanted indicators sorted by priority (lower = higher priority)
+    var active = [];
+    for (var i = 0; i < _indicatorRegistry.length; i++) {
+      var entry = _indicatorRegistry[i];
+      var el = _getIndEl(entry);
+      if (!el) continue;
+      // For indicators set directly by game-manager, check if they're display:block
+      // but only if HUD didn't set 'wanted' (external control)
+      if (entry.wanted) {
+        active.push(entry);
+      } else {
+        el.style.display = 'none';
+      }
+    }
+    // Sort by priority (1 first), then by registry order for same priority
+    active.sort(function(a, b) { return a.priority - b.priority; });
+    // Show top N, hide rest
+    for (var j = 0; j < active.length; j++) {
+      var el = _getIndEl(active[j]);
+      if (j < MAX_VISIBLE_INDICATORS) {
+        el.style.display = 'block';
+        el.style.bottom = (INDICATOR_STACK_BOTTOM + j * INDICATOR_STACK_GAP) + 'px';
+      } else {
+        el.style.display = 'none';
+      }
+    }
+  }
+  // Public refresh — also picks up indicators toggled directly by game-manager.js
+  function refreshIndicators() {
+    for (var i = 0; i < _indicatorRegistry.length; i++) {
+      var entry = _indicatorRegistry[i];
+      var el = _getIndEl(entry);
+      if (!el) continue;
+      // Sync: if game-manager.js set display:block directly, treat as wanted
+      if (el.style.display === 'block' && !entry.wanted) entry.wanted = true;
+      if (el.style.display === 'none' && entry.wanted) {
+        // HUD may have hidden it — check if it was externally hidden
+        // Only clear wanted if it wasn't set by a HUD show* function
+      }
+    }
+    _refreshIndicatorStack();
+  }
+
   // ── Bleed Indicator ────────────────────────────────────────
   const bleedEl = document.getElementById('bleed-indicator');
 
   function showBleed(active) {
     if (!bleedEl) return;
-    bleedEl.style.display = active ? 'block' : 'none';
+    _setIndicatorWanted('bleed-indicator', active);
+    _refreshIndicatorStack();
   }
 
   // ── Prone Indicator ────────────────────────────────────────
@@ -424,7 +505,8 @@ const HUD = (() => {
 
   function showProne(active) {
     if (!proneEl) return;
-    proneEl.style.display = active ? 'block' : 'none';
+    _setIndicatorWanted('prone-indicator', active);
+    _refreshIndicatorStack();
   }
 
   // ── Jam Indicator ──────────────────────────────────────────
@@ -432,7 +514,8 @@ const HUD = (() => {
 
   function showJam(active) {
     if (!jamEl) return;
-    jamEl.style.display = active ? 'block' : 'none';
+    _setIndicatorWanted('jam-indicator', active);
+    _refreshIndicatorStack();
   }
 
   // ── Vehicle HUD ──────────────────────────────────────────────────
@@ -569,19 +652,19 @@ const HUD = (() => {
 
   // ── Feature 3: Slide Indicator ───────────────────────────────────
   const slideEl = document.getElementById('slide-indicator');
-  function showSlide(active) { if (slideEl) slideEl.style.display = active ? 'block' : 'none'; }
+  function showSlide(active) { _setIndicatorWanted('slide-indicator', active); _refreshIndicatorStack(); }
 
   // ── Feature 2: Wall Run Indicator ────────────────────────────────
   const wallrunEl = document.getElementById('wallrun-indicator');
-  function showWallRun(active) { if (wallrunEl) wallrunEl.style.display = active ? 'block' : 'none'; }
+  function showWallRun(active) { _setIndicatorWanted('wallrun-indicator', active); _refreshIndicatorStack(); }
 
   // ── Feature 7: Tactical Sprint Indicator ─────────────────────────
   const tacSprintEl = document.getElementById('tacsprint-indicator');
-  function showTacSprint(active) { if (tacSprintEl) tacSprintEl.style.display = active ? 'block' : 'none'; }
+  function showTacSprint(active) { _setIndicatorWanted('tacsprint-indicator', active); _refreshIndicatorStack(); }
 
   // ── Feature 8: Last Stand Indicator ──────────────────────────────
   const lastStandEl = document.getElementById('laststand-indicator');
-  function showLastStand(active) { if (lastStandEl) lastStandEl.style.display = active ? 'block' : 'none'; }
+  function showLastStand(active) { _setIndicatorWanted('laststand-indicator', active); _refreshIndicatorStack(); }
 
   // ── Feature 9: Focus Mode ────────────────────────────────────────
   const focusEl = document.getElementById('focus-indicator');
@@ -597,7 +680,7 @@ const HUD = (() => {
 
   // ── Feature 11: Dual Wield ───────────────────────────────────────
   const dualWieldEl = document.getElementById('dual-wield-indicator');
-  function showDualWield(active) { if (dualWieldEl) dualWieldEl.style.display = active ? 'block' : 'none'; }
+  function showDualWield(active) { _setIndicatorWanted('dual-wield-indicator', active); _refreshIndicatorStack(); }
 
   // ── Feature 15: Weapon Heat ──────────────────────────────────────
   const heatBarEl = document.getElementById('heat-bar');
@@ -1000,5 +1083,6 @@ const HUD = (() => {
     showDamageFlash,
     // ── B26: QoL ──
     toggleFPS, updateFPS, toggleSettings, getSettings,
+    refreshIndicators,
   };
 })();
