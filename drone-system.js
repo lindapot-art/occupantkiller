@@ -242,7 +242,7 @@ const DroneSystem = (function () {
           // Create explosion at ground below drone
           var bombX = drone.position.x;
           var bombZ = drone.position.z;
-          var bombY = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(bombX, bombZ) : 0;
+          var bombY = (typeof window.VoxelWorld !== 'undefined') ? window.VoxelWorld.getTerrainHeight(bombX, bombZ) : 0;
           if (typeof Enemies !== 'undefined' && Enemies.damageInRadius) {
             // Damage player via GameManager
             var bombPos = new THREE.Vector3(bombX, bombY, bombZ);
@@ -254,10 +254,10 @@ const DroneSystem = (function () {
             }
           }
           // Terrain destruction
-          if (typeof VoxelWorld !== 'undefined' && VoxelWorld.setBlock) {
+          if (typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.setBlock) {
             for (var rx = -2; rx <= 2; rx++) {
               for (var rz = -2; rz <= 2; rz++) {
-                VoxelWorld.setBlock(Math.floor(bombX) + rx, Math.floor(bombY), Math.floor(bombZ) + rz, 0);
+                window.VoxelWorld.setBlock(Math.floor(bombX) + rx, Math.floor(bombY), Math.floor(bombZ) + rz, 0);
               }
             }
           }
@@ -289,10 +289,10 @@ const DroneSystem = (function () {
         var ix = Math.floor(drone.position.x);
         var iy = Math.floor(drone.position.y);
         var iz = Math.floor(drone.position.z);
-        if (typeof VoxelWorld !== 'undefined' && VoxelWorld.setBlock) {
+        if (typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.setBlock) {
           for (var bx = -1; bx <= 1; bx++) {
             for (var bz = -1; bz <= 1; bz++) {
-              VoxelWorld.setBlock(ix + bx, iy, iz + bz, 0);
+              window.VoxelWorld.setBlock(ix + bx, iy, iz + bz, 0);
             }
           }
         }
@@ -350,7 +350,7 @@ const DroneSystem = (function () {
       drone.position.addScaledVector(drone.velocity, delta);
 
       // Ground collision
-      const terrainH = (typeof VoxelWorld !== 'undefined' ? VoxelWorld.getTerrainHeight(drone.position.x, drone.position.z) : 0) + 1;
+      const terrainH = (typeof window.VoxelWorld !== 'undefined' ? window.VoxelWorld.getTerrainHeight(drone.position.x, drone.position.z) : 0) + 1;
       if (drone.position.y < terrainH) {
         drone.position.y = terrainH;
         if (!drone.active) {
@@ -380,12 +380,12 @@ const DroneSystem = (function () {
     }
 
     // Drone motor sound — start/update/stop based on nearest drone
-    if (typeof AudioSystem !== 'undefined') {
+        if (typeof window.AudioSystem !== 'undefined') {
       if (nearestDroneDist < 40) {
-        if (!_droneMotorActive) { AudioSystem.startDroneMotor(); _droneMotorActive = true; }
-        AudioSystem.updateDroneMotor(nearestDroneDist);
+                if (!_droneMotorActive) { window.AudioSystem.startDroneMotor(); _droneMotorActive = true; }
+                window.AudioSystem.updateDroneMotor(nearestDroneDist);
       } else if (_droneMotorActive) {
-        AudioSystem.stopDroneMotor();
+                window.AudioSystem.stopDroneMotor();
         _droneMotorActive = false;
       }
     }
@@ -456,7 +456,7 @@ const DroneSystem = (function () {
       Enemies.damageInRadius(dropPos, 5, drone.damage);
     }
     createDroneExplosion(dropPos);
-    if (typeof AudioSystem !== 'undefined') AudioSystem.playGunshot('launcher');
+        if (typeof window.AudioSystem !== 'undefined') window.AudioSystem.playGunshot('launcher');
     return { position: dropPos, damage: drone.damage };
   }
 
@@ -468,7 +468,7 @@ const DroneSystem = (function () {
       Enemies.damageInRadius(drone.position, 3, drone.damage);
     }
     createDroneExplosion(drone.position.clone());
-    if (typeof AudioSystem !== 'undefined') AudioSystem.playGunshot('launcher');
+        if (typeof window.AudioSystem !== 'undefined') window.AudioSystem.playGunshot('launcher');
     destroyDrone(drone);
     return true;
   }

@@ -8,6 +8,28 @@ const Perks = (function () {
 
   /* ── Perk Definitions ──────────────────────── */
   const PERK_LIST = {
+        // NEW: Drone Recon
+        DRONE_RECON: {
+          id: 'DRONE_RECON', name: 'Drone Recon', icon: '🛰️',
+          desc: 'Call in a recon drone to scout enemy positions. 90s cooldown.',
+          effect: function () {
+            if (typeof DroneSystem !== 'undefined' && DroneSystem.callRecon) {
+              DroneSystem.callRecon();
+            }
+          },
+          cooldown: 90
+        },
+        // NEW: Artillery Strike
+        ARTILLERY_STRIKE: {
+          id: 'ARTILLERY_STRIKE', name: 'Artillery Strike', icon: '💥',
+          desc: 'Call in an artillery barrage on a target area. 120s cooldown.',
+          effect: function () {
+            if (typeof VFX !== 'undefined' && VFX.artilleryBarrage) {
+              VFX.artilleryBarrage();
+            }
+          },
+          cooldown: 120
+        },
     // Feature 33: Field Bandage
     FIELD_BANDAGE: {
       id: 'FIELD_BANDAGE', name: 'Field Bandage', icon: '🩹',

@@ -196,14 +196,22 @@ const WorldFeatures = (function () {
 
   /* ── Feature 27: Supply Airdrops ───────────── */
   function spawnAirdrop(x, z, targetY) {
+    // Crate
     const geo = new _THREE.BoxGeometry(2, 1.5, 2);
     const mat = new _THREE.MeshLambertMaterial({ color: 0x556b2f });
     const mesh = new _THREE.Mesh(geo, mat);
+    // Parachute (hemisphere)
+    const chuteGeo = new _THREE.SphereGeometry(1.6, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+    const chuteMat = new _THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+    const chute = new _THREE.Mesh(chuteGeo, chuteMat);
+    chute.position.set(0, 1.5, 0);
+    mesh.add(chute);
+    // Start position
     const startY = 50;
     mesh.position.set(x, startY, z);
     _scene.add(mesh);
     const contents = CFG.AIRDROP_CONTENTS[Math.floor(Math.random() * CFG.AIRDROP_CONTENTS.length)];
-    airdrops.push({ mesh, targetY: targetY + 1, contents, landed: false, collectRange: 3 });
+    airdrops.push({ mesh, chute, targetY: targetY + 1, contents, landed: false, collectRange: 3, landedVFX: false });
   }
 
   function updateAirdrops(dt) {
@@ -212,10 +220,33 @@ const WorldFeatures = (function () {
       const a = airdrops[i];
       if (!a.landed) {
         a.mesh.position.y -= CFG.AIRDROP_FALL_SPEED * dt;
+        // Parachute swaying animation
+        if (a.chute) {
+          a.chute.rotation.z = Math.sin(Date.now() * 0.001 + i) * 0.18;
+          a.chute.material.opacity = 0.85 - 0.2 * Math.abs(Math.sin(Date.now() * 0.001 + i));
+        }
         if (a.mesh.position.y <= a.targetY) {
           a.mesh.position.y = a.targetY;
           a.landed = true;
           landed.push(a);
+        }
+      } else if (!a.landedVFX) {
+        // Play landing sound and VFX once
+        a.landedVFX = true;
+        if (a.chute) {
+          a.mesh.remove(a.chute);
+        }
+        if (typeof window !== 'undefined' && window.AudioSystem && AudioSystem.playPickup) {
+          AudioSystem.playPickup(); // Use pickup sound for now
+        }
+        // Simple dust VFX: spawn a transparent sphere that fades out
+        if (_scene && _THREE) {
+          const dustGeo = new _THREE.SphereGeometry(1.2, 10, 8);
+          const dustMat = new _THREE.MeshBasicMaterial({ color: 0xccccaa, transparent: true, opacity: 0.35 });
+          const dust = new _THREE.Mesh(dustGeo, dustMat);
+          dust.position.copy(a.mesh.position);
+          _scene.add(dust);
+          setTimeout(() => { _scene.remove(dust); }, 700);
         }
       }
     }

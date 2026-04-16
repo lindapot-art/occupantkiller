@@ -16,6 +16,22 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [HIGH] Rewrite Gameplay Test — Player Movement + Varied Screenshots
+Status: IN-PROGRESS
+Requested: 2026-04-08
+Details: User criticized that gameplay test avatar never moves — all 23 screenshots show same viewpoint from spawn. Need to rewrite combat loop (lines 112-197 of tools/test-gameplay.js) with `act()` helper that moves player position, aims at enemies via CameraSystem.setYaw(), fires at 50 damage (not 99999 instant-kill), switches weapons on schedule. Full plan at `/memories/session/plan.md`. Screenshot capture infrastructure is already in place. Movement pattern: forward/fwd-right/right/fwd-left/left/back cycle. Weapon switch schedule on rounds 3,6,9,11,13,15,17,19.
+
+### [HIGH] QA Screenshots Rule — Every QA Report Must Include Screenshots
+Status: DONE (infrastructure complete)
+Requested: 2026-04-08
+Completed: 2026-04-08
+Details: Added captureScreenshot() helper, SCREENSHOT_DIR, cleanup logic, and screenshot calls at every 5-second interval during gameplay test. 23 PNGs captured. Windows filename bug fixed. Output currently shows stationary player — movement rewrite pending above.
+
+### [MEDIUM] Batch 9 — Mr. Jopa Audit Then Implement
+Status: PENDING
+Requested: 2026-04-08
+Details: Next content batch after movement rewrite is complete.
+
 ### [HIGH] Fix Failing Gameplay/QA Scripts (Session 14)
 Status: DONE
 Requested: 2026-04-06

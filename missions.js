@@ -15,6 +15,61 @@ const MissionSystem = (function () {
 
   /* ── Templates ───────────────────────────────────────────────────── */
   const TEMPLATES = {
+            // NEW: Bradley IFV Mission
+            bradley_mission: {
+              name: 'Bradley IFV Assault',
+              description: 'Ride the Bradley IFV, use Bushmaster Gatling and 25mm cannon. Enter/exit vehicle. Defend convoy on forest road.',
+              tier: 5,
+              generate() {
+                return {
+                  type: 'bradley_mission',
+                  inVehicle: true,
+                  convoyHealth: 200,
+                  roadSegments: 5,
+                  completedSegments: 0,
+                  canExit: true,
+                  forestAmbush: true
+                };
+              },
+              check(mission) { return mission.completedSegments >= mission.roadSegments && mission.convoyHealth > 0; },
+            },
+        // NEW: Airborne Assault (Hostomel)
+        airborne_assault: {
+          name: 'Airborne Assault',
+          description: 'Repel Russian airborne troops and secure the landing zone.',
+          tier: 4,
+          generate() {
+            return {
+              type: 'airborne_assault',
+              waves: 3 + Math.floor(Math.random() * 2),
+              completedWaves: 0,
+              landingZones: [
+                { x: -20, z: 30 },
+                { x: 15, z: -25 }
+              ],
+              reinforcements: true
+            };
+          },
+          check(mission) { return mission.completedWaves >= mission.waves; },
+        },
+        // NEW: Urban Breakout (Kyiv)
+        urban_breakout: {
+          name: 'Urban Breakout',
+          description: 'Break out of encirclement and reach friendly lines.',
+          tier: 5,
+          generate() {
+            return {
+              type: 'urban_breakout',
+              breakoutPoints: [
+                { x: 40, z: -10 },
+                { x: -35, z: 25 }
+              ],
+              reached: false,
+              timeLimit: 180
+            };
+          },
+          check(mission) { return mission.reached; },
+        },
     gather: {
       name: 'Resource Gathering',
       description: 'Collect {amount} {resource} from the world.',
@@ -238,6 +293,36 @@ const MissionSystem = (function () {
 
   /* ── 2. Mission Chains ───────────────────────────────────────────── */
   const MISSION_CHAINS = [
+            // Bradley IFV Forest Road Mission
+            {
+              id: 'bradley_forest',
+              name: 'Bradley Forest Road',
+              stages: [
+                { name: 'Convoy Start', type: 'bradley_mission', desc: 'Defend the convoy while riding the Bradley IFV through a Ukrainian forest road.' },
+                { name: 'Ambush Defense', type: MISSION_TYPE.DEFENSE, desc: 'Repel ambushes and protect the convoy.' },
+                { name: 'Breakout', type: MISSION_TYPE.ESCORT, desc: 'Escort survivors to safety after exiting the vehicle.' }
+              ]
+            },
+        // Hostomel Airport Assault (campaign & skirmish)
+        {
+          id: 'hostomel_airport',
+          name: 'Hostomel Airport Assault',
+          stages: [
+            { name: 'Repel Airborne', type: 'airborne_assault', desc: 'Defend against Russian VDV landings' },
+            { name: 'Secure Runway', type: MISSION_TYPE.DEFENSE, desc: 'Hold the runway for reinforcements' },
+            { name: 'Counterattack', type: MISSION_TYPE.ESCORT, desc: 'Lead a counterattack to clear the airport' }
+          ]
+        },
+        // Kyiv Siege: First Day (campaign)
+        {
+          id: 'kyiv_siege_day1',
+          name: 'Kyiv Siege: First Day',
+          stages: [
+            { name: 'Urban Defense', type: MISSION_TYPE.DEFENSE, desc: 'Hold defensive lines in Kyiv suburbs' },
+            { name: 'Breakout', type: 'urban_breakout', desc: 'Break out of partial encirclement' },
+            { name: 'Rescue Civilians', type: MISSION_TYPE.ESCORT, desc: 'Escort civilians to safety' }
+          ]
+        },
     {
       id: 'operation_viper',
       name: 'Operation Viper',
@@ -350,6 +435,8 @@ const MissionSystem = (function () {
 
   return {
     MISSION_TYPE,
+    // Expose new mission types for IIFE compliance
+    TEMPLATES,
     init,
     generateMission,
     generateRandom,

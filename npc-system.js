@@ -1,3 +1,167 @@
+    // --- Wildlife Types ---
+    const WILDLIFE_TYPE = Object.freeze({
+      BIRD: 'bird',
+      DOG:  'dog',
+      CAT:  'cat',
+    });
+
+    // --- Wildlife NPC Template ---
+    function createWildlifeNPC(type, x, y, z) {
+      const id = nextId++;
+      let mesh;
+      if (type === WILDLIFE_TYPE.BIRD) {
+        mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(0.12, 6, 6),
+          new THREE.MeshLambertMaterial({ color: 0x888888 })
+        );
+        mesh.position.y += 0.1;
+      } else if (type === WILDLIFE_TYPE.DOG) {
+        mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.28, 0.18, 0.12),
+          new THREE.MeshLambertMaterial({ color: 0x8B7355 })
+        );
+        mesh.position.y += 0.09;
+      } else if (type === WILDLIFE_TYPE.CAT) {
+        mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.22, 0.13, 0.10),
+          new THREE.MeshLambertMaterial({ color: 0xB0B0B0 })
+        );
+        mesh.position.y += 0.065;
+      }
+      mesh.castShadow = true;
+      mesh.userData.npcId = id;
+      mesh.userData.faction = 'wildlife';
+      const npc = {
+        id,
+        type,
+        rank: 'wildlife',
+        job: 'wander',
+        position: new THREE.Vector3(x, y, z),
+        mesh,
+        alive: true,
+        aiState: 'idle',
+        aiTimer: Math.random() * 2 + 1,
+        speed: (type === WILDLIFE_TYPE.BIRD) ? 2.2 : 1.1,
+        target: null,
+      };
+      mesh.position.copy(npc.position);
+      return npc;
+    }
+
+    // --- Wildlife AI ---
+    function updateWildlifeAI(npc, delta) {
+      if (!npc.alive) return;
+      npc.aiTimer -= delta;
+      if (npc.aiTimer <= 0) {
+        if (npc.aiState === 'idle') {
+          // Pick a random wander target nearby
+          npc.target = npc.position.clone().add(new THREE.Vector3(
+            (Math.random() - 0.5) * 4,
+            0,
+            (Math.random() - 0.5) * 4
+          ));
+          npc.aiState = 'wander';
+          npc.aiTimer = 2 + Math.random() * 3;
+        } else if (npc.aiState === 'wander') {
+          npc.aiState = 'idle';
+          npc.aiTimer = 1 + Math.random() * 2;
+        }
+      }
+      // Move toward target if wandering
+      if (npc.aiState === 'wander' && npc.target) {
+        const dir = npc.target.clone().sub(npc.position);
+        const dist = dir.length();
+        if (dist > 0.1) {
+          dir.normalize();
+          npc.position.addScaledVector(dir, npc.speed * delta);
+          npc.mesh.position.copy(npc.position);
+        } else {
+          npc.aiState = 'idle';
+          npc.aiTimer = 1 + Math.random() * 2;
+        }
+      }
+      // Flee if player is very close (stub: can be expanded)
+      // Integrate with player position for more realism
+      if (typeof window.GameManager !== 'undefined' && window.GameManager.getPlayer) {
+        const player = window.GameManager.getPlayer();
+        if (player && player.position) {
+          const playerDist = npc.position.distanceTo(player.position);
+          if (playerDist < 6) { // Flee if player is within 6 units
+            // Set flee direction away from player
+            const away = npc.position.clone().sub(player.position).setY(0).normalize();
+            const fleeTarget = npc.position.clone().addScaledVector(away, 8 + Math.random() * 4);
+            npc.target = fleeTarget;
+            npc.aiState = 'flee';
+            npc.aiTimer = 2 + Math.random() * 2;
+            return;
+          }
+        }
+      }
+    }
+
+    // --- Wildlife Spawning ---
+    function spawnWildlifeFromWorld() {
+      if (window._pendingWildlifeSpawns) {
+        for (const pos of window._pendingWildlifeSpawns) {
+          // Randomly pick wildlife type
+          const types = [WILDLIFE_TYPE.BIRD, WILDLIFE_TYPE.DOG, WILDLIFE_TYPE.CAT];
+          for (let i = 0; i < 2 + Math.floor(Math.random() * 2); i++) {
+            const t = types[Math.floor(Math.random() * types.length)];
+            const offset = new THREE.Vector3(
+              (Math.random() - 0.5) * 4,
+              0,
+              (Math.random() - 0.5) * 4
+            );
+            const npc = createWildlifeNPC(t, pos.x + offset.x, pos.y, pos.z + offset.z);
+            npcs.push(npc);
+            _npcById[npc.id] = npc;
+            if (_scene) _scene.add(npc.mesh);
+          }
+        }
+        window._pendingWildlifeSpawns.length = 0;
+      }
+    }
+  // NEW: Ukrainian AI Tactics (Hostomel, Kyiv)
+  function ukrainianTacticsHostomel(npc, context) {
+    // Mobile defense, use cover, counter-flank airborne
+    if (context.isAirborneAssault) {
+      npc.seekCover();
+      if (npc.canFlank()) npc.flankEnemy();
+      if (npc.canCallReinforcements) npc.callReinforcements();
+    }
+  }
+
+  function ukrainianTacticsKyiv(npc, context) {
+    // Urban defense, ambush, fallback, breakout
+    if (context.isUrbanBreakout) {
+      npc.ambushEnemy();
+      if (npc.isEncircled) npc.breakout();
+      if (npc.canRescueCivilians) npc.rescueCivilians();
+    }
+  }
+
+  // NEW: Russian AI Tactics (Hostomel, Kyiv)
+  function russianTacticsHostomel(npc, context) {
+    // Airborne drop, massed assault, attempt to seize runway
+    if (context.isAirborneAssault) {
+      npc.rushObjective();
+      if (npc.canSuppress) npc.suppressDefenders();
+      if (npc.canDeploySmoke) npc.deploySmoke();
+    }
+  }
+
+  function russianTacticsKyiv(npc, context) {
+    // Encirclement, urban push, block breakout
+    if (context.isUrbanBreakout) {
+      npc.blockEscapeRoutes();
+      if (npc.canCallArmor) npc.callArmorSupport();
+      if (npc.canLayMines) npc.layMines();
+    }
+  }
+
+  // Expose for scenario use
+  window.UkrainianTactics = { hostomel: ukrainianTacticsHostomel, kyiv: ukrainianTacticsKyiv };
+  window.RussianTactics = { hostomel: russianTacticsHostomel, kyiv: russianTacticsKyiv };
 /* ───────────────────────────────────────────────────────────────────────
    NPC SIMULATION SYSTEM — Sims-like agents with needs, jobs, AI
    ─────────────────────────────────────────────────────────────────────── */
@@ -35,7 +199,54 @@ const NPCSystem = (function () {
     MEDIC:      'medic',
     EVAC:       'evac',
     ASSAULT:    'assault',
+    WANDER:     'wander',
+    FLEE:       'flee',
+    SHOPKEEPER: 'shopkeeper',
+    HIDE:       'hide'
   });
+
+// ── Civilian Mesh Variant ──
+function buildCivilianMesh(npc) {
+  const group = new THREE.Group();
+  // Simple body (random civilian color)
+  const colors = [0xC2B280, 0x8B7355, 0xB0E0E6, 0xA0522D, 0xD2B48C];
+  const bodyColor = colors[npc.id % colors.length];
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.38, 0.7, 0.28),
+    new THREE.MeshLambertMaterial({ color: bodyColor })
+  );
+  body.position.y = 0.75;
+  group.add(body);
+  // Head
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.17, 8, 8),
+    new THREE.MeshLambertMaterial({ color: 0xEEC9A1 })
+  );
+  head.position.y = 1.22;
+  group.add(head);
+  // Arms
+  for (let side = -1; side <= 1; side += 2) {
+    const arm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.10, 0.48, 0.10),
+      new THREE.MeshLambertMaterial({ color: bodyColor })
+    );
+    arm.position.set(side * 0.22, 0.85, 0);
+    group.add(arm);
+  }
+  // Legs
+  for (let side = -1; side <= 1; side += 2) {
+    const leg = new THREE.Mesh(
+      new THREE.BoxGeometry(0.11, 0.45, 0.11),
+      new THREE.MeshLambertMaterial({ color: 0x444444 })
+    );
+    leg.position.set(side * 0.10, 0.23, 0);
+    group.add(leg);
+  }
+  group.userData.npcId = npc.id;
+  group.userData.faction = 'civilian';
+  group.castShadow = true;
+  return group;
+}
 
   /* ── Friendly Assault Group System ─────────────────────────────── */
   const NUM_FRIENDLY_GROUPS = 4;
@@ -175,7 +386,7 @@ const NPCSystem = (function () {
       guardPos:  null,
     };
 
-    npc.mesh = buildNPCMesh(npc);
+    npc.mesh = (rank === NPC_RANK.CIVILIAN) ? buildCivilianMesh(npc) : buildNPCMesh(npc);
     npc.mesh.position.copy(npc.position);
     return npc;
   }
@@ -456,6 +667,7 @@ const NPCSystem = (function () {
     npcs.length = 0;
     nextId = 1;
     friendlyGroups.length = 0;
+    spawnWildlifeFromWorld();
   }
 
   /* ── Spawn NPC ───────────────────────────────────────────────────── */
@@ -465,6 +677,16 @@ const NPCSystem = (function () {
     _npcById[npc.id] = npc;
     if (_scene) _scene.add(npc.mesh);
     return npc;
+    // ── Civilian Spawning (from shopkeeper spawn points) ──
+    function spawnCiviliansFromWorld() {
+      if (window._pendingShopkeeperSpawns) {
+        for (const pos of window._pendingShopkeeperSpawns) {
+          const civ = spawn(pos.x, pos.y, pos.z, NPC_RANK.CIVILIAN);
+          civ.job = JOB.SHOPKEEPER;
+        }
+        window._pendingShopkeeperSpawns.length = 0;
+      }
+    }
   }
 
   /* ── Spawn Friendly Assault Groups ──────────────────────────────── */
@@ -534,10 +756,14 @@ const NPCSystem = (function () {
 
     for (const npc of npcs) {
       if (!npc.alive) continue;
-      updateNeeds(npc, delta, timeInfo);
-      updateBehavior(npc, delta, timeInfo);
-      updateMovement(npc, delta);
-      updateAnimation(npc, delta);
+      if (npc.rank === 'wildlife' || npc.type === 'wildlife' || npc.type === WILDLIFE_TYPE.BIRD || npc.type === WILDLIFE_TYPE.DOG || npc.type === WILDLIFE_TYPE.CAT) {
+        updateWildlifeAI(npc, delta);
+      } else {
+        updateNeeds(npc, delta, timeInfo);
+        updateBehavior(npc, delta, timeInfo);
+        updateMovement(npc, delta);
+        updateAnimation(npc, delta);
+      }
     }
   }
 
@@ -801,7 +1027,48 @@ const NPCSystem = (function () {
 
   /* ── AI Behavior ─────────────────────────────────────────────────── */
   function updateBehavior(npc, delta, timeInfo) {
-    // Combat takes highest priority for ALL armed NPCs (except medics who heal first)
+    // Civilian AI: flee/react to combat, wander, hide
+    if (npc.rank === NPC_RANK.CIVILIAN) {
+      // If combat nearby, flee
+      const danger = findNearestEnemy(npc);
+      if (danger && danger.dist < 18) {
+        npc.job = JOB.FLEE;
+        // Run away from enemy
+        var away = _nTmp1.subVectors(npc.position, danger.enemy.mesh.position).setY(0).normalize();
+        _nTmp2.copy(npc.position).addScaledVector(away, 10 + Math.random() * 8);
+        if (npc.target) npc.target.copy(_nTmp2);
+        else npc.target = _nTmp2.clone();
+        npc.stress = Math.min(100, npc.stress + delta * 8);
+        return;
+      }
+      // If not in danger, wander or idle in shop
+      if (npc.job === JOB.SHOPKEEPER) {
+        // Idle behind counter, maybe pace a little
+        if (!npc.target && Math.random() < 0.01) {
+          _nTmp2.copy(npc.position).add(new THREE.Vector3((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 1));
+          npc.target = _nTmp2.clone();
+        }
+        return;
+      }
+      if (npc.job === JOB.FLEE) {
+        // After fleeing for a while, switch to wander
+        if (npc.jobTimer > 6) {
+          npc.job = JOB.WANDER;
+          npc.jobTimer = 0;
+        }
+        return;
+      }
+      // Wander randomly
+      if (npc.job === JOB.WANDER || npc.job === JOB.IDLE) {
+        if (!npc.target || Math.random() < 0.01) {
+          _nTmp2.copy(npc.position).add(new THREE.Vector3((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6));
+          npc.target = _nTmp2.clone();
+        }
+        return;
+      }
+      // Default: idle
+      return;
+    }
     if (npc.weapon && npc.job !== JOB.MEDIC) {
       const nearestEnemy = findNearestEnemy(npc);
       if (nearestEnemy) {

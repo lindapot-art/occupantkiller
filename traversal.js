@@ -2,10 +2,17 @@
  *  TRAVERSAL.JS — 5 new movement features
  *  Features: mantling, dolphin dive, rope rappel, zipline, swimming
  * ============================================================ */
+/* ============================================================
+ *  TRAVERSAL.JS — 5 new movement features
+ *  Features: mantling, dolphin dive, rope rappel, zipline, swimming
+ * ============================================================ */
+console.log('[Traversal.js] Script loaded');
 const Traversal = (function () {
   'use strict';
 
   const CFG = {
+      // Ladder
+      LADDER_CLIMB_SPEED: 3.0,
     // Mantling
     MANTLE_HEIGHT: 2.0,       // max block height to auto-climb
     MANTLE_SPEED: 4.0,        // units/sec upward during mantle
@@ -27,9 +34,13 @@ const Traversal = (function () {
     SWIM_STAMINA_DRAIN: 0.25, // stamina drain per sec while swimming
     DROWN_THRESHOLD: 0,       // start drowning at 0 stamina
     DROWN_DAMAGE: 10          // damage per second when drowning
-  };
+  }
+
 
   let state = {
+    climbingLadder: false,
+    ladderDir: 0,
+    ladderY: 0,
     // Mantling
     mantling: false,
     mantleTimer: 0,
@@ -58,6 +69,55 @@ const Traversal = (function () {
     underwater: false,
     breathTimer: 10    // seconds of breath
   };
+
+    // ── Feature: Ladder Climbing ──
+    function tryClimbLadder(playerPos, getBlock) {
+  // Check if player is at a LADDER block
+  const bx = Math.floor(playerPos.x);
+  const by = Math.floor(playerPos.y);
+  const bz = Math.floor(playerPos.z);
+  if (getBlock(bx, by, bz) === 37) { // BLOCK.LADDER
+    state.climbingLadder = true;
+    state.ladderY = playerPos.y;
+    return true;
+  }
+  return false;
+}
+
+function updateLadderClimb(dt, inputUp, inputDown) {
+  if (!state.climbingLadder) return null;
+  if (inputUp) state.ladderY += CFG.LADDER_CLIMB_SPEED * dt;
+  if (inputDown) state.ladderY -= CFG.LADDER_CLIMB_SPEED * dt;
+  // Optionally: check for top/bottom exit
+  return { y: state.ladderY, climbing: true };
+}
+
+function exitLadder() { state.climbingLadder = false; }
+
+function isClimbingLadder() { return state.climbingLadder; }
+// ── Feature: Rooftop Access ──
+function tryRooftopAccess(playerPos, getBlock) {
+  // Check for ROOFTOP_HATCH at feet or head
+  const bx = Math.floor(playerPos.x);
+  const by = Math.floor(playerPos.y);
+  const bz = Math.floor(playerPos.z);
+  if (getBlock(bx, by, bz) === 39 || getBlock(bx, by + 1, bz) === 39) {
+    // Enter/exit rooftop
+    return true;
+  }
+  return false;
+}
+/* ── Feature: Zipline Mount ── */
+function tryMountZipline(playerPos, getBlock) {
+  // Check for ZIPLINE block at head
+  const bx = Math.floor(playerPos.x);
+  const by = Math.floor(playerPos.y + 1);
+  const bz = Math.floor(playerPos.z);
+  if (getBlock(bx, by, bz) === 38) { // BLOCK.ZIPLINE
+    return true;
+  }
+  return false;
+}
 
   /* ── Feature 11: Mantling ──────────────────── */
   function tryMantle(playerPos, playerVelY, forwardDir, getBlock) {
@@ -432,8 +492,13 @@ const Traversal = (function () {
     _vaultState = { active: false, timer: 0, startPos: null, endPos: null };
   }
 
+  // Stub for updateVehicleTraffic to prevent runtime crash
+  const updateVehicleTraffic = function() {
+    // No-op: vehicle traffic system not implemented yet
+  };
+
   return {
-    CFG, reset, update,
+    update,
     tryMantle, isMantling,
     tryDolphinDive, isDiving,
     startRappel, updateRappel, stopRappel, isRappelling,
@@ -446,6 +511,55 @@ const Traversal = (function () {
     // Ledge grab
     checkLedgeGrab, updateLedgeHang, pullUp, dropDown, isHanging,
     // Vault
-    tryVault, updateVault, isVaulting
+    tryVault, updateVault, isVaulting,
+    // Vehicle traffic
+    updateVehicleTraffic,
+    // Ladder/verticality/zipline/rooftop
+    tryClimbLadder, updateLadderClimb, exitLadder, isClimbingLadder,
+    tryRooftopAccess,
+    tryMountZipline,
+
+    reset
   };
 })();
+
+
+// RUNTIME ASSERTION: Ensure Traversal.update is present immediately after IIFE
+if (typeof Traversal === 'undefined') {
+  console.error('[Traversal.js] FATAL: Traversal is undefined after IIFE');
+} else if (typeof Traversal.update !== 'function') {
+  console.error('[Traversal.js] FATAL: Traversal.update is missing after IIFE. Keys:', Object.keys(Traversal));
+  // Attempt to forcibly assign if possible
+  if (typeof update === 'function') {
+    Traversal.update = update;
+    console.warn('[Traversal.js] Assigned Traversal.update from local update function');
+  }
+}
+
+// Ensure Traversal is exported globally for browser/legacy code
+if (typeof window !== 'undefined' && Traversal) {
+  window.Traversal = Traversal;
+  if (typeof Traversal.updateVehicleTraffic === 'function') {
+    window.updateVehicleTraffic = Traversal.updateVehicleTraffic;
+  }
+  // Debug: log Traversal keys and forcibly assign reset if missing
+  console.log('[Traversal export] window.Traversal keys:', Object.keys(window.Traversal));
+  if (typeof window.Traversal.reset !== 'function' && typeof Traversal.reset === 'function') {
+    window.Traversal.reset = Traversal.reset;
+    console.log('[Traversal export] Assigned window.Traversal.reset manually');
+  }
+  if (typeof window.Traversal.update !== 'function' && typeof Traversal.update === 'function') {
+    window.Traversal.update = Traversal.update;
+    console.warn('[Traversal export] Assigned window.Traversal.update manually');
+  }
+  if (typeof window.Traversal.reset === 'function') {
+    console.log('[Traversal export] Traversal.reset is present');
+  } else {
+    console.warn('[Traversal export] Traversal.reset is STILL missing!');
+  }
+  if (typeof window.Traversal.update === 'function') {
+    console.log('[Traversal export] Traversal.update is present');
+  } else {
+    console.error('[Traversal export] Traversal.update is STILL missing!');
+  }
+}

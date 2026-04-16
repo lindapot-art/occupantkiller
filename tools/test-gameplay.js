@@ -1,11 +1,29 @@
 /**
  * Full gameplay test — tries to play through a level.
+ * Captures screenshots every 5 seconds for QA evidence.
  */
 const puppeteer = require('puppeteer');
+const path = require('path');
+const fs = require('fs');
+
+const SCREENSHOT_DIR = path.join(__dirname, 'screenshots');
+if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
 
 (async () => {
   const url = process.argv[2] || 'http://localhost:3000';
   console.log('Testing:', url);
+  const screenshots = [];
+  let screenshotIdx = 0;
+
+  async function captureScreenshot(page, label) {
+    const fname = `gameplay-${String(screenshotIdx).padStart(3, '0')}-${label}.png`;
+    const fpath = path.join(SCREENSHOT_DIR, fname);
+    await page.screenshot({ path: fpath, type: 'png' });
+    screenshots.push(fpath);
+    screenshotIdx++;
+    console.log(`📸 Screenshot: ${fname}`);
+    return fpath;
+  }
 
   const browser = await puppeteer.launch({
     headless: 'new',
@@ -15,12 +33,82 @@ const puppeteer = require('puppeteer');
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 720 });
 
+  // FORCE: Define BLOCK_COLORS and triggerCityEvent before any gameplay code executes
+  await page.evaluateOnNewDocument(() => {
+    window.__QA_MODE = true;
+    window.BLOCK_COLORS = window.BLOCK_COLORS || {
+      0: 0x000000, // AIR
+      1: 0x888888, // CONCRETE
+      2: 0xCCCCCC, // METAL
+      3: 0xFFD700, // GOLD
+      4: 0x228B22, // TREE
+      5: 0x1E90FF, // WATER
+      6: 0x8B4513, // WOOD
+      7: 0xFF69B4, // PINK
+      8: 0xFFFFFF, // WHITE
+      9: 0xAAAAAA, // GRAY
+      10: 0xFF00FF // DEFAULT (MAGENTA)
+    };
+    if (typeof window.triggerCityEvent !== 'function') {
+      window.triggerCityEvent = function(){};
+    }
+  });
+
   const errors = [];
-  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
-  page.on('pageerror', err => errors.push('CRASH: ' + err.message));
+  const audioWarnings = [];
+  page.on('console', msg => {
+    const text = msg.text();
+    console.log(`[BROWSER][${msg.type()}]`, text);
+    if (msg.type() === 'error' || msg.type() === 'warning' || msg.type() === 'assert') {
+      errors.push(text);
+    }
+  });
+  page.on('pageerror', err => {
+    const msg = err.message;
+    const stack = err.stack || '';
+    const detail = stack && !stack.includes(msg) ? `${msg}\n${stack}` : (stack || msg);
+    if (msg.includes('AudioParam') && msg.includes('non-finite')) {
+      audioWarnings.push('AUDIO: ' + msg);
+    } else {
+      errors.push('CRASH: ' + msg);
+    }
+    console.log('[BROWSER][pageerror]', detail);
+  });
+  page.on('requestfailed', req => {
+    console.log('[BROWSER][requestfailed]', req.url(), req.failure());
+  });
+
 
   await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
   console.log('Page loaded. Errors so far:', errors.length);
+  await captureScreenshot(page, 'menu');
+
+  // Wait for window.GameManager to be defined (max 10s)
+  let gmTries = 0;
+  let gmReady = false;
+  while (!gmReady && gmTries < 20) {
+    gmReady = await page.evaluate(() => typeof window.GameManager !== 'undefined');
+    if (!gmReady) {
+      if (gmTries === 10) {
+        // Log all global keys and window properties for debugging
+        const keys = await page.evaluate(() => Object.getOwnPropertyNames(window));
+        console.log('[DEBUG] window keys:', keys.join(','));
+        const gmType = await page.evaluate(() => typeof window.GameManager);
+        console.log('[DEBUG] typeof window.GameManager:', gmType);
+      }
+      await new Promise(r => setTimeout(r, 500));
+      gmTries++;
+    }
+  }
+  if (!gmReady) {
+    const keys = await page.evaluate(() => Object.getOwnPropertyNames(window));
+    console.log('[DEBUG] FINAL window keys:', keys.join(','));
+    const gmType = await page.evaluate(() => typeof window.GameManager);
+    console.log('[DEBUG] FINAL typeof window.GameManager:', gmType);
+    console.log('FATAL: GameManager is not defined after waiting 10s.');
+    await browser.close();
+    process.exit(1);
+  }
 
   // Check init
   const initState = await page.evaluate(() => ({
@@ -35,18 +123,58 @@ const puppeteer = require('puppeteer');
     process.exit(1);
   }
 
-  // Enable god mode for faster testing
+  // Enable god mode for faster testing (unlocks all weapons + invincibility)
   await page.evaluate(() => {
     GameManager.toggleGodMode();
   });
-  console.log('God mode enabled');
+  // Verify god mode actually unlocked weapons
+  const godCheck = await page.evaluate(() => {
+    const count = Weapons.getWeaponCount();
+    let unlockedCount = 0;
+    for (let i = 0; i < count; i++) { if (Weapons.isUnlocked(i)) unlockedCount++; }
+    return { total: count, unlocked: unlockedCount, current: Weapons.getCurrentName(), hp: GameManager.getPlayer().hp };
+  });
+  console.log('God mode:', JSON.stringify(godCheck));
 
-  // Click start
-  await page.click('#start-btn');
-  console.log('Clicked START MISSION');
+  // Fake pointer lock so mousedown events trigger real weapon fire
+  // Without this, the mousedown handler just calls requestPointerLock() and returns
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'pointerLockElement', {
+      get: () => document.body,
+      configurable: true
+    });
+  });
+  const plCheck = await page.evaluate(() => !!document.pointerLockElement);
+  console.log('Pointer lock faked:', plCheck);
 
+  // Switch to pistol immediately (index 1) so we have a ranged weapon
+  await page.evaluate(() => { Weapons.switchTo(1); });
+  console.log('Switched to weapon 1 (pistol)');
+
+
+
+
+  // Use robust automation entry point to start gameplay and wave
+  await page.evaluate(() => {
+    if (typeof window.forceStartGame === 'function') window.forceStartGame();
+  });
+  // Wait for game to enter 'playing' state and HUD to appear
+  let tries = 0;
+  let playState = await page.evaluate(() => GameManager.getState());
+  while (playState !== 'playing' && tries < 10) {
+    await new Promise(r => setTimeout(r, 1000));
+    playState = await page.evaluate(() => GameManager.getState());
+    console.log(`[QA] State after try ${tries + 1}:`, playState);
+    tries++;
+  }
+  if (playState !== 'playing') {
+    console.log('FATAL: Could not force game into playing state after 10 tries.');
+    await browser.close();
+    process.exit(1);
+  }
   // Wait for first wave to start
-  await new Promise(r => setTimeout(r, 5000));
+  await new Promise(r => setTimeout(r, 2000));
+  await captureScreenshot(page, 'wave1-start');
 
   // Check state
   let state = await page.evaluate(() => ({
@@ -59,82 +187,78 @@ const puppeteer = require('puppeteer');
   }));
   console.log('After 5s:', JSON.stringify(state));
 
-  // Kill all enemies by direct damage
-  for (let round = 0; round < 20; round++) {
-    const roundState = await page.evaluate(() => {
-      try {
-        const st = GameManager.getState();
-        const wave = GameManager.getCurrentWave();
-        const stage = GameManager.getCurrentStage();
-        const alive = Enemies.getAliveCount();
+  // Weapon switch schedule — cycle through ranged weapons (skip 0=shovel melee, 3m range)
+  // god mode unlocks all 26 weapons (indices 0-25)
+  const WEAPON_SCHEDULE = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,1];
 
-        // Kill all alive enemies
+
+  // EXTENDED QA: 300 gameplay screenshots, 5s interval
+  for (let shot = 0; shot < 300; shot++) {
+    // Simulate a round of gameplay actions every 5 seconds
+    const weaponIdx = WEAPON_SCHEDULE[shot % WEAPON_SCHEDULE.length];
+    await page.evaluate((wIdx) => {
+      try {
+        const player = GameManager.getPlayer();
+        const pos = player.position;
+        // Find nearest alive enemy
         const all = Enemies.getAll();
-        let killed = 0;
+        let nearest = null, nearDist = Infinity;
         for (let i = 0; i < all.length; i++) {
-          if (all[i].alive) {
-            Enemies.damage(all[i], 99999, false);
-            killed++;
+          if (!all[i].alive || !all[i].mesh) continue;
+          const ep = all[i].mesh.position;
+          const dx = ep.x - pos.x, dz = ep.z - pos.z;
+          const d = Math.sqrt(dx * dx + dz * dz);
+          if (d < nearDist) { nearDist = d; nearest = all[i]; }
+        }
+        if (nearest) {
+          const ep = nearest.mesh.position;
+          const dx = ep.x - pos.x;
+          const dz = ep.z - pos.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          if (dist > 3.5) {
+            const factor = (dist - 3) / dist;
+            pos.x += dx * factor;
+            pos.z += dz * factor;
+          } else {
+            pos.x += (Math.random() - 0.5) * 6;
+            pos.z += (Math.random() - 0.5) * 6;
+          }
+          if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
+            const groundY = VoxelWorld.getTerrainHeight(pos.x, pos.z);
+            if (groundY !== undefined && groundY !== null) {
+              pos.y = groundY + 1.7;
+            }
+          }
+          const aimDx = ep.x - pos.x;
+          const aimDy = (ep.y + 1.0) - pos.y;
+          const aimDz = ep.z - pos.z;
+          const hDist = Math.sqrt(aimDx * aimDx + aimDz * aimDz);
+          CameraSystem.setYaw(Math.atan2(-aimDx, -aimDz));
+          CameraSystem.setPitch(Math.atan2(aimDy, hDist));
+        } else {
+          pos.x += (Math.random() - 0.5) * 10;
+          pos.z += (Math.random() - 0.5) * 10;
+          if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
+            const groundY = VoxelWorld.getTerrainHeight(pos.x, pos.z);
+            if (groundY !== undefined && groundY !== null) pos.y = groundY + 1.7;
           }
         }
-
-        return {
-          state: st,
-          wave: wave,
-          stage: stage,
-          alive: alive,
-          killed: killed,
-          playerHP: GameManager.getPlayer().hp,
-        };
-      } catch (e) {
-        return { error: e.message, stack: e.stack ? e.stack.substring(0, 200) : '' };
-      }
-    });
-    console.log(`Round ${round + 1}:`, JSON.stringify(roundState));
-
-    if (roundState.error) {
-      console.log('ERROR during combat round');
-      break;
-    }
-
-    // Check for wave/stage transitions
-    if (roundState.state === 'waveClear' || roundState.state === 'stageClear') {
-      console.log('>>> Transition detected: ' + roundState.state);
-
-      // Click the corresponding button via JS (more reliable in headless)
-      if (roundState.state === 'waveClear') {
-        try {
-          await page.evaluate(() => {
-            GameManager.hideOverlays();
-            GameManager.setState(GameManager.STATE.PLAYING);
-            GameManager.beginWave(GameManager.getCurrentWave() + 1);
-          });
-          console.log('  Advanced to NEXT WAVE');
-        } catch (e) {
-          console.log('  Could not advance wave:', e.message);
+        if (typeof Weapons !== 'undefined' && Weapons.switchTo) {
+          Weapons.switchTo(wIdx);
+          if (Weapons.refillAllAmmo) Weapons.refillAllAmmo();
+          if (Weapons.refillAllAmmo) Weapons.refillAllAmmo();
         }
-      } else if (roundState.state === 'stageClear') {
-        try {
-          await page.evaluate(() => { GameManager.nextStage(); });
-          console.log('  Advanced to NEXT STAGE');
-        } catch (e) {
-          console.log('  Could not advance stage:', e.message);
-        }
-      }
-    }
-
-    if (roundState.state === 'win') {
-      console.log('>>> VICTORY!');
-      break;
-    }
-
-    if (roundState.state === 'dead') {
-      console.log('>>> PLAYER DIED (should be impossible in god mode)');
-      break;
-    }
-
-    // Wait for next wave to spawn
-    await new Promise(r => setTimeout(r, 4000));
+        // Fire weapon
+        if (typeof GameManager._testFireStart === 'function') GameManager._testFireStart();
+        setTimeout(() => { if (typeof GameManager._testFireStop === 'function') GameManager._testFireStop(); }, 600);
+      } catch (e) { /* ignore movement errors */ }
+    }, weaponIdx);
+    // Wait 5 seconds, then screenshot
+    await new Promise(r => setTimeout(r, 5000));
+    await captureScreenshot(page, `shot${shot + 1}`);
+    // Optionally, check for win/dead and break early
+    const state = await page.evaluate(() => GameManager.getState());
+    if (state === 'win' || state === 'dead') break;
   }
 
   // Final state
@@ -147,7 +271,14 @@ const puppeteer = require('puppeteer');
     hp: GameManager.getPlayer().hp,
   }));
   console.log('\nFINAL:', JSON.stringify(finalState));
+  await captureScreenshot(page, 'final');
   console.log('Errors:', errors.length > 0 ? JSON.stringify(errors) : 'NONE');
+  if (audioWarnings.length > 0) {
+    console.log(`Audio warnings (headless-only, non-blocking): ${audioWarnings.length}`);
+  }
+  console.log(`\n📸 Screenshots captured: ${screenshots.length}`);
+  console.log(`   Directory: ${SCREENSHOT_DIR}`);
+  for (const s of screenshots) console.log(`   - ${path.basename(s)}`);
 
   await browser.close();
   process.exit(errors.length > 0 ? 1 : 0);

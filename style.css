@@ -1,3 +1,69 @@
+/* ── Skill HUD Overlay ─────────────────────────────── */
+#skill-hud-overlay {
+  min-width: 340px;
+  max-width: 420px;
+  background: rgba(10,20,40,0.97);
+  border: 2px solid #44aaff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px #000a, 0 0 0 2px #2228;
+  padding: 24px 28px 18px 28px;
+  color: #aaccff;
+  font-family: monospace;
+  font-size: 15px;
+  pointer-events: auto;
+}
+.skill-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.skill-name {
+  width: 120px;
+  font-weight: bold;
+  color: #fff;
+}
+.skill-bar {
+  flex: 1;
+  height: 12px;
+  background: #223355;
+  border-radius: 6px;
+  margin: 0 10px;
+  position: relative;
+}
+.skill-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg,#44aaff,#88e0ff);
+  transition: width 0.3s;
+}
+.skill-lvl {
+  width: 38px;
+  text-align: right;
+  color: #44ff88;
+  font-weight: bold;
+}
+.perk-row {
+  margin: 10px 0 0 0;
+  padding: 8px 0 0 0;
+  border-top: 1px solid #334;
+}
+.perk-unlocked {
+  color: #ffe066;
+  font-weight: bold;
+}
+.perk-locked {
+  color: #888;
+  opacity: 0.7;
+}
+/* ── NPC Morale Indicator ─────────────────────────────── */
+.npc-morale-indicator {
+  text-shadow: 0 2px 8px #000, 0 0 2px #fff;
+  font-weight: bold;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform, filter;
+  z-index: 251;
+}
 * {
   margin: 0;
   padding: 0;

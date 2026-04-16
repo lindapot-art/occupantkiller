@@ -20,6 +20,7 @@ const Pickups = (() => {
     STIM:    { color: 0xcc44ff, emissive: 0x662288, size: 0.18 },
     INTEL:   { color: 0x00ffff, emissive: 0x006666, size: 0.22 },
     SHIELD:  { color: 0xffd700, emissive: 0x886600, size: 0.26 },
+    WEAPON:  { color: 0xff8800, emissive: 0x884400, size: 0.30 },
   };
 
   let scene   = null;
@@ -41,7 +42,7 @@ const Pickups = (() => {
 
   function init(sc) { scene = sc; }
 
-  function spawn(worldPos, type) {
+  function spawn(worldPos, type, data) {
     if (!scene) return;
     const cfg = TYPE_CONFIG[type];
     if (!cfg) return;
@@ -74,8 +75,10 @@ const Pickups = (() => {
       boxMesh,
       ringMesh,
       type,
+      data: data || null,
       baseY: spawnY,
       phase: Math.random() * Math.PI * 2,
+      life: type === 'WEAPON' ? 30 : Infinity, // weapon drops expire after 30s
     });
   }
 
@@ -84,6 +87,22 @@ const Pickups = (() => {
 
     for (let i = pickups.length - 1; i >= 0; i--) {
       const p = pickups[i];
+
+      // Weapon drop lifetime expiry
+      if (p.life !== Infinity) {
+        p.life -= delta;
+        if (p.life <= 0) {
+          scene.remove(p.group);
+          if (p.boxMesh && p.boxMesh.material) p.boxMesh.material.dispose();
+          if (p.ringMesh && p.ringMesh.material) p.ringMesh.material.dispose();
+          pickups.splice(i, 1);
+          continue;
+        }
+        // Flash when about to expire (last 5s)
+        if (p.life < 5) {
+          p.group.visible = Math.sin(time * 8) > 0;
+        }
+      }
 
       // Hover + rotate animations
       p.group.position.y = p.baseY + Math.sin(time * HOVER_SPEED + p.phase) * HOVER_RANGE;
@@ -99,7 +118,7 @@ const Pickups = (() => {
         if (p.boxMesh && p.boxMesh.material) p.boxMesh.material.dispose();
         if (p.ringMesh && p.ringMesh.material) p.ringMesh.material.dispose();
         pickups.splice(i, 1);
-        onCollect(p.type);
+        onCollect(p.type, p.data);
       }
     }
   }

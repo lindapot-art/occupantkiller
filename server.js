@@ -16,7 +16,7 @@ const SECURITY_HEADERS = {
 const MIME = {
   '.html': 'text/html',
   '.css':  'text/css',
-  '.js':   'application/javascript',
+  '.js':   'application/javascript; charset=utf-8',
   '.json': 'application/json',
   '.png':  'image/png',
   '.jpg':  'image/jpeg',
@@ -42,7 +42,8 @@ const COMPRESSIBLE = new Set([
 const _gzCache = {};
 const CACHE_MAX = 100; // max cached files
 
-const server = http.createServer((req, res) => {
+let server;
+server = http.createServer((req, res) => {
   // Fast health check endpoint for Render.com
   if (req.url === '/healthz') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -92,20 +93,33 @@ const server = http.createServer((req, res) => {
   }
 
   fs.readFile(filePath, (err, data) => {
+    const ext = path.extname(filePath).toLowerCase();
     if (err) {
+      // Enhanced 404 logging for JS files
+      if (ext === '.js') {
+        console.error(`[SERVER][404][JS] url=${url} filePath=${filePath}`);
+      } else {
+        console.error(`[SERVER] 404 Not Found: url=${url} filePath=${filePath}`);
+      }
       res.writeHead(404, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });
       return res.end('Not found');
     }
-    const ext = path.extname(filePath).toLowerCase();
     const mime = MIME[ext] || 'application/octet-stream';
     const headers = { 'Content-Type': mime, ...SECURITY_HEADERS };
+
+    // Log every JS file request (200)
+    if (ext === '.js') {
+      console.log(`[SERVER][200][JS] url=${url} filePath=${filePath}`);
+    }
 
     // Cache-Control: cache JS/CSS/images for 1 hour, HTML for 5 min
     if (ext === '.html') {
       headers['Cache-Control'] = 'public, max-age=300';
     } else if (ext === '.js' || ext === '.css') {
       headers['Cache-Control'] = 'public, max-age=3600';
-    } else if (['.png', '.jpg', '.gif', '.svg', '.ico', '.glb', '.wav', '.mp3', '.ogg'].indexOf(ext) !== -1) {
+    } else if ([
+      '.png', '.jpg', '.gif', '.svg', '.ico', '.glb', '.wav', '.mp3', '.ogg'
+    ].indexOf(ext) !== -1) {
       headers['Cache-Control'] = 'public, max-age=86400';
     }
 
@@ -130,6 +144,7 @@ const server = http.createServer((req, res) => {
         headers['Content-Encoding'] = 'gzip';
         headers['Vary'] = 'Accept-Encoding';
         res.writeHead(200, headers);
+
         res.end(compressed);
       });
     } else {
@@ -139,7 +154,48 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  OccupantKiller server running at:\n`);
-  console.log(`  > http://localhost:${PORT}\n`);
+
+  try {
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`\n  OccupantKiller server running at:\n`);
+      console.log(`  > http://localhost:${PORT}\n`);
+    });
+  } catch (err) {
+    console.error('SERVER STARTUP ERROR:', err);
+    if (err.code === 'EADDRINUSE') {
+      console.error('Port', PORT, 'is already in use. Try killing other node processes or change the port.');
+    } else if (err.code === 'EACCES') {
+      console.error('Permission denied. Try running as administrator or use a different port.');
+    }
+    process.exit(1);
+  }
+
+
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err);
+  console.error(err.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION:', reason);
+  if (reason && reason.stack) console.error(reason.stack);
+  process.exit(1);
+});
+
+process.on('exit', (code) => {
+  console.log('Process exit event with code:', code);
+  console.trace('Exit stack trace');
+});
+
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM');
+  console.trace('SIGTERM stack trace');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('Received SIGINT');
+  console.trace('SIGINT stack trace');
+  process.exit(0);
 });

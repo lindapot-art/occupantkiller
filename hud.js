@@ -1,3 +1,135 @@
+  // ── Skill HUD Overlay ─────────────────────────────────────────────
+  // Import escapeHTML from feedback.js
+  const escapeHTML = window.Feedback && window.Feedback.escapeHTML ? window.Feedback.escapeHTML : (str => String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]));
+  const skillHudEl = document.getElementById('skill-hud-overlay');
+  const skillHudBtn = document.getElementById('skill-hud-btn');
+  let skillHudOpen = false;
+
+  function renderSkillHud() {
+    if (!skillHudEl) return;
+    const skills = SkillSystem.getAllSkills();
+    let html = '<h2 style="color:#44aaff;text-align:center;margin-bottom:12px">🧠 SKILL PROGRESSION</h2>';
+    html += '<div>';
+    for (const [name, data] of Object.entries(skills)) {
+      const def = SkillSystem.SKILLS[name];
+      const pct = Math.min(100, (data.xp / (def.max * 25)) * 100);
+      html += `<div class='skill-row'><span class='skill-name'>${escapeHTML(name.replace(/_/g,' '))}</span><div class='skill-bar'><div class='skill-bar-fill' style='width:${pct}%;'></div></div><span class='skill-lvl'>Lv${escapeHTML(data.level)}</span></div>`;
+    }
+    html += '</div>';
+    // Perks
+    html += '<div class="perk-row"><b>Unlocked Perks:</b><br>';
+    const passives = SkillSystem.getActivePassives();
+    if (passives.length === 0) html += '<span class="perk-locked">None yet — level up skills!</span>';
+    else for (const p of passives) html += `<span class='perk-unlocked'>${escapeHTML(p.name)}</span>: <span style='color:#aaa'>${escapeHTML(p.description)}</span><br>`;
+    html += '</div>';
+    // Skill Trees
+    html += '<div class="perk-row"><b>Skill Tree Unlocks:</b><br>';
+    for (const tree of Object.keys(SkillSystem.SKILL_TREE)) {
+      html += `<div style='margin-top:4px;color:#aaccff'><b>${escapeHTML(tree)}</b>:</div>`;
+      for (const node of SkillSystem.SKILL_TREE[tree]) {
+        const unlocked = node.unlocked;
+        html += `<span class='${unlocked ? 'perk-unlocked' : 'perk-locked'}'>${escapeHTML(node.name)}</span> <span style='color:#aaa'>${escapeHTML(node.description)}</span><br>`;
+      }
+    }
+    html += '</div>';
+    skillHudEl.innerHTML = html;
+  }
+
+  function toggleSkillHud(force) {
+    skillHudOpen = typeof force === 'boolean' ? force : !skillHudOpen;
+    if (skillHudEl) skillHudEl.style.display = skillHudOpen ? 'block' : 'none';
+    if (skillHudOpen) renderSkillHud();
+  }
+
+  if (skillHudBtn) {
+    skillHudBtn.onclick = () => toggleSkillHud();
+  }
+  window.addEventListener('keydown', e => {
+    if (e.key === 'p' || e.key === 'P') toggleSkillHud();
+    // Direct weapon slot keys: 1–9, 0, F1–F12 (10–21), Shift+1–4 (22–25)
+    if (!e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      let idx = -1;
+      if (e.key >= '1' && e.key <= '9') idx = parseInt(e.key, 10) - 1;
+      else if (e.key === '0') idx = 9;
+      else if (e.code.startsWith('F')) {
+        let fnum = parseInt(e.code.slice(1), 10);
+        if (fnum >= 1 && fnum <= 12) idx = 9 + fnum;
+      } else if (e.shiftKey && e.key >= '1' && e.key <= '4') {
+        idx = 21 + parseInt(e.key, 10);
+      }
+      // Defensive: ensure slot exists and is unlocked
+      if (idx >= 0 && typeof window.Weapons !== 'undefined' && window.Weapons.select) {
+        if (window.Weapons.getCount && idx < window.Weapons.getCount()) {
+          window.Weapons.select(idx);
+          e.preventDefault();
+        } else {
+          console.warn('[HUD] Weapon slot index out of range:', idx);
+        }
+      }
+    }
+  });
+  // ── NPC Morale HUD Overlay ─────────────────────────────
+  const moraleHudEl = document.getElementById('npc-morale-hud');
+
+  // Map: npcId → {el, lastMorale}
+  let _moraleIndicators = {};
+
+  // Call this every frame with [{id, position, morale, alive}]
+  function updateNpcMoraleIndicators(npcList, camera, renderer) {
+    if (!moraleHudEl || !Array.isArray(npcList) || !camera || !renderer) return;
+    const width = renderer.domElement.width;
+    const height = renderer.domElement.height;
+    // Track which NPCs are present this frame
+    const seen = new Set();
+    for (const npc of npcList) {
+      if (!npc.alive) continue;
+      seen.add(npc.id);
+      let ind = _moraleIndicators[npc.id];
+      if (!ind) {
+        const el = document.createElement('div');
+        el.className = 'npc-morale-indicator';
+        el.style.position = 'absolute';
+        el.style.pointerEvents = 'none';
+        el.style.fontSize = '22px';
+        el.style.fontFamily = 'monospace';
+        el.style.transition = 'transform 0.18s, filter 0.18s';
+        moraleHudEl.appendChild(el);
+        ind = {el, lastMorale: npc.morale};
+        _moraleIndicators[npc.id] = ind;
+      }
+      // Project world position to screen
+      const pos = npc.position.clone();
+      pos.y += 1.7; // above head
+      pos.project(camera);
+      const sx = (pos.x * 0.5 + 0.5) * width;
+      const sy = (-pos.y * 0.5 + 0.5) * height;
+      ind.el.style.left = Math.round(sx - 16) + 'px';
+      ind.el.style.top = Math.round(sy - 32) + 'px';
+      // Morale → emoji/color
+      let emoji = '😐', color = '#aaa', filter = '';
+      if (npc.morale >= 80) { emoji = '😎'; color = '#44ff88'; filter = 'drop-shadow(0 0 8px #44ff88)'; }
+      else if (npc.morale >= 60) { emoji = '🙂'; color = '#aaffaa'; }
+      else if (npc.morale >= 40) { emoji = '😐'; color = '#ffe066'; }
+      else if (npc.morale >= 20) { emoji = '😰'; color = '#ffbb33'; filter = 'drop-shadow(0 0 8px #ffbb33)'; }
+      else { emoji = '😱'; color = '#ff4444'; filter = 'drop-shadow(0 0 10px #ff4444)'; }
+      ind.el.textContent = emoji;
+      ind.el.style.color = color;
+      ind.el.style.filter = filter;
+      // Animate if morale changed a lot
+      if (Math.abs(npc.morale - ind.lastMorale) > 25) {
+        ind.el.style.transform = 'scale(1.35)';
+        setTimeout(() => { ind.el.style.transform = ''; }, 180);
+      }
+      ind.lastMorale = npc.morale;
+    }
+    // Remove indicators for NPCs not present
+    for (const id in _moraleIndicators) {
+      if (!seen.has(Number(id))) {
+        moraleHudEl.removeChild(_moraleIndicators[id].el);
+        delete _moraleIndicators[id];
+      }
+    }
+  }
 /**
  * hud.js – Heads-Up Display helpers
  * Depends on: nothing (pure DOM)
@@ -16,7 +148,7 @@ const HUD = (() => {
     ammo:         document.getElementById('ammo-display'),
     ammoRes:      document.getElementById('ammo-reserve'),
     weaponName:   document.getElementById('weapon-name-display'),
-    weaponSlots:  Array.from({length: 36}, function(_, i) { return document.getElementById('wslot-' + i); }),
+    weaponSlots:  [], // Will be populated dynamically
     reload:       document.getElementById('reload-indicator'),
     hitMarker:    document.getElementById('hit-marker'),
     vignette:     document.getElementById('damage-vignette'),
@@ -24,6 +156,32 @@ const HUD = (() => {
     headshotNotif: document.getElementById('headshot-notif'),
     pickupNotif:   document.getElementById('pickup-notif'),
   };
+
+  // Dynamically generate weapon slots based on WEAPONS array
+  function createWeaponSlots() {
+    const slotContainer = document.getElementById('weapon-slot-container');
+    if (!slotContainer || typeof Weapons === 'undefined' || !Weapons.getAll) return;
+    slotContainer.innerHTML = '';
+    el.weaponSlots = [];
+    const weapons = Weapons.getAll();
+    // Limit to 26 slots (1-9, 0, F1-F12, Shift+1-4)
+    const maxSlots = 26;
+    for (let i = 0; i < Math.min(weapons.length, maxSlots); i++) {
+      const slot = document.createElement('div');
+      slot.className = 'weapon-slot';
+      slot.id = 'wslot-' + i;
+      slot.innerHTML = `<span>${i + 1}</span>`;
+      slotContainer.appendChild(slot);
+      el.weaponSlots.push(slot);
+    }
+  }
+
+  // Call createWeaponSlots on HUD init
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', createWeaponSlots);
+  } else {
+    createWeaponSlots();
+  }
 
   let hitMarkerTimer   = null;
   let vignetteTimer    = null;
@@ -61,10 +219,11 @@ const HUD = (() => {
     if (!el.ammo || !el.ammoRes) return;
     el.ammo.textContent    = clip;
     el.ammoRes.textContent = '/ ' + reserve;
-    // Low ammo warning flash
+    // Low ammo warning flash + sound
     if (clipSize && typeof clip === 'number' && clip > 0 && clip <= clipSize * 0.25) {
       el.ammo.style.color = '#ff4444';
       el.ammo.style.animation = 'lowAmmoFlash 0.4s infinite';
+      if (window.AudioSystem && AudioSystem.playLowAmmo) AudioSystem.playLowAmmo();
     } else {
       el.ammo.style.color = '';
       el.ammo.style.animation = '';
@@ -162,7 +321,7 @@ const HUD = (() => {
 
   function announceWave(number, enemyCount, totalWaves) {
     const progress = totalWaves ? ' OF ' + totalWaves : '';
-    el.waveAnn.innerHTML = '<h2>WAVE ' + number + progress + '</h2><p>' + enemyCount + ' OCCUPANTS STORMING</p>';
+    el.waveAnn.innerHTML = '<h2>WAVE ' + escapeHTML(number) + progress + '</h2><p>' + escapeHTML(enemyCount) + ' OCCUPANTS STORMING</p>';
     el.waveAnn.classList.remove('visible');
     void el.waveAnn.offsetWidth;
     el.waveAnn.classList.add('visible');
@@ -171,9 +330,9 @@ const HUD = (() => {
 
   function announceStage(stageNum, stageName, description) {
     el.waveAnn.innerHTML =
-      '<h2 style="color:#44ff88">STAGE ' + stageNum + '</h2>' +
-      '<p style="font-size:22px;color:#fff;margin-bottom:6px">' + stageName + '</p>' +
-      '<p style="font-size:13px;color:#aaa">' + (description || '') + '</p>';
+      '<h2 style="color:#44ff88">STAGE ' + escapeHTML(stageNum) + '</h2>' +
+      '<p style="font-size:22px;color:#fff;margin-bottom:6px">' + escapeHTML(stageName) + '</p>' +
+      '<p style="font-size:13px;color:#aaa">' + escapeHTML(description || '') + '</p>';
     el.waveAnn.classList.remove('visible');
     void el.waveAnn.offsetWidth;
     el.waveAnn.classList.add('visible');
@@ -428,7 +587,7 @@ const HUD = (() => {
     for (var t = 0; t < thresholds.length; t++) {
       if (count >= thresholds[t]) { label = _streakNames[thresholds[t]]; break; }
     }
-    streakEl.innerHTML = '🔥 ' + label + ' <span style="font-size:0.85em;color:' + color + '">(' + count + 'x · ' + multiplier.toFixed(1) + 'x)</span>';
+    streakEl.innerHTML = '🔥 ' + escapeHTML(label) + ' <span style="font-size:0.85em;color:' + color + '">(' + escapeHTML(count) + 'x · ' + escapeHTML(multiplier.toFixed(1)) + 'x)</span>';
     streakEl.style.color = color;
     streakEl.style.fontSize = count >= 10 ? '28px' : count >= 5 ? '24px' : '20px';
     streakEl.style.textShadow = '0 0 10px ' + color;
@@ -833,12 +992,12 @@ const HUD = (() => {
   function showWaveStats(stats) {
     if (!waveStatsEl || !waveStatsContent) return;
     waveStatsContent.innerHTML =
-      '💀 Kills: <b>' + (stats.kills || 0) + '</b><br>' +
-      '🎯 Accuracy: <b>' + (stats.accuracy || 0) + '%</b><br>' +
-      '💀 Headshots: <b>' + (stats.headshots || 0) + '</b><br>' +
-      '⏱ Time: <b>' + (stats.time || '0s') + '</b><br>' +
-      '❤ Damage Taken: <b>' + (stats.damageTaken || 0) + '</b><br>' +
-      '🔥 Best Streak: <b>' + (stats.bestStreak || 0) + '</b>';
+      '💀 Kills: <b>' + escapeHTML(stats.kills || 0) + '</b><br>' +
+      '🎯 Accuracy: <b>' + escapeHTML(stats.accuracy || 0) + '%</b><br>' +
+      '💀 Headshots: <b>' + escapeHTML(stats.headshots || 0) + '</b><br>' +
+      '⏱ Time: <b>' + escapeHTML(stats.time || '0s') + '</b><br>' +
+      '❤ Damage Taken: <b>' + escapeHTML(stats.damageTaken || 0) + '</b><br>' +
+      '🔥 Best Streak: <b>' + escapeHTML(stats.bestStreak || 0) + '</b>';
     waveStatsEl.style.display = 'block';
     setTimeout(function () { waveStatsEl.style.display = 'none'; }, 5000);
   }
@@ -848,11 +1007,11 @@ const HUD = (() => {
     var el = document.getElementById('dead-statistics');
     if (!el) return;
     el.innerHTML =
-      '🎯 Accuracy: ' + (stats.accuracy || 0) + '% | ' +
-      '💀 Headshot%: ' + (stats.headshotPct || 0) + '%<br>' +
-      '🔫 Favorite: ' + (stats.favWeapon || 'N/A') + ' | ' +
-      '⏱ Playtime: ' + (stats.playtime || '0s') + '<br>' +
-      '📏 Distance: ' + (stats.distance || 0) + 'm';
+      '🎯 Accuracy: ' + escapeHTML(stats.accuracy || 0) + '% | ' +
+      '💀 Headshot%: ' + escapeHTML(stats.headshotPct || 0) + '%<br>' +
+      '🔫 Favorite: ' + escapeHTML(stats.favWeapon || 'N/A') + ' | ' +
+      '⏱ Playtime: ' + escapeHTML(stats.playtime || '0s') + '<br>' +
+      '📏 Distance: ' + escapeHTML(stats.distance || 0) + 'm';
   }
 
   // ── OKC HUD Update ──────────────────────────────────────────────
@@ -1051,7 +1210,7 @@ const HUD = (() => {
       '<label>FOV <input type="range" id="set-fov" min="50" max="120" value="70"></label><br>' +
       '<label>Show FPS <input type="checkbox" id="set-fps"></label><br>' +
       '<label>Crosshair Color <input type="color" id="set-xhair" value="#ffffff"></label><br>' +
-      '<div style="text-align:center;margin-top:16px;"><button id="set-close" style="padding:8px 24px;' +
+      '<div style="text-align:center;margin-top:16px;"><button id="set-close" style="padding:8px 24px;'+
       'background:#ffcc00;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">CLOSE</button></div>';
     document.body.appendChild(_settingsEl);
     setTimeout(function () {
@@ -1104,12 +1263,12 @@ const HUD = (() => {
     var clipStr = weaponDef.clipSize ? weaponDef.clipSize + ' / ' + weaponDef.maxReserve : '∞';
     _weaponCardEl.innerHTML =
       '<div style="color:#ffcc00;font-size:10px;letter-spacing:3px;margin-bottom:4px">🔓 NEW WEAPON UNLOCKED</div>' +
-      '<div style="color:#fff;font-size:20px;font-weight:bold;margin:6px 0;text-shadow:0 0 8px rgba(255,200,0,0.4)">' + weaponDef.name + '</div>' +
-      '<div style="color:#888;font-size:11px;margin-bottom:8px">' + typeLabel + '</div>' +
+      '<div style="color:#fff;font-size:20px;font-weight:bold;margin:6px 0;text-shadow:0 0 8px rgba(255,200,0,0.4)">' + escapeHTML(weaponDef.name) + '</div>' +
+      '<div style="color:#888;font-size:11px;margin-bottom:8px">' + escapeHTML(typeLabel) + '</div>' +
       '<div style="display:flex;justify-content:center;gap:18px;color:#aaa;font-size:11px">' +
-        '<span>⚔ ' + dmg + ' DMG</span>' +
-        (rpm ? '<span>🔥 ' + rpm + ' RPM</span>' : '') +
-        '<span>📦 ' + clipStr + '</span>' +
+        '<span>⚔ ' + escapeHTML(dmg) + ' DMG</span>' +
+        (rpm ? '<span>🔥 ' + escapeHTML(rpm) + ' RPM</span>' : '') +
+        '<span>📦 ' + escapeHTML(clipStr) + '</span>' +
       '</div>';
     _weaponCardEl.style.opacity = '1';
     _weaponCardEl.style.transform = 'translateX(-50%) scale(1)';
@@ -1118,6 +1277,28 @@ const HUD = (() => {
       _weaponCardEl.style.opacity = '0';
       _weaponCardEl.style.transform = 'translateX(-50%) scale(0.8)';
     }, 2800);
+  }
+
+  // ── Last Wave Summary Overlay ──
+  let _waveSummaryEl = null;
+  function showWaveSummary(stats) {
+    if (!_waveSummaryEl) {
+      _waveSummaryEl = document.createElement('div');
+      _waveSummaryEl.id = 'wave-summary-overlay';
+      _waveSummaryEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.93);border:2px solid #44aaff;border-radius:12px;padding:32px 48px;z-index:10001;color:#fff;font-family:monospace;min-width:340px;text-align:center;box-shadow:0 0 40px #44aaff44;display:none;';
+      document.body.appendChild(_waveSummaryEl);
+    }
+    let html = '<h2 style="color:#44aaff;margin-bottom:18px">WAVE COMPLETE!</h2>';
+    html += `<div style='font-size:18px;margin-bottom:10px'>Wave <b>${stats.wave}</b> cleared</div>`;
+    html += `<div>Kills: <b>${stats.kills}</b> &nbsp; | &nbsp; Score: <b>${stats.score}</b></div>`;
+    html += `<div>Headshots: <b>${stats.headshots}</b> &nbsp; | &nbsp; Damage Taken: <b>${stats.damageTaken}</b></div>`;
+    html += `<div style='margin-top:12px;font-size:13px;color:#aaa'>Time: <b>${stats.time}s</b></div>`;
+    html += `<button id='wave-summary-close' style='margin-top:18px;padding:8px 28px;background:#44aaff;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:15px;'>CONTINUE</button>`;
+    _waveSummaryEl.innerHTML = html;
+    _waveSummaryEl.style.display = 'block';
+    document.getElementById('wave-summary-close').onclick = function() {
+      _waveSummaryEl.style.display = 'none';
+    };
   }
 
   return {
@@ -1153,5 +1334,7 @@ const HUD = (() => {
     toggleFPS, updateFPS, toggleSettings, getSettings,
     refreshIndicators,
     showWeaponUnlockCard,
+    // ── NPC Morale HUD Overlay ──
+    updateNpcMoraleIndicators,
   };
 })();

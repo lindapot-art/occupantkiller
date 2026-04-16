@@ -1,3 +1,7 @@
+// Ensure window.Weapons is always defined before any code runs (robust for QA/headless)
+if (typeof window !== 'undefined' && typeof window.Weapons === 'undefined') {
+  window.Weapons = {};
+}
 /**
  * weapons.js – 23-weapon Ukrainian war arsenal with melee, projectiles, grenades, fire & scope zoom
  * Switch with keys 1-0, Q/E scroll. Weapons 0 (shovel) and 1 (pistol) start unlocked.
@@ -7,6 +11,13 @@
 const Weapons = (() => {
   // ── Weapon definitions ────────────────────────────────────
   const WEAPONS = [
+    // NEW: Gatling Machine Gun (first available)
+    {
+      id: 'GATLING', name: 'Gatling Machine Gun', damage: 14,
+      fireRate: 0.015, clipSize: 200, maxReserve: 800, reloadTime: 7.0,
+      spread: 0.09, auto: true, type: 'GATLING', recoilY: 0.010, recoilX: 0.006,
+      barrels: 6, spinUp: 0.3, spinDown: 0.5, description: 'Six rotating barrels, extremely high fire rate.'
+    },
     {
       id: 'SHOVEL', name: 'Army Shovel (МПЛ-50)', damage: 35,
       fireRate: 0.25, clipSize: 0, maxReserve: 0, reloadTime: 0,
@@ -204,7 +215,23 @@ const Weapons = (() => {
   let states     = WEAPONS.map(makeState);
   let currentIdx = 0;
   // Only Shovel (0) + Makarov (1) start unlocked; rest earned via drops & stage clears
+  // Only Gatling and Shovel start unlocked (indices 0 and 1)
+  // Only Gatling (0) and Shovel (1) start unlocked; rest locked
+  // Unlock pacing: only first 2 weapons unlocked at start, rest unlock per stage
   let unlocked   = WEAPONS.map(function(_, i) { return i <= 1; });
+
+  // Unlock weapons per stage (example: 2 new weapons per stage)
+  function unlockForStage(stageNum) {
+    // Always keep first 2 unlocked
+    for (let i = 2; i < WEAPONS.length; i++) {
+      unlocked[i] = false;
+    }
+    // Example: unlock 2 new weapons per stage (after first 2)
+    let unlockCount = Math.min(2 * stageNum, WEAPONS.length - 2);
+    for (let i = 2; i < 2 + unlockCount; i++) {
+      if (i < WEAPONS.length) unlocked[i] = true;
+    }
+  }
 
   function cur()      { return WEAPONS[currentIdx]; }
   function curState() { return states[currentIdx]; }
@@ -1384,6 +1411,17 @@ const Weapons = (() => {
     return g;
   }
 
+
+  // Placeholder mesh builder for missing weapons
+  function buildPlaceholderMesh() {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+    const geo = new THREE.BoxGeometry(0.2, 0.2, 0.6);
+    const mesh = new THREE.Mesh(geo, mat);
+    g.add(mesh);
+    return g;
+  }
+
   const meshBuilders = [
     buildShovelMesh, buildMakarovMesh, buildAkMesh, buildRpkMesh,
     buildSvdMesh, buildPkmMesh, buildNlawMesh, buildStugnaMesh, buildM4Mesh,
@@ -1394,8 +1432,13 @@ const Weapons = (() => {
     buildClaymoreMesh, buildSmokeMesh, buildFlashbangMesh,
     buildAk12Mesh, buildP90Mesh, buildAt4Mesh, buildGlockMesh,
     buildKs23Mesh, buildAgs17Mesh, buildVssMesh, buildStingerMesh,
-    buildThrowKnifeMesh, buildC4Mesh,
+    buildThrowKnifeMesh, buildC4Mesh
   ];
+
+  // Ensure meshBuilders matches WEAPONS length
+  while (meshBuilders.length < WEAPONS.length) {
+    meshBuilders.push(buildPlaceholderMesh);
+  }
 
   function createGunMesh(camera) {
     _camera = camera;
@@ -1709,6 +1752,12 @@ const Weapons = (() => {
           projectiles.splice(i, 1);
           continue;
         }
+        // Play unique mine sound for MINE type
+        if (p.weaponType === 'MINE' && typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playMine) {
+          window.AudioSystem.playMine();
+        } else if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playExplosion) {
+          window.AudioSystem.playExplosion();
+        }
         // Explosion effect
         Enemies.damageInRadius(p.mesh.position, p.radius, p.damage);
         // Destroy terrain blocks in blast radius
@@ -1822,7 +1871,7 @@ const Weapons = (() => {
     _scene.add(group);
     const cloud = { group: group, pos: pos.clone(), radius: radius, life: 6.0 };
     _smokeClouds.push(cloud);
-    if (typeof AudioSystem !== 'undefined' && AudioSystem.playExplosion) AudioSystem.playExplosion();
+    if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playSmoke) window.AudioSystem.playSmoke();
 
     // Animate fade-out
     const fadeInt = setInterval(function () {
@@ -2629,6 +2678,7 @@ const Weapons = (() => {
     startInspect,
     isInSmoke: isInSmoke,
     getWeaponCount: function () { return WEAPONS.length; },
+    unlockForStage: unlockForStage,
     getCurrentIdx:  function () { return currentIdx; },
     getCurrentType: function () { return cur().type; },
     getCurrentId:   function () { return cur().id; },
@@ -2675,3 +2725,28 @@ const Weapons = (() => {
     getModifiedStats: getModifiedStats,
   };
 })();
+
+// Quick weapon swap: swap to last used weapon.
+// This must be wired after the Weapons singleton exists to avoid TDZ crashes during script load.
+let _lastWeaponIdx = 0;
+function quickSwapLast() {
+  if (typeof Weapons === 'undefined' || !Weapons.getCurrentIdx || !Weapons.switchTo) return;
+  const cur = Weapons.getCurrentIdx();
+  Weapons.switchTo(_lastWeaponIdx);
+  _lastWeaponIdx = cur;
+}
+
+if (typeof Weapons !== 'undefined' && typeof Weapons.switchTo === 'function' && !Weapons.quickSwapLast) {
+  const _origSwitchTo = Weapons.switchTo;
+  Weapons.switchTo = function(idx) {
+    if (typeof Weapons.getCurrentIdx === 'function') {
+      _lastWeaponIdx = Weapons.getCurrentIdx();
+    }
+    return _origSwitchTo.call(this, idx);
+  };
+  Weapons.quickSwapLast = quickSwapLast;
+}
+
+if (typeof window !== 'undefined') {
+  window.Weapons = Weapons;
+}

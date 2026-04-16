@@ -4,7 +4,7 @@
 const Building = (function () {
   'use strict';
 
-  const B = (typeof VoxelWorld !== 'undefined' && VoxelWorld.BLOCK) ? VoxelWorld.BLOCK : {};
+  const B = (typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.BLOCK) ? window.VoxelWorld.BLOCK : {};
 
   /* ── Structure Templates ─────────────────────────────────────────── */
   const TEMPLATES = {
@@ -194,15 +194,15 @@ const Building = (function () {
 
   /* ── Free-form block placement ───────────────────────────────────── */
   function placeBlock(wx, wy, wz, type) {
-    if (wy < 0 || wy >= VoxelWorld.CHUNK_HEIGHT) return false;
-    VoxelWorld.setBlock(wx, wy, wz, type || selectedBlockType);
+    if (wy < 0 || wy >= window.VoxelWorld.CHUNK_HEIGHT) return false;
+    window.VoxelWorld.setBlock(wx, wy, wz, type || selectedBlockType);
     return true;
   }
 
   function removeBlock(wx, wy, wz) {
-    const current = VoxelWorld.getBlock(wx, wy, wz);
+    const current = window.VoxelWorld.getBlock(wx, wy, wz);
     if (current === B.AIR) return null;
-    VoxelWorld.setBlock(wx, wy, wz, B.AIR);
+    window.VoxelWorld.setBlock(wx, wy, wz, B.AIR);
     return current; // return block type for resource recovery
   }
 
@@ -254,13 +254,13 @@ const Building = (function () {
     for (let x = 0; x < s.x; x++)
       for (let y = 0; y < s.y; y++)
         for (let z = 0; z < s.z; z++) {
-          const b = VoxelWorld.getBlock(wx + x, wy + y, wz + z);
+          const b = window.VoxelWorld.getBlock(wx + x, wy + y, wz + z);
           if (b !== B.AIR && b !== B.WATER && b !== B.GRASS) return false;
         }
     // Check foundation (ground underneath)
     for (let x = 0; x < s.x; x++)
       for (let z = 0; z < s.z; z++) {
-        if (!VoxelWorld.isSolid(wx + x, wy - 1, wz + z)) return false;
+        if (!window.VoxelWorld.isSolid(wx + x, wy - 1, wz + z)) return false;
       }
     return true;
   }
@@ -272,7 +272,7 @@ const Building = (function () {
     // Place blocks
     const blockList = _selectedTemplate.generate(wx, wy, wz);
     for (const b of blockList) {
-      VoxelWorld.setBlock(b.x, b.y, b.z, b.t);
+      window.VoxelWorld.setBlock(b.x, b.y, b.z, b.t);
     }
 
     // Track structure

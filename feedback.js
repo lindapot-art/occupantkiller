@@ -76,12 +76,19 @@ const Feedback = (function () {
     }
   }
 
+  // Escape HTML utility
+  function escapeHTML(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+  }
+
   function addKillFeedEntry(killerName, victimName, weapon, isHeadshot) {
     if (!_feedContainer) initKillFeed();
     const el = document.createElement('div');
     el.style.cssText = 'padding:4px 8px;margin:2px 0;background:rgba(0,0,0,0.7);color:#fff;font-size:12px;border-radius:3px;border-left:3px solid #ff4444;transition:opacity 0.5s;';
     const hs = isHeadshot ? ' 💀' : '';
-    el.innerHTML = `<span style="color:#44ff44">${killerName}</span> <span style="color:#888">[${weapon}]</span> <span style="color:#ff6666">${victimName}</span>${hs}`;
+    el.innerHTML = `<span style="color:#44ff44">${escapeHTML(killerName)}</span> <span style="color:#888">[${escapeHTML(weapon)}]</span> <span style="color:#ff6666">${escapeHTML(victimName)}</span>${hs}`;
     _feedContainer.prepend(el);
     killFeed.unshift({ el, timer: CFG.KILL_FEED_DURATION });
     // prune
@@ -631,3 +638,4 @@ const Feedback = (function () {
     checkTips, resetTips, showTip,
   };
 })();
+if (typeof window !== 'undefined') window.Feedback = Feedback;

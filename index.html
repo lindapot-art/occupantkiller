@@ -1,12 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+      // Global stub to prevent early undefined errors
+      if (typeof window !== 'undefined' && typeof window.AudioSystem === 'undefined') {
+        window.AudioSystem = {
+          init: function() {}, resume: function() {},
+          playGunshot: function(){}, playExplosion: function(){}, playMusic: function(){},
+          stopMusic: function(){}, playReload: function(){}, playPickup: function(){},
+          playDeath: function(){}, playFootstep: function(){}, playHit: function(){},
+          // Add more stubs as needed
+        };
+      }
+    </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZOMBIELAND — Occupant Killer</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+  <body>
+    <div id="error-overlay" style="display:none;position:fixed;z-index:99999;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);color:#fff;font-family:monospace;font-size:18px;padding:40px 20px 20px 20px;overflow:auto;"></div>
+    <div id="conn-status" style="position:fixed;top:8px;right:16px;z-index:9999;font-family:monospace;font-size:16px;padding:4px 12px;border-radius:8px;background:#222;color:#fff;border:2px solid #444;box-shadow:0 2px 8px #000;">Server: <span id="conn-dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#aaa;vertical-align:middle;"></span></div>
+    <script src="page-prelude.js"></script>
+  <!-- Skill/Perk Progression HUD -->
+  <div id="skill-hud-overlay" style="display:none;position:fixed;top:10%;left:50%;transform:translateX(-50%);z-index:300;"></div>
+  <button id="skill-hud-btn" style="position:fixed;top:8px;left:12px;background:rgba(0,0,0,0.7);border:1px solid #44aaff;color:#aaccff;padding:4px 14px;border-radius:6px;font-size:13px;font-family:monospace;z-index:210;cursor:pointer">🧠 SKILLS</button>
 <div id="game-container">
 
   <!-- Three.js canvas is appended here by JS -->
@@ -62,44 +80,7 @@
       <div id="weapon-section">
         <div id="weapon-label">WEAPON</div>
         <div id="weapon-name-display">Army Shovel (МПЛ-50)</div>
-        <div id="weapon-slots">
-          <span class="wslot active" id="wslot-0">1·Shovel</span>
-          <span class="wslot" id="wslot-1">2·PM</span>
-          <span class="wslot" id="wslot-2">3·AK</span>
-          <span class="wslot" id="wslot-3">4·RPK</span>
-          <span class="wslot" id="wslot-4">5·SVD</span>
-          <span class="wslot" id="wslot-5">6·PKM</span>
-          <span class="wslot" id="wslot-6">7·NLAW</span>
-          <span class="wslot" id="wslot-7">8·Stugna</span>
-          <span class="wslot" id="wslot-8">9·M4A1</span>
-          <span class="wslot" id="wslot-9">0·Javelin</span>
-          <span class="wslot" id="wslot-10">RPG-7</span>
-          <span class="wslot" id="wslot-11">Igla</span>
-          <span class="wslot" id="wslot-12">GP-25</span>
-          <span class="wslot" id="wslot-13">SCAR</span>
-          <span class="wslot" id="wslot-14">DShK</span>
-          <span class="wslot" id="wslot-15">Molotov</span>
-          <span class="wslot" id="wslot-16">MG3</span>
-          <span class="wslot" id="wslot-17">MP5</span>
-          <span class="wslot" id="wslot-18">Barrett</span>
-          <span class="wslot" id="wslot-19">Minigun</span>
-          <span class="wslot" id="wslot-20">Xbow</span>
-          <span class="wslot" id="wslot-21">Shmel</span>
-          <span class="wslot" id="wslot-22">IZH-43</span>
-          <span class="wslot" id="wslot-23">Clay</span>
-          <span class="wslot" id="wslot-24">Smoke</span>
-          <span class="wslot" id="wslot-25">Flash</span>
-          <span class="wslot" id="wslot-26">AK-12</span>
-          <span class="wslot" id="wslot-27">P90</span>
-          <span class="wslot" id="wslot-28">AT4</span>
-          <span class="wslot" id="wslot-29">Glock</span>
-          <span class="wslot" id="wslot-30">KS-23</span>
-          <span class="wslot" id="wslot-31">AGS-17</span>
-          <span class="wslot" id="wslot-32">VSS</span>
-          <span class="wslot" id="wslot-33">Stinger</span>
-          <span class="wslot" id="wslot-34">Knife</span>
-          <span class="wslot" id="wslot-35">C4</span>
-        </div>
+        <div id="weapon-slots"></div>
       </div>
     </div>
 
@@ -180,6 +161,9 @@
 
     <!-- Kill feed (top-right scrolling list) -->
     <div id="kill-feed"></div>
+
+    <!-- NPC Morale HUD Overlay -->
+    <div id="npc-morale-hud" style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:250"></div>
 
     <!-- Hit direction indicator -->
     <div id="hit-direction"></div>
@@ -693,7 +677,24 @@
 <script src="hud.js"></script>
 <script src="weapons.js"></script>
 <script src="enemies.js"></script>
-<script src="audio-system.js"></script>
+  <script src="audio-system.js"></script>
+  <script>
+    // Global error overlay for unhandled JS exceptions
+    (function(){
+      var overlay = document.getElementById('error-overlay');
+      function showError(msg, url, line, col, err) {
+        if (!overlay) return;
+        overlay.style.display = 'block';
+        overlay.innerText = 'UNHANDLED ERROR:\n' + msg + '\n' + (url||'') + ' @ ' + line + ':' + col + (err && err.stack ? '\n' + err.stack : '');
+      }
+      window.addEventListener('error', function(e) {
+        showError(e.message, e.filename, e.lineno, e.colno, e.error);
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        showError('Unhandled Promise rejection: ' + (e.reason && e.reason.message ? e.reason.message : e.reason), '', '', '', e.reason);
+      });
+    })();
+  </script>
 <script src="weather-system.js"></script>
 <script src="ml-system.js"></script>
 <script src="tracers.js"></script>
@@ -709,13 +710,41 @@
 <script src="feedback.js"></script>
 <script src="progression.js"></script>
 
+
 <script src="game-manager.js"></script>
+
+
+<!-- Defensive global export for VoxelWorld and AudioSystem -->
+<script>
+  // Ensure VoxelWorld is always available on window for all modules
+  if (typeof window !== 'undefined' && typeof window.VoxelWorld === 'undefined' && typeof VoxelWorld !== 'undefined') {
+    window.VoxelWorld = VoxelWorld;
+  }
+  // Ensure AudioSystem is always available on window for all modules
+  if (typeof window !== 'undefined' && (typeof window.AudioSystem === 'undefined' || Object.keys(window.AudioSystem).length < 5) && typeof AudioSystem !== 'undefined') {
+    window.AudioSystem = AudioSystem;
+  }
+</script>
 
 <!-- Boot -->
 <script>
-(function () {
+document.addEventListener('DOMContentLoaded', function () {
+
   'use strict';
-  GameManager.init();
+  // Wait for AudioSystem to be fully populated (not just stub)
+  function isRealAudioSystem(obj) {
+    return obj && typeof obj.init === 'function' && typeof obj.playMusic === 'function' && Object.keys(obj).length > 10;
+  }
+  function bootWhenReady(attempts) {
+    if (typeof window.GameManager !== 'undefined' && isRealAudioSystem(window.AudioSystem)) {
+      window.GameManager.init();
+    } else if ((attempts || 0) < 50) {
+      setTimeout(function() { bootWhenReady((attempts||0)+1); }, 20);
+    } else {
+      console.error('[BOOT] GameManager or AudioSystem not ready after waiting');
+    }
+  }
+  bootWhenReady(0);
 
   // ── Button wiring ──────────────────────────────────────
   // ── Quick-start for new players ───────────────────────
@@ -958,9 +987,7 @@
     if (result > 0) { GameManager.refreshMarketplaceUI('shop'); }
   });
 
-  // Start render loop
-  GameManager.update();
-})();
+});
 </script>
 </body>
 </html>

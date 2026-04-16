@@ -1,7 +1,25 @@
+  // Low ammo warning sound
+  function playLowAmmo() {
+    if (!enabled || !ctx) return;
+    resume();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(120, now + 0.25);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 0.25);
+  }
+
 /* ───────────────────────────────────────────────────────────
    AUDIO SYSTEM — Procedural sound effects via Web Audio API
    ─────────────────────────────────────────────────────────── */
-const AudioSystem = (function () {
+window.AudioSystem = (function () {
   'use strict';
 
   let ctx = null;
@@ -30,26 +48,17 @@ const AudioSystem = (function () {
   function playGunshot(type) {
     // type: 'pistol', 'rifle', 'sniper', 'hmg', 'shotgun'
     if (!enabled || !ctx) return;
-    resume();
-
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const noise = createNoise(0.08);
-    const gain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
-
-    // Different gun types have different characteristics
-    const params = {
+    var now = ctx.currentTime;
+    var osc = ctx.createOscillator();
+    var noise = createNoise(0.08);
+    var gain = ctx.createGain();
+    var filter = ctx.createBiquadFilter();
+    var params = {
       pistol:       { freq: 800, decay: 0.06, noiseVol: 0.4, filterFreq: 3000 },
       rifle:        { freq: 400, decay: 0.10, noiseVol: 0.6, filterFreq: 2000 },
       sniper:       { freq: 200, decay: 0.15, noiseVol: 0.8, filterFreq: 1500 },
       heavy_sniper: { freq: 120, decay: 0.22, noiseVol: 0.95, filterFreq: 1000 },
       hmg:          { freq: 300, decay: 0.08, noiseVol: 0.7, filterFreq: 1800 },
-      launcher:     { freq: 150, decay: 0.25, noiseVol: 0.9, filterFreq: 800 },
-      melee:        { freq: 600, decay: 0.05, noiseVol: 0.3, filterFreq: 4000 },
-      shotgun:      { freq: 250, decay: 0.12, noiseVol: 0.85, filterFreq: 1200 },
-      smg:          { freq: 650, decay: 0.04, noiseVol: 0.5, filterFreq: 2800 },
-      explosive:    { freq: 100, decay: 0.30, noiseVol: 1.0, filterFreq: 600 },
     }[type] || { freq: 400, decay: 0.10, noiseVol: 0.6, filterFreq: 2000 };
 
     filter.type = 'lowpass';
@@ -72,9 +81,9 @@ const AudioSystem = (function () {
 
     // Environmental echo: check for ceiling above player
     var isIndoor = false;
-    if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getBlock && typeof GameManager !== 'undefined' && GameManager.getPlayer) {
+    if (typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.getBlock && typeof GameManager !== 'undefined' && GameManager.getPlayer) {
       var pp = GameManager.getPlayer().position;
-      if (pp) isIndoor = VoxelWorld.getBlock(Math.floor(pp.x), Math.floor(pp.y) + 4, Math.floor(pp.z)) !== 0;
+      if (pp) isIndoor = window.VoxelWorld.getBlock(Math.floor(pp.x), Math.floor(pp.y) + 4, Math.floor(pp.z)) !== 0;
     }
     if (isIndoor) {
       // Indoor reverb: two short delayed reflections
@@ -107,25 +116,66 @@ const AudioSystem = (function () {
     }
   }
 
+  // --- Place wrapAudio and return block at the end of the IIFE ---
+  function wrapAudio(fn, name) {
+    return function() {
+      try { return fn.apply(this, arguments); }
+      catch(e) {
+        if (window.showAudioWarning) window.showAudioWarning('Failed to play sound: ' + name + '\n' + (e.message||e));
+      }
+    }
+  }
+
+
+  // Procedural explosion sound (deep boom + noise burst)
   function playExplosion() {
     if (!enabled || !ctx) return;
     resume();
-    const now = ctx.currentTime;
-    const noise = createNoise(0.5);
-    const gain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
-
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1000, now);
-    filter.frequency.exponentialRampToValueAtTime(100, now + 0.5);
-
-    gain.gain.setValueAtTime(0.8, now);
+    var now = ctx.currentTime;
+    // Deep boom
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(90, now);
+    osc.frequency.exponentialRampToValueAtTime(30, now + 0.5);
+    gain.gain.setValueAtTime(0.28, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-
-    noise.connect(filter);
-    filter.connect(gain);
+    osc.connect(gain);
     gain.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 0.5);
+    // Noise burst overlay
+    var noise = createNoise(0.32);
+    var noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.13, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+    noise.connect(noiseGain);
+    noiseGain.connect(masterGain);
   }
+
+  return {
+    init,
+    resume,
+    playGunshot: wrapAudio(playGunshot, 'playGunshot'),
+    playExplosion: wrapAudio(playExplosion, 'playExplosion'),
+    playFlashbang: wrapAudio(playFlashbang, 'playFlashbang'),
+    playMine: wrapAudio(playMine, 'playMine'),
+    playSmoke: wrapAudio(playSmoke, 'playSmoke'),
+    playSpatialGunshot: wrapAudio(playSpatialGunshot, 'playSpatialGunshot'),
+    playHit: wrapAudio(playHit, 'playHit'),
+    playReload: wrapAudio(playReload, 'playReload'),
+    playPickup: wrapAudio(playPickup, 'playPickup'),
+    playDeath: wrapAudio(playDeath, 'playDeath'),
+    playFootstep: wrapAudio(playFootstep, 'playFootstep'),
+    playLandingThud: wrapAudio(playLandingThud, 'playLandingThud'),
+    playBulletSnap: wrapAudio(playBulletSnap, 'playBulletSnap'),
+    playEnemyFootstep: wrapAudio(playEnemyFootstep, 'playEnemyFootstep'),
+    playRicochet: wrapAudio(playRicochet, 'playRicochet'),
+    playWeaponSwitch: wrapAudio(playWeaponSwitch, 'playWeaponSwitch'),
+    playLowAmmo: wrapAudio(playLowAmmo, 'playLowAmmo'),
+  };
+
+
 
   function playFlashbang() {
     if (!enabled || !ctx) return;
@@ -156,13 +206,74 @@ const AudioSystem = (function () {
     ring.stop(now + 2.0);
   }
 
+  // Procedural mine detonation sound (deep boom + metallic ping)
+  function playMine() {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    // Deep boom
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(80, now);
+    osc.frequency.exponentialRampToValueAtTime(30, now + 0.4);
+    gain.gain.setValueAtTime(0.22, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 0.4);
+    // Metallic ping overlay
+    var ping = ctx.createOscillator();
+    var pingGain = ctx.createGain();
+    ping.type = 'triangle';
+    ping.frequency.setValueAtTime(1800, now + 0.1);
+    ping.frequency.exponentialRampToValueAtTime(600, now + 0.5);
+    pingGain.gain.setValueAtTime(0.08, now + 0.1);
+    pingGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    ping.connect(pingGain);
+    pingGain.connect(masterGain);
+    ping.start(now + 0.1);
+    ping.stop(now + 0.5);
+  }
+
+  // Procedural smoke grenade sound (soft pop + hiss)
+  function playSmoke() {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    // Soft pop
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.12);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 0.12);
+    // Hiss (noise burst)
+    var hiss = createNoise(0.7);
+    var hissGain = ctx.createGain();
+    hissGain.gain.setValueAtTime(0.09, now + 0.1);
+    hissGain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+    hiss.connect(hissGain);
+    hissGain.connect(masterGain);
+  }
+
   // ── Spatial panning helper ─────────────────────────────
   // pos = {x,z} sound source, listener = {x,z} camera, angle = camera Y rotation
+  function _safeAudio(v) { return isFinite(v) ? v : 0; }
+  // Safe AudioParam setter — prevents non-finite value errors (especially in headless)
+  function _safePV(param, v) { if (isFinite(v)) param.value = v; }
+
   function _calcPan(pos, listener, angle) {
     if (!pos || !listener) return 0;
-    var dx = pos.x - listener.x, dz = pos.z - listener.z;
+    var dx = (pos.x || 0) - (listener.x || 0), dz = (pos.z || 0) - (listener.z || 0);
     var dist = Math.sqrt(dx * dx + dz * dz);
-    if (dist < 0.1) return 0;
+    if (!isFinite(dist) || dist < 0.1) return 0;
     // Angle from listener to source relative to listener facing direction
     var toSource = Math.atan2(dx, dz);
     var rel = toSource - (angle || 0);
@@ -193,12 +304,12 @@ const AudioSystem = (function () {
     gain.gain.exponentialRampToValueAtTime(0.001, now + params.decay);
     // Spatial panning (guarded for Safari < 14.1)
     var panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-    if (panner) panner.pan.value = _calcPan(worldPos, listenerPos, listenerAngle);
+    if (panner) _safePV(panner.pan, _calcPan(worldPos, listenerPos, listenerAngle));
     // Distance attenuation
     if (listenerPos && worldPos) {
-      var ddx = worldPos.x - listenerPos.x, ddz = worldPos.z - listenerPos.z;
+      var ddx = (worldPos.x || 0) - (listenerPos.x || 0), ddz = (worldPos.z || 0) - (listenerPos.z || 0);
       var dd = Math.sqrt(ddx * ddx + ddz * ddz);
-      gain.gain.setValueAtTime(0.3 * Math.max(0.05, 1 - dd / 80), now);
+      if (isFinite(dd)) gain.gain.setValueAtTime(_safeAudio(0.3 * Math.max(0.05, 1 - dd / 80)), now);
     }
     osc.connect(filter);
     noise.connect(filter);
@@ -315,8 +426,8 @@ const AudioSystem = (function () {
     var gain = ctx.createGain();
     var filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = 200 + intensity * 300;
-    gain.gain.setValueAtTime(0.15 * intensity, now);
+    filter.frequency.value = _safeAudio(200 + intensity * 300) || 200;
+    gain.gain.setValueAtTime(_safeAudio(0.15 * intensity), now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
     noise.connect(filter);
     filter.connect(gain);
@@ -352,6 +463,7 @@ const AudioSystem = (function () {
     if (!enabled || !ctx || distance > 25) return;
     resume();
     var vol = Math.max(0.005, 0.04 * (1 - distance / 25));
+    if (!isFinite(vol)) return;
     var now = ctx.currentTime;
     var noise = createNoise(0.03);
     var gain = ctx.createGain();
@@ -387,8 +499,8 @@ const AudioSystem = (function () {
   }
   function updateEngine(speed) {
     if (!_engineOsc || !_engineGain) return;
-    _engineOsc.frequency.value = 80 + speed * 3;
-    _engineGain.gain.value = Math.min(0.12, speed * 0.008);
+    _engineOsc.frequency.value = _safeAudio(80 + speed * 3);
+    _engineGain.gain.value = _safeAudio(Math.min(0.12, speed * 0.008));
   }
   function stopEngine() {
     if (_engineOsc) { try { _engineOsc.stop(); } catch(e){} _engineOsc = null; }
@@ -495,8 +607,8 @@ const AudioSystem = (function () {
   }
   function updateDroneMotor(distance) {
     if (!_droneGain) return;
-    if (distance > 40) { _droneGain.gain.value = 0; return; }
-    _droneGain.gain.value = Math.max(0.005, 0.06 * (1 - distance / 40));
+    if (!isFinite(distance) || distance > 40) { _droneGain.gain.value = 0; return; }
+    _droneGain.gain.value = _safeAudio(Math.max(0.005, 0.06 * (1 - distance / 40)));
   }
   function stopDroneMotor() {
     if (_droneOsc1) { try { _droneOsc1.stop(); } catch(e){} _droneOsc1 = null; }
@@ -955,17 +1067,42 @@ const AudioSystem = (function () {
 
   /* ── New Audio Features (B21) ──────────────────────────── */
 
-  // Enemy bark / shout SFX
-  function playEnemyBark(npcId, bark) {
+  // Enemy bark / shout SFX — type-specific tonal patterns
+  var _BARK_TONES = {
+    attack:    { freq: 140, type: 'sawtooth', dur: 0.18, ramp: [1.3, 0.8] },
+    grenade:   { freq: 200, type: 'square',   dur: 0.12, ramp: [1.5, 1.0, 0.6] },
+    reload:    { freq: 100, type: 'triangle',  dur: 0.15, ramp: [0.8] },
+    flank:     { freq: 160, type: 'sawtooth', dur: 0.22, ramp: [0.9, 1.2, 0.7] },
+    sniper:    { freq: 250, type: 'square',   dur: 0.10, ramp: [1.0, 1.8] },
+    retreat:   { freq: 110, type: 'sawtooth', dur: 0.25, ramp: [1.0, 0.6, 0.4] },
+    charge:    { freq: 90,  type: 'sawtooth', dur: 0.30, ramp: [0.7, 1.0, 1.4] },
+    hurt:      { freq: 180, type: 'square',   dur: 0.14, ramp: [1.2, 0.5] },
+    reinforce: { freq: 130, type: 'triangle',  dur: 0.20, ramp: [1.0, 1.3] },
+  };
+  function playEnemyBark(barkType, panX) {
     if (!enabled || !ctx) return;
+    var tone = _BARK_TONES[barkType] || _BARK_TONES.attack;
+    var now = ctx.currentTime;
+    var segDur = tone.dur / tone.ramp.length;
     var osc = ctx.createOscillator();
     var g = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.value = 120 + Math.random() * 60;
-    g.gain.setValueAtTime(0.08, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-    osc.connect(g); g.connect(masterGain);
-    osc.start(); osc.stop(ctx.currentTime + 0.15);
+    osc.type = tone.type;
+    // Frequency contour from ramp multipliers
+    osc.frequency.setValueAtTime(tone.freq * tone.ramp[0], now);
+    for (var ri = 1; ri < tone.ramp.length; ri++) {
+      osc.frequency.linearRampToValueAtTime(tone.freq * tone.ramp[ri], now + segDur * ri);
+    }
+    g.gain.setValueAtTime(0.09, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + tone.dur);
+    // Spatial panning if available
+    if (panX !== undefined && ctx.createStereoPanner) {
+      var pan = ctx.createStereoPanner();
+      _safePV(pan.pan, Math.max(-1, Math.min(1, _safeAudio(panX))));
+      osc.connect(g); g.connect(pan); pan.connect(masterGain);
+    } else {
+      osc.connect(g); g.connect(masterGain);
+    }
+    osc.start(now); osc.stop(now + tone.dur);
   }
 
   // Headshot ding 
@@ -1488,6 +1625,9 @@ const AudioSystem = (function () {
     setMusicVolume: setMusicVolume,
     setMusicIntensity: setMusicIntensity,
     playFlashbang: playFlashbang,
+    playMine: playMine,
+    playSmoke: playSmoke,
+
     playRicochet: playRicochet,
     startDroneMotor: startDroneMotor,
     updateDroneMotor: updateDroneMotor,
@@ -1530,3 +1670,6 @@ const AudioSystem = (function () {
     playImpact: playImpact,
   };
 })();
+if (typeof window !== 'undefined' && window.AudioSystem) {
+  console.log('[AudioSystem] Assigned to window. Keys:', Object.keys(window.AudioSystem));
+}

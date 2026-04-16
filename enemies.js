@@ -46,9 +46,13 @@ const Enemies = (() => {
 
   function spawnDmgNumber(pos, amount, isHeadshot) {
     if (!scene) return;
-    var canvas = document.createElement('canvas');
-    canvas.width = 64; canvas.height = 32;
-    var ctx = canvas.getContext('2d');
+      var canvas = document.createElement('canvas');
+      canvas.width = 64; canvas.height = 32;
+      var ctx = canvas.getContext('2d');
+      if (!scene) {
+        console.error('[Enemies.startWave] scene is null! Wave:', w, 'Stage:', stageId);
+        throw new Error('[Enemies] scene is null in startWave!');
+      }
     ctx.font = 'bold 24px monospace';
     ctx.fillStyle = isHeadshot ? '#ff4444' : '#ffcc00';
     ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
@@ -62,22 +66,122 @@ const Enemies = (() => {
     sprite.position.copy(pos);
     sprite.position.y += 1.5 + Math.random() * 0.5;
     sprite.position.x += (Math.random() - 0.5) * 0.4;
-    scene.add(sprite);
+    if (scene) scene.add(sprite);
+    else console.warn('[Enemies] Skipped sprite add: scene is null', sprite);
     _dmgNumbers.push({ sprite: sprite, life: 0.8, vy: 2.5 });
   }
   function updateDmgNumbers(delta) {
+    // Defensive: null-slot pattern to avoid index corruption
     for (var i = _dmgNumbers.length - 1; i >= 0; i--) {
       var d = _dmgNumbers[i];
+      if (!d || !d.sprite || !d.sprite.material) {
+        _dmgNumbers[i] = null;
+        continue;
+      }
+      if (!scene) {
+        console.error('[Enemies] scene is null in add (dmg sprite)', d.sprite);
+        _dmgNumbers[i] = null;
+        continue;
+      }
       d.sprite.position.y += d.vy * delta;
       d.life -= delta;
       d.sprite.material.opacity = Math.max(0, d.life / 0.8);
       if (d.life <= 0) {
         scene.remove(d.sprite);
-        d.sprite.material.map.dispose();
+        if (d.sprite.material.map) d.sprite.material.map.dispose();
         d.sprite.material.dispose();
-        _dmgNumbers.splice(i, 1);
+        _dmgNumbers[i] = null;
       }
     }
+    // Compact array to remove nulls
+    for (let i = _dmgNumbers.length - 1; i >= 0; i--) {
+      if (_dmgNumbers[i] === null) _dmgNumbers.splice(i, 1);
+    }
+  }
+
+  // ── Floating Enemy Bark Text ──────────────────────────────
+  var _barkSprites = [];
+  var _BARK_TEXTS = {
+    attack:    'АТАКА!',
+    grenade:   'ГРАНАТА!',
+    reload:    'Перезарядка!',
+    flank:     'Обходим!',
+    sniper:    'СНАЙПЕР!',
+    retreat:   'Отступаем!',
+    charge:    'УРААА!',
+    hurt:      'Он ранен!',
+    reinforce: 'Подкрепление!',
+  };
+  function spawnBarkText(pos, barkType) {
+    if (!scene) return;
+    var text = _BARK_TEXTS[barkType] || barkType;
+    var canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 48;
+    var c = canvas.getContext('2d');
+    c.font = 'bold 28px monospace';
+    // Dark background pill
+    var tw = c.measureText(text).width + 16;
+    c.fillStyle = 'rgba(0,0,0,0.6)';
+    c.beginPath();
+    c.roundRect ? c.roundRect(128 - tw/2, 4, tw, 36, 6) : c.fillRect(128 - tw/2, 4, tw, 36);
+    c.fill();
+    c.fillStyle = '#ffffff';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(text, 128, 24);
+    var tex = new THREE.CanvasTexture(canvas);
+    var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+    var sprite = new THREE.Sprite(mat);
+    sprite.scale.set(2.5, 0.5, 1);
+    sprite.position.set(pos.x, pos.y + 2.2, pos.z);
+    if (scene) scene.add(sprite);
+    else console.warn('[Enemies] Skipped bark sprite add: scene is null', sprite);
+    _barkSprites.push({ sprite: sprite, life: 1.5, vy: 0.6 });
+  }
+  function updateBarkSprites(delta) {
+    for (var i = _barkSprites.length - 1; i >= 0; i--) {
+      var b = _barkSprites[i];
+      if (!b || !b.sprite || !b.sprite.material) {
+        _barkSprites.splice(i, 1);
+        continue;
+      }
+      b.sprite.position.y += b.vy * delta;
+      b.life -= delta;
+      b.sprite.material.opacity = Math.max(0, b.life / 1.5);
+      if (b.life <= 0) {
+        scene.remove(b.sprite);
+        if (b.sprite.material.map) b.sprite.material.map.dispose();
+        b.sprite.material.dispose();
+        _barkSprites.splice(i, 1);
+      }
+    }
+  }
+
+  /**
+   * Trigger an enemy bark — floating text + audio.
+   * Has per-enemy cooldown to prevent spam.
+   */
+  function triggerBark(enemy, barkType) {
+    if (!enemy || !enemy.mesh || !enemy.alive) return;
+    // Per-enemy bark cooldown: 3s
+    var now = performance.now();
+      if (enemy._lastBarkTime && now - enemy._lastBarkTime < 3000) return; // Prevent spam
+    enemy._lastBarkTime = now;
+    // Distance check: only if within 25 units of player
+    if (_playerPos) {
+      var dx = enemy.mesh.position.x - _playerPos.x;
+      var dz = enemy.mesh.position.z - _playerPos.z;
+      if (dx * dx + dz * dz > 625) return; // 25^2
+    }
+    spawnBarkText(enemy.mesh.position, barkType);
+    // Spatial panning
+    var panX = 0;
+    if (_playerPos) {
+      var toEnemy = Math.atan2(enemy.mesh.position.x - _playerPos.x, enemy.mesh.position.z - _playerPos.z);
+      var camY = typeof CameraSystem !== 'undefined' ? CameraSystem.getYaw() : 0;
+      panX = Math.sin(toEnemy - camY);
+    }
+      if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playEnemyBark) window.AudioSystem.playEnemyBark(barkType, panX);
   }
 
   // ── Dispose helper — release Three.js GPU resources ────────
@@ -655,11 +759,11 @@ const Enemies = (() => {
       g.vy -= 15 * delta; // gravity
       g.life -= delta;
       // Explode on ground or timeout
-      var terrainY = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(g.mesh.position.x, g.mesh.position.z) : 0;
+      var terrainY = (typeof window.VoxelWorld !== 'undefined') ? window.VoxelWorld.getTerrainHeight(g.mesh.position.x, g.mesh.position.z) : 0;
       if (g.mesh.position.y <= terrainY + 0.2 || g.life <= 0) {
         var pos = g.mesh.position;
         if (typeof Tracers !== 'undefined' && Tracers.spawnExplosion) Tracers.spawnExplosion(pos, 2);
-        if (typeof AudioSystem !== 'undefined') AudioSystem.playExplosion();
+        if (typeof window.AudioSystem !== 'undefined') window.AudioSystem.playExplosion();
         // Damage player if in radius
         if (playerPos) {
           var d = pos.distanceTo(playerPos);
@@ -674,7 +778,24 @@ const Enemies = (() => {
     }
   }
 
-  // ── Choose a type appropriate for the current wave ────────
+  // ── Stage-specific enemy composition tables ────────────────
+  // Each stage has a signature enemy pool + a chance to pull from it
+  var STAGE_ROSTER = {
+    1: { bias: 0.40, pool: ['CONSCRIPT','CONSCRIPT','CONSCRIPT','STORMER','ENGINEER'] },            // Hostomel — green conscripts
+    2: { bias: 0.45, pool: ['CONSCRIPT','STORMER','ENGINEER','ARMORED','ENGINEER'] },               // Avdiivka — industrial defenders
+    3: { bias: 0.50, pool: ['STORMER','STORMER','ARMORED','SABOTEUR','WAGNER'] },                   // Bakhmut — Wagner meat-grinder
+    4: { bias: 0.45, pool: ['CONSCRIPT','SNIPER','PARATROOP','STORMER','SNIPER'] },                 // Kherson — river crossing snipers
+    5: { bias: 0.55, pool: ['FLAMETHROWER','SHIELD_BEARER','STORMER','ARMORED','ENGINEER'] },       // Mariupol — CQB in steelworks
+    6: { bias: 0.50, pool: ['DRONE_OP','KAMIKAZE_DRONE','PARATROOP','SNIPER','SNIPER_ELITE'] },     // Crimea — air+sea
+    7: { bias: 0.55, pool: ['WAR_DOG','BOMBER','WAGNER','SABOTEUR','FLAMETHROWER'] },               // Chornobyl — feral+mutant
+    8: { bias: 0.50, pool: ['SPETSNAZ','SNIPER_ELITE','EW_OPERATOR','COMMISSAR','SHIELD_BEARER'] }, // Moscow — elite FSB
+    9: { bias: 0.55, pool: ['BTR','DRONE_OP','HEAVY_SNIPER','STORMER','MORTAR'] },                  // Sevastopol — naval base
+    10:{ bias: 0.60, pool: ['KADYROVITE','WAGNER','COMMISSAR','MORTAR','ARMORED'] },                 // Donbas — entrenched
+    11:{ bias: 0.60, pool: ['TANK','THERMOBARIC','ASSAULT_MECH','HEAVY_SNIPER','BTR'] },            // Belgorod — mechanized
+    12:{ bias: 0.65, pool: ['SPETSNAZ','ASSAULT_MECH','THERMOBARIC','SWARM_OP','EW_OPERATOR'] },    // Kremlin — everything
+  };
+
+  // ── Choose a type appropriate for the current wave + stage ──
   function pickTypeForWave(w) {
     // AI Smart Learning: ML system may override type selection
     if (_aiStrategy && _aiStrategy.preferredTypes && _aiStrategy.preferredTypes.length > 0 &&
@@ -682,7 +803,7 @@ const Enemies = (() => {
       return _aiStrategy.preferredTypes[Math.floor(Math.random() * _aiStrategy.preferredTypes.length)];
     }
 
-    const r = Math.random();
+    var r = Math.random();
     // Stage boss on final wave, mini-boss every 5th wave
     if (w % 5 === 0 && w >= 5 && r < 0.08) {
       if (typeof EnemyTypes !== 'undefined' && EnemyTypes.getBossForStage) {
@@ -690,6 +811,17 @@ const Enemies = (() => {
       }
       return 'BOSS';
     }
+
+    // ── Stage-specific roster: high chance to pull from signature pool ──
+    var stageNum = (typeof _stageId === 'number') ? _stageId : 1;
+    var roster = STAGE_ROSTER[stageNum];
+    if (roster && Math.random() < roster.bias) {
+      // Later waves unlock deeper pool entries
+      var maxIdx = Math.min(roster.pool.length, 2 + Math.floor(w / 2));
+      return roster.pool[Math.floor(Math.random() * maxIdx)];
+    }
+
+    // ── Global fallback (wave-scaled variety) ──
     // Endgame enemy types (stages 9-12, wave ~15+)
     if (w >= 20 && r < 0.04) return 'ASSAULT_MECH';
     if (w >= 16 && r < 0.07) return 'THERMOBARIC';
@@ -1034,8 +1166,8 @@ const Enemies = (() => {
       sx = px + Math.cos(angle) * r;
       sz = pz + Math.sin(angle) * r;
     }
-    const sy = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
-      ? VoxelWorld.getTerrainHeight(sx, sz) : 0;
+    const sy = (typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.getTerrainHeight)
+      ? window.VoxelWorld.getTerrainHeight(sx, sz) : 0;
     const mesh  = buildMesh(typeCfg);
     // Attach rank-based weapon visual to enemy mesh
     attachWeaponVisual(mesh, typeCfg);
@@ -1113,26 +1245,52 @@ const Enemies = (() => {
 
     const group = createAssaultGroup(groupId, center);
 
-    // Compose group: 1 officer, 1 medic, 2-4 riflemen, 1 stormer(pointman)
-    const officerIdx = spawnOne('OFFICER', groupId, center);
+    // ── Stage-specific assault group composition ──────────────
+    // Each stage flavors the group with its signature units
+    var stageNum = (typeof _stageId === 'number') ? _stageId : 1;
+
+    // Core: officer + medic always present
+    var officerIdx = spawnOne('OFFICER', groupId, center);
     group.members.push(officerIdx);
     group.hasOfficer = true;
 
-    const medicIdx = spawnOne('MEDIC', groupId, center);
+    var medicIdx = spawnOne('MEDIC', groupId, center);
     group.members.push(medicIdx);
     group.hasMedic = true;
 
-    // Pointman (stormer)
-    const pointIdx = spawnOne('STORMER', groupId, center);
+    // Pointman — use stage-specific pointman type
+    var pointType = 'STORMER';
+    if (stageNum === 3)       pointType = 'WAGNER';       // Bakhmut: Wagner spearheads
+    else if (stageNum === 8)  pointType = 'SPETSNAZ';     // Moscow: Spetsnaz vanguard
+    else if (stageNum === 10) pointType = 'KADYROVITE';   // Donbas: Kadyrovite assault
+    else if (stageNum === 12) pointType = 'SPETSNAZ';     // Kremlin: elite assault
+    var pointIdx = spawnOne(pointType, groupId, center);
     enemies[pointIdx].squadRole = SQUAD_ROLE.POINTMAN;
     group.members.push(pointIdx);
 
-    // Riflemen
-    const rifleCt = 2 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < rifleCt; i++) {
-      const typ = Math.random() < 0.3 ? 'ARMORED' : 'CONSCRIPT';
-      const idx = spawnOne(typ, groupId, center);
+    // Riflemen count scales with stage (bigger squads late-game)
+    var rifleCt = 2 + Math.floor(Math.random() * 3) + Math.floor(stageNum / 4);
+
+    // Stage-specific group fillers from roster
+    var roster = STAGE_ROSTER[stageNum];
+    for (var i = 0; i < rifleCt; i++) {
+      var typ;
+      if (roster && Math.random() < 0.5) {
+        // Pull from stage signature pool
+        typ = roster.pool[Math.floor(Math.random() * roster.pool.length)];
+      } else {
+        typ = Math.random() < 0.3 ? 'ARMORED' : 'CONSCRIPT';
+      }
+      var idx = spawnOne(typ, groupId, center);
       group.members.push(idx);
+    }
+
+    // Stage-specific specialist additions
+    if (stageNum >= 5 && Math.random() < 0.4) {
+      // Late stages get an extra specialist
+      var specType = roster ? roster.pool[Math.floor(Math.random() * roster.pool.length)] : 'ARMORED';
+      var specIdx = spawnOne(specType, groupId, center);
+      group.members.push(specIdx);
     }
 
     assaultGroups.push(group);
@@ -1163,8 +1321,9 @@ const Enemies = (() => {
     // AI Smart Learning: adjust group spread based on strategy
     var groupSpread = (_aiStrategy && _aiStrategy.groupSpreadFactor) || 1.0;
 
-    // Spawn 5 enemy assault groups (Russian army штурмовые группы)
-    for (let g = 0; g < NUM_ASSAULT_GROUPS; g++) {
+    // ── Stage-scaled assault group count (more groups in later stages) ──
+    var stageGroupCount = Math.min(8, NUM_ASSAULT_GROUPS + Math.floor((_stageId || 1) / 3));
+    for (let g = 0; g < stageGroupCount; g++) {
       spawnAssaultGroup(g, sc);
     }
 
@@ -1176,11 +1335,12 @@ const Enemies = (() => {
     }
 
     // Additional loose enemies spawn over time (stragglers, reinforcements)
-    // Longer waves: 12 base + 5 per wave, slower spawn rate
-    const baseExtra = 12 + (w - 1) * 5;
+    // Stage-scaled: more reinforcements + faster spawn in later stages
+    var stageNum = (typeof _stageId === 'number') ? _stageId : 1;
+    const baseExtra = 12 + (w - 1) * 5 + stageNum * 2;
     const extraCount = Math.floor(baseExtra * (1 + (stageMult - 1) * 0.5));
     spawnQueue  = Array.from({ length: extraCount }, () => pickTypeForWave(w));
-    spawnTimer  = 8 + Math.random() * 4; // delay before first reinforcement
+    spawnTimer  = Math.max(3, 8 - stageNum * 0.4) + Math.random() * 4; // faster spawns in later stages
   }
 
   // ── Per-frame update ──────────────────────────────────────
@@ -1203,7 +1363,7 @@ const Enemies = (() => {
       }
       // Ground collision
       if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
-        var groundY = VoxelWorld.getTerrainHeight(blood.mesh.position.x, blood.mesh.position.z);
+        var groundY = window.VoxelWorld.getTerrainHeight(blood.mesh.position.x, blood.mesh.position.z);
         if (blood.mesh.position.y <= groundY + 0.05) {
           blood.mesh.position.y = groundY + 0.05;
           blood.velocity.set(0, 0, 0);
@@ -1218,6 +1378,9 @@ const Enemies = (() => {
 
     // Update floating damage numbers
     updateDmgNumbers(delta);
+
+    // Update floating bark text
+    updateBarkSprites(delta);
 
     // Update enemy grenades
     updateEnemyGrenades(delta, playerPos);
@@ -1368,7 +1531,7 @@ const Enemies = (() => {
 
       // Always follow terrain height
       if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
-        e.mesh.position.y = VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z);
+        e.mesh.position.y = window.VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z);
       }
 
       // ── Detection system: enemies must spot the player ──
@@ -1402,8 +1565,14 @@ const Enemies = (() => {
         }
       }
 
-      // Player detection: only spot if not stealthed and within detection range/angle
-      if (!_playerStealth && distToPlayer < DETECTION_RANGE) {
+
+      // Player detection: only spot if not stealthed and within weather-modified detection range/angle
+      let weatherVisionMod = 1.0;
+      if (typeof WeatherSystem !== 'undefined' && WeatherSystem.getModifiers) {
+        weatherVisionMod = WeatherSystem.getModifiers().visionRange || 1.0;
+      }
+      const effectiveDetectionRange = DETECTION_RANGE * weatherVisionMod;
+      if (!_playerStealth && distToPlayer < effectiveDetectionRange) {
         // Check if player is roughly in front of enemy (FOV cone)
         const facingDir = _tmpVec3d.set(0, 0, -1).applyQuaternion(e.mesh.quaternion);
         const angleToPlayer = facingDir.angleTo(_tmpVec3e.copy(dirToPlayer).normalize());
@@ -1420,9 +1589,10 @@ const Enemies = (() => {
       // If player shot this enemy, immediately spot them
       if (e.flashTimer > 0.07) {
         e.spotLevel = SPOT_TIME + 0.5;
-        if (!e.playerSpotted && typeof AudioSystem !== 'undefined' && AudioSystem.playEnemyAlert) {
-          AudioSystem.playEnemyAlert();
+        if (!e.playerSpotted && typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playEnemyAlert) {
+          window.AudioSystem.playEnemyAlert();
         }
+        if (!e.playerSpotted) triggerBark(e, 'attack');
         e.playerSpotted = true;
       }
 
@@ -1467,7 +1637,7 @@ const Enemies = (() => {
           }
           // Try road waypoints for flanking maneuvers
           if (!gotTarget && typeof VoxelWorld !== 'undefined' && VoxelWorld.getRoadWaypoints) {
-            var roadWPs = VoxelWorld.getRoadWaypoints();
+            var roadWPs = window.VoxelWorld.getRoadWaypoints();
             if (roadWPs.length > 0) {
               e._wanderTarget.copy(roadWPs[Math.floor(Math.random() * roadWPs.length)]);
               gotTarget = true;
@@ -1582,10 +1752,10 @@ const Enemies = (() => {
         const nextZ = e.mesh.position.z + dir.z * stepDist * 2;
         let blocked = false;
         if (typeof VoxelWorld !== 'undefined' && VoxelWorld.isSolid) {
-          const nextH = VoxelWorld.getTerrainHeight(nextX, nextZ);
+          const nextH = window.VoxelWorld.getTerrainHeight(nextX, nextZ);
           const curH = e.mesh.position.y;
           if (nextH - curH > MAX_CLIMBABLE_HEIGHT) blocked = true;
-          if (VoxelWorld.isSolid(nextX, curH + 1, nextZ)) blocked = true;
+          if (window.VoxelWorld.isSolid(nextX, curH + 1, nextZ)) blocked = true;
         }
 
         if (blocked) {
@@ -1607,9 +1777,9 @@ const Enemies = (() => {
         e.legAngle += e.legDir * (e.speed / 2.2) * 4 * delta;
         if (Math.abs(e.legAngle) > 0.45) e.legDir *= -1;
         // Play footstep when leg passes zero (step transition)
-        if (prevLeg * e.legAngle < 0 && typeof AudioSystem !== 'undefined' && AudioSystem.playEnemyFootstep) {
+        if (prevLeg * e.legAngle < 0 && typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playEnemyFootstep) {
           var eDist = e.mesh.position.distanceTo(playerPos);
-          AudioSystem.playEnemyFootstep(eDist);
+          window.AudioSystem.playEnemyFootstep(eDist);
         }
       } else if (e.playerSpotted && engageDist > 1 && targetDist <= engageDist) {
         // At engage distance: strafe sideways while facing player
@@ -1652,7 +1822,7 @@ const Enemies = (() => {
           e.mesh.position.addScaledVector(awayDir, e.speed * 1.5 * delta);
           // Snap to terrain height
           if (typeof VoxelWorld !== 'undefined') {
-            e.mesh.position.y = VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z);
+            e.mesh.position.y = window.VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z);
           }
           e.mesh.lookAt(e.mesh.position.x + awayDir.x, e.mesh.position.y, e.mesh.position.z + awayDir.z);
         }
@@ -1736,6 +1906,7 @@ const Enemies = (() => {
             // Chance to throw grenade instead of shooting (8% when dist 8-20)
             if (distToPlayer > 8 && distToPlayer < 20 && Math.random() < 0.08) {
               throwEnemyGrenade(e.mesh.position, playerPos);
+              triggerBark(e, 'grenade');
             } else {
             // Accuracy check - affected by distance
             var hitChance = Math.max(0, e.typeCfg.accuracy * (1 - distToPlayer / (e.typeCfg.range * 1.5)));
@@ -1750,13 +1921,13 @@ const Enemies = (() => {
               onPlayerHit(eDmg, e.mesh.position);
             } else {
               // Near-miss: bullet snap audio with stereo pan from attacker direction
-              if (typeof AudioSystem !== 'undefined' && AudioSystem.playBulletSnap && distToPlayer < 30) {
+              if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playBulletSnap && distToPlayer < 30) {
                 var camYaw = (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) ? CameraSystem.getYaw() : 0;
                 var dx = e.mesh.position.x - playerPos.x;
                 var dz = e.mesh.position.z - playerPos.z;
                 var angleToEnemy = Math.atan2(dx, dz);
                 var relAngle = angleToEnemy - camYaw;
-                AudioSystem.playBulletSnap(Math.sin(relAngle));
+                window.AudioSystem.playBulletSnap(Math.sin(relAngle));
                 // Suppression: near-miss bullets stress the player
                 if (typeof GameManager !== 'undefined' && GameManager.addSuppression) {
                   GameManager.addSuppression(0.12);
@@ -1777,12 +1948,12 @@ const Enemies = (() => {
               Tracers.spawnTracer(tOrigin, tDir, 0xff4400, 80);
             }
             // Enemy gunshot audio (spatial panning)
-            if (typeof AudioSystem !== 'undefined') {
-              if (AudioSystem.playSpatialGunshot) {
+            if (typeof window.AudioSystem !== 'undefined') {
+              if (window.AudioSystem.playSpatialGunshot) {
                 var camAngle = (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) ? CameraSystem.getYaw() : 0;
-                AudioSystem.playSpatialGunshot('rifle', e.mesh.position, playerPos, camAngle);
-              } else if (AudioSystem.playGunshot) {
-                AudioSystem.playGunshot('rifle');
+                window.AudioSystem.playSpatialGunshot('rifle', e.mesh.position, playerPos, camAngle);
+              } else if (window.AudioSystem.playGunshot) {
+                window.AudioSystem.playGunshot('rifle');
               }
             }
             }
@@ -1835,7 +2006,7 @@ const Enemies = (() => {
                 var bDmg = EnemyTypes.TYPES.BOMBER.explosionDamage * Math.max(0, 1 - bDist / EnemyTypes.TYPES.BOMBER.explosionRadius);
                 onPlayerHit(bDmg, e.mesh.position);
               }
-              if (typeof AudioSystem !== 'undefined') AudioSystem.playExplosion();
+              if (typeof window.AudioSystem !== 'undefined') window.AudioSystem.playExplosion();
               if (typeof Tracers !== 'undefined') Tracers.spawnExplosion(e.mesh.position, 3);
               e.hp = 0; e.alive = false; e.deathTimer = 2.0;
               e._deathTiltX = -1.5; e._deathPopY = 2;
@@ -1861,7 +2032,7 @@ const Enemies = (() => {
               if (mDist < etResult.radius) {
                 onPlayerHit(etResult.damage * (1 - mDist / etResult.radius), e.mesh.position);
               }
-              if (typeof AudioSystem !== 'undefined') AudioSystem.playExplosion();
+              if (typeof window.AudioSystem !== 'undefined') window.AudioSystem.playExplosion();
             }
             break;
           case 'SHIELD_BEARER':
@@ -1950,7 +2121,7 @@ const Enemies = (() => {
             }
             break;
           case 'ENGINEER':
-            etResult = EnemyTypes.updateEngineer(e, delta, typeof VoxelWorld !== 'undefined' ? VoxelWorld.setBlock : null);
+            etResult = EnemyTypes.updateEngineer(e, delta, typeof window.VoxelWorld !== 'undefined' ? window.VoxelWorld.setBlock : null);
             break;
           case 'MEDIC':
             etResult = EnemyTypes.updateMedic(e, enemies, delta);
@@ -1974,7 +2145,7 @@ const Enemies = (() => {
             etResult = EnemyTypes.updateTank ? EnemyTypes.updateTank(e, playerPos, delta) : null;
             if (etResult) {
               if (etResult.mainGun) {
-                if (typeof AudioSystem !== 'undefined' && AudioSystem.playTankCannon) AudioSystem.playTankCannon();
+                if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playTankCannon) window.AudioSystem.playTankCannon();
                 if (typeof Tracers !== 'undefined' && Tracers.spawnExplosion) Tracers.spawnExplosion(new THREE.Vector3(etResult.targetX, e.mesh.position.y, etResult.targetZ), 3);
                 if (typeof Feedback !== 'undefined' && Feedback.triggerScreenShake) Feedback.triggerScreenShake(8, 0.5);
                 if (onPlayerHit) onPlayerHit(etResult.damage * 0.3, e.mesh.position); // reduced by distance
@@ -1995,7 +2166,7 @@ const Enemies = (() => {
           case 'SPETSNAZ':
             etResult = EnemyTypes.updateSpetsnaz ? EnemyTypes.updateSpetsnaz(e, playerPos, delta) : null;
             if (etResult && etResult.flashbang) {
-              if (typeof AudioSystem !== 'undefined' && AudioSystem.playFlashbang) AudioSystem.playFlashbang();
+              if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playFlashbang) window.AudioSystem.playFlashbang();
               if (typeof HUD !== 'undefined' && HUD.showGrenadeWarning) HUD.showGrenadeWarning();
               // Actual flashbang blind effect
               var fbOverlay = document.getElementById('flashbang-overlay');
@@ -2070,11 +2241,11 @@ const Enemies = (() => {
                   var hsDir = _tmpVec3e.set(playerPos.x, playerPos.y + 0.8, playerPos.z).sub(hsOrigin).normalize();
                   Tracers.spawnTracer(hsOrigin, hsDir, 0x00ff00, 200);
                 }
-                if (typeof AudioSystem !== 'undefined') {
-                  if (AudioSystem.playSpatialGunshot) {
+                if (typeof window.AudioSystem !== 'undefined') {
+                  if (window.AudioSystem.playSpatialGunshot) {
                     var hsYaw = (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) ? CameraSystem.getYaw() : 0;
-                    AudioSystem.playSpatialGunshot('heavy_sniper', e.mesh.position, playerPos, hsYaw);
-                  } else AudioSystem.playGunshot('sniper');
+                    window.AudioSystem.playSpatialGunshot('heavy_sniper', e.mesh.position, playerPos, hsYaw);
+                  } else window.AudioSystem.playGunshot('sniper');
                 }
               }
               if (etResult.relocating && e.mesh) {
@@ -2086,7 +2257,7 @@ const Enemies = (() => {
           case 'COMMISSAR':
             etResult = EnemyTypes.updateCommissar ? EnemyTypes.updateCommissar(e, enemies, delta) : null;
             if (etResult && etResult.executed) {
-              if (typeof AudioSystem !== 'undefined' && AudioSystem.playGunshot) AudioSystem.playGunshot('pistol');
+              if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playGunshot) window.AudioSystem.playGunshot('pistol');
             }
             break;
           case 'THERMOBARIC':
@@ -2096,7 +2267,7 @@ const Enemies = (() => {
                 var tbTarget = _tmpVec3d.set(etResult.targetX, playerPos.y, etResult.targetZ);
                 Tracers.spawnExplosion(tbTarget, etResult.radius * 0.4);
               }
-              if (typeof AudioSystem !== 'undefined') AudioSystem.playExplosion();
+              if (typeof window.AudioSystem !== 'undefined') window.AudioSystem.playExplosion();
               // AoE damage — check distance from target to player
               var tbdx = playerPos.x - etResult.targetX, tbdz = playerPos.z - etResult.targetZ;
               var tbDist = Math.sqrt(tbdx * tbdx + tbdz * tbdz);
@@ -2134,11 +2305,11 @@ const Enemies = (() => {
               if (etResult.mg && onPlayerHit) {
                 var mechHitChance = e.typeCfg.accuracy * (1 - distToPlayer / (e.typeCfg.range * 1.5));
                 if (Math.random() < mechHitChance) onPlayerHit(etResult.mgDamage, e.mesh.position);
-                if (typeof AudioSystem !== 'undefined') {
-                  if (AudioSystem.playSpatialGunshot) {
+                if (typeof window.AudioSystem !== 'undefined') {
+                  if (window.AudioSystem.playSpatialGunshot) {
                     var mechYaw = (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) ? CameraSystem.getYaw() : 0;
-                    AudioSystem.playSpatialGunshot('hmg', e.mesh.position, playerPos, mechYaw);
-                  } else AudioSystem.playGunshot('hmg');
+                    window.AudioSystem.playSpatialGunshot('hmg', e.mesh.position, playerPos, mechYaw);
+                  } else window.AudioSystem.playGunshot('hmg');
                 }
               }
               if (etResult.rockets) {
@@ -2152,7 +2323,7 @@ const Enemies = (() => {
                     Tracers.spawnExplosion(rTarget, 1.5);
                   }
                 }
-                if (typeof AudioSystem !== 'undefined') AudioSystem.playExplosion();
+                if (typeof window.AudioSystem !== 'undefined') window.AudioSystem.playExplosion();
                 if (onPlayerHit && distToPlayer < 8) onPlayerHit(etResult.rocketDamage, e.mesh.position);
               }
               // Show boss bar for mech
@@ -2173,7 +2344,7 @@ const Enemies = (() => {
                   );
                 }
               }
-              if (typeof AudioSystem !== 'undefined' && AudioSystem.playEnemyBark) AudioSystem.playEnemyBark();
+              if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playEnemyBark) window.AudioSystem.playEnemyBark();
             }
             break;
         }
@@ -2294,6 +2465,8 @@ const Enemies = (() => {
           if (grp.stateTimer <= 0) {
             grp.state = GROUP_STATE.ADVANCING;
             grp.stateTimer = 15 + Math.random() * 20;
+            // Bark: charge when advancing
+            if (aliveMembers.length > 0) triggerBark(enemies[aliveMembers[0]], 'charge');
           }
           break;
 
@@ -2302,6 +2475,10 @@ const Enemies = (() => {
           if (grp.stateTimer <= 0 || lossRatio > 0.3) {
             grp.state = lossRatio > 0.5 ? GROUP_STATE.RETREATING : GROUP_STATE.ASSAULTING;
             grp.stateTimer = 20 + Math.random() * 30;
+            // Bark: retreat or flank based on new state
+            if (aliveMembers.length > 0) {
+              triggerBark(enemies[aliveMembers[0]], lossRatio > 0.5 ? 'retreat' : 'flank');
+            }
           }
           // Set objective on terrain
           if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
@@ -2326,6 +2503,9 @@ const Enemies = (() => {
             }
             grp.state = grp.morale < retreatMoraleThreshold ? GROUP_STATE.RETREATING : GROUP_STATE.REGROUPING;
             grp.stateTimer = 10 + Math.random() * 15;
+            if (aliveMembers.length > 0 && grp.morale < retreatMoraleThreshold) {
+              triggerBark(enemies[aliveMembers[0]], 'retreat');
+            }
           }
           break;
 
@@ -2605,6 +2785,13 @@ const Enemies = (() => {
     spawnQueue = [];
     allDead    = true;   // Prevent premature wave-complete check during startGame→beginWave gap
     assaultGroups.length = 0;
+    // Clean up bark sprites
+    for (var bi = _barkSprites.length - 1; bi >= 0; bi--) {
+      if (scene) scene.remove(_barkSprites[bi].sprite);
+      _barkSprites[bi].sprite.material.map.dispose();
+      _barkSprites[bi].sprite.material.dispose();
+    }
+    _barkSprites.length = 0;
   }
 
   // ── Area damage (explosions) ────────────────────────────────

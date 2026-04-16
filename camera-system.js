@@ -57,6 +57,11 @@ const CameraSystem = (function () {
   let _strafeTilt = 0;   // current roll in radians
   let _strafeDir  = 0;   // -1/0/1 from game manager
 
+  /* ── Damage Flinch ──────────────────────────────────────────────── */
+  let _flinchYaw   = 0;
+  let _flinchPitch = 0;
+  let _flinchDecay = 0;
+
   /* ── Reusable temp objects (avoid per-frame allocation) ──────────── */
   const _tmpEuler = new THREE.Euler(0, 0, 0, 'YXZ');
   const _tmpVec3a = new THREE.Vector3();
@@ -164,6 +169,25 @@ const CameraSystem = (function () {
       shakeOffsetY = 0;
       shakeIntensity = 0;
     }
+    // Damage flinch decay
+    if (Math.abs(_flinchYaw) > 0.0005 || Math.abs(_flinchPitch) > 0.0005) {
+      var fDecay = Math.min(1, delta * 12);
+      _flinchYaw   *= (1 - fDecay);
+      _flinchPitch *= (1 - fDecay);
+    } else {
+      _flinchYaw = 0;
+      _flinchPitch = 0;
+    }
+  }
+
+  /**
+   * Directional camera flinch from damage.
+   * @param {number} yawDelta  - horizontal kick (radians, + = right)
+   * @param {number} pitchDelta - vertical kick (radians, + = up)
+   */
+  function flinch(yawDelta, pitchDelta) {
+    _flinchYaw   += yawDelta;
+    _flinchPitch += pitchDelta;
   }
 
   /* ── FPS Camera ──────────────────────────────────────────────────── */
@@ -202,8 +226,8 @@ const CameraSystem = (function () {
     );
 
     const euler = _tmpEuler.set(
-      pitch + shakeOffsetY * 0.5,
-      yaw + shakeOffsetX * 0.5,
+      pitch + shakeOffsetY * 0.5 + _flinchPitch,
+      yaw + shakeOffsetX * 0.5 + _flinchYaw,
       0, 'YXZ'
     );
     // Strafe camera roll
@@ -372,6 +396,7 @@ const CameraSystem = (function () {
     getForwardDir,
     getMoveDir,
     shake,
+    flinch,
     playLastKillCam,
     updateKillCam,
     isKillCamActive,

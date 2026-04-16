@@ -2,6 +2,8 @@
    GAME MANAGER — central orchestrator for all hybrid game systems
    ─────────────────────────────────────────────────────────────────────── */
 const GameManager = (function () {
+  // QA automation override: set by test script before any game code runs
+  if (typeof window !== 'undefined' && window.__QA_MODE === undefined) window.__QA_MODE = false;
   'use strict';
 
   /* ── Game States ─────────────────────────────────────────────────── */
@@ -146,7 +148,7 @@ const GameManager = (function () {
         for (let i = 0; i < 5; i++) {
           const bx = player.position.x + (Math.random() - 0.5) * 30;
           const bz = player.position.z + (Math.random() - 0.5) * 30;
-          const bh = VoxelWorld.getTerrainHeight(bx, bz);
+          const bh = window.VoxelWorld.getTerrainHeight(bx, bz);
           Enemies.damageInRadius(new THREE.Vector3(bx, bh, bz), 5, 40);
         }
         break;
@@ -155,7 +157,7 @@ const GameManager = (function () {
         for (let i = 0; i < 4; i++) {
           const sx = player.position.x + (Math.random() - 0.5) * 12;
           const sz = player.position.z + (Math.random() - 0.5) * 12;
-          const sh = VoxelWorld.getTerrainHeight(sx, sz);
+          const sh = window.VoxelWorld.getTerrainHeight(sx, sz);
           const types = ['HEALTH', 'AMMO', 'ARMOR', 'MEDKIT', 'GRENADE', 'STIM'];
           Pickups.spawn(new THREE.Vector3(sx, sh, sz), types[Math.floor(Math.random() * types.length)]);
         }
@@ -177,7 +179,7 @@ const GameManager = (function () {
           const dist = 4 + Math.random() * 6;
           const nx = player.position.x + Math.cos(angle) * dist;
           const nz = player.position.z + Math.sin(angle) * dist;
-          const nh = VoxelWorld.getTerrainHeight(nx, nz);
+          const nh = window.VoxelWorld.getTerrainHeight(nx, nz);
           NPCSystem.spawn(nx, nh, nz, 'infantry');
         }
         break;
@@ -229,7 +231,7 @@ const GameManager = (function () {
         for (let i = 0; i < 2; i++) {
           const dx = player.position.x + (Math.random() - 0.5) * 10;
           const dz = player.position.z + (Math.random() - 0.5) * 10;
-          const dh = VoxelWorld.getTerrainHeight(dx, dz) + 8;
+          const dh = window.VoxelWorld.getTerrainHeight(dx, dz) + 8;
           DroneSystem.spawn(dx, dh, dz, i === 0 ? 'fpv_attack' : 'bomb');
         }
         break;
@@ -238,7 +240,7 @@ const GameManager = (function () {
         for (let i = 0; i < 8; i++) {
           const cx = player.position.x + (Math.random() - 0.5) * 20;
           const cz = player.position.z + (Math.random() - 0.5) * 20;
-          const ch = VoxelWorld.getTerrainHeight(cx, cz);
+          const ch = window.VoxelWorld.getTerrainHeight(cx, cz);
           Enemies.damageInRadius(new THREE.Vector3(cx, ch, cz), 4, 25);
         }
         // Player takes minor damage if not stealth
@@ -292,7 +294,8 @@ const GameManager = (function () {
       mesh.userData.vy = 3 + Math.random() * 2; // bounce up velocity
       mesh.userData.age = 0;
       mesh.userData.baseY = worldPos.y;
-      _scene.add(mesh);
+      if (_scene) _scene.add(mesh);
+      else console.warn('Skipped mesh add: _scene is null');
       _lootParticles.push(mesh);
     }
   }
@@ -304,7 +307,7 @@ const GameManager = (function () {
       // Gravity + bounce
       lp.userData.vy -= 12 * delta;
       lp.position.y += lp.userData.vy * delta;
-      var groundH = VoxelWorld.getTerrainHeight(lp.position.x, lp.position.z) + 0.15;
+      var groundH = window.VoxelWorld.getTerrainHeight(lp.position.x, lp.position.z) + 0.15;
       if (lp.position.y < groundH) {
         lp.position.y = groundH;
         lp.userData.vy = Math.abs(lp.userData.vy) * 0.4; // bounce
@@ -325,11 +328,11 @@ const GameManager = (function () {
         player.score += LOOT_CONFIG.VALUE;
         HUD.setScore(player.score);
         if (HUD.addCombatLog) HUD.addCombatLog('+' + LOOT_CONFIG.VALUE + ' gold (loot)', '#ffd700');
-        _scene.remove(lp);
-        lp.geometry.dispose();
-        lp.material.dispose();
+        if (_scene) _scene.remove(lp);
+        if (lp.geometry) lp.geometry.dispose();
+        if (lp.material) lp.material.dispose();
         _lootParticles.splice(i, 1);
-        AudioSystem.playPickup();
+        if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playPickup) window.AudioSystem.playPickup();
         continue;
       }
       // Blink before despawning (last 3 seconds)
@@ -338,9 +341,9 @@ const GameManager = (function () {
       }
       // Despawn after lifetime
       if (lp.userData.age > LOOT_CONFIG.LIFETIME) {
-        _scene.remove(lp);
-        lp.geometry.dispose();
-        lp.material.dispose();
+        if (_scene) _scene.remove(lp);
+        if (lp.geometry) lp.geometry.dispose();
+        if (lp.material) lp.material.dispose();
         _lootParticles.splice(i, 1);
       }
     }
@@ -348,7 +351,7 @@ const GameManager = (function () {
 
   /* ── Block-to-Material Mapping (Minecraft style) ────────────────── */
   function blockToMaterialName(blockType) {
-    var B = VoxelWorld.BLOCK;
+    var B = window.VoxelWorld.BLOCK;
     if (blockType === B.WOOD || blockType === B.LOG) return 'wood';
     if (blockType === B.STONE || blockType === B.REINFORCED) return 'stone';
     if (blockType === B.METAL || blockType === B.ELECTRONICS) return 'metal';
@@ -359,7 +362,7 @@ const GameManager = (function () {
   }
 
   function blockToEconomyResource(blockType) {
-    var B = VoxelWorld.BLOCK;
+    var B = window.VoxelWorld.BLOCK;
     if (blockType === B.WOOD || blockType === B.LOG) return 'wood';
     if (blockType === B.STONE || blockType === B.REINFORCED) return 'stone';
     if (blockType === B.METAL || blockType === B.ELECTRONICS) return 'metal';
@@ -372,8 +375,8 @@ const GameManager = (function () {
     var worldPos = new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5);
     // Spawn terrain impact particle debris
     if (typeof Tracers !== 'undefined' && Tracers.spawnBlockImpact) {
-      var BLOCK_COLORS = (typeof VoxelWorld !== 'undefined' && VoxelWorld.BLOCK_COLORS) ? (VoxelWorld.BLOCK_COLORS[blockType] || 0x8B7355) : 0x8B7355;
-      Tracers.spawnBlockImpact(worldPos, BLOCK_COLORS);
+      var blockColor = (typeof window !== 'undefined' && window.BLOCK_COLORS) ? (window.BLOCK_COLORS[blockType] || 0x8B7355) : 0x8B7355;
+      Tracers.spawnBlockImpact(worldPos, blockColor);
     }
     // 5% chance to spawn 1-2 gold loot particles
     if (Math.random() < 0.05) {
@@ -657,7 +660,8 @@ const GameManager = (function () {
 
     // Lighting — Ukrainian theme
     ambLight = new THREE.AmbientLight(0x888866, 0.8);
-    _scene.add(ambLight);
+    if (_scene) _scene.add(ambLight);
+    else console.warn('Skipped ambLight add: _scene is null');
 
     sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
     sunLight.position.set(20, 30, 10);
@@ -669,10 +673,12 @@ const GameManager = (function () {
     sunLight.shadow.camera.right  =  50;
     sunLight.shadow.camera.top    =  50;
     sunLight.shadow.camera.bottom = -50;
-    _scene.add(sunLight);
+    if (_scene) _scene.add(sunLight);
+    else console.warn('Skipped sunLight add: _scene is null');
 
     hemiLight = new THREE.HemisphereLight(0xFFD700, 0x0057B8, 0.6);
-    _scene.add(hemiLight);
+    if (_scene) _scene.add(hemiLight);
+    else console.warn('Skipped hemiLight add: _scene is null');
 
     // Gradient sky dome (hemisphere)
     (function createSkyDome() {
@@ -693,43 +699,45 @@ const GameManager = (function () {
       skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(skyColors, 3));
       var skyMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, depthWrite: false, fog: false });
       _skyDome = new THREE.Mesh(skyGeo, skyMat);
-      _scene.add(_skyDome);
+      if (_scene) _scene.add(_skyDome);
+      else console.warn('Skipped skyDome add: _scene is null');
     })();
 
     // ── Init all sub-systems ─────────────────────────────────
-    CameraSystem.init(_camera);
-    VoxelWorld.init(_scene);
 
-    TimeSystem.init(_scene, sunLight, ambLight, hemiLight);
-    Building.init(_scene);
-    NPCSystem.init(_scene);
-    DroneSystem.init(_scene, _camera);
-    VehicleSystem.init(_scene);
-    Economy.init();
-    SkillSystem.init();
-    RankSystem.init();
-    MissionSystem.init();
-    Automation.init();
-    Pickups.init(_scene);
+    if (CameraSystem && typeof CameraSystem.init === 'function') CameraSystem.init(_camera);
+    if (window.VoxelWorld && typeof window.VoxelWorld.init === 'function') window.VoxelWorld.init(_scene);
+
+    if (TimeSystem && typeof TimeSystem.init === 'function') TimeSystem.init(_scene, sunLight, ambLight, hemiLight);
+    if (Building && typeof Building.init === 'function') Building.init(_scene);
+    if (NPCSystem && typeof NPCSystem.init === 'function') NPCSystem.init(_scene);
+    if (DroneSystem && typeof DroneSystem.init === 'function') DroneSystem.init(_scene, _camera);
+    if (VehicleSystem && typeof VehicleSystem.init === 'function') VehicleSystem.init(_scene);
+    if (Economy && typeof Economy.init === 'function') Economy.init();
+    if (SkillSystem && typeof SkillSystem.init === 'function') SkillSystem.init();
+    if (RankSystem && typeof RankSystem.init === 'function') RankSystem.init();
+    if (MissionSystem && typeof MissionSystem.init === 'function') MissionSystem.init();
+    if (Automation && typeof Automation.init === 'function') Automation.init();
+    if (Pickups && typeof Pickups.init === 'function') Pickups.init(_scene);
 
     // Tracers system
-    if (typeof Tracers !== 'undefined') Tracers.init(_scene);
+    if (typeof Tracers !== 'undefined' && Tracers && typeof Tracers.init === 'function') Tracers.init(_scene);
 
     // Audio, Weather & ML systems
-    AudioSystem.init();
-    WeatherSystem.init(_scene, _camera);
-    MLSystem.init();
-    if (typeof StageVFX !== 'undefined') StageVFX.init(_scene);
+    if (window.AudioSystem && typeof window.AudioSystem.init === 'function') window.AudioSystem.init();
+    if (WeatherSystem && typeof WeatherSystem.init === 'function') WeatherSystem.init(_scene, _camera);
+    if (MLSystem && typeof MLSystem.init === 'function') MLSystem.init();
+    if (typeof StageVFX !== 'undefined' && StageVFX && typeof StageVFX.init === 'function') StageVFX.init(_scene);
 
     // ── New feature systems init ──────────────────────────
-    if (typeof CombatExtras !== 'undefined') CombatExtras.reset();
-    if (typeof Traversal !== 'undefined') Traversal.reset();
-    if (typeof EnemyTypes !== 'undefined') EnemyTypes.init();
-    if (typeof WorldFeatures !== 'undefined') WorldFeatures.init(_scene, THREE);
-    if (typeof Perks !== 'undefined') Perks.reset();
-    if (typeof MissionTypes !== 'undefined') MissionTypes.clear();
-    if (typeof Feedback !== 'undefined') Feedback.init();
-    if (typeof Progression !== 'undefined') Progression.init();
+    if (typeof CombatExtras !== 'undefined' && CombatExtras && typeof CombatExtras.reset === 'function') CombatExtras.reset();
+    if (typeof Traversal !== 'undefined' && Traversal && typeof Traversal.reset === 'function') Traversal.reset();
+    if (typeof EnemyTypes !== 'undefined' && EnemyTypes && typeof EnemyTypes.init === 'function') EnemyTypes.init();
+    if (typeof WorldFeatures !== 'undefined' && WorldFeatures && typeof WorldFeatures.init === 'function') WorldFeatures.init(_scene, THREE);
+    if (typeof Perks !== 'undefined' && Perks && typeof Perks.reset === 'function') Perks.reset();
+    if (typeof MissionTypes !== 'undefined' && MissionTypes && typeof MissionTypes.clear === 'function') MissionTypes.clear();
+    if (typeof Feedback !== 'undefined' && Feedback && typeof Feedback.init === 'function') Feedback.init();
+    if (typeof Progression !== 'undefined' && Progression && typeof Progression.init === 'function') Progression.init();
 
     // Create weapons
     Weapons.createGunMesh(_camera);
@@ -774,30 +782,30 @@ const GameManager = (function () {
     });
 
     // Set player spawn on terrain
-    const spawnH = VoxelWorld.getTerrainHeight(0, 0);
+    const spawnH = window.VoxelWorld.getTerrainHeight(0, 0);
     player.position.set(0, spawnH + player.height, 0);
 
     // Spawn organized assault groups (4 squads of 4-5 armed NPCs)
     NPCSystem.spawnAssaultGroups();
 
     // Spawn starter vehicle fleet on roads (road-level positions)
-    var roadWPs = (VoxelWorld.getRoadWaypoints ? VoxelWorld.getRoadWaypoints() : []);
+    var roadWPs = (window.VoxelWorld.getRoadWaypoints ? window.VoxelWorld.getRoadWaypoints() : []);
     var _rp0 = roadWPs.length > 2 ? roadWPs[2] : new THREE.Vector3(8, 0, 20);
     var _rp1 = roadWPs.length > 6 ? roadWPs[6] : new THREE.Vector3(12, 0, 20);
     var _rp2 = roadWPs.length > 10 ? roadWPs[10] : new THREE.Vector3(-8, 0, 20);
-    var vh = VoxelWorld.getTerrainHeight(_rp0.x, _rp0.z);
+    var vh = window.VoxelWorld.getTerrainHeight(_rp0.x, _rp0.z);
     VehicleSystem.spawn(_rp0.x, vh, _rp0.z, 'transport');
-    var startVh2 = VoxelWorld.getTerrainHeight(_rp1.x, _rp1.z);
+    var startVh2 = window.VoxelWorld.getTerrainHeight(_rp1.x, _rp1.z);
     VehicleSystem.spawn(_rp1.x, startVh2, _rp1.z, 'combat');
-    var startVh3 = VoxelWorld.getTerrainHeight(_rp2.x, _rp2.z);
+    var startVh3 = window.VoxelWorld.getTerrainHeight(_rp2.x, _rp2.z);
     VehicleSystem.spawn(_rp2.x, startVh3, _rp2.z, 'turret_rover');
 
     // Spawn starter drones
-    const startDh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
+    const startDh1 = window.VoxelWorld.getTerrainHeight(5, 5) + 8;
     DroneSystem.spawn(5, startDh1, 5, 'recon');
-    const startDh2 = VoxelWorld.getTerrainHeight(-5, 5) + 8;
+    const startDh2 = window.VoxelWorld.getTerrainHeight(-5, 5) + 8;
     DroneSystem.spawn(-5, startDh2, 5, 'fpv_attack');
-    const startDh3 = VoxelWorld.getTerrainHeight(0, -10) + 10;
+    const startDh3 = window.VoxelWorld.getTerrainHeight(0, -10) + 10;
     DroneSystem.spawn(0, startDh3, -10, 'bomb');
 
     // Input setup
@@ -992,11 +1000,11 @@ const GameManager = (function () {
             for (var ai = 0; ai < 6; ai++) {
               var ax = player.position.x + (Math.random() - 0.5) * 10;
               var az = player.position.z + (Math.random() - 0.5) * 10;
-              var ah = VoxelWorld.getTerrainHeight(ax, az);
+              var ah = window.VoxelWorld.getTerrainHeight(ax, az);
               var types = ['HEALTH', 'AMMO', 'ARMOR', 'MEDKIT', 'GRENADE', 'STIM'];
               Pickups.spawn(new THREE.Vector3(ax, ah, az), types[Math.floor(Math.random() * types.length)]);
             }
-            AudioSystem.playExplosion();
+            window.AudioSystem.playExplosion();
             HUD.notifyPickup('📦 AIRDROP ARRIVED!', '#44ff88');
           }, 3000);
         }
@@ -1004,18 +1012,18 @@ const GameManager = (function () {
         // Clear weapon jam
         if (e.code === 'KeyR' && Weapons.isJammed && Weapons.isJammed()) {
           Weapons.clearJam();
-          AudioSystem.playReload();
+          window.AudioSystem.playReload();
           HUD.notifyPickup('🔧 JAM CLEARED!', '#ffcc00');
           return; // Don't also trigger reload
         }
 
         // Music toggle (Comma key)
         if (e.code === 'Comma') {
-          if (AudioSystem.isMusicPlaying && AudioSystem.isMusicPlaying()) {
-            AudioSystem.stopMusic();
+          if (window.AudioSystem.isMusicPlaying && window.AudioSystem.isMusicPlaying()) {
+            window.AudioSystem.stopMusic();
             HUD.notifyPickup('🔇 MUSIC OFF', '#888888');
           } else {
-            AudioSystem.playMusic('battle');
+            window.AudioSystem.playMusic('battle');
             HUD.notifyPickup('🎵 MUSIC ON', '#00ff88');
           }
         }
@@ -1157,7 +1165,7 @@ const GameManager = (function () {
           rollDir.copy(rRight).multiplyScalar(e.code === 'KeyD' ? 1 : -1);
           if (CombatExtras.tryRoll(rollDir)) {
             HUD.notifyPickup('🔄 DODGE ROLL', '#00ccff');
-            if (AudioSystem.playRollDodge) AudioSystem.playRollDodge();
+            if (window.AudioSystem.playRollDodge) window.AudioSystem.playRollDodge();
           }
         }
 
@@ -1169,10 +1177,10 @@ const GameManager = (function () {
         // ── B30: Grapple Hook (KeyF + Shift) ──
         if (e.code === 'KeyF' && keys['ShiftLeft'] && typeof Traversal !== 'undefined' && Traversal.launchGrapple) {
           var grapDir = new THREE.Vector3(0, 0, -1).applyQuaternion(_camera.quaternion);
-          var grapResult = Traversal.launchGrapple(player.position, grapDir, 30, function (bx, by, bz) { return VoxelWorld.getBlock(bx, by, bz); });
+          var grapResult = Traversal.launchGrapple(player.position, grapDir, 30, function (bx, by, bz) { return window.VoxelWorld.getBlock(bx, by, bz); });
           if (grapResult) {
             HUD.notifyPickup('🪝 GRAPPLE!', '#ff8800');
-            if (AudioSystem.playGrappleHook) AudioSystem.playGrappleHook();
+            if (window.AudioSystem.playGrappleHook) window.AudioSystem.playGrappleHook();
           }
         }
 
@@ -1194,10 +1202,10 @@ const GameManager = (function () {
             var fwd3 = new THREE.Vector3(0, 0, -1).applyQuaternion(_camera.quaternion);
             var fx = player.position.x + fwd3.x * 3;
             var fz = player.position.z + fwd3.z * 3;
-            var fy = VoxelWorld.getTerrainHeight(fx, fz);
+            var fy = window.VoxelWorld.getTerrainHeight(fx, fz);
             WorldFeatures.buildFortification(fortMap[e.code], fx, fy, fz, _scene);
             HUD.notifyPickup('🏗 ' + fortMap[e.code].toUpperCase() + ' BUILT', '#88cc44');
-            if (AudioSystem.playFortificationBuild) AudioSystem.playFortificationBuild();
+            if (window.AudioSystem.playFortificationBuild) window.AudioSystem.playFortificationBuild();
           }
         }
 
@@ -1217,7 +1225,7 @@ const GameManager = (function () {
 
         // Landmine placement (KeyU)
         if (e.code === 'KeyU' && typeof WorldFeatures !== 'undefined') {
-          var mineY = VoxelWorld.getTerrainHeight(player.position.x, player.position.z);
+          var mineY = window.VoxelWorld.getTerrainHeight(player.position.x, player.position.z);
           if (WorldFeatures.placeMine(player.position.x, mineY, player.position.z, 'player')) {
             HUD.notifyPickup('💣 LANDMINE PLACED!', '#44aa44');
           }
@@ -1231,7 +1239,7 @@ const GameManager = (function () {
           var fwdSB = new THREE.Vector3(0, 0, -1).applyQuaternion(_camera.quaternion);
           var sbX = player.position.x + fwdSB.x * 2;
           var sbZ = player.position.z + fwdSB.z * 2;
-          var sbY = VoxelWorld.getTerrainHeight(sbX, sbZ);
+          var sbY = window.VoxelWorld.getTerrainHeight(sbX, sbZ);
           if (WorldFeatures.startSandbagDeploy(sbX, sbY, sbZ)) {
             HUD.notifyPickup('🏗️ DEPLOYING SANDBAG...', '#c2b280');
           }
@@ -1263,7 +1271,7 @@ const GameManager = (function () {
         if (e.code === 'Digit0') Weapons.switchTo(9);
         if (e.code === 'KeyQ' && !keys['AltLeft'])   Weapons.switchPrev();
         if (e.code === 'KeyE' && !keys['AltLeft'] && gameState === STATE.PLAYING) Weapons.switchNext();
-        if (e.code === 'KeyR' && !(Weapons.isJammed && Weapons.isJammed()) && !keys['KeyM'])   { Weapons.forceReload(); AudioSystem.playReload(); MLSystem.onReload(); MLSystem.trackReload(); }
+        if (e.code === 'KeyR' && !(Weapons.isJammed && Weapons.isJammed()) && !keys['KeyM'])   { Weapons.forceReload(); if (window.AudioSystem && window.AudioSystem.playReload) window.AudioSystem.playReload(); MLSystem.onReload(); MLSystem.trackReload(); }
 
         // Build mode: template selection
         if (gameState === STATE.BUILD_MODE) {
@@ -1378,7 +1386,7 @@ const GameManager = (function () {
 
     document.addEventListener('mousedown', function (e) {
       // Resume audio context on any user gesture
-      AudioSystem.resume();
+      if (window.AudioSystem && typeof window.AudioSystem.resume === 'function') window.AudioSystem.resume();
 
       if (e.button === 0) {
         // If playing without pointer lock, re-acquire it on click
@@ -1496,7 +1504,7 @@ const GameManager = (function () {
   /* ── Build interactions ──────────────────────────────────────────── */
   function handleBuildClick() {
     if (Building.getSelectedTemplate()) {
-      const ray = VoxelWorld.raycastBlock(_camera, 12);
+      const ray = window.VoxelWorld.raycastBlock(_camera, 12);
       if (ray) {
         const p = ray.place;
         const tmpl = Building.getSelectedTemplate();
@@ -1516,7 +1524,7 @@ const GameManager = (function () {
       }
     } else {
       // Free-form block placement
-      const ray = VoxelWorld.raycastBlock(_camera, 8);
+      const ray = window.VoxelWorld.raycastBlock(_camera, 8);
       if (ray) {
         Building.placeBlock(ray.place.x, ray.place.y, ray.place.z);
       }
@@ -1524,16 +1532,16 @@ const GameManager = (function () {
   }
 
   function handleBuildRemove() {
-    const ray = VoxelWorld.raycastBlock(_camera, 8);
+    const ray = window.VoxelWorld.raycastBlock(_camera, 8);
     if (ray) {
       const blockType = Building.removeBlock(ray.hit.x, ray.hit.y, ray.hit.z);
       if (blockType) {
         // Convert removed block to resource
         const blockToResource = {
-          [VoxelWorld.BLOCK.WOOD]:  'wood',
-          [VoxelWorld.BLOCK.METAL]: 'metal',
-          [VoxelWorld.BLOCK.STONE]: 'stone',
-          [VoxelWorld.BLOCK.ELECTRONICS]: 'electronics',
+          [window.VoxelWorld.BLOCK.WOOD]:  'wood',
+          [window.VoxelWorld.BLOCK.METAL]: 'metal',
+          [window.VoxelWorld.BLOCK.STONE]: 'stone',
+          [window.VoxelWorld.BLOCK.ELECTRONICS]: 'electronics',
         };
         const res = blockToResource[blockType];
         if (res) {
@@ -1546,12 +1554,12 @@ const GameManager = (function () {
 
   /* ── Minecraft-style block placement (right-click with shovel) ──── */
   function handleMinecraftPlace() {
-    var ray = VoxelWorld.raycastBlock(_camera, 6);
+    var ray = window.VoxelWorld.raycastBlock(_camera, 6);
     if (!ray) return;
     var p = ray.place;
     // Determine which material to place based on resources
     // Priority: wood > stone > brick > dirt > sand
-    var B = VoxelWorld.BLOCK;
+    var B = window.VoxelWorld.BLOCK;
     var placeType = null;
     var resType = null;
     if (Economy.getResources().wood > 0) { placeType = B.WOOD; resType = 'wood'; }
@@ -1566,7 +1574,7 @@ const GameManager = (function () {
       else if (player.buildMaterials.sand > 0) { placeType = B.SAND; player.buildMaterials.sand--; }
       else if (player.buildMaterials.metal > 0) { placeType = B.METAL; player.buildMaterials.metal--; }
       if (placeType) {
-        VoxelWorld.setBlock(p.x, p.y, p.z, placeType);
+        window.VoxelWorld.setBlock(p.x, p.y, p.z, placeType);
         HUD.notifyPickup('🧱 BLOCK PLACED', '#8B6914');
         if (HUD.addCombatLog) HUD.addCombatLog('Placed block', '#8B6914');
         return;
@@ -1576,7 +1584,7 @@ const GameManager = (function () {
     }
     // Spend economy resource
     if (resType && Economy.spend(resType, 1)) {
-      VoxelWorld.setBlock(p.x, p.y, p.z, placeType);
+      window.VoxelWorld.setBlock(p.x, p.y, p.z, placeType);
       HUD.notifyPickup('🧱 BLOCK PLACED (-1 ' + resType + ')', '#8B6914');
       if (HUD.addCombatLog) HUD.addCombatLog('Placed ' + resType + ' block', '#8B6914');
     } else {
@@ -1604,10 +1612,15 @@ const GameManager = (function () {
   /* ── Start Game ──────────────────────────────────────────────────── */
   function startGame() {
     try {
-    AudioSystem.resume();
+      if (typeof window !== 'undefined') {
+        console.log('[QA] startGame called, __QA_MODE:', window.__QA_MODE);
+      }
+    if (window.AudioSystem && typeof window.AudioSystem.resume === 'function') {
+      window.AudioSystem.resume();
+    }
     // Start battle music
-    if (AudioSystem.playMusic) AudioSystem.playMusic('battle');
-    if (AudioSystem.resetFirstBlood) AudioSystem.resetFirstBlood();
+    if (window.AudioSystem.playMusic) window.AudioSystem.playMusic('battle');
+    if (window.AudioSystem.resetFirstBlood) window.AudioSystem.resetFirstBlood();
     gameState = STATE.PLAYING;
     player.hp = player.maxHp;
     player.score = 0;
@@ -1641,7 +1654,7 @@ const GameManager = (function () {
     // Clear loot particles (shared _lootGeo — only dispose cloned materials)
     for (var li = _lootParticles.length - 1; li >= 0; li--) {
       if (_scene) _scene.remove(_lootParticles[li]);
-      _lootParticles[li].material.dispose();
+      if (_lootParticles[li].material) _lootParticles[li].material.dispose();
     }
     _lootParticles.length = 0;
 
@@ -1678,7 +1691,7 @@ const GameManager = (function () {
     // Apply first stage
     applyStage(0);
 
-    const spawnH = VoxelWorld.getTerrainHeight(0, 0);
+    const spawnH = window.VoxelWorld.getTerrainHeight(0, 0);
     player.position.set(0, spawnH + player.height, 0);
 
     Weapons.reset();
@@ -1703,23 +1716,23 @@ const GameManager = (function () {
     NPCSystem.spawnAssaultGroups();
 
     // Respawn vehicle fleet on roads for first stage
-    var _rwps = (VoxelWorld.getRoadWaypoints ? VoxelWorld.getRoadWaypoints() : []);
+    var _rwps = (window.VoxelWorld.getRoadWaypoints ? window.VoxelWorld.getRoadWaypoints() : []);
     var _sp0 = _rwps.length > 2 ? _rwps[2] : new THREE.Vector3(8, 0, 20);
     var _sp1 = _rwps.length > 6 ? _rwps[6] : new THREE.Vector3(12, 0, 20);
     var _sp2 = _rwps.length > 10 ? _rwps[10] : new THREE.Vector3(-8, 0, 20);
-    var sgVh = VoxelWorld.getTerrainHeight(_sp0.x, _sp0.z);
+    var sgVh = window.VoxelWorld.getTerrainHeight(_sp0.x, _sp0.z);
     VehicleSystem.spawn(_sp0.x, sgVh, _sp0.z, 'transport');
-    var sgVh2 = VoxelWorld.getTerrainHeight(_sp1.x, _sp1.z);
+    var sgVh2 = window.VoxelWorld.getTerrainHeight(_sp1.x, _sp1.z);
     VehicleSystem.spawn(_sp1.x, sgVh2, _sp1.z, 'combat');
-    var sgVh3 = VoxelWorld.getTerrainHeight(_sp2.x, _sp2.z);
+    var sgVh3 = window.VoxelWorld.getTerrainHeight(_sp2.x, _sp2.z);
     VehicleSystem.spawn(_sp2.x, sgVh3, _sp2.z, 'turret_rover');
 
     // Respawn drones
-    const sgDh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
+    const sgDh1 = window.VoxelWorld.getTerrainHeight(5, 5) + 8;
     DroneSystem.spawn(5, sgDh1, 5, 'recon');
-    const sgDh2 = VoxelWorld.getTerrainHeight(-5, 5) + 8;
+    const sgDh2 = window.VoxelWorld.getTerrainHeight(-5, 5) + 8;
     DroneSystem.spawn(-5, sgDh2, 5, 'fpv_attack');
-    const sgDh3 = VoxelWorld.getTerrainHeight(0, -10) + 10;
+    const sgDh3 = window.VoxelWorld.getTerrainHeight(0, -10) + 10;
     DroneSystem.spawn(0, sgDh3, -10, 'bomb');
 
     hideOverlays();
@@ -1755,7 +1768,7 @@ const GameManager = (function () {
     const stageDef = STAGES[stageIndex];
 
     // Generate level terrain and features
-    VoxelWorld.generateLevel(stageIndex);
+    window.VoxelWorld.generateLevel(stageIndex);
 
     // Update scene colors
     _scene.background = new THREE.Color(stageDef.bgColor);
@@ -1790,7 +1803,7 @@ const GameManager = (function () {
 
     // Start stage-specific ambient sound loop
     if (typeof AudioSystem !== 'undefined' && AudioSystem.startAmbientLoop) {
-      AudioSystem.startAmbientLoop(stageDef.theme);
+      window.AudioSystem.startAmbientLoop(stageDef.theme);
     }
 
     // Start stage-specific environmental VFX
@@ -1913,6 +1926,15 @@ const GameManager = (function () {
 
   /* ── Wave Management ─────────────────────────────────────────────── */
   function beginWave(w) {
+    if (typeof window !== 'undefined') {
+      console.log('[QA] beginWave called, __QA_MODE:', window.__QA_MODE, 'gameState:', gameState);
+    }
+    if (typeof window !== 'undefined' && window.__QA_MODE) {
+      // In QA mode, always allow wave start
+      gameState = STATE.PLAYING;
+    } else {
+      if (gameState !== STATE.PLAYING && gameState !== STATE.BUILD_MODE) return;
+    }
     currentWave = w;
     player.waveStartTime = performance.now();
     const stageDef = STAGES[currentStage];
@@ -1929,7 +1951,7 @@ const GameManager = (function () {
 
     // Pass AI strategy to enemies for adaptive behavior
     Enemies.startWave(w, _scene, stageDef.difficulty * mlDiff, aiStrategy, stageDef.id);
-    AudioSystem.playWaveStart();
+    window.AudioSystem.playWaveStart();
     HUD.setWave(w, stageDef.wavesPerStage);
     HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage);
     if (typeof Feedback !== 'undefined' && Feedback.radioChatter) Feedback.radioChatter('wave_start');
@@ -2119,6 +2141,19 @@ const GameManager = (function () {
         bestStreak: player.bestStreak,
       });
     }
+
+    // Show last wave summary overlay (NEW FEATURE)
+    if (typeof HUD !== 'undefined' && HUD.showWaveSummary) {
+      var elapsedSec = Math.round((performance.now() - player.waveStartTime) / 1000);
+      HUD.showWaveSummary({
+        wave: currentWave,
+        kills: player.waveKills,
+        score: player.score,
+        headshots: player.waveHeadshots,
+        damageTaken: Math.round(player.waveDamageTaken),
+        time: elapsedSec
+      });
+    }
     // Play-to-Earn: OKC for wave clear
     if (typeof Marketplace !== 'undefined') {
       Marketplace.onWaveClear();
@@ -2271,7 +2306,7 @@ const GameManager = (function () {
       if (currentStage >= STAGES.length - 1) {
         // Final stage cleared — win!
         gameState = STATE.WIN;
-        if (AudioSystem.playMusic) AudioSystem.playMusic('victory');
+        if (window.AudioSystem.playMusic) window.AudioSystem.playMusic('victory');
         showOverlay('win');
         document.getElementById('win-score').textContent = player.score;
         document.getElementById('win-kills').textContent = player.kills;
@@ -2281,7 +2316,7 @@ const GameManager = (function () {
 
       // Show stage clear overlay
       gameState = STATE.STAGE_CLEAR;
-      if (typeof AudioSystem !== 'undefined' && AudioSystem.playLevelComplete) AudioSystem.playLevelComplete();
+      if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playLevelComplete) window.AudioSystem.playLevelComplete();
       showOverlay('stageclear');
       document.getElementById('stageclear-num').textContent = stageDef.id;
       document.getElementById('stageclear-name').textContent = stageDef.name;
@@ -2471,8 +2506,8 @@ const GameManager = (function () {
     if (player.isCrouching) {
       var headY = player.position.y + 0.5;
       var cx = player.position.x, cz = player.position.z;
-      player.inCover = VoxelWorld.isSolid(cx + 1, headY, cz) || VoxelWorld.isSolid(cx - 1, headY, cz) ||
-                        VoxelWorld.isSolid(cx, headY, cz + 1) || VoxelWorld.isSolid(cx, headY, cz - 1);
+      player.inCover = window.VoxelWorld.isSolid(cx + 1, headY, cz) || window.VoxelWorld.isSolid(cx - 1, headY, cz) ||
+            window.VoxelWorld.isSolid(cx, headY, cz + 1) || window.VoxelWorld.isSolid(cx, headY, cz - 1);
     } else {
       player.inCover = false;
     }
@@ -2494,22 +2529,22 @@ const GameManager = (function () {
     newPos.y += player.velocity.y * delta;
 
     // Terrain collision
-    const terrainH = VoxelWorld.getTerrainHeight(newPos.x, newPos.z) + player.height;
+    const terrainH = window.VoxelWorld.getTerrainHeight(newPos.x, newPos.z) + player.height;
 
     // Horizontal block collision
     const checkH = newPos.y - player.height + 0.5;
-    if (VoxelWorld.isSolid(newPos.x, checkH, newPos.z)) {
+    if (window.VoxelWorld.isSolid(newPos.x, checkH, newPos.z)) {
       // Try mantling over a wall when blocked horizontally and not on ground
       if (!player.onGround && typeof Traversal !== 'undefined' && !Traversal.isMantling()) {
         _gmTmp2.set(0, 0, -1).applyQuaternion(_camera.quaternion);
         Traversal.tryMantle(player.position, player.velocity.y, { x: _gmTmp2.x, z: _gmTmp2.z }, function (bx, by, bz) {
-          return VoxelWorld.getBlock(bx, by, bz);
+          return window.VoxelWorld.getBlock(bx, by, bz);
         });
       }
       // Try sliding along axes
-      if (!VoxelWorld.isSolid(player.position.x, checkH, newPos.z)) {
+      if (!window.VoxelWorld.isSolid(player.position.x, checkH, newPos.z)) {
         newPos.x = player.position.x;
-      } else if (!VoxelWorld.isSolid(newPos.x, checkH, player.position.z)) {
+      } else if (!window.VoxelWorld.isSolid(newPos.x, checkH, player.position.z)) {
         newPos.z = player.position.z;
       } else {
         newPos.x = player.position.x;
@@ -2526,7 +2561,7 @@ const GameManager = (function () {
         if (landIntensity > 0.1) {
           if (CameraSystem.shake) CameraSystem.shake(landIntensity * 0.03, 0.2);
           if (Weapons.applyLandingBob) Weapons.applyLandingBob(landIntensity);
-          if (AudioSystem.playLandingThud) AudioSystem.playLandingThud(landIntensity);
+          if (window.AudioSystem && window.AudioSystem.playLandingThud) window.AudioSystem.playLandingThud(landIntensity);
           if (landIntensity > 0.6) player._landSlowTimer = 0.3;
         }
       }
@@ -2550,14 +2585,14 @@ const GameManager = (function () {
       player._footstepTimer = (player._footstepTimer || 0) - delta;
       if (player._footstepTimer <= 0) {
         var _fsType = 0;
-        if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getBlock) {
-          _fsType = VoxelWorld.getBlock(
+        if (typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.getBlock) {
+          _fsType = window.VoxelWorld.getBlock(
             Math.floor(player.position.x),
             Math.floor(player.position.y - 1),
             Math.floor(player.position.z)
           ) || 0;
         }
-        AudioSystem.playFootstep(_fsType);
+        if (window.AudioSystem && window.AudioSystem.playFootstep) window.AudioSystem.playFootstep(_fsType);
         player._footstepTimer = player.sprinting ? 0.28 : 0.42;
       }
     }
@@ -2624,7 +2659,7 @@ const GameManager = (function () {
       }, mouseNewPress);
       // Play sound on every actual shot (auto-fire included), not just first click
       if (Weapons.didFire()) {
-        AudioSystem.playGunshot(audioMap[weaponType] || 'rifle');
+        if (window.AudioSystem && window.AudioSystem.playGunshot) window.AudioSystem.playGunshot(audioMap[weaponType] || 'rifle');
         MLSystem.onShot(weaponId);
         player.totalShots++;
         player.waveShots++;
@@ -2635,7 +2670,7 @@ const GameManager = (function () {
           CombatExtras.addHeat(isAutoWep);
         }
         // Spawn bullet tracer
-        if (typeof Tracers !== 'undefined' && weaponType !== 'MELEE') {
+        if (typeof Tracers !== 'undefined' && weaponType !== 'MELEE' && weaponType !== 'SILENT') {
           _gmTmp2.copy(_camera.position);
           _camera.getWorldDirection(_gmTmp3);
           var isHeavy = ['HMG', 'HMG_HEAVY', 'MACHINEGUN', 'MINIGUN'].indexOf(weaponType) >= 0;
@@ -2864,7 +2899,7 @@ const GameManager = (function () {
         if (isHeadshot) Progression.updateBounty('headshot_wave', 1);
         Progression.updateBounty('damage', dmg);
         for (var cbi = 0; cbi < completedBounties.length; cbi++) {
-          HUD.notifyPickup('💰 BOUNTY COMPLETE! +' + completedBounties[cbi].reward + ' OKC', '#ffaa00');
+          HUD.notifyPickup('💰 BOUNTY COMPLETE! +' + escapeHTML(completedBounties[cbi].reward) + ' OKC', '#ffaa00');
           if (typeof Marketplace !== 'undefined') Marketplace.addOKC(completedBounties[cbi].reward);
           if (typeof AudioSystem !== 'undefined' && AudioSystem.playBountyComplete) AudioSystem.playBountyComplete();
         }
@@ -2976,6 +3011,27 @@ const GameManager = (function () {
         if (typeof Tracers !== 'undefined' && Tracers.spawnSparks) Tracers.spawnSparks(enemy.mesh.position);
       }
 
+      // Enemy weapon drop: 20% chance, drops weapon ammo pickup
+      if (Math.random() < 0.20) {
+        var _ENEMY_WEAPONS = {
+          CONSCRIPT: 'MAKAROV', STORMER: 'AK74', ARMORED: 'PKM',
+          MEDIC: 'MAKAROV', OFFICER: 'MAKAROV', SNIPER: 'SVD',
+          ENGINEER: 'AK74', SPETSNAZ: 'AK74', RIOT: 'MAKAROV',
+          TANK: 'PKM', HEAVY_ARMOR: 'RPK74', BOSS: 'PKM',
+        };
+        var enemyTypeName = (enemy.typeCfg && enemy.typeCfg.name) || 'CONSCRIPT';
+        var dropWeaponId = _ENEMY_WEAPONS[enemyTypeName] || 'AK74';
+        // Find weapon index by ID
+        var dropIdx = -1;
+        var wCount = Weapons.getWeaponCount();
+        for (var dwi = 0; dwi < wCount; dwi++) {
+          if (Weapons.getWeaponId(dwi) === dropWeaponId) { dropIdx = dwi; break; }
+        }
+        if (dropIdx >= 0) {
+          Pickups.spawn(enemy.mesh.position, 'WEAPON', { weaponIdx: dropIdx, weaponId: dropWeaponId });
+        }
+      }
+
       // Weapon unlock drop (pickup weapons 2-15)
       if (Math.random() < 0.12) {
         const candidates = [];
@@ -2995,7 +3051,7 @@ const GameManager = (function () {
   function onVehicleHit(vehicle, dmg) {
     if (!vehicle || !vehicle.alive) return;
     VehicleSystem.damageVehicle(vehicle.id, dmg);
-    AudioSystem.playHit();
+    if (window.AudioSystem && window.AudioSystem.playHit) window.AudioSystem.playHit();
     if (HUD.addCombatLog) HUD.addCombatLog('Hit vehicle (-' + dmg + ')', '#ff8800');
     // Spawn sparks on vehicle hit
     if (typeof Tracers !== 'undefined' && Tracers.spawnMuzzleFlash) {
@@ -3066,6 +3122,20 @@ const GameManager = (function () {
     if (CameraSystem.shake) {
       CameraSystem.shake(dmg * 0.004, 0.2);
     }
+    // Directional camera flinch: kick view away from attacker
+    if (attackerPos && CameraSystem.flinch) {
+      var fAngle = Math.atan2(attackerPos.x - player.position.x, attackerPos.z - player.position.z);
+      var camYaw = CameraSystem.getYaw();
+      var fRel = fAngle - camYaw;
+      // Normalize to [-PI, PI]
+      while (fRel > Math.PI) fRel -= Math.PI * 2;
+      while (fRel < -Math.PI) fRel += Math.PI * 2;
+      var fIntensity = Math.min(1, dmg / 50);
+      // Kick view AWAY from attacker (opposite side)
+      var fYaw = -Math.sin(fRel) * 0.04 * fIntensity;
+      var fPitch = 0.025 * fIntensity; // slight upward kick
+      CameraSystem.flinch(fYaw, fPitch);
+    }
 
     // AI Smart Learning: track directional vulnerability
     if (attackerPos) {
@@ -3106,10 +3176,11 @@ const GameManager = (function () {
         return;
       }
       gameState = STATE.DEAD;
+      if (_waveStartTimer) { clearTimeout(_waveStartTimer); _waveStartTimer = null; }
       // Force exit vehicle / release drone on death
       if (VehicleSystem.isInVehicle()) VehicleSystem.exit();
       if (DroneSystem.isPossessing()) DroneSystem.release();
-      if (AudioSystem.stopMusic) AudioSystem.stopMusic();
+      if (window.AudioSystem.stopMusic) window.AudioSystem.stopMusic();
       Weapons.exitZoom();
       MLSystem.onDeath();
       // Track death in progression
@@ -3134,10 +3205,45 @@ const GameManager = (function () {
         MLSystem.trackDeathContext(deathType, deathAngle);
       }
       showOverlay('dead');
+
       document.getElementById('dead-stage').textContent = STAGES[currentStage].id;
       document.getElementById('dead-score').textContent = player.score;
       document.getElementById('dead-kills').textContent = player.kills;
       document.getElementById('dead-wave').textContent = currentWave;
+
+      // ── Gameplay Tip Overlay on Death ──
+      var tips = [
+        'Always keep moving to avoid enemy fire.',
+        'Use cover to reduce incoming damage.',
+        'Headshots deal extra damage to most enemies.',
+        'Switch weapons for different enemy types.',
+        'Use grenades to clear groups of enemies.',
+        'Reload during downtime, not in combat.',
+        'Watch your ammo and reload before empty.',
+        'Use perks to boost your survivability.',
+        'Try different weapons to find your favorite.',
+        'Use the minimap to track enemy positions.',
+        'Bandage when bleeding to stop health loss.',
+        'Vehicles provide speed and protection.',
+        'Drones can scout and attack from above.',
+        'Upgrade your skills for new abilities.',
+        'Use build mode to create defensive structures.',
+        'Night vision helps in dark stages.',
+        'Switch to armor-piercing ammo for tough enemies.',
+        'Use stealth to avoid detection.',
+        'Ping locations for your squad.',
+        'Check the shop for upgrades between waves.'
+      ];
+      var tip = tips[Math.floor(Math.random() * tips.length)];
+      var tipEl = document.getElementById('dead-tip');
+      if (!tipEl) {
+        tipEl = document.createElement('div');
+        tipEl.id = 'dead-tip';
+        tipEl.style.cssText = 'margin-top:18px;font-size:15px;color:#44ff88;text-align:center;line-height:1.5;max-width:420px;margin-left:auto;margin-right:auto;';
+        var overlay = document.getElementById('overlay-dead');
+        if (overlay) overlay.appendChild(tipEl);
+      }
+      tipEl.textContent = '💡 TIP: ' + tip;
 
       // ── Death Screen: Letter Grade + Personal Best ──
       var gradeScore = 0;
@@ -3287,6 +3393,63 @@ const GameManager = (function () {
         if (HUD.showRadiation) HUD.showRadiation(false);
       }
 
+      // ── MARIUPOL STEELWORKS: Random fire exposure (stage 5) ──
+      if (STAGES[currentStage] && STAGES[currentStage].id === 5 && gameState === STATE.PLAYING) {
+        player._fireTimer = (player._fireTimer || 0) + delta;
+        if (player._fireTimer >= 4.0 + Math.random() * 2) {
+          player._fireTimer = 0;
+          if (!player.godMode && Math.random() < 0.25) {
+            player.hp = Math.max(1, player.hp - 3);
+            HUD.setHealth(player.hp, player.maxHp);
+            if (HUD.showDamageFlash) HUD.showDamageFlash(0xff4400, 0.2); // orange fire flash
+            if (HUD.notifyPickup) HUD.notifyPickup('🔥 Fire exposure!', '#ff4400');
+          }
+        }
+      }
+
+      // ── CRIMEA BRIDGE: Periodic naval bombardment (stage 6) ──
+      if (STAGES[currentStage] && STAGES[currentStage].id === 6 && gameState === STATE.PLAYING) {
+        player._bombardTimer = (player._bombardTimer || 0) + delta;
+        if (player._bombardTimer >= 12.0 + Math.random() * 6) {
+          player._bombardTimer = 0;
+          if (!player.godMode) {
+            var bombDmg = 5 + Math.floor(Math.random() * 10);
+            player.hp = Math.max(1, player.hp - bombDmg);
+            HUD.setHealth(player.hp, player.maxHp);
+            if (HUD.showDamageFlash) HUD.showDamageFlash(0x2244aa, 0.3);
+            if (typeof Feedback !== 'undefined' && Feedback.screenShake) Feedback.screenShake(0.6);
+            if (HUD.notifyPickup) HUD.notifyPickup('⚓ Naval bombardment!', '#4477ff');
+          }
+        }
+      }
+
+      // ── MOSCOW / KREMLIN: Random mortar barrages (stages 8, 12) ──
+      if (STAGES[currentStage] && (STAGES[currentStage].id === 8 || STAGES[currentStage].id === 12) && gameState === STATE.PLAYING) {
+        player._mortarTimer = (player._mortarTimer || 0) + delta;
+        if (player._mortarTimer >= 15.0 + Math.random() * 10) {
+          player._mortarTimer = 0;
+          if (!player.godMode && Math.random() < 0.35) {
+            var mortarDmg = 8 + Math.floor(Math.random() * 15);
+            player.hp = Math.max(1, player.hp - mortarDmg);
+            HUD.setHealth(player.hp, player.maxHp);
+            if (HUD.showDamageFlash) HUD.showDamageFlash(0xff3300, 0.4);
+            if (typeof Feedback !== 'undefined' && Feedback.screenShake) Feedback.screenShake(1.0);
+            if (HUD.notifyPickup) HUD.notifyPickup('💥 Mortar barrage!', '#ff3300');
+          }
+        }
+      }
+
+      // ── DONBAS: Suppressive trench fire — accuracy debuff (stage 10) ──
+      if (STAGES[currentStage] && STAGES[currentStage].id === 10 && gameState === STATE.PLAYING) {
+        player._trenchSuppressionTimer = (player._trenchSuppressionTimer || 0) + delta;
+        if (player._trenchSuppressionTimer >= 8.0 + Math.random() * 5) {
+          player._trenchSuppressionTimer = 0;
+          if (Math.random() < 0.30) {
+            _suppressionLevel = Math.min(1, _suppressionLevel + 0.3);
+            if (HUD.notifyPickup) HUD.notifyPickup('Suppressive fire!', '#ffaa00');
+          }
+        }
+      }
       // B23: Multikill timer decay
       if (player.multikillTimer > 0) {
         player.multikillTimer -= delta;
@@ -3394,14 +3557,14 @@ const GameManager = (function () {
 
       // Dynamic music intensity based on nearby enemies (throttled to every 0.5s)
       _musicIntTimer -= delta;
-      if (_musicIntTimer <= 0 && AudioSystem.setMusicIntensity && AudioSystem.isMusicPlaying()) {
+      if (_musicIntTimer <= 0 && window.AudioSystem.setMusicIntensity && window.AudioSystem.isMusicPlaying()) {
         _musicIntTimer = 0.5;
         var nearEnemies = 0;
         var allEn = Enemies.getAll();
         for (var mei = 0; mei < allEn.length; mei++) {
           if (allEn[mei].mesh && allEn[mei].mesh.position.distanceTo(player.position) < 25) nearEnemies++;
         }
-        AudioSystem.setMusicIntensity(Math.min(1.0, nearEnemies / 8));
+        window.AudioSystem.setMusicIntensity(Math.min(1.0, nearEnemies / 8));
       }
 
       updateCombat(delta);
@@ -3426,7 +3589,7 @@ const GameManager = (function () {
       Enemies.update(delta, player.position, onPlayerHit, function (waveDone) {
         if (waveDone) onWaveComplete();
       });
-      Pickups.update(delta, player.position, function (type) {
+      Pickups.update(delta, player.position, function (type, data) {
         AudioSystem.playPickup();
         MLSystem.onPickup();
         if (type === 'HEALTH') {
@@ -3461,6 +3624,15 @@ const GameManager = (function () {
           player.shieldTimer = 5.0;
           if (HUD.showShield) HUD.showShield(true);
           HUD.notifyPickup('🛡 SHIELD ACTIVE! 5s', '#ffd700');
+        } else if (type === 'WEAPON' && data) {
+          // Enemy weapon drop: unlock + give one clip of ammo
+          var wIdx = data.weaponIdx;
+          if (!Weapons.isUnlocked(wIdx)) Weapons.unlockWeapon(wIdx);
+          var wDef = Weapons.getWeaponDef(wIdx);
+          if (wDef) {
+            Weapons.addAmmo(wDef.clipSize || 30);
+            HUD.notifyPickup('🔫 ' + (wDef.name || data.weaponId) + ' +' + (wDef.clipSize || 30) + ' ammo', '#ff8800');
+          }
         }
       });
 
@@ -3713,7 +3885,7 @@ const GameManager = (function () {
         if (travResult && travResult.wallRun && travResult.wallRun.active) {
           player.position.y += travResult.wallRun.offsetY * delta;
           player.velocity.y = 0;
-          if (AudioSystem.playWallRun) AudioSystem.playWallRun();
+          if (window.AudioSystem && window.AudioSystem.playWallRun) window.AudioSystem.playWallRun();
         }
 
         // ── B30: Ledge grab update ──
@@ -3829,7 +4001,7 @@ const GameManager = (function () {
         if (wfResult.mineExplosions && wfResult.mineExplosions.length > 0) {
           for (var mi = 0; mi < wfResult.mineExplosions.length; mi++) {
             var me = wfResult.mineExplosions[mi];
-            AudioSystem.playExplosion();
+            if (window.AudioSystem && window.AudioSystem.playExplosion) window.AudioSystem.playExplosion();
             if (typeof Tracers !== 'undefined') Tracers.spawnExplosion(new THREE.Vector3(me.x, me.y, me.z), me.radius * 0.5);
             if (CameraSystem.shake) CameraSystem.shake(0.3, 0.5);
             if (me.target === 'player') {
@@ -3844,7 +4016,7 @@ const GameManager = (function () {
         var airdropResult = WorldFeatures.collectAirdrop(player.position);
         if (airdropResult) {
           HUD.notifyPickup('📦 AIRDROP: ' + airdropResult + '!', '#44ff88');
-          AudioSystem.playPickup();
+          if (window.AudioSystem && window.AudioSystem.playPickup) window.AudioSystem.playPickup();
           if (airdropResult === 'AMMO_CRATE') Weapons.addAmmo(100);
           else if (airdropResult === 'MEDKIT') { player.hp = player.maxHp; HUD.setHealth(player.hp, player.maxHp); }
           else if (airdropResult === 'ARMOR') { player.armor = 100; if (HUD.updateArmor) HUD.updateArmor(1); }
@@ -4017,6 +4189,7 @@ const GameManager = (function () {
       }
     }
 
+    if (!_renderer || !_scene || !_camera) return;
     _renderer.render(_scene, _camera);
   }
 
@@ -4182,7 +4355,7 @@ const GameManager = (function () {
     btnReload.addEventListener('touchstart', function (e) {
       e.preventDefault();
       Weapons.forceReload();
-      AudioSystem.playReload();
+      if (window.AudioSystem && window.AudioSystem.playReload) window.AudioSystem.playReload();
       MLSystem.onReload();
       btnReload.classList.add('active');
     }, { passive: false });
@@ -4767,7 +4940,7 @@ const GameManager = (function () {
     var streak = Perks.activateStreak(index);
     if (!streak) return;
     HUD.notifyPickup(streak.icon + ' ' + streak.name + ' ACTIVATED!', '#ff6600');
-    AudioSystem.playExplosion();
+    if (window.AudioSystem && window.AudioSystem.playExplosion) window.AudioSystem.playExplosion();
     if (CameraSystem.shake) CameraSystem.shake(0.4, 0.5);
 
     if (streak.id === 'ARTILLERY' || streak.id === 'AIRSTRIKE') {
@@ -4857,5 +5030,59 @@ const GameManager = (function () {
     addArmor: addArmor,
     addStimBuff: addStimBuff,
     addSuppression: addSuppression,
+    // Test helpers for headless Puppeteer (bypasses pointer lock requirement)
+    _testFireStart:  function () { mouseDown = true; mouseNewPress = true; },
+    _testFireStop:   function () { mouseDown = false; mouseNewPress = false; },
+    // QA automation: force start game and wave, bypassing all gating
+    forceStartGame: function () {
+      if (typeof window !== 'undefined' && window.__QA_MODE) {
+        try {
+          // Forcibly hide all overlays
+          var overlayIds = [
+            'overlay-start', 'overlay-pause', 'overlay-dead', 'overlay-waveclear',
+            'overlay-stageclear', 'overlay-win', 'inventory-overlay', 'perks-menu',
+            'stats-panel', 'journal-panel', 'leaderboard-panel', 'mission-tracker',
+            'mine-counter', 'adrenaline-indicator', 'uav-indicator', 'supply-menu',
+            'field-promotion', 'achievement-popup', 'wave-stats', 'tactical-map',
+            'bounty-display', 'daily-challenges', 'perk-display', 'killstreak-panel',
+            'slide-indicator', 'focus-indicator', 'revenge-marker', 'dual-wield-indicator',
+            'heat-bar-container', 'ammo-type-indicator', 'laststand-indicator', 'combat-log',
+            'fog-of-war', 'radiation-warning', 'wallrun-indicator', 'tacsprint-indicator',
+            'lean-indicator', 'inspect-overlay', 'bayonet-indicator', 'maintenance-indicator',
+            'overheat-indicator', 'blindfire-indicator', 'swim-indicator', 'breath-bar-container',
+            'mantle-indicator', 'vehicle-hud', 'build-hud', 'build-materials-hud', 'hud-okc-bar',
+            'weather-indicator', 'interaction-prompt', 'low-hp-vignette', 'shield-indicator',
+            'inventory-btn', 'mobile-controls', 'skill-hud-overlay', 'skill-hud-btn'
+          ];
+          overlayIds.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+          });
+          // Hide all elements with class 'overlay'
+          var overlays = document.querySelectorAll('.overlay');
+          overlays.forEach(function(el) { el.style.display = 'none'; });
+          // Show the main HUD
+          var hudEl = document.getElementById('hud');
+          if (hudEl) hudEl.style.display = 'block';
+          gameState = STATE.PLAYING;
+          if (typeof GameManager.startGame === 'function') GameManager.startGame();
+          if (typeof GameManager.beginWave === 'function') GameManager.beginWave(1);
+          if (typeof HUD !== 'undefined' && HUD.show) HUD.show();
+        } catch (e) {
+          if (typeof console !== 'undefined') console.error('forceStartGame error:', e);
+        }
+      }
+    },
   };
 })();
+
+// Expose GameManager and forceStartGame globally for automated QA and Puppeteer access
+if (typeof window !== 'undefined') {
+  window.GameManager = GameManager;
+  console.log('[QA] GameManager export (end)', typeof GameManager, typeof window.GameManager);
+  if (typeof GameManager.forceStartGame === 'function') {
+    window.forceStartGame = GameManager.forceStartGame;
+    console.log('[QA] window.forceStartGame assigned');
+  }
+}
+if (typeof globalThis !== 'undefined') globalThis.GameManager = GameManager;

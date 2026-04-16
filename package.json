@@ -19,5 +19,13 @@
   "bugs": {
     "url": "https://github.com/lindapot-art/occupantkiller/issues"
   },
-  "homepage": "https://github.com/lindapot-art/occupantkiller#readme"
+  "homepage": "https://github.com/lindapot-art/occupantkiller#readme",
+  "dependencies": {
+    "@tensorflow-models/coco-ssd": "^2.2.3",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "canvas": "^3.2.3",
+    "jimp": "^1.6.1",
+    "puppeteer": "^24.40.0"
+  }
 }
