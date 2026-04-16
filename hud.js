@@ -159,14 +159,14 @@ const HUD = (() => {
 
   // Dynamically generate weapon slots based on WEAPONS array
   function createWeaponSlots() {
-    const slotContainer = document.getElementById('weapon-slot-container');
-    if (!slotContainer || typeof Weapons === 'undefined' || !Weapons.getAll) return;
+    const slotContainer = document.getElementById('weapon-slots');
+    if (!slotContainer || typeof Weapons === 'undefined' || !Weapons.getWeaponCount) return;
     slotContainer.innerHTML = '';
     el.weaponSlots = [];
-    const weapons = Weapons.getAll();
+    const weaponCount = Weapons.getWeaponCount();
     // Limit to 26 slots (1-9, 0, F1-F12, Shift+1-4)
     const maxSlots = 26;
-    for (let i = 0; i < Math.min(weapons.length, maxSlots); i++) {
+    for (let i = 0; i < Math.min(weaponCount, maxSlots); i++) {
       const slot = document.createElement('div');
       slot.className = 'weapon-slot';
       slot.id = 'wslot-' + i;
@@ -1334,6 +1334,8 @@ const HUD = (() => {
     toggleFPS, updateFPS, toggleSettings, getSettings,
     refreshIndicators,
     showWeaponUnlockCard,
+    createWeaponSlots,
+    showWaveSummary,
     // ── NPC Morale HUD Overlay ──
     updateNpcMoraleIndicators,
   };

@@ -753,6 +753,9 @@ const GameManager = (function () {
     Weapons.createGunMesh(_camera);
     Weapons.createMuzzleFlash(_scene, _camera);
 
+    // Create weapon HUD slots (must be after Weapons is initialized)
+    if (HUD && HUD.createWeaponSlots) HUD.createWeaponSlots();
+
     // Wire terrain destruction callbacks for loot & mining
     Weapons.setOnTerrainDig(function (x, y, z, blockType) {
       onShovelMine(x, y, z, blockType);
@@ -3429,7 +3432,7 @@ const GameManager = (function () {
             player.hp = Math.max(1, player.hp - bombDmg);
             HUD.setHealth(player.hp, player.maxHp);
             if (HUD.showDamageFlash) HUD.showDamageFlash(0x2244aa, 0.3);
-            if (typeof Feedback !== 'undefined' && Feedback.screenShake) Feedback.screenShake(0.6);
+            if (typeof Feedback !== 'undefined' && Feedback.triggerScreenShake) Feedback.triggerScreenShake(0.6);
             if (HUD.notifyPickup) HUD.notifyPickup('⚓ Naval bombardment!', '#4477ff');
           }
         }
@@ -3445,7 +3448,7 @@ const GameManager = (function () {
             player.hp = Math.max(1, player.hp - mortarDmg);
             HUD.setHealth(player.hp, player.maxHp);
             if (HUD.showDamageFlash) HUD.showDamageFlash(0xff3300, 0.4);
-            if (typeof Feedback !== 'undefined' && Feedback.screenShake) Feedback.screenShake(1.0);
+            if (typeof Feedback !== 'undefined' && Feedback.triggerScreenShake) Feedback.triggerScreenShake(1.0);
             if (HUD.notifyPickup) HUD.notifyPickup('💥 Mortar barrage!', '#ff3300');
           }
         }
@@ -5049,8 +5052,8 @@ const GameManager = (function () {
       if (data.weapons && Weapons.unlockWeapon) {
         for (var i = 0; i < data.weapons.length; i++) Weapons.unlockWeapon(data.weapons[i]);
       }
-      if (data.currentWeapon != null && Weapons.switchWeapon) {
-        Weapons.switchWeapon(data.currentWeapon);
+      if (data.currentWeapon != null && Weapons.switchTo) {
+        Weapons.switchTo(data.currentWeapon);
       }
 
       // Apply stage visuals
