@@ -68,6 +68,74 @@ const clearVehicles = (...args) => (typeof window !== 'undefined' && window.Voxe
 
 // Universal Module Definition for VoxelWorld
 window.VoxelWorld = (function () {
+  const BLOCK = Object.freeze({
+    AIR:         0,
+    DIRT:        1,
+    GRASS:       2,
+    STONE:       3,
+    WOOD:        4,
+    METAL:       5,
+    ELECTRONICS: 6,
+    SAND:        7,
+    WATER:       8,
+    CONCRETE:    9,
+    BRICK:       10,
+    GLASS:       11,
+    FUEL_BARREL: 12,
+    CRATE:       13,
+    REINFORCED:  14,
+    FENCE:       15,
+    RUBBLE:      16,
+    SANDBAG:     17,
+    ASPHALT:     18,
+    ROOFTILE:    19,
+    PLASTER:     20,
+    CARPET:      21,
+    LINOLEUM:    22,
+    WALLPAPER:   23,
+    CERAMIC:     24,
+    SHINGLE:     25,
+    BUSH:        26,
+    LIGHT:       27,
+    CAR:         28,
+    DOOR:        29,
+    LADDER:      30,
+    LAMPPOST:    31,
+    STREETLIGHT: 32,
+    BENCH:       33,
+    SIGN:        34,
+    BRIDGE:      35,
+    TUNNEL:      36,
+    FIRE:        37,
+    FLAG:        38,
+    BANNER:      39,
+    LOOT_CRATE:  40,
+    ROOFTOP_HATCH: 41,
+    BREAKABLE_FENCE: 42,
+    ZIPLINE:     43,
+    TRUCK:       44,
+    BUS:         45,
+    SHOP_SIGN:   46,
+    SHELF:       47,
+    COUNTER:     48,
+    MAILBOX:     49,
+    STREET_SIGN: 50,
+    BUS_STOP:    51,
+    PARK_TREE:   52,
+    SLIDE:       53,
+    SWING:       54,
+    STATUE:      55,
+    UMBRELLA:    56,
+    GOALPOST:    57,
+    TABLE:       58,
+    SANDBOX:     59,
+    CONFETTI:    60,
+    CROWD:       61,
+    FIREWORK:    62,
+    PARADE_VEHICLE: 63,
+  });
+  if (typeof window !== 'undefined') window.BLOCK = BLOCK;
+
   // --- Collision helpers (hoisted for closure order) ---
   function isSolid(wx, wy, wz) {
     const b = getBlock(Math.floor(wx), Math.floor(wy), Math.floor(wz));
@@ -142,9 +210,8 @@ window.VoxelWorld = (function () {
     for (let px = 2; px < w - 2; px++) for (let pz = d; pz < d + 3; pz++) {
       setBlock(ox + px, getTerrainHeight(ox + px, oz + pz), oz + pz, BLOCK.WATER);
     }
+  }
 
-
-    // (Removed: window.BLOCK and window.isSolid export here; handled at end of file)
   // Each vehicle is an object: { type, pos: {x,y,z}, dir, speed, waypointIdx }
   let _activeVehicles = [];
   function spawnVehicle(type, startPos, dir, speed) {
@@ -202,15 +269,6 @@ window.VoxelWorld = (function () {
     // Barriers
     setBlock(ox + 3, getTerrainHeight(ox + 3, oz) + 1, oz, BLOCK.FENCE);
     setBlock(ox + 3, getTerrainHeight(ox + 3, oz + 4) + 1, oz + 4, BLOCK.FENCE);
-
-      // Benches (wood)
-      if (i % 4 === 2) {
-        setBlock(ox + i, getTerrainHeight(ox + i, oz) + 2, oz, BLOCK.WOOD);
-        setBlock(ox + i, getTerrainHeight(ox + i, oz + 1) + 2, oz + 1, BLOCK.WOOD);
-      }
-    }
-    // Tram sign
-    setBlock(ox + Math.floor(length / 2), getTerrainHeight(ox + Math.floor(length / 2), oz) + 4, oz, BLOCK.SIGN);
   }
 
   // ── City Event System (moved to top level for global access) ──
@@ -424,7 +482,9 @@ window.VoxelWorld = (function () {
     [BLOCK.BUSH]:       0.3,
     [BLOCK.CAR]:        2.0,
   // (global export block moved to end of file)
-  }
+  };
+
+  const BLOCK_TRANSPARENT = new Set([BLOCK.AIR, BLOCK.WATER, BLOCK.GLASS]);
 
   function placeBush(wx, wy, wz) {
     setBlock(wx, wy, wz, BLOCK.BUSH);
