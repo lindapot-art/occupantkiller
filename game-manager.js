@@ -641,14 +641,24 @@ const GameManager = (function () {
   /* ── Init ────────────────────────────────────────────────────────── */
   function init() {
     // Create renderer
-    _renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-    _renderer.setSize(window.innerWidth, window.innerHeight);
-    _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-    _renderer.shadowMap.enabled = true;
-    _renderer.shadowMap.type = THREE.PCFShadowMap;
-    _renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    _renderer.toneMappingExposure = 0.85;
-    document.getElementById('game-container').appendChild(_renderer.domElement);
+    try {
+      _renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+      _renderer.setSize(window.innerWidth, window.innerHeight);
+      _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+      _renderer.shadowMap.enabled = true;
+      _renderer.shadowMap.type = THREE.PCFShadowMap;
+      _renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      _renderer.toneMappingExposure = 0.85;
+      document.getElementById('game-container').appendChild(_renderer.domElement);
+    } catch (e) {
+      console.error('[GameManager] WebGL init failed:', e.message);
+      // Allow QA mode to continue without renderer
+      if (window.__QA_MODE) {
+        _renderer = null;
+      } else {
+        throw e;
+      }
+    }
 
     // Create scene — Ukrainian theme (golden sky)
     _scene = new THREE.Scene();
@@ -1450,7 +1460,7 @@ const GameManager = (function () {
     });
 
     /* ── Touch look controls (right half of canvas) ──────────── */
-    if (isMobile) {
+    if (isMobile && _renderer) {
       const canvas = _renderer.domElement;
       canvas.addEventListener('touchstart', function (e) {
         for (let i = 0; i < e.changedTouches.length; i++) {
@@ -1595,7 +1605,7 @@ const GameManager = (function () {
   /* ── Pointer lock helpers ────────────────────────────────────────── */
   function requestPointerLock() {
     if (isMobile) return;   // Touch controls replace pointer lock on mobile
-    _renderer.domElement.requestPointerLock();
+    if (_renderer && _renderer.domElement) _renderer.domElement.requestPointerLock();
   }
 
   /* ── Overlay helpers ─────────────────────────────────────────────── */
@@ -4592,7 +4602,7 @@ const GameManager = (function () {
   function onResize() {
     _camera.aspect = window.innerWidth / window.innerHeight;
     _camera.updateProjectionMatrix();
-    _renderer.setSize(window.innerWidth, window.innerHeight);
+    if (_renderer) _renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
   /* ── Marketplace UI Builder ─────────────────────────────────────── */

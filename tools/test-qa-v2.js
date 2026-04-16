@@ -152,7 +152,9 @@ function httpGet(url) {
   for (const f of moduleFiles) {
     const content = fs.readFileSync(path.join(ROOT, f), 'utf8');
     if (content.match(/^(const|var|let)\s+\w+\s*=\s*\(?\s*function/m) ||
-        content.match(/^(const|var|let)\s+\w+\s*=\s*\(\s*\(\)\s*=>/m)) {
+        content.match(/^(const|var|let)\s+\w+\s*=\s*\(\s*\(\)\s*=>/m) ||
+        content.match(/^window\.\w+\s*=\s*\(function/m) ||
+        content.match(/^\(function\s*\(/m)) {
       iifeOk++;
     } else {
       console.log(`    ⚠ ${f}: non-standard module pattern`);
