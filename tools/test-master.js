@@ -64,8 +64,8 @@ async function phase1() {
     if (r.body.length > 40000) ok('Index size > 40KB (' + r.body.length + 'b)');
     else fail('Index size', r.body.length + 'b (expected >40KB)');
 
-    if (r.body.includes('ZOMBIELAND')) ok('Title contains ZOMBIELAND');
-    else fail('Title', 'ZOMBIELAND not found');
+    if (r.body.includes('OCCUPANT KILLER') || r.body.includes('OccupantKiller')) ok('Title contains OccupantKiller');
+    else fail('Title', 'OccupantKiller not found');
 
     // Security headers
     const secHeaders = ['x-content-type-options', 'x-frame-options', 'x-xss-protection'];

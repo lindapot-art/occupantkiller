@@ -211,7 +211,7 @@ function httpGet(url) {
       const live = await httpGet('https://occupantkiller.onrender.com');
       if (live.status === 200) {
         ok(`Render LIVE: HTTP 200 (${live.body.length} bytes)`);
-        if (live.body.includes('ZOMBIELAND')) ok('Render: game title present');
+        if (live.body.includes('OCCUPANT KILLER') || live.body.includes('OccupantKiller')) ok('Render: game title present');
         if (live.body.includes('game-container')) ok('Render: game-container present');
         if (live.body.includes('GameManager.init()')) ok('Render: boot script present');
       } else if (live.status === 301 || live.status === 302) {

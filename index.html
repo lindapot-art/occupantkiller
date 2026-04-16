@@ -15,7 +15,7 @@
     </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ZOMBIELAND — Occupant Killer</title>
+  <title>OccupantKiller — Hybrid Voxel Warfare</title>
   <link rel="stylesheet" href="style.css" />
 </head>
   <body>
@@ -412,10 +412,10 @@
 
   <!-- Start screen -->
   <div id="overlay-start" class="overlay">
-    <div id="level-badge">HYBRID VOXEL WARFARE — 4 STAGES</div>
-    <h1>ZOMBIELAND</h1>
-    <p>Avdiivka sector. Voxel world. Build. Command. Fight.</p>
-    <p class="subtitle">Clear 4 stages across different battlefields to achieve victory.</p>
+    <div id="level-badge">HYBRID VOXEL WARFARE — 12 STAGES</div>
+    <h1>OCCUPANT KILLER</h1>
+    <p>Ukraine. Voxel world. Build. Command. Fight.</p>
+    <p class="subtitle">Clear 12 stages across different battlefields to achieve victory.</p>
     <!-- Quick start for new players -->
     <div id="quick-start-section" style="display:none;margin:16px 0">
       <button class="btn" id="quick-start-btn" style="font-size:18px;padding:12px 36px;border-color:#44ff88;color:#44ff88;text-shadow:0 0 10px rgba(68,255,136,0.4)">▶ QUICK START</button>
@@ -449,6 +449,7 @@
       <p id="challenge-desc" style="color:#666;font-size:11px;margin:4px 0"></p>
     </div>
     <button class="btn" id="start-btn">▶ START MISSION</button>
+    <button class="btn" id="continue-btn" style="display:none;border-color:#44ff88;color:#44ff88;margin-top:6px">📂 CONTINUE (Stage <span id="continue-stage">1</span>, Wave <span id="continue-wave">1</span>)</button>
     </div>
     <div id="start-wallet-row" style="margin:8px 0;display:none">
       <button class="btn" id="start-connect-wallet" style="font-size:12px;padding:5px 14px;border-color:#8247e5;color:#8247e5;display:inline-block">🦊 Connect MetaMask (Polygon)</button>
@@ -840,8 +841,29 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   document.getElementById('play-again-btn').addEventListener('click', function () {
+    GameManager.deleteSave();
     GameManager.startGame();
   });
+
+  // Continue from save
+  (function () {
+    var contBtn = document.getElementById('continue-btn');
+    if (GameManager.hasSave()) {
+      try {
+        var save = JSON.parse(localStorage.getItem('ok_save'));
+        document.getElementById('continue-stage').textContent = (save.stage || 0) + 1;
+        document.getElementById('continue-wave').textContent = (save.wave || 0) + 1;
+        contBtn.style.display = '';
+      } catch (e) { contBtn.style.display = 'none'; }
+    }
+    contBtn.addEventListener('click', function () {
+      GameManager.startGame();
+      GameManager.loadGame();
+      GameManager.hideOverlays();
+      GameManager.beginWave();
+      GameManager.requestPointerLock();
+    });
+  })();
 
   // ── Role selection ──────────────────────────────────────
   document.getElementById('start-role-brigade').addEventListener('click', function () {

@@ -2693,6 +2693,11 @@ const Weapons = (() => {
     },
     getWeaponDef: function (i) { return WEAPONS[i] || null; },
     isUnlocked:     function (i) { return !!unlocked[i]; },
+    getUnlockedList: function () {
+      var list = [];
+      for (var i = 0; i < unlocked.length; i++) { if (unlocked[i]) list.push(i); }
+      return list;
+    },
     lockWeapon:     function (i) {
       if (i < 2) return;  // can't lock starter weapons
       unlocked[i] = false;

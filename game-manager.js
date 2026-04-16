@@ -2318,6 +2318,7 @@ const GameManager = (function () {
       gameState = STATE.STAGE_CLEAR;
       if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playLevelComplete) window.AudioSystem.playLevelComplete();
       showOverlay('stageclear');
+      saveGame();
       document.getElementById('stageclear-num').textContent = stageDef.id;
       document.getElementById('stageclear-name').textContent = stageDef.name;
       document.getElementById('stageclear-score').textContent = player.score;
@@ -2340,6 +2341,7 @@ const GameManager = (function () {
     }
 
     gameState = STATE.WAVE_CLEAR;
+    saveGame();
     showOverlay('waveclear');
     document.getElementById('waveclear-num').textContent = currentWave;
     document.getElementById('waveclear-total').textContent = stageDef.wavesPerStage;
@@ -4993,6 +4995,73 @@ const GameManager = (function () {
     if (HUD.notifyPickup) HUD.notifyPickup('💉 Speed Boost ' + duration + 's', '#ff8a65');
   }
 
+  /* ── Save / Load System ──────────────────────────────────────────── */
+  function saveGame() {
+    try {
+      var data = {
+        v: 1,
+        stage: currentStage,
+        wave: currentWave,
+        score: player.score,
+        kills: player.kills,
+        hp: player.hp,
+        maxHp: player.maxHp,
+        armor: player.armor || 0,
+        currency: typeof Economy !== 'undefined' ? Economy.getCurrency() : 0,
+        weapons: Weapons.getUnlockedList ? Weapons.getUnlockedList() : [],
+        currentWeapon: Weapons.getCurrentIdx ? Weapons.getCurrentIdx() : 0,
+        ts: Date.now()
+      };
+      localStorage.setItem('ok_save', JSON.stringify(data));
+      if (HUD.notifyPickup) HUD.notifyPickup('💾 GAME SAVED', '#44ff88');
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function loadGame() {
+    try {
+      var raw = localStorage.getItem('ok_save');
+      if (!raw) return false;
+      var data = JSON.parse(raw);
+      if (!data || data.v !== 1) return false;
+
+      currentStage = data.stage || 0;
+      currentWave = data.wave || 0;
+      player.score = data.score || 0;
+      player.kills = data.kills || 0;
+      player.hp = data.hp || 100;
+      player.maxHp = data.maxHp || 100;
+      player.armor = data.armor || 0;
+
+      if (data.currency && typeof Economy !== 'undefined' && Economy.setCurrency) {
+        Economy.setCurrency(data.currency);
+      }
+      if (data.weapons && Weapons.unlockWeapon) {
+        for (var i = 0; i < data.weapons.length; i++) Weapons.unlockWeapon(data.weapons[i]);
+      }
+      if (data.currentWeapon != null && Weapons.switchWeapon) {
+        Weapons.switchWeapon(data.currentWeapon);
+      }
+
+      // Apply stage visuals
+      applyStage(currentStage);
+
+      // Update HUD
+      HUD.setHealth(player.hp, player.maxHp);
+      HUD.setWeapon(Weapons.getCurrentName(), Weapons.getCurrentIdx());
+      HUD.notifyPickup('📂 GAME LOADED — Stage ' + (currentStage + 1) + ' Wave ' + (currentWave + 1), '#44ff88');
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function hasSave() {
+    try { return !!localStorage.getItem('ok_save'); } catch (e) { return false; }
+  }
+
+  function deleteSave() {
+    try { localStorage.removeItem('ok_save'); } catch (e) {}
+  }
+
   /* ── Public API ──────────────────────────────────────────────────── */
   return {
     STATE,
@@ -5014,6 +5083,10 @@ const GameManager = (function () {
     populateWeaponsGrid,
     updateRoleIndicator,
     refreshMarketplaceUI,
+    saveGame,
+    loadGame,
+    hasSave,
+    deleteSave,
     getState:        function () { return gameState; },
     setState:        function (s) { gameState = s; },
     getPlayer:       function () { return player; },
