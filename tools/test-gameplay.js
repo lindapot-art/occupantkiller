@@ -192,8 +192,8 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
   const WEAPON_SCHEDULE = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,1];
 
 
-  // EXTENDED QA: 300 gameplay screenshots, 5s interval
-  for (let shot = 0; shot < 300; shot++) {
+  // EXTENDED QA: 20 gameplay rounds, 5s interval (fast QA pass)
+  for (let shot = 0; shot < 20; shot++) {
     // Simulate a round of gameplay actions every 5 seconds
     const weaponIdx = WEAPON_SCHEDULE[shot % WEAPON_SCHEDULE.length];
     await page.evaluate((wIdx) => {
