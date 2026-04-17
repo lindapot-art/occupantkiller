@@ -2337,7 +2337,7 @@ const GameManager = (function () {
       VehicleSystem.spawnEnemy(evx2, evy2, evz2, 'transport');
     }
 
-    // Spawn enemy drones
+    // Spawn enemy drones (more per wave, with observers)
     if (w >= 2 && typeof DroneSystem !== 'undefined' && DroneSystem.spawnEnemyDrone) {
       var droneSpawnH = 20 + Math.random() * 10;
       var droneAngle = Math.random() * Math.PI * 2;
@@ -2349,6 +2349,20 @@ const GameManager = (function () {
       var fpvZ = player.position.z + Math.sin(droneAngle) * droneDist;
       DroneSystem.spawnEnemyDrone(fpvX, droneSpawnH, fpvZ, 'enemy_fpv');
       
+      // Second FPV from opposite side (always from wave 2+)
+      var fpv2Angle = droneAngle + Math.PI;
+      var fpv2X = player.position.x + Math.cos(fpv2Angle) * droneDist;
+      var fpv2Z = player.position.z + Math.sin(fpv2Angle) * droneDist;
+      DroneSystem.spawnEnemyDrone(fpv2X, droneSpawnH, fpv2Z, 'enemy_fpv');
+      
+      if (w >= 3) {
+        // Observer drone at high altitude — calls reinforcements
+        var obsAngle = droneAngle + Math.PI * 0.25;
+        var obsX = player.position.x + Math.cos(obsAngle) * (droneDist + 15);
+        var obsZ = player.position.z + Math.sin(obsAngle) * (droneDist + 15);
+        DroneSystem.spawnEnemyDrone(obsX, droneSpawnH + 15, obsZ, 'enemy_observer');
+      }
+      
       if (w >= 4 || extraDroneWaves > 0) {
         // Bomber drone
         var bomberAngle = droneAngle + Math.PI * 0.5;
@@ -2357,23 +2371,24 @@ const GameManager = (function () {
         DroneSystem.spawnEnemyDrone(bomberX, droneSpawnH + 5, bomberZ, 'enemy_bomber');
         
         // Extra FPV
-        var fpv2Angle = droneAngle + Math.PI;
-        var fpv2X = player.position.x + Math.cos(fpv2Angle) * droneDist;
-        var fpv2Z = player.position.z + Math.sin(fpv2Angle) * droneDist;
-        DroneSystem.spawnEnemyDrone(fpv2X, droneSpawnH, fpv2Z, 'enemy_fpv');
+        var fpv3Angle = droneAngle + Math.PI * 0.75;
+        var fpv3X = player.position.x + Math.cos(fpv3Angle) * droneDist;
+        var fpv3Z = player.position.z + Math.sin(fpv3Angle) * droneDist;
+        DroneSystem.spawnEnemyDrone(fpv3X, droneSpawnH, fpv3Z, 'enemy_fpv');
       }
       
       if (w >= 6 || extraDroneWaves > 0) {
-        // Additional bombers and FPVs
-        for (var ei = 0; ei < 2 + extraDroneWaves; ei++) {
+        // Drone swarm — additional bombers, FPVs, and observers
+        for (var ei = 0; ei < 3 + extraDroneWaves; ei++) {
           var extraAngle = Math.random() * Math.PI * 2;
           var exX = player.position.x + Math.cos(extraAngle) * (droneDist + 10);
           var exZ = player.position.z + Math.sin(extraAngle) * (droneDist + 10);
-          DroneSystem.spawnEnemyDrone(exX, droneSpawnH + ei * 3, exZ, ei === 0 ? 'enemy_bomber' : 'enemy_fpv');
+          var exType = ei === 0 ? 'enemy_bomber' : ei === 1 ? 'enemy_observer' : 'enemy_fpv';
+          DroneSystem.spawnEnemyDrone(exX, droneSpawnH + ei * 3, exZ, exType);
         }
       }
       
-      HUD.notifyPickup('⚠ ENEMY DRONES DETECTED!', '#ff4488');
+      HUD.notifyPickup('WARNING: ENEMY DRONES INBOUND!', '#ff4488');
     }
 
     // ═══ NEW: Wave-begin integrations for 59 features ═══
@@ -2939,6 +2954,14 @@ const GameManager = (function () {
           targets.push(veh.mesh);
         }
       }
+      // Add enemy drone meshes as shootable targets
+      var allDrones = typeof DroneSystem !== 'undefined' ? DroneSystem.getAll() : [];
+      for (var dri = 0; dri < allDrones.length; dri++) {
+        var drn = allDrones[dri];
+        if (drn.mesh && drn.alive && drn.faction === 'russian') {
+          targets.push(drn.mesh);
+        }
+      }
       const weaponType = Weapons.getCurrentType();
       const weaponId = Weapons.getCurrentId();
       // Map weapon type to audio sound type
@@ -2952,7 +2975,30 @@ const GameManager = (function () {
             break;
           }
         }
-        if (hitVehicle) {
+        // Check if hit a drone mesh
+        var hitDrone = null;
+        for (var hdi = 0; hdi < allDrones.length; hdi++) {
+          if (allDrones[hdi].mesh === hit.object || (hit.object.parent && allDrones[hdi].mesh === hit.object.parent)) {
+            hitDrone = allDrones[hdi];
+            break;
+          }
+        }
+        if (hitDrone) {
+          // Drone hit — deal damage, bonus for AA weapons
+          var droneDmg = Weapons.getDamage();
+          var curWepType = Weapons.getCurrentType();
+          if (curWepType === 'AA') droneDmg *= 3;
+          else if (curWepType === 'AMR' || curWepType === 'SNIPER') droneDmg *= 2;
+          DroneSystem.damageDrone(hitDrone.id, droneDmg);
+          if (window.AudioSystem && window.AudioSystem.playHit) window.AudioSystem.playHit();
+          if (HUD.addCombatLog) HUD.addCombatLog('Hit drone (-' + droneDmg + ')', '#00aaff');
+          if (hitDrone.health <= 0) {
+            player.score += 100;
+            player.kills++;
+            HUD.setScore(player.score);
+            HUD.notifyPickup('DRONE DESTROYED! +100', '#00aaff');
+          }
+        } else if (hitVehicle) {
           onVehicleHit(hitVehicle, Weapons.getDamage());
         } else {
           onEnemyHit(hit);

@@ -146,6 +146,8 @@ window.VoxelWorld = (function () {
     CROWD:       61,
     FIREWORK:    62,
     PARADE_VEHICLE: 63,
+    BLUE_TILE:   64,
+    WHITE_TILE:  65,
   });
   if (typeof window !== 'undefined') window.BLOCK = BLOCK;
 
@@ -378,6 +380,8 @@ window.VoxelWorld = (function () {
     [BLOCK.GOALPOST]:   0xFFFFFF,  // white goalpost
     [BLOCK.TABLE]:      0x8B4513,  // brown table
     [BLOCK.SANDBOX]:    0xFFF8DC,  // sand color
+    [BLOCK.BLUE_TILE]:  0x0057B8,  // Ukrainian blue tile (hallways)
+    [BLOCK.WHITE_TILE]: 0xF0F0F0,  // white tile (upper hallway walls)
   };
   // Expose BLOCK_COLORS globally for legacy/stray references
   if (typeof window !== 'undefined') window.BLOCK_COLORS = BLOCK_COLORS;
@@ -613,6 +617,8 @@ window.VoxelWorld = (function () {
     [BLOCK.LAMPPOST]:   2.5,
     [BLOCK.BUSH]:       0.3,
     [BLOCK.CAR]:        2.0,
+    [BLOCK.BLUE_TILE]:  2,
+    [BLOCK.WHITE_TILE]: 1.5,
   // (global export block moved to end of file)
   };
 
@@ -1575,6 +1581,202 @@ window.VoxelWorld = (function () {
     setBlock(ox + Math.floor(w / 2), surfH, oz, BLOCK.AIR);
     setBlock(ox + Math.floor(w / 2), surfH + 1, oz, BLOCK.AIR);
     setBlock(ox + Math.floor(w / 2), surfH + 2, oz, BLOCK.AIR);
+  }
+
+  /* ── Ukrainian Apartment Building (6 or 12 stories, full interior) ── */
+  function generateUkrainianApartment(ox, oz, stories) {
+    const surfH = getTerrainHeight(ox, oz);
+    const W = 18;   // width (x axis)
+    const D = 10;   // depth (z axis)
+    const FH = 3;   // floor height (slab-to-slab)
+    stories = stories || 6;
+
+    // Cap floors to chunk height
+    const maxFloors = Math.floor((CHUNK_HEIGHT - surfH - 2) / FH);
+    stories = Math.min(stories, maxFloors);
+    if (stories < 3) return;
+
+    // Hallway runs at z-center: z offsets 4 and 5 (2-block wide corridor)
+    const hallZ1 = 4;
+    const hallZ2 = 5;
+    // Stairwell zone at x=1..3
+    const stairX1 = 1;
+    const stairX2 = 3;
+    // Apartment dividing walls (x positions)
+    const dividers = [6, 11, 15];
+    // Door positions into apartments (centered in each bay)
+    const doorXPositions = [4, 8, 13, 16];
+
+    for (let floor = 0; floor < stories; floor++) {
+      const baseY = surfH + floor * FH;
+
+      // ─── Floor slab ───
+      for (let x = 0; x < W; x++) {
+        for (let z = 0; z < D; z++) {
+          setBlock(ox + x, baseY, oz + z, BLOCK.CONCRETE);
+        }
+      }
+
+      // ─── Clear interior air (between slabs) ───
+      for (let dy = 1; dy < FH; dy++) {
+        for (let x = 1; x < W - 1; x++) {
+          for (let z = 1; z < D - 1; z++) {
+            setBlock(ox + x, baseY + dy, oz + z, BLOCK.AIR);
+          }
+        }
+      }
+
+      // ─── Exterior walls ───
+      for (let dy = 1; dy < FH; dy++) {
+        for (let x = 0; x < W; x++) {
+          setBlock(ox + x, baseY + dy, oz, BLOCK.CONCRETE);           // front
+          setBlock(ox + x, baseY + dy, oz + D - 1, BLOCK.CONCRETE);   // back
+        }
+        for (let z = 0; z < D; z++) {
+          setBlock(ox, baseY + dy, oz + z, BLOCK.CONCRETE);           // left
+          setBlock(ox + W - 1, baseY + dy, oz + z, BLOCK.CONCRETE);   // right
+        }
+      }
+
+      // ─── Hallway walls (blue bottom / white top) ───
+      for (let x = 1; x < W - 1; x++) {
+        // Skip stairwell area
+        if (x >= stairX1 && x <= stairX2 + 1) continue;
+        // South hallway wall (z = hallZ1 - 1 = 3)
+        setBlock(ox + x, baseY + 1, oz + hallZ1 - 1, BLOCK.BLUE_TILE);
+        if (FH > 2) setBlock(ox + x, baseY + 2, oz + hallZ1 - 1, BLOCK.WHITE_TILE);
+        // North hallway wall (z = hallZ2 + 1 = 6)
+        setBlock(ox + x, baseY + 1, oz + hallZ2 + 1, BLOCK.BLUE_TILE);
+        if (FH > 2) setBlock(ox + x, baseY + 2, oz + hallZ2 + 1, BLOCK.WHITE_TILE);
+      }
+
+      // ─── Apartment dividing walls ───
+      for (var di = 0; di < dividers.length; di++) {
+        var dx = dividers[di];
+        if (dx >= W - 1) continue;
+        for (let dy = 1; dy < FH; dy++) {
+          // South-side apartments (z = 1..hallZ1-2)
+          for (let z = 1; z <= hallZ1 - 2; z++) {
+            setBlock(ox + dx, baseY + dy, oz + z, BLOCK.PLASTER);
+          }
+          // North-side apartments (z = hallZ2+2..D-2)
+          for (let z = hallZ2 + 2; z <= D - 2; z++) {
+            setBlock(ox + dx, baseY + dy, oz + z, BLOCK.PLASTER);
+          }
+        }
+      }
+
+      // ─── Apartment doorways to hallway ───
+      for (var ddi = 0; ddi < doorXPositions.length; ddi++) {
+        var ddx = doorXPositions[ddi];
+        if (ddx <= stairX2 + 1 || ddx >= W - 1) continue;
+        // South apartment doors
+        setBlock(ox + ddx, baseY + 1, oz + hallZ1 - 1, BLOCK.AIR);
+        setBlock(ox + ddx, baseY + 2, oz + hallZ1 - 1, BLOCK.AIR);
+        // North apartment doors
+        setBlock(ox + ddx, baseY + 1, oz + hallZ2 + 1, BLOCK.AIR);
+        setBlock(ox + ddx, baseY + 2, oz + hallZ2 + 1, BLOCK.AIR);
+      }
+
+      // ─── Windows (exterior) ───
+      for (let x = 2; x < W - 2; x += 3) {
+        // Front windows (south)
+        setBlock(ox + x, baseY + 1, oz, BLOCK.GLASS);
+        if (FH > 2) setBlock(ox + x, baseY + 2, oz, BLOCK.GLASS);
+        // Back windows (north)
+        setBlock(ox + x, baseY + 1, oz + D - 1, BLOCK.GLASS);
+        if (FH > 2) setBlock(ox + x, baseY + 2, oz + D - 1, BLOCK.GLASS);
+      }
+      // Side windows
+      for (let z = 2; z < D - 2; z += 3) {
+        setBlock(ox, baseY + 1, oz + z, BLOCK.GLASS);
+        if (FH > 2) setBlock(ox, baseY + 2, oz + z, BLOCK.GLASS);
+        setBlock(ox + W - 1, baseY + 1, oz + z, BLOCK.GLASS);
+        if (FH > 2) setBlock(ox + W - 1, baseY + 2, oz + z, BLOCK.GLASS);
+      }
+
+      // ─── Sniper windows: remove glass on upper floors for shooting ───
+      if (floor >= 3) {
+        // Open a few windows on each upper floor (front and back only)
+        var sniperX = 5 + (floor % 3) * 4;
+        if (sniperX < W - 2) {
+          setBlock(ox + sniperX, baseY + 1, oz, BLOCK.AIR);
+          if (FH > 2) setBlock(ox + sniperX, baseY + 2, oz, BLOCK.AIR);
+          setBlock(ox + sniperX, baseY + 1, oz + D - 1, BLOCK.AIR);
+          if (FH > 2) setBlock(ox + sniperX, baseY + 2, oz + D - 1, BLOCK.AIR);
+        }
+      }
+
+      // ─── Stairwell ───
+      // Stairwell walls (blue tiles)
+      for (let dy = 1; dy < FH; dy++) {
+        // East stairwell wall separating from hallway
+        for (let z = hallZ1 - 1; z <= hallZ2 + 1; z++) {
+          setBlock(ox + stairX2 + 1, baseY + dy, oz + z, BLOCK.BLUE_TILE);
+        }
+        // Blue accent on side walls inside stairwell
+        for (let x = stairX1; x <= stairX2; x++) {
+          setBlock(ox + x, baseY + 1, oz + hallZ1 - 1, BLOCK.BLUE_TILE);
+          setBlock(ox + x, baseY + 1, oz + hallZ2 + 1, BLOCK.BLUE_TILE);
+        }
+      }
+
+      // Stairwell door from hallway
+      setBlock(ox + stairX2 + 1, baseY + 1, oz + hallZ1, BLOCK.AIR);
+      setBlock(ox + stairX2 + 1, baseY + 2, oz + hallZ1, BLOCK.AIR);
+
+      // Ladder blocks (alternating sides each floor for realism)
+      if (floor % 2 === 0) {
+        setBlock(ox + stairX1, baseY + 1, oz + hallZ1, BLOCK.LADDER);
+        setBlock(ox + stairX1, baseY + 2, oz + hallZ1, BLOCK.LADDER);
+        // Hole in ceiling above ladder for floor access
+        if (floor < stories - 1) {
+          setBlock(ox + stairX1, baseY + FH, oz + hallZ1, BLOCK.AIR);
+        }
+      } else {
+        setBlock(ox + stairX2, baseY + 1, oz + hallZ2, BLOCK.LADDER);
+        setBlock(ox + stairX2, baseY + 2, oz + hallZ2, BLOCK.LADDER);
+        if (floor < stories - 1) {
+          setBlock(ox + stairX2, baseY + FH, oz + hallZ2, BLOCK.AIR);
+        }
+      }
+      // Also open the opposite side's ceiling hole for descent
+      if (floor > 0) {
+        if (floor % 2 === 0) {
+          setBlock(ox + stairX2, baseY, oz + hallZ2, BLOCK.AIR);
+        } else {
+          setBlock(ox + stairX1, baseY, oz + hallZ1, BLOCK.AIR);
+        }
+      }
+    }
+
+    // ─── Roof slab ───
+    var roofY = surfH + stories * FH;
+    for (let x = 0; x < W; x++) {
+      for (let z = 0; z < D; z++) {
+        setBlock(ox + x, roofY, oz + z, BLOCK.CONCRETE);
+      }
+    }
+    // Roof access hatch
+    setBlock(ox + stairX1 + 1, roofY, oz + hallZ1 + 1, BLOCK.AIR);
+
+    // ─── Ground floor entrances ───
+    // Front entrance (centered)
+    var entranceX = Math.floor(W / 2);
+    setBlock(ox + entranceX, surfH, oz, BLOCK.AIR);
+    setBlock(ox + entranceX, surfH + 1, oz, BLOCK.AIR);
+    setBlock(ox + entranceX, surfH + 2, oz, BLOCK.AIR);
+    setBlock(ox + entranceX + 1, surfH, oz, BLOCK.AIR);
+    setBlock(ox + entranceX + 1, surfH + 1, oz, BLOCK.AIR);
+    setBlock(ox + entranceX + 1, surfH + 2, oz, BLOCK.AIR);
+    // Back entrance
+    setBlock(ox + entranceX, surfH, oz + D - 1, BLOCK.AIR);
+    setBlock(ox + entranceX, surfH + 1, oz + D - 1, BLOCK.AIR);
+    setBlock(ox + entranceX, surfH + 2, oz + D - 1, BLOCK.AIR);
+    // Side entrance (stairwell)
+    setBlock(ox, surfH, oz + hallZ1, BLOCK.AIR);
+    setBlock(ox, surfH + 1, oz + hallZ1, BLOCK.AIR);
+    setBlock(ox, surfH + 2, oz + hallZ1, BLOCK.AIR);
   }
 
   // IDEA 2: Industrial complex (coking plant for Avdiivka)
@@ -3239,8 +3441,29 @@ window.VoxelWorld = (function () {
     regenerate();
     if (level.id === 'HOSTOMEL') {
       generateHostomelAirport(0, 0);
-      rebuildAll();
+      // Ukrainian apartment buildings near the airport
+      generateUkrainianApartment(-35, -30, 6);   // 6-story khrushchyovka
+      generateUkrainianApartment(-35, -50, 12);  // 12-story panel building
+      generateUkrainianApartment(25, -35, 6);    // another 6-story
+    } else if (level.id === 'AVDIIVKA') {
+      // Dense residential zone for Avdiivka industrial area
+      generateUkrainianApartment(-20, -20, 6);
+      generateUkrainianApartment(-20, -42, 12);
+      generateUkrainianApartment(10, -25, 6);
+      generateUkrainianApartment(10, -47, 12);
+    } else if (level.id === 'BAKHMUT') {
+      // War-torn Bakhmut — mix of buildings
+      generateUkrainianApartment(-25, -20, 6);
+      generateUkrainianApartment(-25, -42, 6);
+      generateUkrainianApartment(15, -15, 12);
+      generateUkrainianApartment(15, -37, 6);
+    } else if (level.id === 'KHERSON') {
+      // Kherson residential area near the bridgehead
+      generateUkrainianApartment(-30, -25, 12);
+      generateUkrainianApartment(-30, -47, 6);
+      generateUkrainianApartment(20, -30, 6);
     }
+    rebuildAll();
     _levelSpawnPoint = resolveLevelSpawnPoint(level);
     return level;
   }

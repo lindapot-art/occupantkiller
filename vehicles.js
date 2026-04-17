@@ -425,8 +425,8 @@ const VehicleSystem = (function () {
           v.position.y = terrainH;
           if (v.velocity.y < 0) v.velocity.y = 0;
         }
-        // Clamp any upward velocity to prevent launches
-        if (v.velocity.y > 1) v.velocity.y = 1;
+        // Hard ground-lock: zero upward velocity for ground vehicles (prevents BMP flying)
+        if (v.velocity.y > 0) v.velocity.y = 0;
         // Hard speed cap for AI vehicles to prevent erratic movement
         if (v !== _occupiedVehicle) {
           var hSpd = Math.sqrt(v.velocity.x * v.velocity.x + v.velocity.z * v.velocity.z);

@@ -15,22 +15,26 @@ const DroneSystem = (function () {
     FPV_ATTACK:   'fpv_attack',
     BOMB:         'bomb',
     SURVEILLANCE: 'surveillance',
+    KAMIKAZE:     'kamikaze',
     ENEMY_BOMBER: 'enemy_bomber',
     ENEMY_FPV:    'enemy_fpv',
+    ENEMY_OBSERVER: 'enemy_observer',
   });
 
   const DRONE_STATS = {
-    recon:         { speed: 12, health: 30,  battery: 120, damage: 0,   range: 80 },
-    fpv_attack:    { speed: 18, health: 15,  battery: 45,  damage: 80,  range: 50 },
-    bomb:          { speed: 8,  health: 40,  battery: 90,  damage: 200, range: 60 },
-    surveillance:  { speed: 6,  health: 50,  battery: 300, damage: 0,   range: 100 },
-    enemy_bomber:  { speed: 7,  health: 35,  battery: 80,  damage: 150, range: 50 },
-    enemy_fpv:     { speed: 22, health: 10,  battery: 30,  damage: 100, range: 40 },
+    recon:          { speed: 12, health: 30,  battery: 120, damage: 0,   range: 80 },
+    fpv_attack:     { speed: 18, health: 15,  battery: 45,  damage: 80,  range: 50 },
+    bomb:           { speed: 8,  health: 40,  battery: 90,  damage: 200, range: 60 },
+    surveillance:   { speed: 6,  health: 50,  battery: 300, damage: 0,   range: 100 },
+    kamikaze:       { speed: 25, health: 8,   battery: 20,  damage: 120, range: 35 },
+    enemy_bomber:   { speed: 7,  health: 35,  battery: 80,  damage: 150, range: 50 },
+    enemy_fpv:      { speed: 22, health: 10,  battery: 30,  damage: 100, range: 40 },
+    enemy_observer: { speed: 5,  health: 45,  battery: 200, damage: 0,   range: 120 },
   };
 
   /* ── Faction helpers ────────────────────────────────────────────── */
   function factionForType(type) {
-    if (type === DRONE_TYPE.ENEMY_BOMBER || type === DRONE_TYPE.ENEMY_FPV) return 'russian';
+    if (type === DRONE_TYPE.ENEMY_BOMBER || type === DRONE_TYPE.ENEMY_FPV || type === DRONE_TYPE.ENEMY_OBSERVER) return 'russian';
     return 'ukrainian';
   }
 
@@ -77,9 +81,18 @@ const DroneSystem = (function () {
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     group.add(body);
 
-    // Russian flag stripe on enemy drones
+    // National flag stripes on drones
     if (faction === 'russian') {
       addRussianFlag(group);
+    } else {
+      // Ukrainian flag (blue top, yellow bottom)
+      var flagGeo = new THREE.BoxGeometry(0.3, 0.02, 0.05);
+      var blueStripe = new THREE.Mesh(flagGeo, new THREE.MeshLambertMaterial({ color: 0x005BBB }));
+      blueStripe.position.set(0, 0.095, -0.03);
+      group.add(blueStripe);
+      var yellowStripe = new THREE.Mesh(flagGeo.clone(), new THREE.MeshLambertMaterial({ color: 0xFFD500 }));
+      yellowStripe.position.set(0, 0.095, 0.03);
+      group.add(yellowStripe);
     }
 
     // 4 Arms + rotors
@@ -432,6 +445,23 @@ const DroneSystem = (function () {
 
   function updateAIDrone(drone, delta) {
     if (drone.patrolPoints.length === 0) return;
+
+    // Observer drones circle and call reinforcements
+    if (drone.type === DRONE_TYPE.ENEMY_OBSERVER) {
+      drone._observerTimer = (drone._observerTimer || 0) + delta;
+      // Every 15 seconds, call extra enemy reinforcements
+      if (drone._observerTimer >= 15) {
+        drone._observerTimer = 0;
+        if (typeof Enemies !== 'undefined' && Enemies.spawnReinforcement) {
+          Enemies.spawnReinforcement(drone.position.x, drone.position.z, 3);
+        } else if (typeof Enemies !== 'undefined' && Enemies.startWave) {
+          // Fallback: spawn a few extra enemies near the observer
+          if (typeof HUD !== 'undefined' && HUD.addCombatLog) {
+            HUD.addCombatLog('Observer drone calling reinforcements!', '#ff4444');
+          }
+        }
+      }
+    }
 
     const target = drone.patrolPoints[drone.patrolIdx];
     _dTmpFwd.copy(target).sub(drone.position);
