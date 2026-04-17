@@ -16,6 +16,12 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [HIGH] Fix Gameplay Visual Regression After Apartment Batch
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Repaired the Hostomel/player-view regression that left gameplay screenshots clipped into geometry or dominated by flat terrain color. Moved Hostomel preferred spawn candidates farther into open ground, tightened voxel spawn validation to require wider body clearance plus headroom and a forward view corridor, and upgraded the gameplay harness to reject roofed/interior teleport targets and blocked travel paths. Verified locally: `/healthz` 200, syntax PASS on changed files, gameplay harness PASS with 23 screenshots and `Errors: NONE`, refreshed screenshot set visually clear.
+
 ### [HIGH] Fix Start Screen / Live Render Regression
 Status: DONE
 Requested: 2026-04-17

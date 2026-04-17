@@ -4,9 +4,9 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-18 — Session 26: Ukrainian apartments, combat improvements, cover degradation, tactical formations, cover-seeking AI
+- **Timestamp**: 2026-04-18 — Session 27: visual regression repaired in spawn selection and gameplay screenshot harness
 - **Agent**: KING
-- **Status**: COMPLETE — Two commits shipped: e3610d4 (apartments + drone shootdown + BMP fix) and b6daf09 (cover degradation + formations + cover AI). Push blocked by credential issue (user must fix).
+- **Status**: COMPLETE — Hostomel spawn selection now prefers open outdoor ground with view clearance, and the gameplay harness rejects roofed/clipped teleport targets. Local proxy QA and screenshot verification passed.
 
 ## Current Task
 - DONE: Ukrainian apartment buildings (6/12 stories) with blue/white hallway tiles, stairways, accessible apartments, sniper windows
@@ -23,8 +23,21 @@
 - DONE: Tactical formations (wedge/line/column/staggered) for assault groups
 - DONE: Formation switching per group state (advance→wedge, assault→line, retreat→column, regroup→staggered)
 - DONE: Cover-seeking AI (wounded ranged enemies find solid blocks to hide behind)
+- DONE: Hostomel spawn candidates moved farther from hangars and terminal overhangs
+- DONE: Spawn resolver now requires wider body clearance, headroom, and forward view corridor
+- DONE: Gameplay QA harness now rejects roofed/interior teleport spots and blocked travel paths
 - QA: healthz 200, node --check all PASS, test-master 38/0/0, test-qa-v2 21/0, gameplay 24 screenshots 0 errors
 - BLOCKED: git push (credential mismatch — PhotonBounce cached, needs lindapot-art)
+
+## Steps Completed This Session (Session 27)
+1. [x] Reproduced the visual regression from gameplay screenshots and confirmed it was a real player-view failure, not a false-positive QA result
+2. [x] Traced the root causes to Hostomel spawn placement near dense airport geometry and gameplay-harness movement checks that only validated the destination body column
+3. [x] Updated Hostomel preferred spawn candidates to safer outdoor runway-approach positions
+4. [x] Hardened `isSpawnAreaClear()` to require wider player clearance, overhead headroom, and an open forward view corridor
+5. [x] Upgraded `tools/test-gameplay.js` safe movement logic to reject roofed/interior cells and blocked line-of-travel teleports
+6. [x] Re-ran syntax checks: `node --check voxel-world.js`, `node --check tools/test-gameplay.js`, `node --check game-manager.js` — all PASS
+7. [x] Re-ran live gameplay QA: `/healthz` 200, `tools/test-gameplay.js` PASS, 23 screenshots, `Errors: NONE`, final state `playing`, wave 2
+8. [x] Manually re-inspected the refreshed gameplay screenshots to verify the clipped/yellow opening regression was resolved
 
 ## Steps Completed This Session (Session 26)
 1. [x] Committed previous session's apartment buildings + combat improvements batch (e3610d4)

@@ -1126,7 +1126,7 @@ window.VoxelWorld = (function () {
 
   /* ── Level Definitions ────────────────────────────────────────────── */
   const LEVELS = [
-    { id: 'HOSTOMEL',  name: 'Hostomel Airport',    desc: 'Stop the airborne assault',  theme: 'grassland', wavesPerLevel: 7, difficulty: 1.0, fogColor: 0xD4A017, spawnCandidates: [{ x: 0, z: -12 }, { x: -10, z: -10 }, { x: 10, z: -10 }, { x: 0, z: -6 }] },
+    { id: 'HOSTOMEL',  name: 'Hostomel Airport',    desc: 'Stop the airborne assault',  theme: 'grassland', wavesPerLevel: 7, difficulty: 1.0, fogColor: 0xD4A017, spawnCandidates: [{ x: 0, z: -24 }, { x: -12, z: -22 }, { x: 12, z: -22 }, { x: 0, z: -18 }, { x: -6, z: -26 }, { x: 6, z: -26 }] },
     { id: 'AVDIIVKA',  name: 'Avdiivka Industrial Zone', desc: 'Hold the coking plant',  theme: 'urban',     wavesPerLevel: 7, difficulty: 1.3, fogColor: 0x3a3028 },
     { id: 'BAKHMUT',   name: 'Bakhmut Ruins',        desc: 'Defend the city',             theme: 'urban',     wavesPerLevel: 7, difficulty: 1.6, fogColor: 0x2a2a2a },
     { id: 'KHERSON',   name: 'Kherson Bridgehead',   desc: 'Cross the Dnipro',            theme: 'grassland', wavesPerLevel: 7, difficulty: 1.9, fogColor: 0xD4A017 },
@@ -1425,14 +1425,32 @@ window.VoxelWorld = (function () {
 
   function isSpawnAreaClear(x, z, groundY) {
     const baseY = Math.floor(groundY) + 1;
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dz = -1; dz <= 1; dz++) {
-        if (isSolid(x + dx, baseY, z + dz) || isSolid(x + dx, baseY + 1, z + dz)) {
+    const ix = Math.round(x);
+    const iz = Math.round(z);
+
+    // Require a wider clear bubble around the player body.
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        if (isSolid(ix + dx, baseY, iz + dz) || isSolid(ix + dx, baseY + 1, iz + dz)) {
           return false;
         }
       }
     }
-    return !isSolid(x, baseY + 2, z);
+
+    // Require generous headroom so spawn framing doesn't start under eaves/roofs.
+    for (let dy = 2; dy <= 5; dy++) {
+      if (isSolid(ix, baseY + dy, iz)) return false;
+    }
+
+    // Keep the immediate view corridor open so stage-start screenshots don't face clipped geometry.
+    for (let step = 1; step <= 8; step++) {
+      for (let lateral = -2; lateral <= 2; lateral++) {
+        if (isSolid(ix + lateral, baseY + 1, iz + step)) return false;
+        if (isSolid(ix + lateral, baseY + 2, iz + step)) return false;
+      }
+    }
+
+    return true;
   }
 
   function scoreSpawnCandidate(x, z, originX, originZ) {

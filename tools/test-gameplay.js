@@ -226,6 +226,48 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
       try {
         const player = GameManager.getPlayer();
         const pos = player.position;
+        function isOutdoorCell(sampleX, sampleZ) {
+          const groundY = VoxelWorld.getTerrainHeight(sampleX, sampleZ);
+          const ix = Math.round(sampleX);
+          const iz = Math.round(sampleZ);
+          const bodyY = groundY + 1.7;
+
+          for (let dx = -1; dx <= 1; dx++) {
+            for (let dz = -1; dz <= 1; dz++) {
+              if (VoxelWorld.isSolid(ix + dx, Math.floor(bodyY), iz + dz)) return null;
+              if (VoxelWorld.isSolid(ix + dx, Math.floor(bodyY + 1), iz + dz)) return null;
+            }
+          }
+
+          // Reject roofed/interior spots: require clear headroom and open sky immediately above.
+          for (let dy = 2; dy <= 6; dy++) {
+            if (VoxelWorld.isSolid(ix, Math.floor(bodyY + dy), iz)) return null;
+          }
+
+          // Reject tight positions that put geometry directly in the camera's near field.
+          for (let dx = -2; dx <= 2; dx++) {
+            for (let dz = -2; dz <= 2; dz++) {
+              if (Math.abs(dx) + Math.abs(dz) < 2) continue;
+              if (VoxelWorld.isSolid(ix + dx, Math.floor(bodyY + 1), iz + dz)) return null;
+            }
+          }
+
+          return { y: bodyY };
+        }
+
+        function pathIsClear(fromX, fromZ, toX, toZ) {
+          const dx = toX - fromX;
+          const dz = toZ - fromZ;
+          const steps = Math.max(2, Math.ceil(Math.sqrt(dx * dx + dz * dz)));
+          for (let step = 1; step <= steps; step++) {
+            const t = step / steps;
+            const px = fromX + dx * t;
+            const pz = fromZ + dz * t;
+            if (!isOutdoorCell(px, pz)) return false;
+          }
+          return true;
+        }
+
         function movePlayerSafely(targetX, targetZ) {
           if (typeof VoxelWorld === 'undefined' || !VoxelWorld.getTerrainHeight || !VoxelWorld.isSolid) return false;
 
@@ -237,17 +279,20 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
             { x: targetX, z: targetZ - 2 },
             { x: targetX + 2, z: targetZ + 2 },
             { x: targetX - 2, z: targetZ + 2 },
+            { x: targetX + 3, z: targetZ - 1 },
+            { x: targetX - 3, z: targetZ - 1 },
+            { x: targetX + 1, z: targetZ + 3 },
+            { x: targetX - 1, z: targetZ + 3 },
           ];
 
           for (let i = 0; i < samples.length; i++) {
             const sample = samples[i];
-            const groundY = VoxelWorld.getTerrainHeight(sample.x, sample.z);
-            const bodyY = groundY + 1.7;
-            if (VoxelWorld.isSolid(Math.round(sample.x), Math.floor(bodyY), Math.round(sample.z))) continue;
-            if (VoxelWorld.isSolid(Math.round(sample.x), Math.floor(bodyY + 1), Math.round(sample.z))) continue;
+            const outdoor = isOutdoorCell(sample.x, sample.z);
+            if (!outdoor) continue;
+            if (!pathIsClear(pos.x, pos.z, sample.x, sample.z)) continue;
             pos.x = sample.x;
             pos.z = sample.z;
-            pos.y = bodyY;
+            pos.y = outdoor.y;
             return true;
           }
           return false;
@@ -273,7 +318,7 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
             const factor = step / dist;
             movePlayerSafely(pos.x + dx * factor, pos.z + dz * factor);
           } else {
-            movePlayerSafely(pos.x + (Math.random() - 0.5) * 4, pos.z + (Math.random() - 0.5) * 4);
+            movePlayerSafely(pos.x + (Math.random() - 0.5) * 3, pos.z + (Math.random() - 0.5) * 3);
           }
           const aimDx = ep.x - pos.x;
           const aimDy = (ep.y + 1.0) - pos.y;
@@ -282,7 +327,7 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
           CameraSystem.setYaw(Math.atan2(-aimDx, -aimDz));
           CameraSystem.setPitch(Math.atan2(aimDy, hDist));
         } else {
-          movePlayerSafely(pos.x + (Math.random() - 0.5) * 6, pos.z + (Math.random() - 0.5) * 6);
+          movePlayerSafely(pos.x + (Math.random() - 0.5) * 4, pos.z + (Math.random() - 0.5) * 4);
         }
         if (typeof Weapons !== 'undefined' && Weapons.switchTo) {
           Weapons.switchTo(wIdx);
