@@ -5,6 +5,36 @@ const THEMES = {
     heightScale: 1.0,
     surfaceBlock: typeof BLOCK !== 'undefined' ? BLOCK.GRASS : 2,
     subBlock: typeof BLOCK !== 'undefined' ? BLOCK.DIRT : 1
+  },
+  urban: {
+    fogColor: 0x8F877C,
+    heightScale: 0.65,
+    surfaceBlock: typeof BLOCK !== 'undefined' ? BLOCK.CONCRETE : 9,
+    subBlock: typeof BLOCK !== 'undefined' ? BLOCK.BRICK : 10
+  },
+  industrial: {
+    fogColor: 0x5D626B,
+    heightScale: 0.55,
+    surfaceBlock: typeof BLOCK !== 'undefined' ? BLOCK.ASPHALT : 18,
+    subBlock: typeof BLOCK !== 'undefined' ? BLOCK.METAL : 5
+  },
+  coastal: {
+    fogColor: 0x87B4D8,
+    heightScale: 0.8,
+    surfaceBlock: typeof BLOCK !== 'undefined' ? BLOCK.SAND : 7,
+    subBlock: typeof BLOCK !== 'undefined' ? BLOCK.DIRT : 1
+  },
+  wasteland: {
+    fogColor: 0x807255,
+    heightScale: 0.9,
+    surfaceBlock: typeof BLOCK !== 'undefined' ? BLOCK.DIRT : 1,
+    subBlock: typeof BLOCK !== 'undefined' ? BLOCK.STONE : 3
+  },
+  cityscape: {
+    fogColor: 0x6E727A,
+    heightScale: 0.45,
+    surfaceBlock: typeof BLOCK !== 'undefined' ? BLOCK.CONCRETE : 9,
+    subBlock: typeof BLOCK !== 'undefined' ? BLOCK.STONE : 3
   }
 };
 // Ensure window.BLOCK and window.VoxelWorld are always defined before any code runs (robust for QA/headless)
@@ -20,23 +50,6 @@ const WORLD_CHUNKS = typeof window !== 'undefined' ? window.WORLD_CHUNKS : 32;
 const CHUNK_SIZE = typeof window !== 'undefined' ? window.CHUNK_SIZE : 32;
 const CHUNK_HEIGHT = typeof window !== 'undefined' ? window.CHUNK_HEIGHT : 64;
 const BLOCK_SIZE = typeof window !== 'undefined' ? window.BLOCK_SIZE : 1;
-// Robust global VoxelWorld shims for QA/headless/test harness.
-// Some legacy bootstrap code still expects these methods as globals before the IIFE export is complete.
-const setBlock = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.setBlock === 'function') ? window.VoxelWorld.setBlock(...args) : undefined;
-const getBlock = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.getBlock === 'function') ? window.VoxelWorld.getBlock(...args) : undefined;
-const getTerrainHeight = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.getTerrainHeight === 'function') ? window.VoxelWorld.getTerrainHeight(...args) : 0;
-const raycastBlock = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.raycastBlock === 'function') ? window.VoxelWorld.raycastBlock(...args) : undefined;
-const updateDirtyChunks = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.updateDirtyChunks === 'function') ? window.VoxelWorld.updateDirtyChunks(...args) : undefined;
-const rebuildAll = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.rebuildAll === 'function') ? window.VoxelWorld.rebuildAll(...args) : undefined;
-const scatterResources = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.scatterResources === 'function') ? window.VoxelWorld.scatterResources(...args) : undefined;
-const worldToChunk = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.worldToChunk === 'function') ? window.VoxelWorld.worldToChunk(...args) : undefined;
-const getLevelDef = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.getLevelDef === 'function') ? window.VoxelWorld.getLevelDef(...args) : undefined;
-const generateLevel = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.generateLevel === 'function') ? window.VoxelWorld.generateLevel(...args) : undefined;
-const getRoadWaypoints = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.getRoadWaypoints === 'function') ? window.VoxelWorld.getRoadWaypoints(...args) : [];
-const spawnVehicle = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.spawnVehicle === 'function') ? window.VoxelWorld.spawnVehicle(...args) : undefined;
-const updateVehicles = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.updateVehicles === 'function') ? window.VoxelWorld.updateVehicles(...args) : undefined;
-const getActiveVehicles = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.getActiveVehicles === 'function') ? window.VoxelWorld.getActiveVehicles(...args) : [];
-const clearVehicles = (...args) => (typeof window !== 'undefined' && window.VoxelWorld && typeof window.VoxelWorld.clearVehicles === 'function') ? window.VoxelWorld.clearVehicles(...args) : undefined;
 // (Removed: window.BLOCK export here; handled at end of file)
   function generateRoundabout(ox, oz, radius) {
     // Draw a circular asphalt road
@@ -136,6 +149,65 @@ window.VoxelWorld = (function () {
   });
   if (typeof window !== 'undefined') window.BLOCK = BLOCK;
 
+  const chunks = new Map();
+
+  function chunkKey(cx, cz) {
+    return cx + ',' + cz;
+  }
+
+  function blockIndex(lx, ly, lz) {
+    return ly * CHUNK_SIZE * CHUNK_SIZE + lz * CHUNK_SIZE + lx;
+  }
+
+  function worldToChunk(wx, wz) {
+    const cx = Math.floor(wx / CHUNK_SIZE);
+    const cz = Math.floor(wz / CHUNK_SIZE);
+    const lx = ((wx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    const lz = ((wz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    return { cx, cz, lx, lz };
+  }
+
+  function getChunk(cx, cz) {
+    return chunks.get(chunkKey(cx, cz)) || null;
+  }
+
+  function createChunk(cx, cz) {
+    const chunk = {
+      cx: cx,
+      cz: cz,
+      data: new Uint8Array(CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE),
+      mesh: null,
+      waterMesh: null,
+      dirty: true,
+    };
+    chunks.set(chunkKey(cx, cz), chunk);
+    return chunk;
+  }
+
+  function getBlock(wx, wy, wz) {
+    const iy = Math.floor(wy);
+    if (iy < 0 || iy >= CHUNK_HEIGHT) return BLOCK.AIR;
+    const world = worldToChunk(Math.floor(wx), Math.floor(wz));
+    const chunk = getChunk(world.cx, world.cz);
+    if (!chunk) return BLOCK.AIR;
+    return chunk.data[blockIndex(world.lx, iy, world.lz)] || BLOCK.AIR;
+  }
+
+  function setBlock(wx, wy, wz, type) {
+    const iy = Math.floor(wy);
+    if (iy < 0 || iy >= CHUNK_HEIGHT) return false;
+    const world = worldToChunk(Math.floor(wx), Math.floor(wz));
+    let chunk = getChunk(world.cx, world.cz);
+    if (!chunk) chunk = createChunk(world.cx, world.cz);
+    chunk.data[blockIndex(world.lx, iy, world.lz)] = type;
+    chunk.dirty = true;
+    if (world.lx === 0) markDirty(world.cx - 1, world.cz);
+    if (world.lx === CHUNK_SIZE - 1) markDirty(world.cx + 1, world.cz);
+    if (world.lz === 0) markDirty(world.cx, world.cz - 1);
+    if (world.lz === CHUNK_SIZE - 1) markDirty(world.cx, world.cz + 1);
+    return true;
+  }
+
   // --- Collision helpers (hoisted for closure order) ---
   function isSolid(wx, wy, wz) {
     const b = getBlock(Math.floor(wx), Math.floor(wy), Math.floor(wz));
@@ -215,21 +287,81 @@ window.VoxelWorld = (function () {
   // Each vehicle is an object: { type, pos: {x,y,z}, dir, speed, waypointIdx }
   let _activeVehicles = [];
   function spawnVehicle(type, startPos, dir, speed) {
-    // (Vehicle spawning logic can be added here)
+    const vehicle = {
+      type: type || 'truck',
+      pos: startPos ? { x: startPos.x || 0, y: startPos.y || 0, z: startPos.z || 0 } : { x: 0, y: 0, z: 0 },
+      dir: dir || 0,
+      speed: speed || 0,
+      waypointIdx: 0
+    };
+    _activeVehicles.push(vehicle);
+    return vehicle;
   }
   // Expose global no-op for test harness
   if (typeof window !== 'undefined') window.spawnVehicle = spawnVehicle;
 
-  // --- FIX: Add missing updateVehicles stub to prevent crash ---
   function updateVehicles(dt) {
+    const delta = Number.isFinite(dt) ? dt : 0;
+    if (!delta || _activeVehicles.length === 0) return;
+    for (const vehicle of _activeVehicles) {
+      vehicle.pos.x += Math.cos(vehicle.dir) * vehicle.speed * delta;
+      vehicle.pos.z += Math.sin(vehicle.dir) * vehicle.speed * delta;
+    }
+  }
 
-    // No-op stub for now. Implement vehicle AI/physics here if needed.
-    // This prevents runtime crash from missing API.
-    return;
+  function getActiveVehicles() {
+    return _activeVehicles.slice();
+  }
+
+  function clearVehicles() {
+    _activeVehicles.length = 0;
   }
 
   // Moved BLOCK_COLORS inside IIFE
   const BLOCK_COLORS = {
+    [BLOCK.DIRT]:       0x7A5A3A,
+    [BLOCK.GRASS]:      0x005BBB,
+    [BLOCK.STONE]:      0x7F7F86,
+    [BLOCK.WOOD]:       0x8B5A2B,
+    [BLOCK.METAL]:      0x6F7C85,
+    [BLOCK.ELECTRONICS]:0x3A5F8C,
+    [BLOCK.SAND]:       0xC9B27C,
+    [BLOCK.WATER]:      0x3D7FB3,
+    [BLOCK.CONCRETE]:   0xA4A7AC,
+    [BLOCK.BRICK]:      0xA54B3F,
+    [BLOCK.GLASS]:      0xA9D8E8,
+    [BLOCK.FUEL_BARREL]:0xB2472F,
+    [BLOCK.CRATE]:      0x8A6A3C,
+    [BLOCK.REINFORCED]: 0x545B66,
+    [BLOCK.FENCE]:      0x857A6A,
+    [BLOCK.RUBBLE]:     0x6F6256,
+    [BLOCK.SANDBAG]:    0xA89A72,
+    [BLOCK.ASPHALT]:    0x34363A,
+    [BLOCK.ROOFTILE]:   0x78433B,
+    [BLOCK.PLASTER]:    0xD7D2C8,
+    [BLOCK.CARPET]:     0x8A2F2F,
+    [BLOCK.LINOLEUM]:   0x8E8A74,
+    [BLOCK.WALLPAPER]:  0xC7C19E,
+    [BLOCK.CERAMIC]:    0xD9DDD8,
+    [BLOCK.SHINGLE]:    0x4D535C,
+    [BLOCK.BUSH]:       0x0057A0,
+    [BLOCK.LIGHT]:      0xFFE8A3,
+    [BLOCK.CAR]:        0x2C4B7C,
+    [BLOCK.DOOR]:       0x6B4627,
+    [BLOCK.LADDER]:     0x8D6B3F,
+    [BLOCK.LAMPPOST]:   0x4F545B,
+    [BLOCK.STREETLIGHT]:0xD6C26E,
+    [BLOCK.BENCH]:      0x7B5632,
+    [BLOCK.SIGN]:       0xC8C39B,
+    [BLOCK.BRIDGE]:     0x70757D,
+    [BLOCK.TUNNEL]:     0x595146,
+    [BLOCK.FIRE]:       0xFF6A00,
+    [BLOCK.FLAG]:       0x2F65C7,
+    [BLOCK.BANNER]:     0xB33A3A,
+    [BLOCK.LOOT_CRATE]: 0x9A793A,
+    [BLOCK.ROOFTOP_HATCH]: 0x5A6068,
+    [BLOCK.BREAKABLE_FENCE]: 0x9B8A6E,
+    [BLOCK.ZIPLINE]:    0xC8B45A,
     [BLOCK.TRUCK]:      0x444444,  // dark gray truck
     [BLOCK.BUS]:        0xFFD700,  // yellow bus
     [BLOCK.SHOP_SIGN]:  0xFFD700,  // yellow shop sign
@@ -547,7 +679,7 @@ window.VoxelWorld = (function () {
 
   // Theme setter/getter
   function setTheme(themeName) {
-    _theme = THEMES[themeName] || THEMES.grassland;
+    _theme = Object.assign({ seed: 0 }, THEMES[themeName] || THEMES.grassland);
   }
   function getTheme() { return _theme; }
 
@@ -742,7 +874,6 @@ window.VoxelWorld = (function () {
 
 
     if (vertCount === 0 && wVertCount === 0) { chunk.dirty = false; return; }
-  if (vertCount === 0 && wVertCount === 0) { chunk.dirty = false; return undefined; }
 
     // Solid terrain mesh
     if (vertCount > 0) {
@@ -781,6 +912,8 @@ window.VoxelWorld = (function () {
         depthWrite: false,
         side: THREE.DoubleSide
       });
+      const wMesh = new THREE.Mesh(wGeo, wMat);
+      wMesh.position.set(ox * BLOCK_SIZE, 0, oz * BLOCK_SIZE);
       if (scene) scene.add(wMesh);
       else console.warn('[VoxelWorld] Skipped water mesh add: scene is null', wMesh);
       chunk.waterMesh = wMesh;
@@ -794,6 +927,7 @@ window.VoxelWorld = (function () {
   const HALF = Math.floor(WORLD_CHUNKS / 2);
 
   function init(scene) {
+    _scene = scene || null;
     chunks.clear();
 
     // Generate terrain chunks
@@ -806,10 +940,8 @@ window.VoxelWorld = (function () {
 
     // Build all meshes
     rebuildAll();
-  }
-
-    // Optionally: trigger random city event at start
     if (Math.random() < 0.2) triggerCityEvent('fire');
+  }
 
   function regenerate() {
     // Remove all existing chunk meshes
@@ -828,6 +960,7 @@ window.VoxelWorld = (function () {
       }
     }
     chunks.clear();
+    _roadWaypoints.length = 0;
 
     // Regenerate with current theme
     for (let cx = -HALF; cx < HALF; cx++) {
@@ -835,6 +968,7 @@ window.VoxelWorld = (function () {
         const chunk = createChunk(cx, cz);
         generateChunkTerrain(chunk);
       }
+    }
     rebuildAll();
   }
 
@@ -847,9 +981,6 @@ window.VoxelWorld = (function () {
 
   let _rebuildBudget = 4; // max chunks to rebuild per frame
   function updateDirtyChunks() {
-    // Trace all invocations for debugging
-    console.log('[VoxelWorld] updateDirtyChunks invoked', new Error().stack);
-    // Defensive: always define count, even if called out of context
     let count = 0;
     if (typeof chunks !== 'object' || !chunks.values) {
       console.warn('[VoxelWorld] updateDirtyChunks called with invalid context:', this);
@@ -928,17 +1059,17 @@ window.VoxelWorld = (function () {
 
   /* ── Level Definitions ────────────────────────────────────────────── */
   const LEVELS = [
-    { id: 'HOSTOMEL',  name: 'Hostomel Airport',    desc: 'Stop the airborne assault',  theme: 'grassland', wavesPerLevel: 7, difficulty: 1.0, fogColor: 0x4a5a3a },
+    { id: 'HOSTOMEL',  name: 'Hostomel Airport',    desc: 'Stop the airborne assault',  theme: 'grassland', wavesPerLevel: 7, difficulty: 1.0, fogColor: 0xD4A017, spawnCandidates: [{ x: 0, z: -12 }, { x: -10, z: -10 }, { x: 10, z: -10 }, { x: 0, z: -6 }] },
     { id: 'AVDIIVKA',  name: 'Avdiivka Industrial Zone', desc: 'Hold the coking plant',  theme: 'urban',     wavesPerLevel: 7, difficulty: 1.3, fogColor: 0x3a3028 },
     { id: 'BAKHMUT',   name: 'Bakhmut Ruins',        desc: 'Defend the city',             theme: 'urban',     wavesPerLevel: 7, difficulty: 1.6, fogColor: 0x2a2a2a },
-    { id: 'KHERSON',   name: 'Kherson Bridgehead',   desc: 'Cross the Dnipro',            theme: 'grassland', wavesPerLevel: 7, difficulty: 1.9, fogColor: 0x4a5a3a },
+    { id: 'KHERSON',   name: 'Kherson Bridgehead',   desc: 'Cross the Dnipro',            theme: 'grassland', wavesPerLevel: 7, difficulty: 1.9, fogColor: 0xD4A017 },
     { id: 'MARIUPOL',  name: 'Mariupol Steelworks',  desc: 'Fight through Azovstal',      theme: 'industrial', wavesPerLevel: 7, difficulty: 2.2, fogColor: 0x1a1a20 },
     { id: 'CRIMEA',    name: 'Crimea Bridge',        desc: 'Cut the supply line',         theme: 'coastal',   wavesPerLevel: 7, difficulty: 2.5, fogColor: 0x5577aa },
     { id: 'CHORNOBYL', name: 'Chornobyl Zone',       desc: 'Irradiated exclusion zone',   theme: 'wasteland', wavesPerLevel: 7, difficulty: 2.8, fogColor: 0x3a3520 },
     { id: 'MOSCOW',    name: 'Moscow Finale',        desc: 'End it at the Kremlin',       theme: 'cityscape', wavesPerLevel: 9, difficulty: 3.5, fogColor: 0x222228 },
     { id: 'SEVASTOPOL', name: 'Sevastopol Naval Base', desc: 'Destroy the Black Sea Fleet', theme: 'coastal',  wavesPerLevel: 7, difficulty: 3.8, fogColor: 0x3355aa },
     { id: 'DONBAS',    name: 'Donbas Final Push',     desc: 'Liberate the last stronghold', theme: 'urban',   wavesPerLevel: 8, difficulty: 4.2, fogColor: 0x2a2020 },
-    { id: 'BELGOROD',  name: 'Belgorod Offensive',    desc: 'Cross into enemy territory',   theme: 'grassland', wavesPerLevel: 8, difficulty: 4.6, fogColor: 0x3a4a2a },
+    { id: 'BELGOROD',  name: 'Belgorod Offensive',    desc: 'Cross into enemy territory',   theme: 'grassland', wavesPerLevel: 8, difficulty: 4.6, fogColor: 0xD4A017 },
     { id: 'KREMLIN',   name: 'Kremlin Showdown',      desc: 'The final battle for peace',   theme: 'cityscape', wavesPerLevel: 10, difficulty: 5.0, fogColor: 0x111118 },
   ];
 
@@ -1223,6 +1354,71 @@ window.VoxelWorld = (function () {
   /* ── Road Generation System ─────────────────────────────────────── */
   // Stores road waypoints for vehicle AI to follow
   const _roadWaypoints = [];
+  let _levelSpawnPoint = { x: 0, y: 0, z: 0 };
+
+  function isSpawnAreaClear(x, z, groundY) {
+    const baseY = Math.floor(groundY) + 1;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        if (isSolid(x + dx, baseY, z + dz) || isSolid(x + dx, baseY + 1, z + dz)) {
+          return false;
+        }
+      }
+    }
+    return !isSolid(x, baseY + 2, z);
+  }
+
+  function scoreSpawnCandidate(x, z, originX, originZ) {
+    const centerH = getTerrainHeight(x, z);
+    let variance = 0;
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        variance += Math.abs(getTerrainHeight(x + dx, z + dz) - centerH);
+      }
+    }
+    const distPenalty = Math.abs(x - originX) + Math.abs(z - originZ);
+    return variance + distPenalty * 0.15;
+  }
+
+  function resolveLevelSpawnPoint(level) {
+    const preferred = level && Array.isArray(level.spawnCandidates) ? level.spawnCandidates : [];
+    const fallback = [
+      { x: 0, z: 0 },
+      { x: 0, z: 8 },
+      { x: 8, z: 0 },
+      { x: -8, z: 0 },
+      { x: 0, z: -8 },
+      { x: 16, z: 8 },
+      { x: -16, z: 8 },
+      { x: 12, z: -12 },
+      { x: -12, z: -12 },
+    ];
+    const candidates = preferred.concat(fallback);
+    const anchor = candidates[0] || { x: 0, z: 0 };
+    let best = null;
+    let bestScore = Infinity;
+
+    for (let i = 0; i < candidates.length; i++) {
+      const candidate = candidates[i];
+      const groundY = getTerrainHeight(candidate.x, candidate.z);
+      if (!isSpawnAreaClear(candidate.x, candidate.z, groundY)) continue;
+
+      const score = scoreSpawnCandidate(candidate.x, candidate.z, anchor.x, anchor.z);
+      if (score < bestScore) {
+        bestScore = score;
+        best = { x: candidate.x, y: groundY, z: candidate.z };
+      }
+    }
+
+    if (best) return best;
+
+    const fallbackGround = getTerrainHeight(0, 0);
+    return { x: 0, y: fallbackGround, z: 0 };
+  }
+
+  function getSpawnPoint() {
+    return { x: _levelSpawnPoint.x, y: _levelSpawnPoint.y, z: _levelSpawnPoint.z };
+  }
 
   /**
    * Generate an asphalt road between two points using Bresenham-style line with width.
@@ -1839,6 +2035,8 @@ window.VoxelWorld = (function () {
   }
 
   // IDEA 16: Bridge fortifications
+  function generateBridgeFortification(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
     // Flag (blue + yellow blocks) - Ukrainian colors
     // Blue stripe (top)
     setBlock(ox + 1, surfH + 7, oz, BLOCK.WATER);
@@ -3038,17 +3236,13 @@ window.VoxelWorld = (function () {
     setTheme(level.theme);
     _theme.seed = index * 3137;
 
-    // Clear and regenerate base terrain
-    for (const chunk of chunks.values()) {
-      if (chunk.mesh && _scene) {
-        _scene.remove(chunk.mesh);
-        chunk.mesh.geometry.dispose();
-        chunk.mesh.material.dispose();
-        rebuildAll();
-        return level;
-      }
+    regenerate();
+    if (level.id === 'HOSTOMEL') {
+      generateHostomelAirport(0, 0);
+      rebuildAll();
     }
-    // ... rest of generateLevel ...
+    _levelSpawnPoint = resolveLevelSpawnPoint(level);
+    return level;
   }
 
   function dispose() {
@@ -3073,27 +3267,28 @@ window.VoxelWorld = (function () {
     CHUNK_HEIGHT,
     BLOCK_SIZE,
     THEMES,
-    init,
-    regenerate,
-    dispose,
-    setTheme,
-    getTheme,
-    getBlock,
-    setBlock,
-    getTerrainHeight,
-    raycastBlock,
-    updateDirtyChunks,
-    rebuildAll,
+    init: typeof init === 'function' ? init : function () {},
+    regenerate: typeof regenerate === 'function' ? regenerate : function () {},
+    dispose: typeof dispose === 'function' ? dispose : function () {},
+    setTheme: typeof setTheme === 'function' ? setTheme : function () {},
+    getTheme: typeof getTheme === 'function' ? getTheme : function () { return THEMES.grassland; },
+    getBlock: typeof getBlock === 'function' ? getBlock : function () { return BLOCK.AIR; },
+    setBlock: typeof setBlock === 'function' ? setBlock : function () { return false; },
+    getTerrainHeight: typeof getTerrainHeight === 'function' ? getTerrainHeight : function () { return 0; },
+    raycastBlock: typeof raycastBlock === 'function' ? raycastBlock : function () { return null; },
+    updateDirtyChunks: typeof updateDirtyChunks === 'function' ? updateDirtyChunks : function () {},
+    rebuildAll: typeof rebuildAll === 'function' ? rebuildAll : function () {},
     scatterResources,
     worldToChunk,
     getLevelDef,
-    generateLevel,
+    getSpawnPoint,
+    generateLevel: typeof generateLevel === 'function' ? generateLevel : function () { return null; },
     getRoadWaypoints: function () { return _roadWaypoints.slice(); },
     spawnVehicle,
     updateVehicles,
     getActiveVehicles,
     clearVehicles,
-    isSolid: isSolid
+    isSolid: typeof isSolid === 'function' ? isSolid : function () { return false; }
   };
 
 })();
@@ -3102,7 +3297,7 @@ window.VoxelWorld = (function () {
 // Ensure isSolid is always exported to window, even if VoxelWorld is not yet defined
 if (typeof window !== 'undefined') {
   // If VoxelWorld is defined, use its isSolid; otherwise, fallback to the local isSolid
-  window.isSolid = (window.VoxelWorld && window.VoxelWorld.isSolid) ? window.VoxelWorld.isSolid : isSolid;
+  window.isSolid = (window.VoxelWorld && window.VoxelWorld.isSolid) ? window.VoxelWorld.isSolid : function () { return false; };
 }
 
 

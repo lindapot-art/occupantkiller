@@ -393,6 +393,7 @@ const CameraSystem = (function () {
     getPitch,
     setYaw,
     setPitch,
+    getCamera: function () { return _camera; },
     getForwardDir,
     getMoveDir,
     shake,

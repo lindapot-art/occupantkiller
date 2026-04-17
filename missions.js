@@ -121,6 +121,7 @@ const MissionSystem = (function () {
         return {
           type: MISSION_TYPE.RECON,
           targetPoints: points,
+          scoutedPoints: points.map(function () { return false; }),
           scoutedCount: 0,
           targetCount: 3,
         };
@@ -241,8 +242,10 @@ const MissionSystem = (function () {
   function onDroneScout(position) {
     for (const m of activeMissions) {
       if (m.data.type === MISSION_TYPE.RECON) {
-        for (const pt of m.data.targetPoints) {
-          if (position.distanceTo(pt) < 10) {
+        for (let i = 0; i < m.data.targetPoints.length; i++) {
+          const pt = m.data.targetPoints[i];
+          if (!m.data.scoutedPoints[i] && position.distanceTo(pt) < 10) {
+            m.data.scoutedPoints[i] = true;
             m.data.scoutedCount++;
           }
         }
@@ -281,10 +284,13 @@ const MissionSystem = (function () {
   function checkSideObjective(stats) {
     if (!activeSideObj) return false;
     var passed = activeSideObj.check(stats);
-    if (passed && typeof Economy !== 'undefined' && Economy.addOKC) {
-      Economy.addOKC(activeSideObj.reward);
-    }
-    return passed;
+    if (!passed) return false;
+    return {
+      completed: true,
+      id: activeSideObj.id,
+      name: activeSideObj.name,
+      reward: activeSideObj.reward,
+    };
   }
 
   function getSideObjective() {
@@ -423,6 +429,9 @@ const MissionSystem = (function () {
     if (missionTimerLeft <= 0) {
       missionTimerLeft = 0;
       missionTimerActive = false;
+    }
+    if (typeof MissionTypes !== 'undefined' && MissionTypes.getActive && MissionTypes.getActive()) {
+      return;
     }
     if (typeof HUD !== 'undefined' && HUD.showTimer) {
       HUD.showTimer(missionTimerLeft);

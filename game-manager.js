@@ -32,13 +32,22 @@ const GameManager = (function () {
   var _waveStartTimer = null;
   var _hudSlowTimer = 0; // throttle slow HUD updates (dailies, bounties, prestige)
   var _musicIntTimer = 0; // throttle music intensity calc
+  var _escapeHTML = (typeof window !== 'undefined' && window.Feedback && window.Feedback.escapeHTML)
+    ? window.Feedback.escapeHTML
+    : function (str) {
+        return String(str).replace(/[&<>"']/g, function (c) {
+          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+        });
+      };
   var _buildMatHud = null; // cached DOM ref for build materials HUD
   var _buildMatList = null;
+  var _buildMatHtml = '';
   // Cached per-frame HUD indicator DOM refs
   var _domLean = null, _domInspect = null, _domBayonet = null;
   var _domHeatBar = null, _domOverheat = null, _domMaint = null;
   var _domSwim = null, _domBreathContainer = null, _domBreathBar = null;
   var _domMantle = null;
+  var _enemyDroneWarnCooldown = 0;
 
   /* ── Player State ────────────────────────────────────────────────── */
   const GOD_MODE_HP = 999999;
@@ -109,6 +118,8 @@ const GameManager = (function () {
   /* ── Wave State ──────────────────────────────────────────────────── */
   let currentWave = 0;
   const SCORE_WAVE_BONUS = 500;
+  let _activeWavePlan = null;
+  let _wavePlanReminderTimer = null;
 
   /* ── Stamina Config ──────────────────────────────────────────────── */
   const STAMINA_DRAIN_RATE = 0.15;  // per second while sprinting
@@ -129,6 +140,213 @@ const GameManager = (function () {
     { id: 'EMP',            label: '⚡ EMP BLAST!',             color: '#4400ff', chance: 0.04 },
     { id: 'TUNNEL_BREACH',  label: '🕳 TUNNEL BREACH!',        color: '#884400', chance: 0.06 },
   ];
+
+  const WAVE_PLAN_TEMPLATES = {
+    INFANTRY_PUSH: {
+      id: 'INFANTRY_PUSH',
+      name: 'INFANTRY PUSH',
+      briefing: 'Rifle squads and engineers are massing for a frontal rush.',
+      objectiveText: 'Break the first push before it collapses your line.',
+      rewardText: 'Discipline bonus: accuracy 35%+',
+      color: '#88ff88',
+      enemyPool: ['CONSCRIPT', 'CONSCRIPT', 'STORMER', 'ENGINEER', 'OFFICER'],
+      initialTypes: ['STORMER', 'ENGINEER'],
+      groupDelta: 1,
+      extraMultiplier: 0.95,
+      spawnIntervalMultiplier: 1.05,
+      missionType: 'CAPTURE_ZONE',
+      pickupTypes: ['AMMO', 'AMMO', 'MEDKIT'],
+      bonusLabel: 'HOLD THE LINE',
+      bonusScore: 150,
+      bonusOKC: 20,
+      bonusCheck: function (stats) { return stats.accuracy >= 0.35; },
+    },
+    MORTAR_LOCKDOWN: {
+      id: 'MORTAR_LOCKDOWN',
+      name: 'MORTAR LOCKDOWN',
+      briefing: 'Indirect fire pins the field while spotters call the range.',
+      objectiveText: 'Stay mobile and erase the mortar crews quickly.',
+      rewardText: 'Counter-battery bonus: take 40 damage or less',
+      color: '#ff9966',
+      enemyPool: ['MORTAR', 'CONSCRIPT', 'HEAVY_SNIPER', 'STORMER'],
+      initialTypes: ['MORTAR'],
+      groupDelta: -1,
+      extraMultiplier: 0.85,
+      spawnIntervalMultiplier: 0.9,
+      missionType: 'ASSASSINATION',
+      pickupTypes: ['ARMOR', 'AMMO', 'MEDKIT'],
+      bonusLabel: 'COUNTER-BATTERY',
+      bonusScore: 200,
+      bonusOKC: 25,
+      bonusCheck: function (stats) { return stats.damageTaken <= 40; },
+    },
+    DRONE_HUNT: {
+      id: 'DRONE_HUNT',
+      name: 'DRONE HUNT',
+      briefing: 'EW crews are coordinating FPV strikes over the battlefield.',
+      objectiveText: 'Prioritize drone crews before the swarm builds.',
+      rewardText: 'Intercept bonus: finish with 2+ headshots',
+      color: '#ff66bb',
+      enemyPool: ['EW_OPERATOR', 'SPETSNAZ', 'STORMER', 'CONSCRIPT'],
+      initialTypes: ['EW_OPERATOR'],
+      extraMultiplier: 0.9,
+      spawnIntervalMultiplier: 0.95,
+      extraDroneWaves: 1,
+      pickupTypes: ['AMMO', 'STIM', 'MEDKIT'],
+      bonusLabel: 'DRONE INTERCEPT',
+      bonusScore: 175,
+      bonusOKC: 25,
+      bonusCheck: function (stats) { return stats.headshots >= 2; },
+    },
+    ARMOR_BREACH: {
+      id: 'ARMOR_BREACH',
+      name: 'ARMOR BREACH',
+      briefing: 'Mechanized armor is probing for a breakthrough.',
+      objectiveText: 'Crack the heavy units first, then clean up the escort.',
+      rewardText: 'Breach bonus: accuracy 25%+ and damage under 80',
+      color: '#ff5555',
+      enemyPool: ['ARMORED', 'BTR', 'CONSCRIPT', 'THERMOBARIC', 'ENGINEER'],
+      initialTypes: ['ARMORED'],
+      groupDelta: -1,
+      extraMultiplier: 0.8,
+      spawnIntervalMultiplier: 1.0,
+      forceArmor: true,
+      missionType: 'DEMOLITION',
+      pickupTypes: ['ARMOR', 'AMMO', 'GRENADE'],
+      bonusLabel: 'ARMOR BREACH',
+      bonusScore: 225,
+      bonusOKC: 30,
+      bonusCheck: function (stats) { return stats.accuracy >= 0.25 && stats.damageTaken <= 80; },
+    },
+    COUNTER_SNIPERS: {
+      id: 'COUNTER_SNIPERS',
+      name: 'COUNTER-SNIPERS',
+      briefing: 'Long sightlines are covered by elite marksmen and escorts.',
+      objectiveText: 'Pick the marksmen fast before they bleed your armor away.',
+      rewardText: 'Marksman bonus: clear inside 90 seconds',
+      color: '#66ccff',
+      enemyPool: ['HEAVY_SNIPER', 'SNIPER', 'SPETSNAZ', 'CONSCRIPT'],
+      initialTypes: ['HEAVY_SNIPER'],
+      groupDelta: -1,
+      extraMultiplier: 0.85,
+      spawnIntervalMultiplier: 1.1,
+      missionType: 'ASSASSINATION',
+      pickupTypes: ['AMMO', 'STIM', 'SHIELD'],
+      bonusLabel: 'COUNTER-SNIPER',
+      bonusScore: 175,
+      bonusOKC: 20,
+      bonusCheck: function (stats) { return stats.time <= 90; },
+    },
+    BREACH_AND_CLEAR: {
+      id: 'BREACH_AND_CLEAR',
+      name: 'BREACH AND CLEAR',
+      briefing: 'Shock troops are stacking for a close-range breach.',
+      objectiveText: 'Survive the breach, then punish the second wave of entries.',
+      rewardText: 'Breach bonus: finish with 8+ kills inside 75 seconds',
+      color: '#ffaa44',
+      enemyPool: ['STORMER', 'ARMORED', 'KADYROVITE', 'WAGNER', 'THERMOBARIC'],
+      initialTypes: ['STORMER', 'STORMER'],
+      groupDelta: 1,
+      extraMultiplier: 1.1,
+      spawnIntervalMultiplier: 0.95,
+      missionType: 'RESCUE',
+      pickupTypes: ['MEDKIT', 'ARMOR', 'GRENADE'],
+      bonusLabel: 'ROOM CLEAR',
+      bonusScore: 200,
+      bonusOKC: 25,
+      bonusCheck: function (stats) { return stats.kills >= 8 && stats.time <= 75; },
+    },
+  };
+
+  const STAGE_WAVE_PLAN_ROTATIONS = {
+    1:  ['INFANTRY_PUSH', 'MORTAR_LOCKDOWN', 'DRONE_HUNT'],
+    2:  ['INFANTRY_PUSH', 'COUNTER_SNIPERS', 'ARMOR_BREACH'],
+    3:  ['BREACH_AND_CLEAR', 'MORTAR_LOCKDOWN', 'COUNTER_SNIPERS'],
+    4:  ['COUNTER_SNIPERS', 'INFANTRY_PUSH', 'DRONE_HUNT'],
+    5:  ['BREACH_AND_CLEAR', 'ARMOR_BREACH', 'MORTAR_LOCKDOWN'],
+    6:  ['COUNTER_SNIPERS', 'ARMOR_BREACH', 'DRONE_HUNT'],
+    7:  ['MORTAR_LOCKDOWN', 'COUNTER_SNIPERS', 'DRONE_HUNT'],
+    8:  ['COUNTER_SNIPERS', 'DRONE_HUNT', 'ARMOR_BREACH'],
+    9:  ['MORTAR_LOCKDOWN', 'DRONE_HUNT', 'ARMOR_BREACH'],
+    10: ['BREACH_AND_CLEAR', 'MORTAR_LOCKDOWN', 'ARMOR_BREACH'],
+    11: ['ARMOR_BREACH', 'COUNTER_SNIPERS', 'DRONE_HUNT'],
+    12: ['DRONE_HUNT', 'ARMOR_BREACH', 'BREACH_AND_CLEAR'],
+  };
+
+  function pickRandom(list) {
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  function spawnPlanPickups(types, radius) {
+    if (!types || !types.length || typeof Pickups === 'undefined' || !window.VoxelWorld) return;
+    for (var i = 0; i < types.length; i++) {
+      var angle = (i / types.length) * Math.PI * 2 + Math.random() * 0.4;
+      var dist = 2 + Math.random() * (radius || 4);
+      var px = player.position.x + Math.cos(angle) * dist;
+      var pz = player.position.z + Math.sin(angle) * dist;
+      var py = window.VoxelWorld.getTerrainHeight(px, pz);
+      Pickups.spawn(new THREE.Vector3(px, py, pz), types[i]);
+    }
+  }
+
+  function getWaveBattlePlan(stageDef, waveNum) {
+    var rotation = STAGE_WAVE_PLAN_ROTATIONS[stageDef.id] || ['INFANTRY_PUSH', 'COUNTER_SNIPERS', 'ARMOR_BREACH'];
+    var planId = rotation[(waveNum - 1) % rotation.length];
+    if (waveNum === 1) planId = rotation[0] || 'INFANTRY_PUSH';
+    if (waveNum === stageDef.wavesPerStage) {
+      planId = stageDef.id >= 9 ? 'ARMOR_BREACH' : 'BREACH_AND_CLEAR';
+    }
+    var template = WAVE_PLAN_TEMPLATES[planId] || WAVE_PLAN_TEMPLATES.INFANTRY_PUSH;
+    var plan = Object.assign({}, template);
+    plan.stageId = stageDef.id;
+    plan.stageName = stageDef.name;
+    plan.wave = waveNum;
+    return plan;
+  }
+
+  function scheduleWavePlanReminder(plan) {
+    if (_wavePlanReminderTimer) clearTimeout(_wavePlanReminderTimer);
+    if (!plan || !HUD || !HUD.showObjective) return;
+    _wavePlanReminderTimer = setTimeout(function () {
+      HUD.showObjective(plan.name + ' — ' + plan.objectiveText);
+    }, 7000);
+  }
+
+  function tryStartPlanMission(plan) {
+    if (!plan || !plan.missionType || typeof MissionTypes === 'undefined' || !MissionTypes.TYPES || !MissionTypes.startMission) return false;
+    if (MissionTypes.getActive && MissionTypes.getActive()) return false;
+    var zoneX = player.position.x + (Math.random() - 0.5) * 34;
+    var zoneZ = player.position.z + (Math.random() - 0.5) * 34;
+    if (!MissionTypes.startMission(plan.missionType, zoneX, zoneZ)) return false;
+    HUD.notifyPickup('📍 PLAN OBJECTIVE: ' + MissionTypes.TYPES[plan.missionType].name, '#ffcc00');
+    return true;
+  }
+
+  function getWavePlanStats() {
+    return {
+      kills: player.waveKills || 0,
+      accuracy: player.waveShots > 0 ? (player.waveHits / player.waveShots) : 0,
+      headshots: player.waveHeadshots || 0,
+      damageTaken: Math.round(player.waveDamageTaken || 0),
+      time: Math.round((performance.now() - (player.waveStartTime || performance.now())) / 1000),
+      hpRatio: player.maxHp > 0 ? (player.hp / player.maxHp) : 0,
+    };
+  }
+
+  function applyWavePlanCompletion(plan) {
+    if (!plan || typeof plan.bonusCheck !== 'function') return;
+    var stats = getWavePlanStats();
+    if (!plan.bonusCheck(stats)) return;
+
+    player.score += plan.bonusScore || 0;
+    HUD.setScore(player.score);
+    if (typeof Marketplace !== 'undefined' && Marketplace.addOKC && plan.bonusOKC) {
+      Marketplace.addOKC(plan.bonusOKC);
+      if (HUD.updateOKC) HUD.updateOKC(Marketplace.getOKC());
+    }
+    spawnPlanPickups(plan.pickupTypes, 5);
+    HUD.notifyPickup('★ ' + plan.bonusLabel + ' +' + (plan.bonusScore || 0), plan.color || '#ffdd44');
+  }
 
   function triggerBattlefieldEvent() {
     const roll = Math.random();
@@ -412,11 +630,11 @@ const GameManager = (function () {
       theme:        'grassland',
       wavesPerStage: 7,
       difficulty:   0.8,
-      fogColor:     0x4a5a3a,
-      bgColor:      0x4a5a3a,
-      sunColor:     0xff8833,
-      sunIntensity: 0.85,
-      exposure:     0.9,
+      fogColor:     0xD4A017,
+      bgColor:      0xFFD500,
+      sunColor:     0xFFEE44,
+      sunIntensity: 1.1,
+      exposure:     1.0,
       description:  'Stop the airborne assault at Hostomel Airport.',
     },
     {
@@ -451,11 +669,11 @@ const GameManager = (function () {
       theme:        'grassland',
       wavesPerStage: 7,
       difficulty:   1.8,
-      fogColor:     0x4a5a3a,
-      bgColor:      0x4a5a3a,
-      sunColor:     0xffcc55,
-      sunIntensity: 0.9,
-      exposure:     0.9,
+      fogColor:     0xD4A017,
+      bgColor:      0xFFD500,
+      sunColor:     0xFFEE44,
+      sunIntensity: 1.0,
+      exposure:     1.0,
       description:  'Cross the Dnipro at Kherson. Liberate the bridgehead.',
     },
     {
@@ -542,11 +760,11 @@ const GameManager = (function () {
       theme:        'grassland',
       wavesPerStage: 8,
       difficulty:   4.6,
-      fogColor:     0x3a4a2a,
-      bgColor:      0x3a4a2a,
-      sunColor:     0xffaa44,
-      sunIntensity: 0.75,
-      exposure:     0.85,
+      fogColor:     0xD4A017,
+      bgColor:      0xFFD500,
+      sunColor:     0xFFEE44,
+      sunIntensity: 0.9,
+      exposure:     0.95,
       description:  'Cross into enemy territory. Take the fight to them.',
     },
     {
@@ -794,9 +1012,12 @@ const GameManager = (function () {
       }, 10000);
     });
 
+    resetPlayerPresentationState();
+
     // Set player spawn on terrain
-    const spawnH = window.VoxelWorld.getTerrainHeight(0, 0);
-    player.position.set(0, spawnH + player.height, 0);
+    var initSpawn = getPlayerSpawnPosition();
+    player.position.set(initSpawn.x, initSpawn.y, initSpawn.z);
+    orientCameraForStageSpawn(currentStage, initSpawn);
 
     // Spawn organized assault groups (4 squads of 4-5 armed NPCs)
     NPCSystem.spawnAssaultGroups();
@@ -832,6 +1053,8 @@ const GameManager = (function () {
 
     // Handle resize
     window.addEventListener('resize', onResize);
+
+    ensureUpdateLoopRunning();
 
     return { scene: _scene, camera: _camera, renderer: _renderer };
   }
@@ -1620,6 +1843,7 @@ const GameManager = (function () {
 
   function hideOverlays() {
     document.querySelectorAll('.overlay').forEach(function (el) { el.style.display = 'none'; });
+    if (typeof HUD !== 'undefined' && HUD.hideWaveSummary) HUD.hideWaveSummary();
   }
 
   /* ── Start Game ──────────────────────────────────────────────────── */
@@ -1701,11 +1925,14 @@ const GameManager = (function () {
       Progression.refreshDailies();
     }
 
+    resetPlayerPresentationState();
+
     // Apply first stage
     applyStage(0);
 
-    const spawnH = window.VoxelWorld.getTerrainHeight(0, 0);
-    player.position.set(0, spawnH + player.height, 0);
+    var startSpawn = getPlayerSpawnPosition();
+    player.position.set(startSpawn.x, startSpawn.y, startSpawn.z);
+    orientCameraForStageSpawn(currentStage, startSpawn);
 
     Weapons.reset();
     if (player.godMode) {
@@ -1777,6 +2004,60 @@ const GameManager = (function () {
   }
 
   /* ── Stage Management ───────────────────────────────────────────── */
+  function resetPlayerPresentationState() {
+    player.prone = false;
+    player.isCrouching = false;
+    player.inCover = false;
+    player.slideTimer = 0;
+    player.slideDir = null;
+    player.sprinting = false;
+    player.onGround = false;
+    player.height = 1.7;
+
+    if (typeof HUD !== 'undefined' && HUD.showProne) HUD.showProne(false);
+
+    if (window.CameraSystem) {
+      if (window.CameraSystem.setMode && window.CameraSystem.MODE) {
+        window.CameraSystem.setMode(window.CameraSystem.MODE.FIRST_PERSON);
+      }
+      if (window.CameraSystem.setVehicleTarget) window.CameraSystem.setVehicleTarget(null);
+      if (window.CameraSystem.setDroneTarget) window.CameraSystem.setDroneTarget(null);
+      if (window.CameraSystem.setStrafeDir) window.CameraSystem.setStrafeDir(0);
+      if (window.CameraSystem.setYaw) window.CameraSystem.setYaw(0);
+      if (window.CameraSystem.setPitch) window.CameraSystem.setPitch(0);
+    }
+  }
+
+  function getPlayerSpawnPosition() {
+    var spawn = (window.VoxelWorld && window.VoxelWorld.getSpawnPoint) ? window.VoxelWorld.getSpawnPoint() : null;
+    if (!spawn || !isFinite(spawn.x) || !isFinite(spawn.y) || !isFinite(spawn.z)) {
+      var fallbackH = window.VoxelWorld.getTerrainHeight(0, 0);
+      spawn = { x: 0, y: fallbackH, z: 0 };
+    }
+    return {
+      x: spawn.x,
+      y: spawn.y + player.height + 0.15,
+      z: spawn.z,
+    };
+  }
+
+  function orientCameraForStageSpawn(stageIndex, spawnPos) {
+    if (!window.CameraSystem || !window.CameraSystem.setYaw || !window.CameraSystem.setPitch) return;
+
+    var lookTarget = { x: spawnPos.x, z: spawnPos.z + 24 };
+    var pitch = 0;
+    var stageDef = STAGES[stageIndex];
+    if (stageDef && stageDef.id === 'HOSTOMEL') {
+      lookTarget = { x: spawnPos.x - 2, z: spawnPos.z + 34 };
+      pitch = -0.1;
+    }
+
+    var dx = lookTarget.x - spawnPos.x;
+    var dz = lookTarget.z - spawnPos.z;
+    window.CameraSystem.setYaw(Math.atan2(-dx, -dz));
+    window.CameraSystem.setPitch(pitch);
+  }
+
   function applyStage(stageIndex) {
     const stageDef = STAGES[stageIndex];
 
@@ -1876,10 +2157,13 @@ const GameManager = (function () {
     player.hp = Math.min(player.maxHp, player.hp + Math.ceil(missingHp * 0.5));
     HUD.setHealth(player.hp, player.maxHp);
 
+    resetPlayerPresentationState();
+
     // Reset player position on new terrain
-    const spawnH = VoxelWorld.getTerrainHeight(0, 0);
-    player.position.set(0, spawnH + player.height, 0);
+    var nextStageSpawn = getPlayerSpawnPosition();
+    player.position.set(nextStageSpawn.x, nextStageSpawn.y, nextStageSpawn.z);
     player.velocity.set(0, 0, 0);
+    orientCameraForStageSpawn(currentStage, nextStageSpawn);
 
     // Clear enemies, pickups, and module state from old stage
     Enemies.clear();
@@ -1952,6 +2236,10 @@ const GameManager = (function () {
     player.waveStartTime = performance.now();
     const stageDef = STAGES[currentStage];
     const mlDiff = MLSystem.getDifficultyMult();
+    _activeWavePlan = getWaveBattlePlan(stageDef, w);
+
+    if (HUD.hideWaveSummary) HUD.hideWaveSummary();
+    if (HUD.hideObjective) HUD.hideObjective();
 
     // AI Smart Learning: classify combat style each wave and pass counter-strategy
     MLSystem.classifyCombatStyle();
@@ -1963,10 +2251,14 @@ const GameManager = (function () {
     }
 
     // Pass AI strategy to enemies for adaptive behavior
-    Enemies.startWave(w, _scene, stageDef.difficulty * mlDiff, aiStrategy, stageDef.id);
+    Enemies.startWave(w, _scene, stageDef.difficulty * mlDiff, aiStrategy, stageDef.id, _activeWavePlan);
     window.AudioSystem.playWaveStart();
     HUD.setWave(w, stageDef.wavesPerStage);
-    HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage);
+    HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage, _activeWavePlan);
+    if (HUD.showObjective && _activeWavePlan && _activeWavePlan.objectiveText) {
+      HUD.showObjective(_activeWavePlan.objectiveText);
+    }
+    scheduleWavePlanReminder(_activeWavePlan);
     if (typeof Feedback !== 'undefined' && Feedback.radioChatter) Feedback.radioChatter('wave_start');
 
     // ═══ Stage Boss on final wave ═══
@@ -2027,7 +2319,7 @@ const GameManager = (function () {
     }
 
     // Spawn enemy vehicles on later waves (Russian armored assault)
-    if (w >= 3) {
+    if (w >= 3 && (!_activeWavePlan || _activeWavePlan.forceArmor || _activeWavePlan.id === 'ARMOR_BREACH')) {
       var enemySpawnAngle = Math.random() * Math.PI * 2;
       var enemySpawnDist = 35 + Math.random() * 10;
       var evx = Math.cos(enemySpawnAngle) * enemySpawnDist;
@@ -2036,7 +2328,7 @@ const GameManager = (function () {
       VehicleSystem.spawnEnemy(evx, evy, evz, 'combat');
       HUD.notifyPickup('⚠ ENEMY ARMOR SPOTTED!', '#ff4444');
     }
-    if (w >= 5) {
+    if (w >= 5 && (!_activeWavePlan || _activeWavePlan.forceArmor || _activeWavePlan.id === 'ARMOR_BREACH')) {
       var evAngle2 = Math.random() * Math.PI * 2;
       var evDist2 = 30 + Math.random() * 10;
       var evx2 = Math.cos(evAngle2) * evDist2;
@@ -2050,13 +2342,14 @@ const GameManager = (function () {
       var droneSpawnH = 20 + Math.random() * 10;
       var droneAngle = Math.random() * Math.PI * 2;
       var droneDist = 30 + Math.random() * 15;
+      var extraDroneWaves = _activeWavePlan && _activeWavePlan.extraDroneWaves ? _activeWavePlan.extraDroneWaves : 0;
       
       // FPV drone
       var fpvX = player.position.x + Math.cos(droneAngle) * droneDist;
       var fpvZ = player.position.z + Math.sin(droneAngle) * droneDist;
       DroneSystem.spawnEnemyDrone(fpvX, droneSpawnH, fpvZ, 'enemy_fpv');
       
-      if (w >= 4) {
+      if (w >= 4 || extraDroneWaves > 0) {
         // Bomber drone
         var bomberAngle = droneAngle + Math.PI * 0.5;
         var bomberX = player.position.x + Math.cos(bomberAngle) * droneDist;
@@ -2070,9 +2363,9 @@ const GameManager = (function () {
         DroneSystem.spawnEnemyDrone(fpv2X, droneSpawnH, fpv2Z, 'enemy_fpv');
       }
       
-      if (w >= 6) {
+      if (w >= 6 || extraDroneWaves > 0) {
         // Additional bombers and FPVs
-        for (var ei = 0; ei < 2; ei++) {
+        for (var ei = 0; ei < 2 + extraDroneWaves; ei++) {
           var extraAngle = Math.random() * Math.PI * 2;
           var exX = player.position.x + Math.cos(extraAngle) * (droneDist + 10);
           var exZ = player.position.z + Math.sin(extraAngle) * (droneDist + 10);
@@ -2090,14 +2383,14 @@ const GameManager = (function () {
       Progression.trackStat('wavesCleared', 0); // track at begin; increment at complete
     }
     // Spawn a random mission type every 3 waves
-    if (w % 3 === 0 && typeof MissionTypes !== 'undefined') {
+    if (!tryStartPlanMission(_activeWavePlan) && w % 3 === 0 && typeof MissionTypes !== 'undefined') {
       var mTypes = Object.keys(MissionTypes.TYPES);
       var mType = mTypes[Math.floor(Math.random() * mTypes.length)];
       MissionTypes.startMission(mType, player.position.x + (Math.random() - 0.5) * 40, player.position.z + (Math.random() - 0.5) * 40);
       HUD.notifyPickup('📍 NEW MISSION: ' + MissionTypes.TYPES[mType].name, '#ffcc00');
     }
     // Spawn supply airdrop every 4 waves
-    if (w % 4 === 0 && typeof WorldFeatures !== 'undefined') {
+    if ((w % 4 === 0 || (_activeWavePlan && _activeWavePlan.id === 'ARMOR_BREACH')) && typeof WorldFeatures !== 'undefined') {
       var adX = player.position.x + (Math.random() - 0.5) * 30;
       var adZ = player.position.z + (Math.random() - 0.5) * 30;
       var adY = VoxelWorld.getTerrainHeight(adX, adZ);
@@ -2106,7 +2399,9 @@ const GameManager = (function () {
     }
     // Place enemy landmines on later waves
     if (w >= 4 && typeof WorldFeatures !== 'undefined') {
-      for (var lmi = 0; lmi < Math.min(w, 8); lmi++) {
+      var mineCount = Math.min(w, 8);
+      if (_activeWavePlan && _activeWavePlan.id === 'BREACH_AND_CLEAR') mineCount += 2;
+      for (var lmi = 0; lmi < mineCount; lmi++) {
         var lmAngle = Math.random() * Math.PI * 2;
         var lmDist = 10 + Math.random() * 20;
         var lmX = player.position.x + Math.cos(lmAngle) * lmDist;
@@ -2116,7 +2411,7 @@ const GameManager = (function () {
       }
     }
     // Spawn radiation zones on wave 6+
-    if (w === 6 && typeof WorldFeatures !== 'undefined') {
+    if ((w === 6 || (_activeWavePlan && _activeWavePlan.id === 'MORTAR_LOCKDOWN' && w >= 5)) && typeof WorldFeatures !== 'undefined') {
       WorldFeatures.addRadiationZone(player.position.x + 30, player.position.z + 30, 8);
       HUD.notifyPickup('☢ RADIATION ZONE DETECTED!', '#00ff00');
     }
@@ -2127,6 +2422,8 @@ const GameManager = (function () {
   }
 
   function onWaveComplete() {
+    if (_wavePlanReminderTimer) clearTimeout(_wavePlanReminderTimer);
+    if (HUD.hideObjective) HUD.hideObjective();
     player.score += SCORE_WAVE_BONUS;
     HUD.setScore(player.score);
     MLSystem.onWaveComplete(currentWave, currentStage, player.hp / player.maxHp);
@@ -2155,18 +2452,7 @@ const GameManager = (function () {
       });
     }
 
-    // Show last wave summary overlay (NEW FEATURE)
-    if (typeof HUD !== 'undefined' && HUD.showWaveSummary) {
-      var elapsedSec = Math.round((performance.now() - player.waveStartTime) / 1000);
-      HUD.showWaveSummary({
-        wave: currentWave,
-        kills: player.waveKills,
-        score: player.score,
-        headshots: player.waveHeadshots,
-        damageTaken: Math.round(player.waveDamageTaken),
-        time: elapsedSec
-      });
-    }
+    applyWavePlanCompletion(_activeWavePlan);
     // Play-to-Earn: OKC for wave clear
     if (typeof Marketplace !== 'undefined') {
       Marketplace.onWaveClear();
@@ -2359,7 +2645,7 @@ const GameManager = (function () {
     document.getElementById('waveclear-num').textContent = currentWave;
     document.getElementById('waveclear-total').textContent = stageDef.wavesPerStage;
     document.getElementById('waveclear-stage-info').textContent =
-      'Stage ' + stageDef.id + ': ' + stageDef.name;
+      'Stage ' + stageDef.id + ': ' + stageDef.name + (_activeWavePlan ? ' · ' + _activeWavePlan.name : '');
 
     // Populate wave shop stats
     var shopKills = document.getElementById('shop-kills');
@@ -2914,7 +3200,7 @@ const GameManager = (function () {
         if (isHeadshot) Progression.updateBounty('headshot_wave', 1);
         Progression.updateBounty('damage', dmg);
         for (var cbi = 0; cbi < completedBounties.length; cbi++) {
-          HUD.notifyPickup('💰 BOUNTY COMPLETE! +' + escapeHTML(completedBounties[cbi].reward) + ' OKC', '#ffaa00');
+          HUD.notifyPickup('💰 BOUNTY COMPLETE! +' + _escapeHTML(completedBounties[cbi].reward) + ' OKC', '#ffaa00');
           if (typeof Marketplace !== 'undefined') Marketplace.addOKC(completedBounties[cbi].reward);
           if (typeof AudioSystem !== 'undefined' && AudioSystem.playBountyComplete) AudioSystem.playBountyComplete();
         }
@@ -3311,6 +3597,14 @@ const GameManager = (function () {
   var _fpsSamples = 0;
   var _perfCheckTimer = 0;
   var _qualityReduced = false;
+  var _updateLoopStarted = false;
+
+  function ensureUpdateLoopRunning() {
+    if (_updateLoopStarted) return;
+    _updateLoopStarted = true;
+    prevTime = performance.now();
+    update();
+  }
 
   function update() {
     requestAnimationFrame(update);
@@ -3557,16 +3851,21 @@ const GameManager = (function () {
           if (matList) {
             var mats = player.buildMaterials;
             var eco = Economy.getResources();
-            matList.innerHTML =
+            var buildMatHtml =
               '🪵 Wood: ' + ((mats.wood || 0) + (eco.wood || 0)) + '<br>' +
               '🪨 Stone: ' + ((mats.stone || 0) + (eco.stone || 0)) + '<br>' +
               '🔩 Metal: ' + ((mats.metal || 0) + (eco.metal || 0)) + '<br>' +
               '🟫 Dirt: ' + (mats.dirt || 0) + '<br>' +
               '🏖 Sand: ' + (mats.sand || 0) + '<br>' +
               '🧱 Brick: ' + (mats.brick || 0);
+            if (_buildMatHtml !== buildMatHtml) {
+              matList.innerHTML = buildMatHtml;
+              _buildMatHtml = buildMatHtml;
+            }
           }
         } else {
           _buildMatHud.style.display = 'none';
+          _buildMatHtml = '';
         }
       }
 
@@ -3762,14 +4061,16 @@ const GameManager = (function () {
       }
 
       // Enemy drone proximity warning
+      if (_enemyDroneWarnCooldown > 0) _enemyDroneWarnCooldown -= delta;
       if (typeof DroneSystem !== 'undefined' && DroneSystem.getAll) {
         var allDrones = DroneSystem.getAll();
         for (var di = 0; di < allDrones.length; di++) {
           var dr = allDrones[di];
-          if (dr.faction === 'enemy' && dr.alive !== false && dr.position) {
+          if (dr.faction === 'russian' && dr.alive !== false && dr.position) {
             var ddist = player.position.distanceTo(dr.position);
-            if (ddist < 20) {
+            if (ddist < 20 && _enemyDroneWarnCooldown <= 0) {
               HUD.notifyPickup('⚠ ENEMY DRONE NEARBY!', '#ff4488');
+              _enemyDroneWarnCooldown = 3;
               break;
             }
           }
@@ -4098,9 +4399,8 @@ const GameManager = (function () {
               mTracker.style.display = 'block';
               var mTitle = document.getElementById('mission-tracker-title');
               if (mTitle) mTitle.textContent = '📍 ' + (MissionTypes.getActive() ? MissionTypes.getActive().config.name : 'MISSION');
-              var mTimer = document.getElementById('mission-tracker-timer');
-              if (mTimer && missionResult.timeRemaining !== undefined) {
-                mTimer.textContent = '⏱ ' + Math.ceil(missionResult.timeRemaining) + 's';
+              if (typeof HUD !== 'undefined' && HUD.showTimer && missionResult.timeRemaining !== undefined) {
+                HUD.showTimer(missionResult.timeRemaining);
               }
             } else if (missionResult.state === 'COMPLETE') {
               var reward = MissionTypes.completeMission();
@@ -4152,7 +4452,7 @@ const GameManager = (function () {
                 var d = dailies[di2];
                 var pct = Math.min(100, Math.round((d.progress / d.target) * 100));
                 var color = d.completed ? '#44ff44' : '#ccc';
-                dHTML += '<div style="color:' + color + '">' + (d.completed ? '✅' : '⬜') + ' ' + d.name + ': ' + d.progress + '/' + d.target + ' (' + pct + '%)</div>';
+                dHTML += '<div style="color:' + color + '">' + (d.completed ? '✅' : '⬜') + ' ' + _escapeHTML(d.name) + ': ' + _escapeHTML(d.progress) + '/' + _escapeHTML(d.target) + ' (' + _escapeHTML(pct) + '%)</div>';
               }
               dailyList.innerHTML = dHTML;
             }
@@ -4172,7 +4472,7 @@ const GameManager = (function () {
                 var b = bounties[bi2];
                 var bpct = Math.min(100, Math.round((b.progress / b.target) * 100));
                 var bcolor = b.completed ? '#44ff44' : '#ffaa00';
-                bHTML += '<div style="color:' + bcolor + '">' + (b.completed ? '✅' : '💰') + ' ' + b.name + ': ' + b.progress + '/' + b.target + ' (+' + b.reward + ' OKC)</div>';
+                bHTML += '<div style="color:' + bcolor + '">' + (b.completed ? '✅' : '💰') + ' ' + _escapeHTML(b.name) + ': ' + _escapeHTML(b.progress) + '/' + _escapeHTML(b.target) + ' (+' + _escapeHTML(b.reward) + ' OKC)</div>';
               }
               bountyList.innerHTML = bHTML;
             }
@@ -4920,8 +5220,22 @@ const GameManager = (function () {
       if (equipped[i]) {
         slot.style.display = 'block';
         slot.textContent = equipped[i].icon + ' ' + equipped[i].name;
+        slot.style.cursor = (typeof equipped[i].effect === 'function') ? 'pointer' : 'default';
+        slot.onclick = (function (perk) {
+          return function () {
+            if (!perk || typeof Perks.activatePerk !== 'function') return;
+            var activated = Perks.activatePerk(perk.id);
+            if (activated) {
+              HUD.notifyPickup(perk.icon + ' ' + perk.name + ' ACTIVATED!', '#44aaff');
+            } else if (typeof perk.effect === 'function') {
+              HUD.notifyPickup('⏳ ' + perk.name + ' cooling down', '#ffaa44');
+            }
+          };
+        })(equipped[i]);
       } else {
         slot.style.display = 'none';
+        slot.style.cursor = 'default';
+        slot.onclick = null;
       }
     }
   }
@@ -5151,8 +5465,13 @@ const GameManager = (function () {
           var hudEl = document.getElementById('hud');
           if (hudEl) hudEl.style.display = 'block';
           gameState = STATE.PLAYING;
-          if (typeof GameManager.startGame === 'function') GameManager.startGame();
-          if (typeof GameManager.beginWave === 'function') GameManager.beginWave(1);
+          if (typeof GameManager.startGame === 'function') {
+            GameManager.startGame();
+            if (_waveStartTimer) clearTimeout(_waveStartTimer);
+            _waveStartTimer = setTimeout(function () {
+              beginWave(1);
+            }, 150);
+          }
           if (typeof HUD !== 'undefined' && HUD.show) HUD.show();
         } catch (e) {
           if (typeof console !== 'undefined') console.error('forceStartGame error:', e);

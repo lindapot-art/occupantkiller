@@ -8,6 +8,7 @@ const DroneSystem = (function () {
   // Reusable temp vectors for possessed drone update (avoids per-frame alloc)
   var _dTmpFwd = new THREE.Vector3();
   var _dTmpRight = new THREE.Vector3();
+  var _fallbackPlayerPos = new THREE.Vector3(0, 5, 0);
 
   const DRONE_TYPE = Object.freeze({
     RECON:        'recon',
@@ -40,6 +41,9 @@ const DroneSystem = (function () {
   let nextId = 1;
   let _possessedDrone = null;
   var _explosionIntervals = [];
+  var _activeExplosions = [];
+  var _droneCacheDirty = true;
+  var _cacheStamp = 1;
 
   /* ── Create Drone Mesh ───────────────────────────────────────────── */
   function addRussianFlag(group) {
@@ -132,6 +136,12 @@ const DroneSystem = (function () {
     drones.length = 0;
     nextId = 1;
     _possessedDrone = null;
+    _invalidateDroneCaches();
+  }
+
+  function _invalidateDroneCaches() {
+    _droneCacheDirty = true;
+    _cacheStamp++;
   }
 
   /* ── Spawn Drone ─────────────────────────────────────────────────── */
@@ -171,6 +181,7 @@ const DroneSystem = (function () {
 
     if (_scene) _scene.add(drone.mesh);
     drones.push(drone);
+    _invalidateDroneCaches();
     return drone;
   }
 
@@ -190,7 +201,10 @@ const DroneSystem = (function () {
   function release() {
     if (_possessedDrone) {
       _possessedDrone = null;
-      if (typeof CameraSystem !== 'undefined') CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
+      if (typeof CameraSystem !== 'undefined') {
+        if (CameraSystem.setDroneTarget) CameraSystem.setDroneTarget(null);
+        CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
+      }
     }
   }
 
@@ -209,7 +223,7 @@ const DroneSystem = (function () {
     // Get player position from GameManager
     var gm = (typeof GameManager !== 'undefined') ? GameManager : null;
     var _p = gm && gm.getPlayer ? gm.getPlayer() : null;
-    var playerPos = _p && _p.position ? _p.position : new THREE.Vector3(0, 5, 0);
+    var playerPos = _p && _p.position ? _p.position : _fallbackPlayerPos;
 
     var dx = playerPos.x - drone.position.x;
     var dz = playerPos.z - drone.position.z;
@@ -243,15 +257,13 @@ const DroneSystem = (function () {
           var bombX = drone.position.x;
           var bombZ = drone.position.z;
           var bombY = (typeof window.VoxelWorld !== 'undefined') ? window.VoxelWorld.getTerrainHeight(bombX, bombZ) : 0;
-          if (typeof Enemies !== 'undefined' && Enemies.damageInRadius) {
-            // Damage player via GameManager
-            var bombPos = new THREE.Vector3(bombX, bombY, bombZ);
-            var distToPlayer = bombPos.distanceTo(playerPos);
-            if (distToPlayer < 6 && gm) {
-              var dmg = Math.max(1, Math.floor(drone.damage * (1 - distToPlayer / 6)));
-              var p = gm.getPlayer();
-              if (p && !p.godMode) p.hp -= dmg;
-            }
+          // Damage player via GameManager
+          var bombPos = new THREE.Vector3(bombX, bombY, bombZ);
+          var distToPlayer = bombPos.distanceTo(playerPos);
+          if (distToPlayer < 6 && gm) {
+            var dmg = Math.max(1, Math.floor(drone.damage * (1 - distToPlayer / 6)));
+            var p = gm.getPlayer();
+            if (p && !p.godMode) p.hp -= dmg;
           }
           // Terrain destruction
           if (typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.setBlock) {
@@ -272,9 +284,7 @@ const DroneSystem = (function () {
       var targetY = playerPos.y + 1;
       var dy = targetY - drone.position.y;
       var dist3D = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
       if (dist3D > 2) {
-        // Approach phase - dive toward player
         var speed = drone.speed;
         drone.velocity.x = (dx / dist3D) * speed;
         drone.velocity.y = (dy / dist3D) * speed;
@@ -362,6 +372,10 @@ const DroneSystem = (function () {
       // Update mesh
       drone.mesh.position.copy(drone.position);
 
+      if (drone.type === DRONE_TYPE.RECON && typeof MissionSystem !== 'undefined' && MissionSystem.onDroneScout) {
+        MissionSystem.onDroneScout(drone.position);
+      }
+
       // Rotor animation
       drone.mesh.children.forEach(child => {
         if (child.userData.isRotor) {
@@ -441,6 +455,24 @@ const DroneSystem = (function () {
     return true;
   }
 
+  function callRecon() {
+    var gm = (typeof GameManager !== 'undefined') ? GameManager : null;
+    var player = gm && gm.getPlayer ? gm.getPlayer() : null;
+    var pos = player && player.position ? player.position : null;
+    if (!pos) return false;
+
+    var startY = pos.y + 18;
+    var recon = spawn(pos.x, startY, pos.z, DRONE_TYPE.RECON);
+    var patrolHeight = startY;
+    setPatrol(recon.id, [
+      new THREE.Vector3(pos.x + 20, patrolHeight, pos.z + 20),
+      new THREE.Vector3(pos.x - 20, patrolHeight, pos.z + 20),
+      new THREE.Vector3(pos.x - 20, patrolHeight, pos.z - 20),
+      new THREE.Vector3(pos.x + 20, patrolHeight, pos.z - 20),
+    ]);
+    return recon.id;
+  }
+
   function dropPayload(droneId) {
     const drone = drones.find(d => d.id === droneId);
     if (!drone || !drone.hasPayload) return false;
@@ -483,6 +515,7 @@ const DroneSystem = (function () {
     const flash = new THREE.Mesh(flashGeo, flashMat);
     flash.position.copy(pos);
     _scene.add(flash);
+    var explosion = { mesh: flash, geometry: flashGeo, material: flashMat, interval: null };
     let t = 0.3;
     const fadeInterval = setInterval(function () {
       t -= 0.016;
@@ -495,9 +528,13 @@ const DroneSystem = (function () {
         clearInterval(fadeInterval);
         var idx = _explosionIntervals.indexOf(fadeInterval);
         if (idx >= 0) _explosionIntervals.splice(idx, 1);
+        idx = _activeExplosions.indexOf(explosion);
+        if (idx >= 0) _activeExplosions.splice(idx, 1);
       }
     }, 16);
+    explosion.interval = fadeInterval;
     _explosionIntervals.push(fadeInterval);
+    _activeExplosions.push(explosion);
   }
 
   function setPatrol(droneId, points) {
@@ -528,31 +565,59 @@ const DroneSystem = (function () {
       });
       if (_scene) _scene.remove(drone.mesh);
     }
+    _droneCacheDirty = true;
   }
 
   /* ── Queries ─────────────────────────────────────────────────────── */
   var _droneAliveCache = [];
-  var _droneCacheFrame = -1;
+  var _activeDroneCache = [];
+  var _enemyDroneCache = [];
+  var _friendlyDroneCache = [];
+  var _typeDroneCache = Object.create(null);
+  var _cachedFrame = -1;
+
   function _rebuildDroneCache() {
-    var f = performance.now();
-    if (f === _droneCacheFrame) return;
-    _droneCacheFrame = f;
+    if (!_droneCacheDirty && _cachedFrame === _cacheStamp) return;
     _droneAliveCache.length = 0;
-    for (var i = 0; i < drones.length; i++) {
-      if (drones[i].alive) _droneAliveCache.push(drones[i]);
+    _activeDroneCache.length = 0;
+    _enemyDroneCache.length = 0;
+    _friendlyDroneCache.length = 0;
+    _typeDroneCache = Object.create(null);
+    for (var i = drones.length - 1; i >= 0; i--) {
+      if (!drones[i].alive) {
+        drones.splice(i, 1);
+        continue;
+      }
+      var drone = drones[i];
+      _droneAliveCache.unshift(drone);
+      if (drone.active) _activeDroneCache.unshift(drone);
+      if (drone.faction === 'russian') _enemyDroneCache.unshift(drone);
+      if (drone.faction === 'ukrainian') _friendlyDroneCache.unshift(drone);
+      if (!_typeDroneCache[drone.type]) _typeDroneCache[drone.type] = [];
+      _typeDroneCache[drone.type].unshift(drone);
     }
+    _droneCacheDirty = false;
+    _cachedFrame = _cacheStamp;
   }
   function getAll()        { _rebuildDroneCache(); return _droneAliveCache; }
-  function getActive()     { return drones.filter(d => d.alive && d.active); }
+  function getActive()     { _rebuildDroneCache(); return _activeDroneCache; }
   function getById(id)     { return drones.find(d => d.id === id && d.alive); }
-  function getByType(type) { return drones.filter(d => d.alive && d.type === type); }
+  function getByType(type) { _rebuildDroneCache(); return _typeDroneCache[type] || []; }
 
   function clear() {
+    if (_possessedDrone) release();
     // Clear any active explosion fade intervals
     for (var ei = 0; ei < _explosionIntervals.length; ei++) {
       clearInterval(_explosionIntervals[ei]);
     }
     _explosionIntervals.length = 0;
+    for (var ai = 0; ai < _activeExplosions.length; ai++) {
+      var explosion = _activeExplosions[ai];
+      if (_scene && explosion.mesh) _scene.remove(explosion.mesh);
+      if (explosion.geometry) explosion.geometry.dispose();
+      if (explosion.material) explosion.material.dispose();
+    }
+    _activeExplosions.length = 0;
     for (const drone of drones) {
       if (drone.mesh) {
         drone.mesh.traverse(function (child) {
@@ -564,6 +629,7 @@ const DroneSystem = (function () {
     }
     drones.length = 0;
     _possessedDrone = null;
+    _invalidateDroneCaches();
   }
 
   /* ── Drone Swarm ─────────────────────────────────────────────────── */
@@ -648,7 +714,8 @@ const DroneSystem = (function () {
   }
 
   function getEnemyDronesList() {
-    return _enemyDrones.filter(function (d) { return d.alive; });
+    _rebuildDroneCache();
+    return _enemyDroneCache;
   }
 
   /* ── Drone Upgrades ──────────────────────────────────────────────── */
@@ -701,6 +768,7 @@ const DroneSystem = (function () {
     setDroneKey,
     update,
     markTarget,
+    callRecon,
     dropPayload,
     fireAttack,
     setPatrol,
@@ -710,8 +778,8 @@ const DroneSystem = (function () {
     getActive,
     getById,
     getByType,
-    getEnemyDrones: function() { return drones.filter(function(d) { return d.alive && d.faction === 'russian'; }); },
-    getFriendlyDrones: function() { return drones.filter(function(d) { return d.alive && d.faction === 'ukrainian'; }); },
+    getEnemyDrones: function() { _rebuildDroneCache(); return _enemyDroneCache; },
+    getFriendlyDrones: function() { _rebuildDroneCache(); return _friendlyDroneCache; },
     spawnEnemyDrone,
     clear,
     // Drone Swarm

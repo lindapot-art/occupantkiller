@@ -847,6 +847,16 @@ const Enemies = (() => {
     return 'CONSCRIPT';
   }
 
+  function pickTypeForPlan(w, battlePlan) {
+    if (battlePlan && battlePlan.enemyPool && battlePlan.enemyPool.length > 0) {
+      var pool = battlePlan.enemyPool;
+      var maxIdx = Math.min(pool.length, 2 + Math.floor(w / 2));
+      var picked = pool[Math.floor(Math.random() * Math.max(1, maxIdx))];
+      if (picked && TYPES[picked]) return picked;
+    }
+    return pickTypeForWave(w);
+  }
+
   // ── White «Z» texture for helmet side ─────────────────────
   // Draws a white Z letter on a dark olive canvas
   function makeHelmetZTexture(helmetColorHex) {
@@ -1300,7 +1310,7 @@ const Enemies = (() => {
   // ── Initialise a wave ─────────────────────────────────────
   var _stageId = 1;
 
-  function startWave(w, sc, stageMultiplier, aiStrategy, stageId) {
+  function startWave(w, sc, stageMultiplier, aiStrategy, stageId, battlePlan) {
     wave      = w;
     scene     = sc;
     stageMult = stageMultiplier || 1;
@@ -1322,9 +1332,16 @@ const Enemies = (() => {
     var groupSpread = (_aiStrategy && _aiStrategy.groupSpreadFactor) || 1.0;
 
     // ── Stage-scaled assault group count (more groups in later stages) ──
-    var stageGroupCount = Math.min(8, NUM_ASSAULT_GROUPS + Math.floor((_stageId || 1) / 3));
+    var planGroupDelta = battlePlan && isFinite(battlePlan.groupDelta) ? battlePlan.groupDelta : 0;
+    var stageGroupCount = Math.min(8, Math.max(2, NUM_ASSAULT_GROUPS + Math.floor((_stageId || 1) / 3) + planGroupDelta));
     for (let g = 0; g < stageGroupCount; g++) {
       spawnAssaultGroup(g, sc);
+    }
+
+    if (battlePlan && battlePlan.initialTypes && battlePlan.initialTypes.length) {
+      for (var pi = 0; pi < battlePlan.initialTypes.length; pi++) {
+        spawnOne(battlePlan.initialTypes[pi]);
+      }
     }
 
     // AI Smart Learning: adjust formation spread for all groups
@@ -1338,9 +1355,11 @@ const Enemies = (() => {
     // Stage-scaled: more reinforcements + faster spawn in later stages
     var stageNum = (typeof _stageId === 'number') ? _stageId : 1;
     const baseExtra = 12 + (w - 1) * 5 + stageNum * 2;
-    const extraCount = Math.floor(baseExtra * (1 + (stageMult - 1) * 0.5));
-    spawnQueue  = Array.from({ length: extraCount }, () => pickTypeForWave(w));
-    spawnTimer  = Math.max(3, 8 - stageNum * 0.4) + Math.random() * 4; // faster spawns in later stages
+    var extraMultiplier = battlePlan && isFinite(battlePlan.extraMultiplier) ? battlePlan.extraMultiplier : 1;
+    const extraCount = Math.max(4, Math.floor(baseExtra * (1 + (stageMult - 1) * 0.5) * extraMultiplier));
+    spawnQueue  = Array.from({ length: extraCount }, () => pickTypeForPlan(w, battlePlan));
+    var spawnIntervalMultiplier = battlePlan && isFinite(battlePlan.spawnIntervalMultiplier) ? battlePlan.spawnIntervalMultiplier : 1;
+    spawnTimer  = (Math.max(3, 8 - stageNum * 0.4) + Math.random() * 4) * spawnIntervalMultiplier;
   }
 
   // ── Per-frame update ──────────────────────────────────────
@@ -1946,6 +1965,10 @@ const Enemies = (() => {
               tOrigin.y += 1.2;
               var tDir = _tmpVec3e.set(playerPos.x, playerPos.y + 0.8, playerPos.z).sub(tOrigin).normalize();
               Tracers.spawnTracer(tOrigin, tDir, 0xff4400, 80);
+              // Enemy muzzle flash so player can SEE where shots come from
+              if (Tracers.spawnMuzzleFlash) {
+                Tracers.spawnMuzzleFlash(tOrigin, tDir);
+              }
             }
             // Enemy gunshot audio (spatial panning)
             if (typeof window.AudioSystem !== 'undefined') {

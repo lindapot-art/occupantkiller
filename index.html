@@ -732,17 +732,13 @@
 document.addEventListener('DOMContentLoaded', function () {
 
   'use strict';
-  // Wait for AudioSystem to be fully populated (not just stub)
-  function isRealAudioSystem(obj) {
-    return obj && typeof obj.init === 'function' && typeof obj.playMusic === 'function' && Object.keys(obj).length > 10;
-  }
   function bootWhenReady(attempts) {
-    if (typeof window.GameManager !== 'undefined' && isRealAudioSystem(window.AudioSystem)) {
+    if (typeof window.GameManager !== 'undefined' && typeof window.GameManager.init === 'function') {
       window.GameManager.init();
     } else if ((attempts || 0) < 50) {
       setTimeout(function() { bootWhenReady((attempts||0)+1); }, 20);
     } else {
-      console.error('[BOOT] GameManager or AudioSystem not ready after waiting');
+      console.error('[BOOT] GameManager not ready after waiting');
     }
   }
   bootWhenReady(0);

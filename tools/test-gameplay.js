@@ -226,6 +226,33 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
       try {
         const player = GameManager.getPlayer();
         const pos = player.position;
+        function movePlayerSafely(targetX, targetZ) {
+          if (typeof VoxelWorld === 'undefined' || !VoxelWorld.getTerrainHeight || !VoxelWorld.isSolid) return false;
+
+          const samples = [
+            { x: targetX, z: targetZ },
+            { x: targetX + 2, z: targetZ },
+            { x: targetX - 2, z: targetZ },
+            { x: targetX, z: targetZ + 2 },
+            { x: targetX, z: targetZ - 2 },
+            { x: targetX + 2, z: targetZ + 2 },
+            { x: targetX - 2, z: targetZ + 2 },
+          ];
+
+          for (let i = 0; i < samples.length; i++) {
+            const sample = samples[i];
+            const groundY = VoxelWorld.getTerrainHeight(sample.x, sample.z);
+            const bodyY = groundY + 1.7;
+            if (VoxelWorld.isSolid(Math.round(sample.x), Math.floor(bodyY), Math.round(sample.z))) continue;
+            if (VoxelWorld.isSolid(Math.round(sample.x), Math.floor(bodyY + 1), Math.round(sample.z))) continue;
+            pos.x = sample.x;
+            pos.z = sample.z;
+            pos.y = bodyY;
+            return true;
+          }
+          return false;
+        }
+
         // Find nearest alive enemy
         const all = Enemies.getAll();
         let nearest = null, nearDist = Infinity;
@@ -242,18 +269,11 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
           const dz = ep.z - pos.z;
           const dist = Math.sqrt(dx * dx + dz * dz);
           if (dist > 3.5) {
-            const factor = (dist - 3) / dist;
-            pos.x += dx * factor;
-            pos.z += dz * factor;
+            const step = Math.min(8, Math.max(2.5, dist - 3));
+            const factor = step / dist;
+            movePlayerSafely(pos.x + dx * factor, pos.z + dz * factor);
           } else {
-            pos.x += (Math.random() - 0.5) * 6;
-            pos.z += (Math.random() - 0.5) * 6;
-          }
-          if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
-            const groundY = VoxelWorld.getTerrainHeight(pos.x, pos.z);
-            if (groundY !== undefined && groundY !== null) {
-              pos.y = groundY + 1.7;
-            }
+            movePlayerSafely(pos.x + (Math.random() - 0.5) * 4, pos.z + (Math.random() - 0.5) * 4);
           }
           const aimDx = ep.x - pos.x;
           const aimDy = (ep.y + 1.0) - pos.y;
@@ -262,12 +282,7 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
           CameraSystem.setYaw(Math.atan2(-aimDx, -aimDz));
           CameraSystem.setPitch(Math.atan2(aimDy, hDist));
         } else {
-          pos.x += (Math.random() - 0.5) * 10;
-          pos.z += (Math.random() - 0.5) * 10;
-          if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
-            const groundY = VoxelWorld.getTerrainHeight(pos.x, pos.z);
-            if (groundY !== undefined && groundY !== null) pos.y = groundY + 1.7;
-          }
+          movePlayerSafely(pos.x + (Math.random() - 0.5) * 6, pos.z + (Math.random() - 0.5) * 6);
         }
         if (typeof Weapons !== 'undefined' && Weapons.switchTo) {
           Weapons.switchTo(wIdx);

@@ -363,7 +363,7 @@ function buildCivilianMesh(npc) {
       // Position & movement
       position: new THREE.Vector3(x, y, z),
       target:   null,
-      speed:    2.5,
+      speed:    1.4,
       mesh:     null,
 
       // Job state

@@ -103,6 +103,7 @@ const Perks = (function () {
   let uavActive = false, uavTimer = 0;
   let gunshipActive = false, gunshipTimer = 0;
   let pendingStreaks = [];
+  let activeCooldowns = {};
 
   function reset() {
     equipped = [];
@@ -112,6 +113,7 @@ const Perks = (function () {
     uavActive = false; uavTimer = 0;
     gunshipActive = false; gunshipTimer = 0;
     pendingStreaks = [];
+    activeCooldowns = {};
   }
 
   /* ── Feature 32: Perk System ───────────────── */
@@ -132,6 +134,16 @@ const Perks = (function () {
 
   function hasPerk(perkId) { return equipped.includes(perkId); }
   function getEquipped() { return equipped.map(id => PERK_LIST[id]); }
+
+  function activatePerk(perkId) {
+    if (!hasPerk(perkId)) return false;
+    const perk = PERK_LIST[perkId];
+    if (!perk || typeof perk.effect !== 'function') return false;
+    if ((activeCooldowns[perkId] || 0) > 0) return false;
+    perk.effect();
+    if (perk.cooldown) activeCooldowns[perkId] = perk.cooldown;
+    return perk;
+  }
 
   /* ── Feature 32: Killstreak Rewards ────────── */
   function onKill() {
@@ -241,6 +253,10 @@ const Perks = (function () {
     }
     if (bandageCooldown > 0) bandageCooldown -= dt;
 
+    for (const perkId in activeCooldowns) {
+      activeCooldowns[perkId] = Math.max(0, activeCooldowns[perkId] - dt);
+    }
+
     // Adrenaline
     if (adrenalineActive) {
       adrenalineTimer -= dt;
@@ -268,6 +284,7 @@ const Perks = (function () {
     PERK_LIST, KILLSTREAKS, MAX_PERKS,
     reset, update,
     equipPerk, unequipPerk, hasPerk, getEquipped,
+    activatePerk,
     onKill, resetStreak, getAvailableStreaks, activateStreak,
     useBandage,
     isDeadEyeShot, getDeadEyeMult,

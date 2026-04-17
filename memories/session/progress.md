@@ -1,17 +1,87 @@
 # Session Progress
 
-- Task: Review current changed batch in D:\occupantkiller\occupantkiller and report a proxy QA PASS/FAIL verdict with key findings only
+- Task: Restore gameplay start flow and live render stability in D:\occupantkiller\occupantkiller
 - Status: Complete
-- Plan:
-  - Read checkpoint/task queue and identify changed files for the current batch
-  - Inspect each changed file for syntax, regressions, security, and integration risks
-  - Run proxy QA checks with raw terminal output where required
-  - Deliver concise PASS/FAIL verdict with key findings only
-- Completed:
-  - Changed batch scoped via git status/git diff
-  - Static review completed for gameplay, NPC, HUD, server, audio, weapon, and QA harness changes
-  - Local server health passed: /healthz 200, / 200, tactical-compass present
-  - Changed-file syntax checks passed
-  - tools/test-qa-v2.js passed (21 passed, 0 failed)
-  - tools/test-master.js passed (38 passed, 0 failed)
-  - Blocking finding: tools/test-gameplay.js reached wave progression but did not complete a demonstrated stage advance within proxy QA runtime, so the new stage-progression requirement remains unproven
+- Files changed:
+  - game-manager.js
+  - voxel-world.js
+- Plan completed:
+  - Start the main update loop during initialization so gameplay actually advances after boot
+  - Fix frame-loop crashes from undeclared CombatExtras HUD DOM references
+  - Restore base voxel block colors so terrain no longer falls back to magenta
+  - Re-run live gameplay QA with screenshots every 5 seconds
+- Verified:
+  - Server health passed: /healthz 200
+  - `node --check game-manager.js` passed
+  - `node --check voxel-world.js` passed
+  - `tools/test-gameplay.js http://localhost:3000` passed with `Errors: NONE`
+  - 23 screenshots captured under `tools/screenshots/`
+  - Start menu progressed into live gameplay and remained stable through later screenshots
+- Additional verified follow-up:
+  - Restored missing non-grassland world themes in `voxel-world.js`
+  - Fixed `setTheme()` so direct/theme-only generation always gets a numeric seed
+  - Direct regeneration probe confirmed distinct terrain outputs by theme:
+    - grassland -> top block 2
+    - urban -> top block 9
+    - industrial -> top block 18
+    - coastal -> top block 7
+    - wasteland -> top block 1
+    - cityscape -> top block 9
+  - Full local proxy QA re-run passed after the theme batch:
+    - `tools/test-master.js`: 37 passed, 0 failed, 1 warning
+    - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+    - `tools/test-gameplay.js http://localhost:3000`: 23 screenshots, `Errors: NONE`, final state `playing`, wave 2
+  - Follow-up performance cleanup:
+    - Replaced repeated drone query `filter()` allocations with cache-backed getters in `drone-system.js`
+    - Added cache stamp invalidation so drone lists rebuild only after state mutation
+    - Local QA after the drone cache batch:
+      - `node --check drone-system.js`: passed
+      - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+      - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+  - Spawn-facing and screenshot QA cleanup:
+    - Added a player presentation reset before init/start/stage spawns so crouch, prone, drone, and vehicle camera state cannot leak into a new run
+    - Added stage-spawn camera orientation so Hostomel starts facing the airport instead of empty terrain
+    - Tightened `tools/test-gameplay.js` movement so the QA harness relocates only onto open ground and no longer clips the camera into structure corners
+    - Local QA after the spawn/screenshot batch:
+      - `node --check game-manager.js`: passed
+      - `node --check tools/test-gameplay.js`: passed
+      - `tools/test-gameplay.js http://localhost:3000`: 23 screenshots, `Errors: NONE`, final state `playing`, wave 2, stage 0, score 610, kills 1
+      - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+- Notes:
+  - Camera now follows player correctly during live gameplay
+  - Remaining visual quality issues, if any, are no longer caused by the prior start-loop or HUD ReferenceError failures
+  - Opening Hostomel screenshots now reflect stage content instead of stale camera orientation or harness-only clipping
+
+- Next autonomous task: Batch 9 — Mr. Jopa audit then implementation
+- Status: Complete
+- Immediate objective:
+  - Get a content and retention audit from Mr. Jopa that is grounded in the current browser-shooter scope and recent gameplay QA baseline
+  - Convert the highest-ROI recommendation into a small, shippable gameplay/content batch
+- Batch 9 outcome:
+  - Mr. Jopa audit selected Directed Wave Battle Plans as the highest-ROI improvement for the current game state
+  - Added curated wave-plan selection in `game-manager.js` so each wave now carries a named combat identity, objective text, reward condition, and support profile
+  - Extended `enemies.js` wave startup to honor plan-specific reinforcement pools, initial threat packages, assault-group count tuning, and spawn pacing
+  - Extended `hud.js` wave announcement to show the active battle plan briefing and reward hook
+  - Plan hooks now drive directed mission starts, support pressure emphasis, and on-clear bonuses with pickup bursts
+  - Fixed `forceStartGame()` so QA starts exactly one wave quickly instead of either double-starting or capturing a dead pre-wave frame
+- Verified after Batch 9:
+  - `/healthz`: 200
+  - `node --check game-manager.js`: passed
+  - `node --check enemies.js`: passed
+  - `node --check hud.js`: passed
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+  - `tools/test-gameplay.js http://localhost:3000`: 23 screenshots, `Errors: NONE`, final state `playing`, wave 2, stage 0, score 690, kills 1
+- Follow-up HUD and presentation cleanup:
+  - Added `HUD.hideWaveSummary()` and now dismiss summary UI whenever gameplay resumes so the wave-clear flow no longer stacks a separate summary card over the main overlay
+  - Moved scheduled battle-plan reminders from `HUD.notifyPickup(...)` to the top objective channel so they no longer collide with the lower ammo/HUD region
+  - Removed the extra `HUD.showWaveSummary(...)` call from `onWaveComplete()` because the full wave-clear/shop overlay already covers the same information
+  - Retuned Hostomel presentation by moving preferred spawn points behind the runway and aiming the spawn camera deeper into the airport complex with a slight downward pitch
+- Verified after HUD/presentation cleanup:
+  - `/healthz`: 200
+  - `node --check game-manager.js`: passed
+  - `node --check hud.js`: passed
+  - `node --check voxel-world.js`: passed
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+  - `tools/test-gameplay.js http://localhost:3000`: 23 screenshots, `Errors: NONE`, final states observed across reruns remained `playing`, wave 2

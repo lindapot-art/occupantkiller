@@ -153,30 +153,6 @@ window.AudioSystem = (function () {
     noiseGain.connect(masterGain);
   }
 
-  return {
-    init,
-    resume,
-    playGunshot: wrapAudio(playGunshot, 'playGunshot'),
-    playExplosion: wrapAudio(playExplosion, 'playExplosion'),
-    playFlashbang: wrapAudio(playFlashbang, 'playFlashbang'),
-    playMine: wrapAudio(playMine, 'playMine'),
-    playSmoke: wrapAudio(playSmoke, 'playSmoke'),
-    playSpatialGunshot: wrapAudio(playSpatialGunshot, 'playSpatialGunshot'),
-    playHit: wrapAudio(playHit, 'playHit'),
-    playReload: wrapAudio(playReload, 'playReload'),
-    playPickup: wrapAudio(playPickup, 'playPickup'),
-    playDeath: wrapAudio(playDeath, 'playDeath'),
-    playFootstep: wrapAudio(playFootstep, 'playFootstep'),
-    playLandingThud: wrapAudio(playLandingThud, 'playLandingThud'),
-    playBulletSnap: wrapAudio(playBulletSnap, 'playBulletSnap'),
-    playEnemyFootstep: wrapAudio(playEnemyFootstep, 'playEnemyFootstep'),
-    playRicochet: wrapAudio(playRicochet, 'playRicochet'),
-    playWeaponSwitch: wrapAudio(playWeaponSwitch, 'playWeaponSwitch'),
-    playLowAmmo: wrapAudio(playLowAmmo, 'playLowAmmo'),
-  };
-
-
-
   function playFlashbang() {
     if (!enabled || !ctx) return;
     resume();

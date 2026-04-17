@@ -16,6 +16,12 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [HIGH] Fix Start Screen / Live Render Regression
+Status: DONE
+Requested: 2026-04-17
+Completed: 2026-04-17
+Details: Fixed gameplay boot/update regression that left the camera/render loop inactive after init, declared missing CombatExtras HUD DOM refs that were crashing every frame, restored base voxel block colors to remove magenta fallback terrain, and verified live gameplay with screenshots every 5 seconds. Final gameplay QA: /healthz 200, 23 screenshots captured, Errors: NONE, game reached playing state and advanced to wave 2.
+
 ### [HIGH] Rewrite Gameplay Test — Player Movement + Varied Screenshots
 Status: DONE
 Requested: 2026-04-08
@@ -29,9 +35,16 @@ Completed: 2026-04-08
 Details: Added captureScreenshot() helper, SCREENSHOT_DIR, cleanup logic, and screenshot calls at every 5-second interval during gameplay test. 23 PNGs captured. Windows filename bug fixed. Output currently shows stationary player — movement rewrite pending above.
 
 ### [MEDIUM] Batch 9 — Mr. Jopa Audit Then Implement
-Status: PENDING
+Status: DONE
 Requested: 2026-04-08
-Details: Next content batch after movement rewrite is complete.
+Completed: 2026-04-17
+Details: Ran Mr. Jopa audit, selected Directed Wave Battle Plans as the highest-ROI batch, then implemented plan-aware wave orchestration. Waves now get curated battle-plan identities with plan-specific enemy pools, support pressure, mission hooks, HUD briefings, and completion bonuses. Verified locally: /healthz 200, node --check on game-manager.js/enemies.js/hud.js passed, test-master 38/0/0, test-qa-v2 21/0, gameplay harness PASS with 23 screenshots and 0 errors.
+
+### [MEDIUM] HUD Cleanup + Hostomel Opening Frame Polish
+Status: DONE
+Requested: 2026-04-17
+Completed: 2026-04-17
+Details: Cleaned up post-Batch-9 screenshot issues by removing the duplicate wave-summary card from wave-clear flow, hiding summary UI whenever gameplay resumes, and moving battle-plan reminders onto the top objective channel instead of the bottom pickup toast. Also moved Hostomel spawn candidates farther behind the runway and retuned spawn-facing camera framing so the opening QA shot establishes more of the airport approach. Verified locally: /healthz 200, node --check on game-manager.js/hud.js/voxel-world.js passed, test-master 38/0/0, test-qa-v2 21/0, gameplay harness PASS with 23 screenshots and 0 errors.
 
 ### [HIGH] Fix Failing Gameplay/QA Scripts (Session 14)
 Status: DONE
