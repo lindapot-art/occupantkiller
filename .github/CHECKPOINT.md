@@ -4,22 +4,50 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-17 — Session 25: HUD cleanup and Hostomel opening-frame polish implemented and QA-passed
+- **Timestamp**: 2026-04-18 — Session 26: Ukrainian apartments, combat improvements, cover degradation, tactical formations, cover-seeking AI
 - **Agent**: KING
-- **Status**: COMPLETE — wave-clear UI no longer stacks duplicate summaries, plan reminders use the top objective channel, and Hostomel opens from a stronger establishing position
+- **Status**: COMPLETE — Two commits shipped: e3610d4 (apartments + drone shootdown + BMP fix) and b6daf09 (cover degradation + formations + cover AI). Push blocked by credential issue (user must fix).
 
 ## Current Task
-- DONE: Start the main gameplay update loop during initialization
-- DONE: Declare missing CombatExtras HUD DOM refs to stop per-frame ReferenceErrors
-- DONE: Restore base voxel block colors so terrain no longer renders with magenta fallback
-- DONE: Restore missing non-grassland world themes and safe theme seeding in voxel-world.js
-- DONE: Replace repeated drone query filters with cache-backed getters in drone-system.js
-- DONE: Reset crouch/prone/drone/vehicle presentation state before init, start-game, and stage-transition spawns
-- DONE: Orient Hostomel start camera toward airport content instead of away from the level
-- DONE: Restrict screenshot-QA movement to open ground so automated screenshots stop clipping into buildings
-- DONE: Run Batch 9 audit and implement directed wave battle plans
-- DONE: Remove duplicate wave summary stacking, move plan reminders off the bottom pickup toast, and retune Hostomel opening spawn/framing
-- QA: healthz 200, node --check game-manager.js PASS, node --check enemies.js PASS, node --check hud.js PASS, node --check voxel-world.js PASS, node --check drone-system.js PASS, node --check tools/test-gameplay.js PASS, test-master 38/0 PASS, test-qa-v2 21/0 PASS, gameplay PASS (23 screenshots, 0 errors, reached wave 2)
+- DONE: Ukrainian apartment buildings (6/12 stories) with blue/white hallway tiles, stairways, accessible apartments, sniper windows
+- DONE: Buildings placed on all 4 stages (14 total)
+- DONE: New block types BLUE_TILE + WHITE_TILE
+- DONE: BMP ground-lock (velocity.y clamped to 0)
+- DONE: Drone shootdown mechanics (raycast targets, weapon bonuses)
+- DONE: Ukrainian flag stripes on friendly drones
+- DONE: New drone types (KAMIKAZE, ENEMY_OBSERVER)
+- DONE: Observer drone calls reinforcements every 15s
+- DONE: More drones per wave, threat alerts
+- DONE: Cover degradation system (blocks track HP, degrade from sustained fire, heal over time)
+- DONE: Weapon-type block damage scaling (explosives 5x, AMR/HMG 3x, sniper/LMG 2x)
+- DONE: Tactical formations (wedge/line/column/staggered) for assault groups
+- DONE: Formation switching per group state (advance→wedge, assault→line, retreat→column, regroup→staggered)
+- DONE: Cover-seeking AI (wounded ranged enemies find solid blocks to hide behind)
+- QA: healthz 200, node --check all PASS, test-master 38/0/0, test-qa-v2 21/0, gameplay 24 screenshots 0 errors
+- BLOCKED: git push (credential mismatch — PhotonBounce cached, needs lindapot-art)
+
+## Steps Completed This Session (Session 26)
+1. [x] Committed previous session's apartment buildings + combat improvements batch (e3610d4)
+2. [x] Attempted git push — blocked by credential mismatch (PhotonBounce vs lindapot-art)
+3. [x] Implemented cover degradation system in voxel-world.js (damageBlock, updateCoverDegradation, getBlockDamageRatio)
+4. [x] Wired cover degradation into weapons.js fire callback (replaces instant destroyBlock with damage accumulation)
+5. [x] Added weapon-type block damage multipliers (explosives 5x, AMR/HMG 3x, sniper/LMG 2x, shotgun 1.5x)
+6. [x] Integrated updateCoverDegradation(delta) into game-manager.js main loop
+7. [x] Implemented tactical formations (wedge/line/column/staggered) with getFormationOffset + getFormationWorldPos
+8. [x] Added formation switching per assault group state (ADVANCING→wedge, ASSAULTING→line, RETREATING→column, REGROUPING→staggered)
+9. [x] Wired formation offsets into enemy movement (group-following enemies use formation positions)
+10. [x] Implemented cover-seeking AI: findCoverPosition() searches 8-block radius for solid blocks relative to threat direction
+11. [x] Wounded ranged enemies (<50% HP) seek cover positions and re-evaluate every 3-5 seconds
+12. [x] Full QA pass: node --check 4/4 PASS, healthz 200, test-master 38/0/0, test-qa-v2 21/0, gameplay 24 screenshots exit 0
+13. [x] Committed batch as b6daf09
+
+## Files Changed This Session (Session 26)
+- `voxel-world.js` — cover degradation system (damageBlock, updateCoverDegradation, getBlockDamageRatio), exported to public API
+- `weapons.js` — fire callback uses damageBlock instead of instant destroyBlock, weapon-type block damage multipliers
+- `game-manager.js` — updateCoverDegradation(delta) in main loop, drone shootdown, expanded drone spawns
+- `enemies.js` — tactical formations (getFormationOffset, getFormationWorldPos), formation switching per state, cover-seeking AI (findCoverPosition), spawnReinforcement API
+- `drone-system.js` — new drone types (KAMIKAZE, ENEMY_OBSERVER), Ukrainian flag on friendly drones, observer drone AI
+- `vehicles.js` — BMP ground-lock fix
 
 ## Steps Completed This Session (Session 25)
 1. [x] Advanced the queue to Batch 9 and checkpointed the new autonomous task in session memory
