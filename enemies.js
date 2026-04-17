@@ -610,6 +610,48 @@ const Enemies = (() => {
     },
   };
 
+  // ── Cover-Seeking Helper ────────────────────────────────────
+  // Find a position behind solid blocks relative to a threat position
+  var _coverSearchTmp = new THREE.Vector3();
+  function findCoverPosition(enemyPos, threatPos) {
+    if (typeof VoxelWorld === 'undefined' || !VoxelWorld.isSolid) return null;
+    // Direction from threat to enemy (enemy wants to get blocks BETWEEN them and threat)
+    var awayX = enemyPos.x - threatPos.x;
+    var awayZ = enemyPos.z - threatPos.z;
+    var awayLen = Math.sqrt(awayX * awayX + awayZ * awayZ);
+    if (awayLen < 0.1) return null;
+    awayX /= awayLen; awayZ /= awayLen;
+
+    var bestPos = null;
+    var bestScore = -Infinity;
+    var ex = Math.floor(enemyPos.x), ez = Math.floor(enemyPos.z);
+    var ey = Math.floor(enemyPos.y);
+
+    // Search nearby blocks (8-block radius) for solid blocks to hide behind
+    for (var dx = -8; dx <= 8; dx += 2) {
+      for (var dz = -8; dz <= 8; dz += 2) {
+        var bx = ex + dx, bz = ez + dz;
+        // Check if this block is solid (potential cover)
+        if (!VoxelWorld.isSolid(bx, ey, bz) && !VoxelWorld.isSolid(bx, ey + 1, bz)) continue;
+        // The cover position is on the opposite side of the block from the threat
+        var coverX = bx + 0.5 + awayX * 1.2;
+        var coverZ = bz + 0.5 + awayZ * 1.2;
+        // Don't pick positions inside solid blocks
+        if (VoxelWorld.isSolid(Math.floor(coverX), ey, Math.floor(coverZ))) continue;
+        // Score: prefer close to enemy + behind block relative to threat
+        var distFromEnemy = Math.abs(dx) + Math.abs(dz);
+        var toBlockX = bx + 0.5 - threatPos.x, toBlockZ = bz + 0.5 - threatPos.z;
+        var blockInLine = (toBlockX * awayX + toBlockZ * awayZ); // dot product (higher = more "behind")
+        var score = blockInLine * 2 - distFromEnemy;
+        if (score > bestScore) {
+          bestScore = score;
+          bestPos = _coverSearchTmp.set(coverX, ey, coverZ);
+        }
+      }
+    }
+    return bestPos ? bestPos.clone() : null;
+  }
+
   // ── Enemy Roles for Assault Groups ──────────────────────
   const SQUAD_ROLE = Object.freeze({
     POINTMAN:  'pointman',   // leads group, scouts ahead
@@ -639,6 +681,8 @@ const Enemies = (() => {
   function createAssaultGroup(id, spawnCenter) {
     const objectiveAngle = Math.random() * Math.PI * 2;
     const objectiveDist = 8 + Math.random() * 12;
+    // Pick formation type based on group id
+    var formations = ['wedge', 'line', 'column', 'staggered'];
     return {
       id: id,
       state: GROUP_STATE.FORMING,
@@ -655,7 +699,52 @@ const Enemies = (() => {
       hasOfficer: false,
       hasMedic: false,
       formationSpread: 2 + Math.random() * 2,
+      formation: formations[id % formations.length],
+      formationHeading: objectiveAngle, // direction the formation faces
     };
+  }
+
+  // ── Tactical Formation Offsets ──────────────────────────────
+  // Returns a {x, z} offset for member index within a formation
+  function getFormationOffset(formation, memberIndex, totalMembers, spread) {
+    var s = spread || 2.5;
+    var i = memberIndex;
+    switch (formation) {
+      case 'wedge': {
+        // V-shape: leader at front, members fan out behind
+        if (i === 0) return { x: 0, z: 0 }; // pointman at tip
+        var side = (i % 2 === 0) ? 1 : -1;
+        var row = Math.ceil(i / 2);
+        return { x: side * row * s * 0.8, z: -row * s };
+      }
+      case 'line': {
+        // Abreast line perpendicular to heading
+        var half = (totalMembers - 1) / 2;
+        return { x: (i - half) * s, z: 0 };
+      }
+      case 'column': {
+        // Single file, leader at front
+        return { x: (i % 2 === 0 ? 0.3 : -0.3) * s, z: -i * s * 0.7 };
+      }
+      case 'staggered': {
+        // Alternating left-right echelon
+        var side2 = (i % 2 === 0) ? 1 : -1;
+        return { x: side2 * s * 0.5 * ((i % 4 < 2) ? 1 : 1.5), z: -Math.floor(i / 2) * s * 0.6 };
+      }
+      default:
+        return { x: (Math.random() - 0.5) * s * 2, z: (Math.random() - 0.5) * s * 2 };
+    }
+  }
+
+  // Get world-space formation position for a member given group heading
+  function getFormationWorldPos(group, memberIndex, totalMembers) {
+    var offset = getFormationOffset(group.formation, memberIndex, totalMembers, group.formationSpread);
+    var heading = group.formationHeading;
+    var cosH = Math.cos(heading), sinH = Math.sin(heading);
+    // Rotate offset by heading
+    var wx = offset.x * cosH - offset.z * sinH;
+    var wz = offset.x * sinH + offset.z * cosH;
+    return { x: wx, z: wz };
   }
 
   // ── Military Ranks ───────────────────────────────────────
@@ -1632,11 +1721,22 @@ const Enemies = (() => {
         e.npcTarget = null;
       }
 
-      // If no target, follow group objective or patrol
+      // If no target, follow group objective or patrol with formation offsets
       if (!moveTarget && e.groupId >= 0 && e.groupId < assaultGroups.length) {
         const grp = assaultGroups[e.groupId];
         if (grp) {
-          moveTarget = grp.state === GROUP_STATE.RETREATING ? grp.rallyPoint : grp.objective;
+          var baseTarget = grp.state === GROUP_STATE.RETREATING ? grp.rallyPoint : grp.objective;
+          // Apply tactical formation offset
+          var memberIdx = grp.members.indexOf(i);
+          if (memberIdx < 0) memberIdx = 0;
+          // Update formation heading toward objective
+          var dx = grp.objective.x - (grp.rallyPoint.x || 0);
+          var dz = grp.objective.z - (grp.rallyPoint.z || 0);
+          if (dx * dx + dz * dz > 1) grp.formationHeading = Math.atan2(dx, dz);
+          var fOff = getFormationWorldPos(grp, memberIdx, grp.members.length);
+          if (!e._formationTarget) e._formationTarget = new THREE.Vector3();
+          e._formationTarget.set(baseTarget.x + fOff.x, 0, baseTarget.z + fOff.z);
+          moveTarget = e._formationTarget;
           targetDist = e.mesh.position.distanceTo(moveTarget);
         }
       }
@@ -1671,6 +1771,23 @@ const Enemies = (() => {
         }
         moveTarget = e._wanderTarget;
         targetDist = e.mesh.position.distanceTo(moveTarget);
+      }
+
+      // ── Cover-seeking AI ────────────────────────────────────────
+      // Wounded enemies or retreating groups seek cover behind solid blocks
+      var seekingCover = false;
+      if (e.playerSpotted && e.hp < e.maxHp * 0.5 && e.typeCfg.rangedDmg > 0) {
+        // Wounded ranged enemy seeks cover
+        if (!e._coverTarget || e._coverTimer <= 0) {
+          e._coverTarget = findCoverPosition(e.mesh.position, playerPos);
+          e._coverTimer = 3 + Math.random() * 2; // re-evaluate every 3-5 seconds
+        }
+        if (e._coverTarget) {
+          moveTarget = e._coverTarget;
+          targetDist = e.mesh.position.distanceTo(moveTarget);
+          seekingCover = true;
+        }
+        if (e._coverTimer > 0) e._coverTimer -= delta;
       }
 
       // ── Movement toward target with obstacle avoidance + strategic flanking ──
@@ -2487,6 +2604,7 @@ const Enemies = (() => {
         case GROUP_STATE.FORMING:
           if (grp.stateTimer <= 0) {
             grp.state = GROUP_STATE.ADVANCING;
+            grp.formation = 'wedge'; // advance in wedge formation
             grp.stateTimer = 15 + Math.random() * 20;
             // Bark: charge when advancing
             if (aliveMembers.length > 0) triggerBark(enemies[aliveMembers[0]], 'charge');
@@ -2497,6 +2615,7 @@ const Enemies = (() => {
           // Move toward objective
           if (grp.stateTimer <= 0 || lossRatio > 0.3) {
             grp.state = lossRatio > 0.5 ? GROUP_STATE.RETREATING : GROUP_STATE.ASSAULTING;
+            grp.formation = lossRatio > 0.5 ? 'column' : 'line'; // retreat in column, assault in line
             grp.stateTimer = 20 + Math.random() * 30;
             // Bark: retreat or flank based on new state
             if (aliveMembers.length > 0) {
@@ -2583,6 +2702,7 @@ const Enemies = (() => {
             grp.objective.set(Math.cos(oAngle) * oDist, 0, Math.sin(oAngle) * oDist);
             grp.morale = Math.min(100, grp.morale + 15);
             grp.state = GROUP_STATE.ADVANCING;
+            grp.formation = 'staggered'; // reformed groups use staggered approach
             grp.stateTimer = 15 + Math.random() * 20;
           }
           break;

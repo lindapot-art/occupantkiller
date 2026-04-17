@@ -2192,7 +2192,18 @@ const Weapons = (() => {
         if (hitBlockType === 12 && typeof WorldFeatures !== 'undefined' && WorldFeatures.detonateBarrel) {
           WorldFeatures.detonateBarrel(bRay.hit.x, bRay.hit.y, bRay.hit.z);
         } else {
-          destroyBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z, false);
+          // Cover degradation: accumulate damage instead of instant destroy
+          var wepDmg = wep.damage || 10;
+          // Explosives and high-caliber weapons deal more block damage
+          if (wep.type === 'EXPLOSIVE' || wep.type === 'RPG' || wep.type === 'GRENADE_LAUNCHER') wepDmg *= 5;
+          else if (wep.type === 'AMR' || wep.type === 'HMG' || wep.type === 'HMG_HEAVY') wepDmg *= 3;
+          else if (wep.type === 'SNIPER' || wep.type === 'LMG') wepDmg *= 2;
+          else if (wep.type === 'SHOTGUN') wepDmg *= 1.5;
+          if (typeof VoxelWorld !== 'undefined' && VoxelWorld.damageBlock) {
+            VoxelWorld.damageBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z, wepDmg);
+          } else {
+            destroyBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z, false);
+          }
         }
       }
     }

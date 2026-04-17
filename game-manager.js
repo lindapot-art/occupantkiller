@@ -4048,8 +4048,9 @@ const GameManager = (function () {
         }
       }
 
-      // Voxel chunk rebuilds
+      // Voxel chunk rebuilds + cover degradation healing
       VoxelWorld.updateDirtyChunks();
+      if (VoxelWorld.updateCoverDegradation) VoxelWorld.updateCoverDegradation(delta);
 
       // Update loot particles
       updateLootParticles(delta);

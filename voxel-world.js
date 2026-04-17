@@ -624,6 +624,67 @@ window.VoxelWorld = (function () {
 
   const BLOCK_TRANSPARENT = new Set([BLOCK.AIR, BLOCK.WATER, BLOCK.GLASS]);
 
+  // ── Cover Degradation System ────────────────────────────────
+  // Blocks track accumulated damage. When damage exceeds HP → block breaks.
+  // HP = BLOCK_HARDNESS * 30 (soft blocks break fast, reinforced takes sustained fire)
+  const _blockDamage = {};  // key "x,y,z" → { hp: remaining, maxHp: initial }
+  const _damageDecayRate = 2;  // HP restored per second (cover slowly "recovers" if not shot)
+  const _damageDecayDelay = 3; // seconds of no hits before decay starts
+  const _blockLastHit = {};    // key → timestamp of last hit
+
+  function _blockKey(x, y, z) { return x + ',' + y + ',' + z; }
+
+  function damageBlock(x, y, z, weaponDamage) {
+    x = Math.floor(x); y = Math.floor(y); z = Math.floor(z);
+    var blockType = getBlock(x, y, z);
+    if (!blockType || blockType === BLOCK.AIR || blockType === BLOCK.WATER) return false;
+    var hardness = BLOCK_HARDNESS[blockType] || 1;
+    var maxHp = hardness * 30;
+    var key = _blockKey(x, y, z);
+    if (!_blockDamage[key]) _blockDamage[key] = { hp: maxHp, maxHp: maxHp };
+    var dmg = _blockDamage[key];
+    // Weapon damage scales inversely with hardness (high-caliber breaks hard cover faster)
+    var effectiveDmg = Math.max(1, weaponDamage / hardness);
+    dmg.hp -= effectiveDmg;
+    _blockLastHit[key] = performance.now() / 1000;
+    if (dmg.hp <= 0) {
+      // Block destroyed — convert to rubble or air
+      delete _blockDamage[key];
+      delete _blockLastHit[key];
+      if (hardness >= 3 && blockType !== BLOCK.GLASS) {
+        setBlock(x, y, z, BLOCK.RUBBLE);
+      } else {
+        setBlock(x, y, z, BLOCK.AIR);
+      }
+      return true; // block broke
+    }
+    return false;
+  }
+
+  function updateCoverDegradation(delta) {
+    var now = performance.now() / 1000;
+    var keysToRemove = [];
+    for (var key in _blockDamage) {
+      var lastHit = _blockLastHit[key] || 0;
+      if (now - lastHit > _damageDecayDelay) {
+        var dmg = _blockDamage[key];
+        dmg.hp = Math.min(dmg.maxHp, dmg.hp + _damageDecayRate * delta);
+        if (dmg.hp >= dmg.maxHp) keysToRemove.push(key);
+      }
+    }
+    for (var i = 0; i < keysToRemove.length; i++) {
+      delete _blockDamage[keysToRemove[i]];
+      delete _blockLastHit[keysToRemove[i]];
+    }
+  }
+
+  function getBlockDamageRatio(x, y, z) {
+    var key = _blockKey(Math.floor(x), Math.floor(y), Math.floor(z));
+    var dmg = _blockDamage[key];
+    if (!dmg) return 0;
+    return 1 - (dmg.hp / dmg.maxHp);
+  }
+
   function placeBush(wx, wy, wz) {
     setBlock(wx, wy, wz, BLOCK.BUSH);
     setBlock(wx, wy + 1, wz, BLOCK.BUSH);
@@ -3511,7 +3572,11 @@ window.VoxelWorld = (function () {
     updateVehicles,
     getActiveVehicles,
     clearVehicles,
-    isSolid: typeof isSolid === 'function' ? isSolid : function () { return false; }
+    isSolid: typeof isSolid === 'function' ? isSolid : function () { return false; },
+    // Cover degradation
+    damageBlock: damageBlock,
+    updateCoverDegradation: updateCoverDegradation,
+    getBlockDamageRatio: getBlockDamageRatio,
   };
 
 })();
