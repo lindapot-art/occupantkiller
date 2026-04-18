@@ -117,10 +117,17 @@ const Progression = (function () {
       const template = shuffled[i];
       const tier = Math.min(2, Math.floor(wave / 4));
       const targets = { weapon_kill: [5, 10, 20], survive: [2, 4, 6], build: [3, 6, 10], collect: [5, 10, 15], damage: [500, 1000, 2000], headshot_wave: [3, 5, 8], speed_wave: [60, 45, 30], low_damage: [50, 25, 10] };
+      const targetVal = (targets[template.type] || [5, 10, 20])[tier];
+      let resolvedName = template.name.replace('{n}', targetVal);
+      if (resolvedName.indexOf('{weapon}') !== -1) {
+        const weaponNames = ['AK-74M', 'RPK-74', 'SVD Dragunov', 'PKM', 'M4A1', 'FN SCAR-H', 'Barrett M82', 'MP5 SMG'];
+        resolvedName = resolvedName.replace('{weapon}', weaponNames[Math.floor(Math.random() * weaponNames.length)]);
+      }
       activeBounties.push({
         ...template,
+        name: resolvedName,
         tier,
-        target: (targets[template.type] || [5, 10, 20])[tier],
+        target: targetVal,
         reward: template.rewards[tier],
         progress: 0,
         completed: false

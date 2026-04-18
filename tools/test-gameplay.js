@@ -215,9 +215,9 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
   }));
   console.log('After 5s:', JSON.stringify(state));
 
-  // Weapon switch schedule — cycle through ranged weapons (skip 0=shovel melee, 3m range)
-  // god mode unlocks all 26 weapons (indices 0-25)
-  const WEAPON_SCHEDULE = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,1];
+  // Weapon switch schedule — prioritize effective ranged weapons for kill-testing
+  // god mode unlocks all weapons; lead with assault/LMG/sniper for best kill rate
+  const WEAPON_SCHEDULE = [2,3,4,5,8,2,3,14,15,16,9,10,11,12,13,2,3,5,8,2];
 
 
   // EXTENDED QA: 20 gameplay rounds, 5s interval (fast QA pass)
@@ -359,12 +359,14 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
           const dx = ep.x - pos.x;
           const dz = ep.z - pos.z;
           const dist = Math.sqrt(dx * dx + dz * dz);
-          if (dist > 14) {
-            const step = Math.min(4, Math.max(2.5, dist - 14));
+          if (dist > 8) {
+            const step = Math.min(5, Math.max(3, dist - 8));
             const factor = step / dist;
             movePlayerSafely(pos.x + dx * factor, pos.z + dz * factor);
+          } else if (dist < 3) {
+            movePlayerSafely(pos.x - dx * 0.3, pos.z - dz * 0.3);
           } else {
-            movePlayerSafely(anchor.x + (Math.random() - 0.5) * 6, anchor.z + (Math.random() - 0.5) * 6);
+            movePlayerSafely(anchor.x + (Math.random() - 0.5) * 4, anchor.z + (Math.random() - 0.5) * 4);
           }
           const aimDx = ep.x - pos.x;
           const aimDy = (ep.y + 1.0) - pos.y;
@@ -380,9 +382,16 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
           if (Weapons.refillAllAmmo) Weapons.refillAllAmmo();
           if (Weapons.refillAllAmmo) Weapons.refillAllAmmo();
         }
-        // Fire weapon
+        // Fire weapon — continuous burst for better kill rate
         if (typeof GameManager._testFireStart === 'function') GameManager._testFireStart();
-        setTimeout(() => { if (typeof GameManager._testFireStop === 'function') GameManager._testFireStop(); }, 600);
+        // Re-trigger mouseNewPress periodically for semi-auto weapons
+        var _fireInterval = setInterval(() => {
+          if (typeof GameManager._testFireStart === 'function') GameManager._testFireStart();
+        }, 200);
+        setTimeout(() => {
+          clearInterval(_fireInterval);
+          if (typeof GameManager._testFireStop === 'function') GameManager._testFireStop();
+        }, 3000);
       } catch (e) { /* ignore movement errors */ }
     }, { wIdx: weaponIdx, shot });
     // Wait 5 seconds, then screenshot
