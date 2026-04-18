@@ -33,22 +33,9 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 720 });
 
-  // FORCE: Define BLOCK_COLORS and triggerCityEvent before any gameplay code executes
+  // FORCE: Enable QA mode and provide a no-op city event hook before gameplay code executes.
   await page.evaluateOnNewDocument(() => {
     window.__QA_MODE = true;
-    window.BLOCK_COLORS = window.BLOCK_COLORS || {
-      0: 0x000000, // AIR
-      1: 0x888888, // CONCRETE
-      2: 0xCCCCCC, // METAL
-      3: 0xFFD700, // GOLD
-      4: 0x228B22, // TREE
-      5: 0x1E90FF, // WATER
-      6: 0x8B4513, // WOOD
-      7: 0xFF69B4, // PINK
-      8: 0xFFFFFF, // WHITE
-      9: 0xAAAAAA, // GRAY
-      10: 0xFF00FF // DEFAULT (MAGENTA)
-    };
     if (typeof window.triggerCityEvent !== 'function') {
       window.triggerCityEvent = function(){};
     }
@@ -200,6 +187,21 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
   }
   // Wait for first wave to start
   await new Promise(r => setTimeout(r, 2000));
+  await page.evaluate(() => {
+    if (GameManager.getCurrentStage() !== 0) return;
+    const player = GameManager.getPlayer();
+    const scenicPos = { x: 0, z: -20 };
+    const scenicLook = { x: 0, z: 10 };
+    player.position.x = scenicPos.x;
+    player.position.z = scenicPos.z;
+    player.position.y = VoxelWorld.getTerrainHeight(scenicPos.x, scenicPos.z) + 1.7;
+    window.__qaAnchor = { x: scenicPos.x, z: scenicPos.z };
+    const dx = scenicLook.x - scenicPos.x;
+    const dz = scenicLook.z - scenicPos.z;
+    CameraSystem.setYaw(Math.atan2(-dx, -dz));
+    CameraSystem.setPitch(-0.14);
+  });
+  await new Promise(r => setTimeout(r, 750));
   await captureScreenshot(page, 'wave1-start');
 
   // Check state
@@ -222,15 +224,49 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
   for (let shot = 0; shot < 20; shot++) {
     // Simulate a round of gameplay actions every 5 seconds
     const weaponIdx = WEAPON_SCHEDULE[shot % WEAPON_SCHEDULE.length];
-    await page.evaluate((wIdx) => {
+    await page.evaluate(({ wIdx, shot }) => {
       try {
         const player = GameManager.getPlayer();
         const pos = player.position;
+        window.__qaAnchor = window.__qaAnchor || { x: pos.x, z: pos.z };
+        const anchor = window.__qaAnchor;
+        const scenicTarget = GameManager.getCurrentStage() === 0
+          ? { x: 0, y: VoxelWorld.getTerrainHeight(0, 10) + 2, z: 10 }
+          : null;
+
+        function clampToAnchor(targetX, targetZ) {
+          const dx = targetX - anchor.x;
+          const dz = targetZ - anchor.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          if (dist <= 12) return { x: targetX, z: targetZ };
+          const scale = 12 / dist;
+          return {
+            x: anchor.x + dx * scale,
+            z: anchor.z + dz * scale,
+          };
+        }
+
+        function terrainIsStable(sampleX, sampleZ, centerGround) {
+          let minGround = centerGround;
+          let maxGround = centerGround;
+          for (let dx = -2; dx <= 2; dx++) {
+            for (let dz = -2; dz <= 2; dz++) {
+              const localGround = VoxelWorld.getTerrainHeight(sampleX + dx, sampleZ + dz);
+              minGround = Math.min(minGround, localGround);
+              maxGround = Math.max(maxGround, localGround);
+              if (Math.abs(localGround - centerGround) > 1) return false;
+            }
+          }
+          return (maxGround - minGround) <= 1;
+        }
+
         function isOutdoorCell(sampleX, sampleZ) {
           const groundY = VoxelWorld.getTerrainHeight(sampleX, sampleZ);
           const ix = Math.round(sampleX);
           const iz = Math.round(sampleZ);
           const bodyY = groundY + 1.7;
+
+          if (!terrainIsStable(ix, iz, groundY)) return null;
 
           for (let dx = -1; dx <= 1; dx++) {
             for (let dz = -1; dz <= 1; dz++) {
@@ -271,18 +307,20 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
         function movePlayerSafely(targetX, targetZ) {
           if (typeof VoxelWorld === 'undefined' || !VoxelWorld.getTerrainHeight || !VoxelWorld.isSolid) return false;
 
+          const clamped = clampToAnchor(targetX, targetZ);
+
           const samples = [
-            { x: targetX, z: targetZ },
-            { x: targetX + 2, z: targetZ },
-            { x: targetX - 2, z: targetZ },
-            { x: targetX, z: targetZ + 2 },
-            { x: targetX, z: targetZ - 2 },
-            { x: targetX + 2, z: targetZ + 2 },
-            { x: targetX - 2, z: targetZ + 2 },
-            { x: targetX + 3, z: targetZ - 1 },
-            { x: targetX - 3, z: targetZ - 1 },
-            { x: targetX + 1, z: targetZ + 3 },
-            { x: targetX - 1, z: targetZ + 3 },
+            { x: clamped.x, z: clamped.z },
+            { x: clamped.x + 2, z: clamped.z },
+            { x: clamped.x - 2, z: clamped.z },
+            { x: clamped.x, z: clamped.z + 2 },
+            { x: clamped.x, z: clamped.z - 2 },
+            { x: clamped.x + 2, z: clamped.z + 2 },
+            { x: clamped.x - 2, z: clamped.z + 2 },
+            { x: clamped.x + 3, z: clamped.z - 1 },
+            { x: clamped.x - 3, z: clamped.z - 1 },
+            { x: clamped.x + 1, z: clamped.z + 3 },
+            { x: clamped.x - 1, z: clamped.z + 3 },
           ];
 
           for (let i = 0; i < samples.length; i++) {
@@ -308,17 +346,25 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
           const d = Math.sqrt(dx * dx + dz * dz);
           if (d < nearDist) { nearDist = d; nearest = all[i]; }
         }
-        if (nearest) {
+        if (scenicTarget && shot < 2) {
+          movePlayerSafely(anchor.x + shot * 2, anchor.z + shot);
+          const aimDx = scenicTarget.x - pos.x;
+          const aimDy = scenicTarget.y - pos.y;
+          const aimDz = scenicTarget.z - pos.z;
+          const hDist = Math.sqrt(aimDx * aimDx + aimDz * aimDz);
+          CameraSystem.setYaw(Math.atan2(-aimDx, -aimDz));
+          CameraSystem.setPitch(Math.atan2(aimDy, hDist) - 0.1);
+        } else if (nearest) {
           const ep = nearest.mesh.position;
           const dx = ep.x - pos.x;
           const dz = ep.z - pos.z;
           const dist = Math.sqrt(dx * dx + dz * dz);
-          if (dist > 3.5) {
-            const step = Math.min(8, Math.max(2.5, dist - 3));
+          if (dist > 14) {
+            const step = Math.min(4, Math.max(2.5, dist - 14));
             const factor = step / dist;
             movePlayerSafely(pos.x + dx * factor, pos.z + dz * factor);
           } else {
-            movePlayerSafely(pos.x + (Math.random() - 0.5) * 3, pos.z + (Math.random() - 0.5) * 3);
+            movePlayerSafely(anchor.x + (Math.random() - 0.5) * 6, anchor.z + (Math.random() - 0.5) * 6);
           }
           const aimDx = ep.x - pos.x;
           const aimDy = (ep.y + 1.0) - pos.y;
@@ -327,7 +373,7 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
           CameraSystem.setYaw(Math.atan2(-aimDx, -aimDz));
           CameraSystem.setPitch(Math.atan2(aimDy, hDist));
         } else {
-          movePlayerSafely(pos.x + (Math.random() - 0.5) * 4, pos.z + (Math.random() - 0.5) * 4);
+          movePlayerSafely(anchor.x + (Math.random() - 0.5) * 6, anchor.z + (Math.random() - 0.5) * 6);
         }
         if (typeof Weapons !== 'undefined' && Weapons.switchTo) {
           Weapons.switchTo(wIdx);
@@ -338,7 +384,7 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
         if (typeof GameManager._testFireStart === 'function') GameManager._testFireStart();
         setTimeout(() => { if (typeof GameManager._testFireStop === 'function') GameManager._testFireStop(); }, 600);
       } catch (e) { /* ignore movement errors */ }
-    }, weaponIdx);
+    }, { wIdx: weaponIdx, shot });
     // Wait 5 seconds, then screenshot
     await new Promise(r => setTimeout(r, 5000));
     await captureScreenshot(page, `shot${shot + 1}`);

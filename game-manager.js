@@ -630,11 +630,13 @@ const GameManager = (function () {
       theme:        'grassland',
       wavesPerStage: 7,
       difficulty:   0.8,
-      fogColor:     0xD4A017,
-      bgColor:      0xFFD500,
-      sunColor:     0xFFEE44,
+      fogColor:     0x8FA0AF,
+      bgColor:      0xC3D2DE,
+      sunColor:     0xF0D8A6,
       sunIntensity: 1.1,
-      exposure:     1.0,
+      exposure:     0.88,
+      fogNear:      55,
+      fogFar:       210,
       description:  'Stop the airborne assault at Hostomel Airport.',
     },
     {
@@ -2048,8 +2050,8 @@ const GameManager = (function () {
     var pitch = 0;
     var stageDef = STAGES[stageIndex];
     if (stageDef && stageDef.id === 'HOSTOMEL') {
-      lookTarget = { x: spawnPos.x - 2, z: spawnPos.z + 34 };
-      pitch = -0.1;
+      lookTarget = { x: 0, z: 18 };
+      pitch = -0.03;
     }
 
     var dx = lookTarget.x - spawnPos.x;
@@ -2066,7 +2068,7 @@ const GameManager = (function () {
 
     // Update scene colors
     _scene.background = new THREE.Color(stageDef.bgColor);
-    _scene.fog = new THREE.Fog(stageDef.fogColor, 30, 140);
+    _scene.fog = new THREE.Fog(stageDef.fogColor, stageDef.fogNear || 30, stageDef.fogFar || 140);
 
     // Update sky dome colors for this stage
     if (_skyDome) {

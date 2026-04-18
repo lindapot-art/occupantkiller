@@ -85,3 +85,10 @@
   - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
   - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
   - `tools/test-gameplay.js http://localhost:3000`: 23 screenshots, `Errors: NONE`, final states observed across reruns remained `playing`, wave 2
+
+- Current recovery task: Repair residual Hostomel visual QA regressions that still show yellow dead-space openings and cratered gameplay viewpoints in fresh screenshots.
+- Current plan:
+  - Move Hostomel spawn selection onto the airport apron/runway approach and score candidates against the actual terminal sightline
+  - Tighten spawn and gameplay movement checks to reject crater bowls and steep footing, not just roofs and walls
+  - Remove the stale gameplay-test `BLOCK_COLORS` bootstrap so QA reflects the game's real palette and stage lighting
+  - Re-run proxy QA and manually inspect the refreshed screenshot set before closing the task

@@ -1126,7 +1126,7 @@ window.VoxelWorld = (function () {
 
   /* ── Level Definitions ────────────────────────────────────────────── */
   const LEVELS = [
-    { id: 'HOSTOMEL',  name: 'Hostomel Airport',    desc: 'Stop the airborne assault',  theme: 'grassland', wavesPerLevel: 7, difficulty: 1.0, fogColor: 0xD4A017, spawnCandidates: [{ x: 0, z: -24 }, { x: -12, z: -22 }, { x: 12, z: -22 }, { x: 0, z: -18 }, { x: -6, z: -26 }, { x: 6, z: -26 }] },
+    { id: 'HOSTOMEL',  name: 'Hostomel Airport',    desc: 'Stop the airborne assault',  theme: 'grassland', wavesPerLevel: 7, difficulty: 1.0, fogColor: 0xD4A017, spawnCandidates: [{ x: 0, z: -22 }, { x: -10, z: -22 }, { x: 10, z: -22 }, { x: -6, z: -26 }, { x: 6, z: -26 }, { x: 0, z: -16 }], spawnLookTarget: { x: 0, z: 18 } },
     { id: 'AVDIIVKA',  name: 'Avdiivka Industrial Zone', desc: 'Hold the coking plant',  theme: 'urban',     wavesPerLevel: 7, difficulty: 1.3, fogColor: 0x3a3028 },
     { id: 'BAKHMUT',   name: 'Bakhmut Ruins',        desc: 'Defend the city',             theme: 'urban',     wavesPerLevel: 7, difficulty: 1.6, fogColor: 0x2a2a2a },
     { id: 'KHERSON',   name: 'Kherson Bridgehead',   desc: 'Cross the Dnipro',            theme: 'grassland', wavesPerLevel: 7, difficulty: 1.9, fogColor: 0xD4A017 },
@@ -1323,6 +1323,20 @@ window.VoxelWorld = (function () {
     }
   }
 
+  function levelArea(minX, maxX, minZ, maxZ, surfaceY, topBlock, fillBlock) {
+    for (let x = minX; x <= maxX; x++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        for (let y = 0; y < surfaceY; y++) {
+          setBlock(x, y, z, fillBlock);
+        }
+        setBlock(x, surfaceY, z, topBlock);
+        for (let y = surfaceY + 1; y <= surfaceY + 18; y++) {
+          setBlock(x, y, z, BLOCK.AIR);
+        }
+      }
+    }
+  }
+
   function generateBuilding(ox, oz, w, d, h, blockType) {
     const surfH = getTerrainHeight(ox, oz);
     for (let y = 0; y < h; y++) {
@@ -1423,10 +1437,22 @@ window.VoxelWorld = (function () {
   const _roadWaypoints = [];
   let _levelSpawnPoint = { x: 0, y: 0, z: 0 };
 
-  function isSpawnAreaClear(x, z, groundY) {
+  function hasStableSpawnFooting(x, z, groundY) {
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        const localY = getTerrainHeight(x + dx, z + dz);
+        if (Math.abs(localY - groundY) > 1) return false;
+      }
+    }
+    return true;
+  }
+
+  function isSpawnAreaClear(x, z, groundY, lookTarget) {
     const baseY = Math.floor(groundY) + 1;
     const ix = Math.round(x);
     const iz = Math.round(z);
+
+    if (!hasStableSpawnFooting(ix, iz, groundY)) return false;
 
     // Require a wider clear bubble around the player body.
     for (let dx = -2; dx <= 2; dx++) {
@@ -1442,11 +1468,25 @@ window.VoxelWorld = (function () {
       if (isSolid(ix, baseY + dy, iz)) return false;
     }
 
-    // Keep the immediate view corridor open so stage-start screenshots don't face clipped geometry.
-    for (let step = 1; step <= 8; step++) {
-      for (let lateral = -2; lateral <= 2; lateral++) {
-        if (isSolid(ix + lateral, baseY + 1, iz + step)) return false;
-        if (isSolid(ix + lateral, baseY + 2, iz + step)) return false;
+    let dirX = 0;
+    let dirZ = 1;
+    if (lookTarget && isFinite(lookTarget.x) && isFinite(lookTarget.z)) {
+      const dx = lookTarget.x - x;
+      const dz = lookTarget.z - z;
+      const len = Math.hypot(dx, dz);
+      if (len > 0.001) {
+        dirX = dx / len;
+        dirZ = dz / len;
+      }
+    }
+
+    // Keep the immediate view corridor open in the direction the stage intro camera will face.
+    for (let step = 1; step <= 12; step++) {
+      for (let lateral = -3; lateral <= 3; lateral++) {
+        const sampleX = Math.round(x + dirX * step + dirZ * lateral);
+        const sampleZ = Math.round(z + dirZ * step - dirX * lateral);
+        if (isSolid(sampleX, baseY + 1, sampleZ)) return false;
+        if (isSolid(sampleX, baseY + 2, sampleZ)) return false;
       }
     }
 
@@ -1486,7 +1526,7 @@ window.VoxelWorld = (function () {
     for (let i = 0; i < candidates.length; i++) {
       const candidate = candidates[i];
       const groundY = getTerrainHeight(candidate.x, candidate.z);
-      if (!isSpawnAreaClear(candidate.x, candidate.z, groundY)) continue;
+      if (!isSpawnAreaClear(candidate.x, candidate.z, groundY, level && level.spawnLookTarget)) continue;
 
       const score = scoreSpawnCandidate(candidate.x, candidate.z, anchor.x, anchor.z);
       if (score < bestScore) {
@@ -3421,6 +3461,18 @@ window.VoxelWorld = (function () {
 
   /* ── Prebuilt: Full Hostomel Airport Complex ───────────────────── */
   function generateHostomelAirport(ox, oz) {
+    const levelSamples = [
+      getTerrainHeight(ox - 32, oz),
+      getTerrainHeight(ox, oz),
+      getTerrainHeight(ox + 32, oz),
+      getTerrainHeight(ox - 8, oz + 20),
+      getTerrainHeight(ox + 16, oz + 22),
+    ];
+    const airportBaseY = Math.round(levelSamples.reduce((sum, value) => sum + value, 0) / levelSamples.length);
+
+    // Flatten the whole airport footprint before stamping the runway, hangars, and terminal.
+    levelArea(ox - 44, ox + 44, oz - 32, oz + 34, airportBaseY, BLOCK.DIRT, BLOCK.DIRT);
+
     // Main runway (extended, 80 blocks long x 8 wide)
     generateRunway(ox - 40, oz, 80, 8);
 

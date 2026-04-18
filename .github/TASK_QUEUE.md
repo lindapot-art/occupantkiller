@@ -16,6 +16,11 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [HIGH] Repair Residual Hostomel Visual QA Regression
+Status: IN-PROGRESS
+Requested: 2026-04-18
+Details: Fresh gameplay screenshots still show Hostomel opening on flat yellow dead space and later teleporting into crater bowls despite the prior spawn cleanup. Rework stage spawn framing and gameplay harness movement validation, then rerun full proxy QA with screenshot inspection.
+
 ### [HIGH] Fix Gameplay Visual Regression After Apartment Batch
 Status: DONE
 Requested: 2026-04-18
