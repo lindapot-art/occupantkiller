@@ -4,9 +4,9 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-18 — Session 27: visual regression repaired in spawn selection and gameplay screenshot harness
+- **Timestamp**: 2026-04-18 — Session 28: Hostomel visual regression fully resolved
 - **Agent**: KING
-- **Status**: COMPLETE — Hostomel spawn selection now prefers open outdoor ground with view clearance, and the gameplay harness rejects roofed/clipped teleport targets. Local proxy QA and screenshot verification passed.
+- **Status**: COMPLETE — Five root causes identified and fixed: unleveled airport terrain, yellow bgColor wash, stale BLOCK_COLORS shim in QA harness, unanchored QA bot movement, and flat camera pitch. Full QA gate passed (38/0 master, 21/0 v2, 23 screenshots 0 errors). Commit d002487.
 
 ## Current Task
 - DONE: Ukrainian apartment buildings (6/12 stories) with blue/white hallway tiles, stairways, accessible apartments, sniper windows

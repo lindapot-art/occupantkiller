@@ -17,9 +17,10 @@ Details: [what you want done]
 ## Active Tasks
 
 ### [HIGH] Repair Residual Hostomel Visual QA Regression
-Status: IN-PROGRESS
+Status: DONE
 Requested: 2026-04-18
-Details: Fresh gameplay screenshots still show Hostomel opening on flat yellow dead space and later teleporting into crater bowls despite the prior spawn cleanup. Rework stage spawn framing and gameplay harness movement validation, then rerun full proxy QA with screenshot inspection.
+Completed: 2026-04-18
+Details: Five root causes identified and fixed: (1) airport built on uneven procedural terrain — added levelArea() to flatten 89x66 footprint, (2) bright yellow bgColor washing out scene — changed to muted blue-gray palette, (3) stale 10-entry BLOCK_COLORS shim in QA harness poisoning rendering — removed, (4) QA bot chasing enemies into clutter — added 12-block anchor clamping + scenic establishing view, (5) flat camera pitch showing fog horizon — forced -0.14 pitch. Commit d002487.
 
 ### [HIGH] Fix Gameplay Visual Regression After Apartment Batch
 Status: DONE
