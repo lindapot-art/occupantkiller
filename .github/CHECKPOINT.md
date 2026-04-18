@@ -4,9 +4,9 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-18 — Session 28: Hostomel visual regression fully resolved
+- **Timestamp**: 2026-04-17 — Session 29: Fixed bounty template bug + improved QA bot
 - **Agent**: KING
-- **Status**: COMPLETE — Five root causes identified and fixed: unleveled airport terrain, yellow bgColor wash, stale BLOCK_COLORS shim in QA harness, unanchored QA bot movement, and flat camera pitch. Full QA gate passed (38/0 master, 21/0 v2, 23 screenshots 0 errors). Commit d002487.
+- **Status**: COMPLETE — Bounty {n} template variable resolved (now shows real target numbers). QA bot improved: 3s continuous fire, closer enemy engagement (8 blocks), semi-auto re-trigger, better weapon priority. Commit 50dfe66.
 
 ## Current Task
 - DONE: Ukrainian apartment buildings (6/12 stories) with blue/white hallway tiles, stairways, accessible apartments, sniper windows

@@ -16,6 +16,12 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [HIGH] Fix Bounty Template + QA Bot Combat
+Status: DONE
+Requested: 2026-04-17
+Completed: 2026-04-17
+Details: Fixed bounty {n} and {weapon} template placeholders showing raw in HUD. progression.js generateBounties() now resolves templates with target values and random weapon names. Improved QA bot: fires 3s continuous burst (was 600ms), approaches enemies to 8 blocks (was 14), re-triggers mouseNewPress for semi-auto weapons, prioritizes assault/LMG/sniper weapons. Kills improved 1→2, score 600→900. Commit 50dfe66.
+
 ### [HIGH] Repair Residual Hostomel Visual QA Regression
 Status: DONE
 Requested: 2026-04-18
