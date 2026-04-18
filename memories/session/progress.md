@@ -227,3 +227,26 @@
   - Commit the existing verified tank-polish worktree exactly as-is, including checkpoint/task/session logs and refreshed QA screenshots
   - Attempt `git push origin main` with current credentials and record whether remote auth is still blocked
   - Implement one more small tank polish batch, re-run full proxy QA, then commit and attempt a second push
+
+- Push attempt after tank-polish stack commit:
+  - Local commit created: `f816fa1` (`feat: expand tank combat polish stack`)
+  - `git push origin main` failed with `403` because GitHub authenticated as `PhotonBounce`, which does not have permission to push to `lindapot-art/occupantkiller`
+
+- Latest task: Tank rear brake/reverse lights + HUD speed readout
+- Status: Complete
+- Files changed:
+  - vehicles.js
+  - game-manager.js
+  - index.html
+  - style.css
+- Fix shipped:
+  - Added rear brake lamp meshes and PointLights that brighten while braking and stay dimly lit while occupied.
+  - Added reverse lamp meshes and PointLights that illuminate when the tank is backing up.
+  - Added a live speed readout to the tank HUD based on horizontal tank velocity.
+- Verified:
+  - `node --check vehicles.js` passed
+  - `node --check game-manager.js` passed
+  - `/healthz` returned 200
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 0 failed
+  - `tools/test-gameplay.js http://localhost:3000`: PASS, 23 screenshots, `Errors: NONE`

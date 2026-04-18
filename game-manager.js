@@ -1842,12 +1842,17 @@ const GameManager = (function () {
     var cannonMax = document.getElementById('tank-cannon-max');
     var mgEl = document.getElementById('tank-mg-ammo');
     var hpEl = document.getElementById('tank-hp-pct');
+    var speedEl = document.getElementById('tank-speed-kmh');
     var viewEl = document.getElementById('tank-view-mode');
 
     if (cannonEl) cannonEl.textContent = ammo.cannon;
     if (cannonMax) cannonMax.textContent = ammo.maxCannon;
     if (mgEl) mgEl.textContent = ammo.mg;
     if (hpEl) hpEl.textContent = Math.round((v.health / v.maxHealth) * 100);
+    if (speedEl && v.velocity) {
+      var hudSpeed = Math.sqrt(v.velocity.x * v.velocity.x + v.velocity.z * v.velocity.z);
+      speedEl.textContent = Math.round(hudSpeed * 12);
+    }
     if (viewEl) viewEl.textContent = v.viewMode === 'first' ? 'PERISCOPE' : 'THIRD PERSON';
 
     // Reload bar

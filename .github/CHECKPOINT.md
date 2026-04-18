@@ -4,9 +4,9 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-17 — Session 34: Added tank headlight beams + suspension pitch on accel/brake
+- **Timestamp**: 2026-04-18 — Session 34: Added tank rear brake/reverse lights + HUD speed readout
 - **Agent**: KING
-- **Status**: COMPLETE — Two SpotLights per tank activate when occupied (warm 0xffffcc, range 25, angle π/6). Hull pitches forward on braking, backward on acceleration (capped ±0.04 rad). Verified with full proxy QA and gameplay `Errors: NONE`.
+- **Status**: COMPLETE — Tanks now show active rear brake lights, reverse lamps, and a live speed HUD readout. Verified with full proxy QA and gameplay `Errors: NONE`. Push remains blocked by GitHub auth mismatch (`PhotonBounce` lacks access to `lindapot-art/occupantkiller`).
 
 ## Current Task
 - DONE: Ukrainian apartment buildings (6/12 stories) with blue/white hallway tiles, stairways, accessible apartments, sniper windows
@@ -44,6 +44,7 @@
 - DONE: MG shell casing ejection + periscope speed vignette; full QA green
 - DONE: Antenna spring wobble + hull body roll on turns; full QA green
 - DONE: Tank headlight beams + suspension pitch on accel/brake; full QA green
+- DONE: Tank rear brake/reverse lights + HUD speed readout; full QA green
 
 ## Steps Completed This Session (Session 34)
 1. [x] Updated `vehicles.js` so tank turret visuals track camera pitch instead of only projectile pitch

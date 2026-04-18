@@ -587,6 +587,7 @@ canvas {
 .tank-hud-cannon { color: #ff6600; }
 .tank-hud-mg { color: #ffcc22; }
 .tank-hud-armor { color: #88cc44; }
+.tank-hud-speed { color: #f5d98a; }
 .tank-hud-view { color: #89d4ff; }
 
 #tank-reload-bar {

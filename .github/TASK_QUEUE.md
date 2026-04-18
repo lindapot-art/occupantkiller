@@ -16,6 +16,12 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [HIGH] Tank Rear Brake/Reverse Lights + HUD Speed Readout
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Added rear brake lamp meshes, reverse lamp meshes, and paired PointLights to the tank model. Brake lights brighten on decel/rear running state, reverse lamps illuminate while backing up. Tank HUD now shows a live speed readout in km/h derived from horizontal velocity. Files changed: vehicles.js, game-manager.js, index.html, style.css. Verified: syntax PASS, healthz 200, test-master 38/0/0, test-qa-v2 0 failed, gameplay Errors: NONE.
+
 ### [HIGH] Tank Headlight Beams + Suspension Pitch
 Status: DONE
 Requested: 2026-04-17

@@ -350,6 +350,35 @@ const VehicleSystem = (function () {
       group.add(spot);
     }
 
+    // Rear brake + reverse lights
+    for (var rl = -1; rl <= 1; rl += 2) {
+      var brakeLamp = new THREE.Mesh(
+        new THREE.BoxGeometry(0.14, 0.08, 0.05),
+        new THREE.MeshBasicMaterial({ color: 0x441111 })
+      );
+      brakeLamp.position.set(rl * 0.92, 0.72, 2.58);
+      brakeLamp.userData.isBrakeLamp = true;
+      group.add(brakeLamp);
+
+      var brakeLight = new THREE.PointLight(0xff2a18, 0, 4.5);
+      brakeLight.position.set(rl * 0.92, 0.72, 2.46);
+      brakeLight.userData.isBrakeLight = true;
+      group.add(brakeLight);
+
+      var reverseLamp = new THREE.Mesh(
+        new THREE.BoxGeometry(0.1, 0.06, 0.05),
+        new THREE.MeshBasicMaterial({ color: 0x181818 })
+      );
+      reverseLamp.position.set(rl * 0.55, 0.64, 2.58);
+      reverseLamp.userData.isReverseLamp = true;
+      group.add(reverseLamp);
+
+      var reverseLight = new THREE.PointLight(0xe8f4ff, 0, 4.0);
+      reverseLight.position.set(rl * 0.55, 0.64, 2.46);
+      reverseLight.userData.isReverseLight = true;
+      group.add(reverseLight);
+    }
+
     group.castShadow = true;
     return group;
   }
@@ -1066,6 +1095,7 @@ const VehicleSystem = (function () {
   function updateTankEffects(v, delta) {
     if (!v || !v.mesh) return;
     var hSpeed = Math.sqrt(v.velocity.x * v.velocity.x + v.velocity.z * v.velocity.z);
+    var forwardSpeed = -(Math.sin(v.rotation.y) * v.velocity.x + Math.cos(v.rotation.y) * v.velocity.z);
     var terrainH = typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight
       ? VoxelWorld.getTerrainHeight(v.position.x, v.position.z)
       : v.position.y;
@@ -1110,6 +1140,25 @@ const VehicleSystem = (function () {
       v.exhaustTimer = grounded && hSpeed > 0.8 ? TANK_EXHAUST_INTERVAL : TANK_EXHAUST_INTERVAL * 1.8;
       spawnTankExhaust(v, grounded && hSpeed > 0.8 ? 2 : 1);
     }
+
+    var brakeActive = !!(_vKeys.s && forwardSpeed > 0.35);
+    var reverseActive = forwardSpeed < -0.2;
+    var runningTail = !!v.occupied;
+    v.mesh.traverse(function(ch) {
+      if (!ch.userData) return;
+      if (ch.userData.isBrakeLamp && ch.material && ch.material.color) {
+        ch.material.color.setHex(brakeActive ? 0xff3a28 : runningTail ? 0x7a1812 : 0x441111);
+      }
+      if (ch.userData.isReverseLamp && ch.material && ch.material.color) {
+        ch.material.color.setHex(reverseActive ? 0xe8f4ff : 0x181818);
+      }
+      if (ch.isPointLight && ch.userData.isBrakeLight) {
+        ch.intensity = brakeActive ? 1.6 : runningTail ? 0.18 : 0;
+      }
+      if (ch.isPointLight && ch.userData.isReverseLight) {
+        ch.intensity = reverseActive ? 1.1 : 0;
+      }
+    });
 
     var healthRatio = v.maxHealth > 0 ? (v.health / v.maxHealth) : 0;
     if (healthRatio < 0.45) {
