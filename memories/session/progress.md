@@ -92,3 +92,138 @@
   - Tighten spawn and gameplay movement checks to reject crater bowls and steep footing, not just roofs and walls
   - Remove the stale gameplay-test `BLOCK_COLORS` bootstrap so QA reflects the game's real palette and stage lighting
   - Re-run proxy QA and manually inspect the refreshed screenshot set before closing the task
+
+- Latest task: Fix numeric weapon hotkeys when loadout unlocks are sparse
+- Status: Complete
+- Root cause:
+  - Weapon hotkeys were mapped to absolute weapon indices while the live HUD/loadout exposed only unlocked weapons.
+  - After sparse unlocks, keys like `3`, `4`, and `5` often pointed at locked gaps and silently failed.
+- Files changed:
+  - hud.js
+  - game-manager.js
+  - weapons.js
+- Fix shipped:
+  - Mapped hotkeys to the current unlocked loadout order.
+  - Updated HUD weapon slots to render unlocked weapons with matching hotkey labels.
+  - Refreshed HUD weapon state on unlock, lock, and reset.
+- Verified:
+  - `node --check hud.js` passed
+  - `node --check game-manager.js` passed
+  - `node --check weapons.js` passed
+  - `/healthz` returned 200
+  - Live browser repro passed: `Digit3/4/5` and `Numpad3/4/5` switched to expected weapons
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+  - `tools/test-gameplay.js http://localhost:3000`: PASS, 23 screenshots, `Errors: NONE`, final state `playing`, wave 2
+
+- Latest task: Tank HUD cleanup and GameManager save API restoration
+- Status: Complete
+- Root cause:
+  - Tank HUD/periscope markup had been inserted twice into `index.html`, creating duplicate IDs and fragile UI state.
+  - `index.html` still called `GameManager.hasSave()` / `loadGame()` / `deleteSave()`, but those methods were no longer exported, causing a boot-time pageerror during gameplay QA.
+- Files changed:
+  - index.html
+  - style.css
+  - game-manager.js
+- Fix shipped:
+  - Removed duplicate tank HUD and periscope DOM blocks so each tank UI element exists exactly once.
+  - Moved tank HUD/periscope presentation into stylesheet classes and added a live `PERISCOPE` / `THIRD PERSON` view label.
+  - Restored minimal save API compatibility on `GameManager` so the start/continue UI no longer crashes.
+- Verified:
+  - `node --check game-manager.js` passed
+  - `/healthz` returned 200
+  - Served HTML check: `tank-hud` count = 1, `tank-interior-overlay` count = 1
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+  - `tools/test-gameplay.js http://localhost:3000`: PASS, 23 screenshots, `Errors: NONE`, final state `playing`, wave 1
+
+- Latest task: Tank feel polish and HUD-state robustness
+- Status: Complete
+- Root cause:
+  - Tanks still felt visually static during movement and cannon fire.
+  - Tank HUD visibility depended on a narrow direct-enter path instead of the actual occupied vehicle state.
+- Files changed:
+  - vehicles.js
+  - game-manager.js
+- Fix shipped:
+  - Added tank cannon recoil, exhaust smoke, and track dust using the existing tracer smoke system.
+  - Made `updateTankHUD()` auto-show for any occupied tank and auto-hide when leaving tank state.
+- Verified:
+  - `node --check vehicles.js` passed
+  - `node --check game-manager.js` passed
+  - `/healthz` returned 200
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+  - `tools/test-gameplay.js http://localhost:3000`: PASS, 23 screenshots, `Errors: NONE`, final state `playing`, wave 1
+
+- Latest task: Tank gun pitch visual sync
+- Status: Complete
+- Root cause:
+  - Tank shells already followed camera pitch, but the visible barrel assembly still looked flatter, creating an aim/readability mismatch.
+- Files changed:
+  - vehicles.js
+- Fix shipped:
+  - Added clamped `turretPitch` state and applied it to the main gun, muzzle, and coax MG so the visible assembly elevates with camera pitch.
+  - Spawn logic continues to use the actual gun mounts, so visuals and fire origin stay aligned.
+- Verified:
+  - `node --check vehicles.js` passed
+  - `/healthz` returned 200
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+  - `tools/test-gameplay.js http://localhost:3000`: PASS, 23 screenshots, `Errors: NONE`, final state `playing`, wave 1
+
+- Latest task: Tank wreck persistence
+- Status: Complete
+- Root cause:
+  - Destroyed tanks disappeared immediately, which made kills read abruptly and wasted the improved destruction feedback already added.
+- Files changed:
+  - vehicles.js
+- Fix shipped:
+  - Destroyed tanks now remain briefly as darkened smoking wrecks with occasional sparks.
+  - Wrecks stay out of gameplay because they remain `alive = false`, then clean themselves up after a short timer.
+- Verified:
+  - `node --check vehicles.js` passed
+  - `/healthz` returned 200
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+  - `tools/test-gameplay.js http://localhost:3000`: PASS, 23 screenshots, `Errors: NONE`, final state `playing`, wave 1
+
+- Latest task: Tank armored-hit feedback
+- Status: Complete
+- Root cause:
+  - Tanks reacted clearly when aiming or dying, but incoming hits still lacked readable armored-impact feedback during live combat.
+- Files changed:
+  - vehicles.js
+- Fix shipped:
+  - Added rate-limited tank hit feedback with sparks and metallic impact debris at the hull.
+  - Played ricochet audio for mostly deflected hits and hit audio for heavier penetrations.
+  - Added small camera shake when the player is inside the tank and taking hits.
+- Verified:
+  - `node --check vehicles.js` passed
+  - `/healthz` returned 200
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+  - `tools/test-gameplay.js http://localhost:3000`: PASS, 23 screenshots, `Errors: NONE`, final state `playing`, wave 1
+
+- Latest task: Tank damage feedback readability
+- Status: Complete
+- Root cause:
+  - Tanks had weak damage-state feedback, so heavy hits and near-destruction states were hard to read during combat.
+- Files changed:
+  - vehicles.js
+- Fix shipped:
+  - Added low-health smoke pulses for damaged tanks.
+  - Added a larger destruction explosion and explosion audio cue when a vehicle is destroyed.
+- Verified:
+  - `node --check vehicles.js` passed
+  - `/healthz` returned 200
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+  - `tools/test-gameplay.js http://localhost:3000`: PASS, 23 screenshots, `Errors: NONE`, final state `playing`, wave 1
+
+- Current task: Commit current tank polish stack, attempt push, then continue with next tank-feel batch
+- Status: In progress
+- Plan:
+  - Commit the existing verified tank-polish worktree exactly as-is, including checkpoint/task/session logs and refreshed QA screenshots
+  - Attempt `git push origin main` with current credentials and record whether remote auth is still blocked
+  - Implement one more small tank polish batch, re-run full proxy QA, then commit and attempt a second push

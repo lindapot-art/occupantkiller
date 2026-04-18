@@ -1829,9 +1829,12 @@ const GameManager = (function () {
   }
 
   function updateTankHUD() {
-    if (!_tankHUDVisible) return;
     var v = VehicleSystem.getOccupied();
-    if (!v || !v.isTank) { hideTankHUD(); return; }
+    if (!v || !v.isTank) {
+      if (_tankHUDVisible) hideTankHUD();
+      return;
+    }
+    if (!_tankHUDVisible) showTankHUD();
 
     // Update ammo
     var ammo = VehicleSystem.getTankAmmo();
@@ -1839,24 +1842,43 @@ const GameManager = (function () {
     var cannonMax = document.getElementById('tank-cannon-max');
     var mgEl = document.getElementById('tank-mg-ammo');
     var hpEl = document.getElementById('tank-hp-pct');
+    var viewEl = document.getElementById('tank-view-mode');
 
     if (cannonEl) cannonEl.textContent = ammo.cannon;
     if (cannonMax) cannonMax.textContent = ammo.maxCannon;
     if (mgEl) mgEl.textContent = ammo.mg;
     if (hpEl) hpEl.textContent = Math.round((v.health / v.maxHealth) * 100);
+    if (viewEl) viewEl.textContent = v.viewMode === 'first' ? 'PERISCOPE' : 'THIRD PERSON';
 
     // Reload bar
     var reloadBar = document.getElementById('tank-reload-bar');
     var reloadFill = document.getElementById('tank-reload-fill');
     var reloadText = document.getElementById('tank-reload-text');
+    var reloadFlash = document.getElementById('tank-reload-flash');
     if (v.fireCooldown > 0) {
       var prog = VehicleSystem.getTankReloadProgress();
       if (reloadBar) reloadBar.style.display = 'block';
       if (reloadFill) reloadFill.style.width = (prog * 100) + '%';
       if (reloadText) reloadText.style.display = 'block';
+      if (reloadFlash) {
+        reloadFlash.classList.add('active');
+        reloadFlash.style.opacity = (0.12 + (1 - prog) * 0.16).toFixed(3);
+      }
     } else {
       if (reloadBar) reloadBar.style.display = 'none';
       if (reloadText) reloadText.style.display = 'none';
+      if (reloadFlash) {
+        reloadFlash.classList.remove('active');
+        reloadFlash.style.opacity = '0';
+      }
+    }
+
+    // Speed vignette — darkens edges when moving fast
+    var speedVign = document.getElementById('tank-speed-vignette');
+    if (speedVign && v.velocity) {
+      var spd = Math.sqrt(v.velocity.x * v.velocity.x + v.velocity.z * v.velocity.z);
+      var t = Math.min(1, Math.max(0, (spd - 2) / (v.speed - 2)));
+      speedVign.style.opacity = (t * 0.7).toFixed(3);
     }
 
     // Interior overlay (periscope view) — show only in first person
@@ -2020,6 +2042,50 @@ const GameManager = (function () {
     MissionSystem.generateRandom();
     } catch (err) {
       console.error('Failed to initialize game:', err);
+    }
+  }
+
+  function hasSave() {
+    try {
+      return !!localStorage.getItem('ok_save');
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function loadGame() {
+    try {
+      var raw = localStorage.getItem('ok_save');
+      if (!raw) return false;
+      var save = JSON.parse(raw);
+      if (!save || typeof save !== 'object') return false;
+
+      if (typeof save.wave === 'number' && isFinite(save.wave)) {
+        currentWave = Math.max(0, Math.floor(save.wave));
+      }
+      if (typeof save.stage === 'number' && isFinite(save.stage)) {
+        currentStage = Math.max(0, Math.min(STAGES.length - 1, Math.floor(save.stage)));
+      }
+      if (typeof save.score === 'number' && isFinite(save.score)) {
+        player.score = Math.max(0, Math.floor(save.score));
+      }
+      if (typeof save.kills === 'number' && isFinite(save.kills)) {
+        player.kills = Math.max(0, Math.floor(save.kills));
+      }
+      if (typeof save.hp === 'number' && isFinite(save.hp)) {
+        player.hp = Math.max(1, Math.min(player.maxHp, save.hp));
+      }
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function deleteSave() {
+    try {
+      localStorage.removeItem('ok_save');
+    } catch (_e) {
+      // noop
     }
   }
 
@@ -5276,6 +5342,9 @@ const GameManager = (function () {
     STAGES,
     init,
     startGame,
+    hasSave,
+    loadGame,
+    deleteSave,
     nextStage,
     update,
     beginWave,

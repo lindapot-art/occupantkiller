@@ -40,8 +40,45 @@ const VehicleSystem = (function () {
   /* ── Tank-specific State ─────────────────────────────────────────── */
   const TANK_CANNON_PROJ_SPEED = 60;
   const TANK_MG_PROJ_SPEED = 80;
+  const TANK_MIN_PITCH = -0.12;
+  const TANK_MAX_PITCH = 0.32;
+  const TANK_DUST_INTERVAL = 0.12;
+  const TANK_EXHAUST_INTERVAL = 0.22;
   var _tankMGCooldown = 0;
   var _tankCannonAmmo = 20;
+
+  /* ── Scorch mark pool ────────────────────────────────────────────── */
+  var scorchMarks = [];
+  var _scorchGeo = null;
+  var _scorchMat = null;
+
+  /* ── Cannon muzzle flash light ───────────────────────────────────── */
+  var _muzzleFlashLight = null;
+  var _muzzleFlashTimer = 0;
+
+  /* ── MG strobe flash light ───────────────────────────────────────── */
+  var _mgStrobeLight = null;
+  var _mgStrobeTimer = 0;
+
+  /* ── Shell tracer trails ─────────────────────────────────────────── */
+  var shellTrails = [];
+
+  /* ── Tank tread marks ────────────────────────────────────────────── */
+  var treadMarks = [];
+  var _treadMarkInterval = 0.18;  // seconds between marks
+  var _lastTreadPos = new THREE.Vector3();
+  var _treadDistAccum = 0;
+  var _treadGeo = null;
+
+  /* ── MG shell casings ─────────────────────────────────────────── */
+  var mgCasings = [];
+  var _casingGeo = null;
+  var _casingMat = null;
+
+  /* ── Cannon impact shockwave rings ─────────────────────────────── */
+  var shockwaveRings = [];
+  var _shockwaveGeo = null;
+
   var _tankMGAmmo = 500;
   var _tankMaxCannonAmmo = 20;
   var _tankMaxMGAmmo = 500;
@@ -167,6 +204,7 @@ const VehicleSystem = (function () {
       var exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 6), matGun);
       exhaust.rotation.x = Math.PI / 2;
       exhaust.position.set(ex * 0.4, 1.2, 2.3);
+      exhaust.userData.isTankExhaust = true;
       group.add(exhaust);
     }
 
@@ -189,6 +227,7 @@ const VehicleSystem = (function () {
         wheel.rotation.z = Math.PI / 2;
         wheel.position.set(side * 1.65, 0.3, wz);
         wheel.userData.isWheel = true;
+        wheel.userData.isTankWheel = true;
         group.add(wheel);
       }
 
@@ -238,12 +277,16 @@ const VehicleSystem = (function () {
     mainGun.rotation.x = Math.PI / 2;
     mainGun.position.set(0, 0.35, -2.6);
     mainGun.userData.isMainGun = true;
+    mainGun.userData.baseZ = -2.6;
+    mainGun.userData.baseRotationX = Math.PI / 2;
     turretGroup.add(mainGun);
 
     // Muzzle brake
     var muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.08, 0.2, 8), matGun);
     muzzle.rotation.x = Math.PI / 2;
     muzzle.position.set(0, 0.35, -4.15);
+    muzzle.userData.isTankMuzzle = true;
+    muzzle.userData.baseRotationX = Math.PI / 2;
     turretGroup.add(muzzle);
 
     // Coaxial MG (right of main gun)
@@ -251,6 +294,8 @@ const VehicleSystem = (function () {
     coaxMG.rotation.x = Math.PI / 2;
     coaxMG.position.set(0.25, 0.3, -1.8);
     coaxMG.userData.isCoaxMG = true;
+    coaxMG.userData.coaxTipOffset = -0.78;
+    coaxMG.userData.baseRotationX = Math.PI / 2;
     turretGroup.add(coaxMG);
 
     // Commander's cupola (top hatch with MG)
@@ -282,6 +327,9 @@ const VehicleSystem = (function () {
     // Antenna
     var antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.015, 1.5, 4), matGun);
     antenna.position.set(0.8, 2.2, 0.5);
+    antenna.userData.isAntenna = true;
+    antenna.userData.baseRotX = 0;
+    antenna.userData.baseRotZ = 0;
     group.add(antenna);
 
     // Headlights
@@ -290,6 +338,16 @@ const VehicleSystem = (function () {
       light.rotation.x = Math.PI / 2;
       light.position.set(hl * 0.9, 0.75, -2.6);
       group.add(light);
+      // Working SpotLight beam per headlight
+      var spot = new THREE.SpotLight(0xffffcc, 0, 25, Math.PI / 6, 0.6, 1.5);
+      spot.position.set(hl * 0.9, 0.75, -2.6);
+      // Target placed forward of headlight
+      var spotTarget = new THREE.Object3D();
+      spotTarget.position.set(hl * 0.9, 0.3, -12);
+      group.add(spotTarget);
+      spot.target = spotTarget;
+      spot.userData.isHeadlight = true;
+      group.add(spot);
     }
 
     group.castShadow = true;
@@ -402,6 +460,26 @@ const VehicleSystem = (function () {
       cannonAmmo: type === 'tank' ? _tankMaxCannonAmmo : 0,
       mgAmmo: type === 'tank' ? _tankMaxMGAmmo : 0,
       turretYaw: 0,   // independent turret rotation
+      turretPitch: 0,
+      cannonRecoil: 0,
+      dustTimer: 0,
+      exhaustTimer: 0,
+      damageSmokeTimer: 0,
+      impactFxCooldown: 0,
+      wrecked: false,
+      wreckTimer: 0,
+      wreckSmokeTimer: 0,
+      // Antenna spring state
+      antennaVelX: 0,
+      antennaVelZ: 0,
+      antennaDispX: 0,
+      antennaDispZ: 0,
+      // Hull roll state
+      hullRoll: 0,
+      hullPitch: 0,
+      _prevYaw: 0,
+      _prevHSpeed: 0,
+      _headlightsOn: false,
     };
 
     vehicle.mesh = type === 'tank' ? buildTankMesh() : buildVehicleMesh(type);
@@ -467,6 +545,10 @@ const VehicleSystem = (function () {
     v.occupied = true;
     _occupiedVehicle = v;
     attachPlayerBody(v);
+    if (v.isTank) {
+      _tankCannonAmmo = v.cannonAmmo;
+      _tankMGAmmo = v.mgAmmo;
+    }
     if (v.viewMode === 'first') {
       CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
     } else {
@@ -478,6 +560,9 @@ const VehicleSystem = (function () {
       if (HUD.showHijackProgress) HUD.showHijackProgress(0);
     }
     if (typeof AudioSystem !== 'undefined' && AudioSystem.startEngine) AudioSystem.startEngine();
+    if (v.isTank && typeof HUD !== 'undefined' && HUD.notifyPickup) {
+      HUD.notifyPickup('\uD83D\uDE94 TANK CAPTURED! LMB=Cannon RMB=MG T=Toggle View', '#00ff88');
+    }
     return true;
   }
 
@@ -493,6 +578,10 @@ const VehicleSystem = (function () {
     v.occupied = true;
     _occupiedVehicle = v;
     attachPlayerBody(v);
+    if (v.isTank) {
+      _tankCannonAmmo = v.cannonAmmo;
+      _tankMGAmmo = v.mgAmmo;
+    }
     if (v.viewMode === 'first') {
       CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
     } else {
@@ -500,6 +589,9 @@ const VehicleSystem = (function () {
     }
     CameraSystem.setVehicleTarget(v.mesh);
     if (typeof HUD !== 'undefined' && HUD.showVehicleHUD) HUD.showVehicleHUD(v);
+    if (v.isTank && typeof HUD !== 'undefined' && HUD.notifyPickup) {
+      HUD.notifyPickup('\uD83D\uDE94 TANK CAPTURED! LMB=Cannon RMB=MG T=Toggle View', '#00ff88');
+    }
     return true;
   }
 
@@ -586,7 +678,10 @@ const VehicleSystem = (function () {
     }
 
     for (const v of vehicles) {
-      if (!v.alive) continue;
+      if (!v.alive) {
+        if (v.wrecked) updateVehicleWreck(v, delta);
+        continue;
+      }
 
       // Fire cooldown
       if (v.fireCooldown > 0) v.fireCooldown -= delta;
@@ -653,6 +748,20 @@ const VehicleSystem = (function () {
       v.mesh.position.copy(v.position);
       v.mesh.rotation.copy(v.rotation);
 
+      if (v.isTank) updateTankEffects(v, delta);
+
+      // Tank idle engine vibration — subtle camera rumble when stationary
+      if (v.isTank && v === _occupiedVehicle) {
+        var hSpd = Math.sqrt(v.velocity.x * v.velocity.x + v.velocity.z * v.velocity.z);
+        if (hSpd < 0.5 && typeof CameraSystem !== 'undefined' && CameraSystem.shake) {
+          v._idleVibTimer = (v._idleVibTimer || 0) + delta;
+          if (v._idleVibTimer >= 0.25) {
+            v._idleVibTimer = 0;
+            CameraSystem.shake(0.003, 0.2);  // very subtle rumble
+          }
+        }
+      }
+
       // Rotor animation
       v.mesh.children.forEach(child => {
         if (child.userData.isRotor) child.rotation.y += delta * 20;
@@ -665,10 +774,258 @@ const VehicleSystem = (function () {
 
     // Update turret projectiles
     updateTurretProjectiles(delta);
+    updateScorchMarks(delta);
+    updateMuzzleFlashLight(delta);
+    updateShellTrails(delta);
+    updateTreadMarks(delta);
+    updateShockwaveRings(delta);
+    updateMGCasings(delta);
 
     // Update vehicle HUD
     if (_occupiedVehicle && typeof HUD !== 'undefined' && HUD.updateVehicleHUD) {
       HUD.updateVehicleHUD(_occupiedVehicle);
+    }
+  }
+
+  function updateVehicleWreck(v, delta) {
+    if (!v || !v.wrecked || !v.mesh) return;
+    v.wreckTimer -= delta;
+    v.wreckSmokeTimer -= delta;
+
+    if (v.wreckSmokeTimer <= 0) {
+      v.wreckSmokeTimer = 0.14;
+      spawnTankDamageSmoke(v, 2);
+      if (typeof Tracers !== 'undefined' && Tracers.spawnSparks && Math.random() < 0.35) {
+        _vTmp1.set(
+          v.position.x + (Math.random() - 0.5) * 1.8,
+          v.position.y + 0.8 + Math.random() * 1.2,
+          v.position.z + (Math.random() - 0.5) * 2.8
+        );
+        Tracers.spawnSparks(_vTmp1);
+      }
+    }
+
+    if (v.wreckTimer <= 0) {
+      disposeVehicleMesh(v);
+      v.wrecked = false;
+    }
+  }
+
+  /* ── Cannon Scorch Marks ─────────────────────────────────────────── */
+  function spawnScorchMark(pos) {
+    if (!_scene) return;
+    if (!_scorchGeo) _scorchGeo = new THREE.CircleGeometry(1.8, 8);
+    if (!_scorchMat) _scorchMat = new THREE.MeshBasicMaterial({
+      color: 0x1a1a1a, transparent: true, opacity: 0.7, depthWrite: false,
+    });
+    var mesh = new THREE.Mesh(_scorchGeo, _scorchMat.clone());
+    mesh.rotation.x = -Math.PI / 2;                     // flat on ground
+    mesh.position.set(pos.x, pos.y + 0.05, pos.z);      // just above terrain
+    var scale = 0.8 + Math.random() * 0.6;
+    mesh.scale.set(scale, scale, 1);
+    mesh.rotation.z = Math.random() * Math.PI * 2;      // random twist
+    _scene.add(mesh);
+    scorchMarks.push({ mesh: mesh, life: 18 });
+    // Cap pool to 20 marks
+    if (scorchMarks.length > 20) {
+      var old = scorchMarks.shift();
+      if (old.mesh) { old.mesh.material.dispose(); _scene.remove(old.mesh); }
+    }
+  }
+
+  function updateScorchMarks(delta) {
+    for (var i = scorchMarks.length - 1; i >= 0; i--) {
+      var s = scorchMarks[i];
+      s.life -= delta;
+      // Fade out over last 4 seconds
+      if (s.life < 4) s.mesh.material.opacity = Math.max(0, s.life / 4 * 0.7);
+      if (s.life <= 0) {
+        s.mesh.material.dispose();
+        _scene.remove(s.mesh);
+        scorchMarks.splice(i, 1);
+      }
+    }
+  }
+
+  function spawnBulletTerrainImpact(pos) {
+    if (!_scene) return;
+    if (typeof Tracers !== 'undefined' && Tracers.spawnSparks) {
+      Tracers.spawnSparks(pos);
+    }
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.playRicochet) {
+      AudioSystem.playRicochet();
+    }
+  }
+
+  /* ── Muzzle flash light fade ─────────────────────────────────────── */
+  function updateMuzzleFlashLight(delta) {
+    if (_muzzleFlashTimer > 0) {
+      _muzzleFlashTimer -= delta;
+      if (_muzzleFlashLight) {
+        _muzzleFlashLight.intensity = 3.0 * Math.max(0, _muzzleFlashTimer / 0.15);
+      }
+      if (_muzzleFlashTimer <= 0 && _muzzleFlashLight) {
+        _muzzleFlashLight.intensity = 0;
+      }
+    }
+    // MG strobe
+    if (_mgStrobeTimer > 0) {
+      _mgStrobeTimer -= delta;
+      if (_mgStrobeLight) {
+        _mgStrobeLight.intensity = 1.5 * Math.max(0, _mgStrobeTimer / 0.06);
+      }
+      if (_mgStrobeTimer <= 0 && _mgStrobeLight) {
+        _mgStrobeLight.intensity = 0;
+      }
+    }
+  }
+
+  /* ── Tank tread marks ────────────────────────────────────────────── */
+  function spawnTreadMark(v) {
+    if (!_scene) return;
+    if (!_treadGeo) _treadGeo = new THREE.PlaneGeometry(0.6, 2.0);
+    var yaw = v.rotation.y;
+    var rightX = Math.cos(yaw);
+    var rightZ = -Math.sin(yaw);
+    for (var side = -1; side <= 1; side += 2) {
+      var mat = new THREE.MeshBasicMaterial({ color: 0x222211, transparent: true, opacity: 0.5, depthWrite: false });
+      var mesh = new THREE.Mesh(_treadGeo, mat);
+      mesh.position.set(
+        v.position.x + rightX * side * 1.4,
+        v.position.y + 0.02,
+        v.position.z + rightZ * side * 1.4
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.rotation.z = -yaw;
+      _scene.add(mesh);
+      treadMarks.push({ mesh: mesh, life: 12 });
+    }
+    // Pool cap
+    while (treadMarks.length > 120) {
+      var old = treadMarks.shift();
+      old.mesh.material.dispose();
+      _scene.remove(old.mesh);
+    }
+  }
+
+  function updateTreadMarks(delta) {
+    for (var i = treadMarks.length - 1; i >= 0; i--) {
+      var t = treadMarks[i];
+      t.life -= delta;
+      t.mesh.material.opacity = 0.5 * Math.max(0, t.life / 12);
+      if (t.life <= 0) {
+        t.mesh.material.dispose();
+        _scene.remove(t.mesh);
+        treadMarks.splice(i, 1);
+      }
+    }
+  }
+
+  /* ── Cannon impact shockwave rings ───────────────────────────────── */
+  function spawnShockwaveRing(pos) {
+    if (!_scene) return;
+    if (!_shockwaveGeo) _shockwaveGeo = new THREE.RingGeometry(0.2, 0.5, 24);
+    var mat = new THREE.MeshBasicMaterial({ color: 0xffaa44, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false });
+    var mesh = new THREE.Mesh(_shockwaveGeo, mat);
+    mesh.position.set(pos.x, pos.y + 0.1, pos.z);
+    mesh.rotation.x = -Math.PI / 2;
+    _scene.add(mesh);
+    shockwaveRings.push({ mesh: mesh, age: 0, maxAge: 0.4 });
+    // Cap pool
+    if (shockwaveRings.length > 8) {
+      var old = shockwaveRings.shift();
+      old.mesh.material.dispose();
+      _scene.remove(old.mesh);
+    }
+  }
+
+  function updateShockwaveRings(delta) {
+    for (var i = shockwaveRings.length - 1; i >= 0; i--) {
+      var r = shockwaveRings[i];
+      r.age += delta;
+      var t = r.age / r.maxAge;
+      // Expand from scale 1 to 12 over lifetime
+      var s = 1 + t * 11;
+      r.mesh.scale.set(s, s, s);
+      r.mesh.material.opacity = 0.7 * (1 - t);
+      if (r.age >= r.maxAge) {
+        r.mesh.material.dispose();
+        _scene.remove(r.mesh);
+        shockwaveRings.splice(i, 1);
+      }
+    }
+  }
+
+  /* ── MG Shell Casing Ejection ──────────────────────────────────── */
+  function spawnMGCasing(firePos, camYaw) {
+    if (!_scene) return;
+    if (!_casingGeo) _casingGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.06, 4);
+    if (!_casingMat) _casingMat = new THREE.MeshLambertMaterial({ color: 0xC8A832 });
+    var mesh = new THREE.Mesh(_casingGeo, _casingMat);
+    mesh.position.copy(firePos);
+    // Eject to the right of the gun, slightly up
+    var rightX = Math.cos(camYaw);
+    var rightZ = -Math.sin(camYaw);
+    _scene.add(mesh);
+    mgCasings.push({
+      mesh: mesh,
+      vx: rightX * (2.5 + Math.random() * 1.5) + (Math.random() - 0.5) * 0.5,
+      vy: 1.8 + Math.random() * 1.2,
+      vz: rightZ * (2.5 + Math.random() * 1.5) + (Math.random() - 0.5) * 0.5,
+      rotSpeed: (Math.random() - 0.5) * 20,
+      life: 1.5
+    });
+    // Cap pool size
+    while (mgCasings.length > 30) {
+      var old = mgCasings.shift();
+      if (_scene) _scene.remove(old.mesh);
+    }
+  }
+
+  function updateMGCasings(delta) {
+    for (var i = mgCasings.length - 1; i >= 0; i--) {
+      var c = mgCasings[i];
+      c.life -= delta;
+      c.vy -= 9.8 * delta; // gravity
+      c.mesh.position.x += c.vx * delta;
+      c.mesh.position.y += c.vy * delta;
+      c.mesh.position.z += c.vz * delta;
+      c.mesh.rotation.x += c.rotSpeed * delta;
+      c.mesh.rotation.z += c.rotSpeed * 0.7 * delta;
+      // Fade out in last 0.4s
+      if (c.life < 0.4) {
+        c.mesh.visible = c.life > 0;
+      }
+      if (c.life <= 0) {
+        if (_scene) _scene.remove(c.mesh);
+        mgCasings.splice(i, 1);
+      }
+    }
+  }
+
+  /* ── Shell tracer trails update ──────────────────────────────────── */
+  function updateShellTrails(delta) {
+    for (var i = shellTrails.length - 1; i >= 0; i--) {
+      var t = shellTrails[i];
+      t.life -= delta;
+      var positions = t.line.geometry.attributes.position.array;
+      // Tail end stays at origin initially, then fades toward head
+      if (t.proj && t.proj.mesh && t.proj.mesh.parent) {
+        // Head follows projectile
+        positions[3] = t.proj.mesh.position.x;
+        positions[4] = t.proj.mesh.position.y;
+        positions[5] = t.proj.mesh.position.z;
+      }
+      t.line.geometry.attributes.position.needsUpdate = true;
+      // Fade opacity
+      var alpha = Math.max(0, t.life / 4.0);
+      t.line.material.opacity = alpha * 0.9;
+      if (t.life <= 0) {
+        t.line.geometry.dispose();
+        t.line.material.dispose();
+        if (_scene) _scene.remove(t.line);
+        shellTrails.splice(i, 1);
+      }
     }
   }
 
@@ -684,6 +1041,8 @@ const VehicleSystem = (function () {
     if (_vKeys.s) v.velocity.addScaledVector(_vTmp1, -accel * delta * 0.5);
     if (_vKeys.a) v.rotation.y += delta * 1.5;
     if (_vKeys.d) v.rotation.y -= delta * 1.5;
+    // Track turn rate for hull roll
+    v._turnRate = (_vKeys.a ? 1.5 : 0) + (_vKeys.d ? -1.5 : 0);
 
     if (v.flying) {
       if (_vKeys.up) v.velocity.y += accel * delta * 0.5;
@@ -702,6 +1061,236 @@ const VehicleSystem = (function () {
     }
     // Update engine sound with current speed
     if (typeof AudioSystem !== 'undefined' && AudioSystem.updateEngine) AudioSystem.updateEngine(hSpeed);
+  }
+
+  function updateTankEffects(v, delta) {
+    if (!v || !v.mesh) return;
+    var hSpeed = Math.sqrt(v.velocity.x * v.velocity.x + v.velocity.z * v.velocity.z);
+    var terrainH = typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight
+      ? VoxelWorld.getTerrainHeight(v.position.x, v.position.z)
+      : v.position.y;
+    var grounded = v.position.y <= terrainH + 0.05;
+
+    if (v.cannonRecoil > 0) {
+      v.cannonRecoil = Math.max(0, v.cannonRecoil - delta * 1.4);
+    }
+
+    for (var ci = 0; ci < v.mesh.children.length; ci++) {
+      var child = v.mesh.children[ci];
+      if (child.userData && child.userData.isTurret) {
+        for (var ti = 0; ti < child.children.length; ti++) {
+          var turretChild = child.children[ti];
+          if (turretChild.userData && turretChild.userData.isMainGun) {
+            var baseZ = turretChild.userData.baseZ || -2.6;
+            turretChild.position.z = baseZ + v.cannonRecoil * 0.5;
+          }
+        }
+      }
+    }
+
+    if (grounded && hSpeed > 1.4) {
+      v.dustTimer -= delta;
+      if (v.dustTimer <= 0) {
+        v.dustTimer = TANK_DUST_INTERVAL;
+        spawnTankDust(v, Math.min(1, hSpeed / Math.max(1, v.speed)));
+      }
+      // Tread marks — spawn at intervals based on distance traveled
+      _treadDistAccum += hSpeed * delta;
+      if (_treadDistAccum >= 2.0) {
+        _treadDistAccum = 0;
+        spawnTreadMark(v);
+      }
+    } else {
+      v.dustTimer = Math.min(v.dustTimer, 0.05);
+      _treadDistAccum = 0;
+    }
+
+    v.exhaustTimer -= delta;
+    if (v.exhaustTimer <= 0) {
+      v.exhaustTimer = grounded && hSpeed > 0.8 ? TANK_EXHAUST_INTERVAL : TANK_EXHAUST_INTERVAL * 1.8;
+      spawnTankExhaust(v, grounded && hSpeed > 0.8 ? 2 : 1);
+    }
+
+    var healthRatio = v.maxHealth > 0 ? (v.health / v.maxHealth) : 0;
+    if (healthRatio < 0.45) {
+      v.damageSmokeTimer -= delta;
+      if (v.damageSmokeTimer <= 0) {
+        v.damageSmokeTimer = healthRatio < 0.2 ? 0.08 : 0.16;
+        spawnTankDamageSmoke(v, healthRatio < 0.2 ? 2 : 1);
+      }
+    } else {
+      v.damageSmokeTimer = 0;
+    }
+
+    if (v.impactFxCooldown > 0) {
+      v.impactFxCooldown = Math.max(0, v.impactFxCooldown - delta);
+    }
+
+    // ── Antenna spring wobble ──
+    // Driving forces: velocity changes + cannon recoil kick
+    var accelForceX = -v.velocity.x * 0.3;
+    var accelForceZ = -v.velocity.z * 0.3;
+    if (v.cannonRecoil > 0.3) {
+      // Cannon just fired — big kick
+      accelForceX += (Math.random() - 0.5) * 4;
+      accelForceZ += (Math.random() - 0.5) * 4;
+    }
+    var springK = 25;   // stiffness
+    var damping = 4.5;  // damping
+    v.antennaVelX += (-springK * v.antennaDispX - damping * v.antennaVelX + accelForceX) * delta;
+    v.antennaVelZ += (-springK * v.antennaDispZ - damping * v.antennaVelZ + accelForceZ) * delta;
+    v.antennaDispX += v.antennaVelX * delta;
+    v.antennaDispZ += v.antennaVelZ * delta;
+    // Clamp displacement
+    var maxDisp = 0.35;
+    v.antennaDispX = Math.max(-maxDisp, Math.min(maxDisp, v.antennaDispX));
+    v.antennaDispZ = Math.max(-maxDisp, Math.min(maxDisp, v.antennaDispZ));
+    // Apply to antenna mesh
+    for (var ai = 0; ai < v.mesh.children.length; ai++) {
+      if (v.mesh.children[ai].userData && v.mesh.children[ai].userData.isAntenna) {
+        v.mesh.children[ai].rotation.x = v.antennaDispZ * 0.8;
+        v.mesh.children[ai].rotation.z = v.antennaDispX * 0.8;
+        break;
+      }
+    }
+
+    // ── Hull body roll on turns ──
+    var targetRoll = (v._turnRate || 0) * hSpeed * 0.012; // lean proportional to turn × speed
+    targetRoll = Math.max(-0.06, Math.min(0.06, targetRoll)); // cap at ~3.4 degrees
+    v.hullRoll += (targetRoll - v.hullRoll) * Math.min(1, delta * 6);
+    v.mesh.rotation.z = v.hullRoll;
+
+    // ── Suspension pitch on accel/brake ──
+    var accelDelta = hSpeed - (v._prevHSpeed || 0);
+    var targetPitch = -accelDelta * 0.4; // nose dips on brake (decel), rises on accel
+    targetPitch = Math.max(-0.04, Math.min(0.04, targetPitch)); // cap ~2.3 degrees
+    v.hullPitch += (targetPitch - v.hullPitch) * Math.min(1, delta * 5);
+    v.mesh.rotation.x = v.hullPitch;
+    v._prevHSpeed = hSpeed;
+
+    // ── Headlight beams ──
+    if (!v._headlightsOn && v.occupied) {
+      v._headlightsOn = true;
+      v.mesh.traverse(function(ch) {
+        if (ch.isSpotLight && ch.userData && ch.userData.isHeadlight) ch.intensity = 1.8;
+      });
+    } else if (v._headlightsOn && !v.occupied) {
+      v._headlightsOn = false;
+      v.mesh.traverse(function(ch) {
+        if (ch.isSpotLight && ch.userData && ch.userData.isHeadlight) ch.intensity = 0;
+      });
+    }
+
+    // Hull damage darkening — tint hull materials toward charred black as HP drops
+    if (healthRatio < 0.9) {
+      var darkFactor = Math.max(0, healthRatio);  // 1.0=pristine, 0=charred
+      if (!v._origColors) {
+        v._origColors = [];
+        v.mesh.traverse(function(child) {
+          if (child.isMesh && child.material && child.material.color) {
+            v._origColors.push({ mat: child.material, r: child.material.color.r, g: child.material.color.g, b: child.material.color.b });
+          }
+        });
+      }
+      for (var oc = 0; oc < v._origColors.length; oc++) {
+        var entry = v._origColors[oc];
+        entry.mat.color.setRGB(
+          entry.r * darkFactor,
+          entry.g * darkFactor,
+          entry.b * darkFactor
+        );
+      }
+    }
+  }
+
+  function spawnTankDust(v, intensity) {
+    if (typeof Tracers === 'undefined' || !Tracers.spawnSmoke) return;
+    var yaw = v.rotation.y;
+    var backX = Math.sin(yaw);
+    var backZ = Math.cos(yaw);
+    var rightX = Math.cos(yaw);
+    var rightZ = -Math.sin(yaw);
+    for (var side = -1; side <= 1; side += 2) {
+      _vTmp1.set(
+        v.position.x + rightX * side * 1.6 + backX * 1.6,
+        v.position.y + 0.15,
+        v.position.z + rightZ * side * 1.6 + backZ * 1.6
+      );
+      Tracers.spawnSmoke(_vTmp1);
+      if (intensity > 0.65) {
+        _vTmp2.copy(_vTmp1);
+        _vTmp2.x += (Math.random() - 0.5) * 0.35;
+        _vTmp2.z += (Math.random() - 0.5) * 0.35;
+        Tracers.spawnSmoke(_vTmp2);
+      }
+    }
+  }
+
+  function spawnTankExhaust(v, count) {
+    if (typeof Tracers === 'undefined' || !Tracers.spawnSmoke) return;
+    count = count || 1;
+    var yaw = v.rotation.y;
+    var backX = Math.sin(yaw);
+    var backZ = Math.cos(yaw);
+    var rightX = Math.cos(yaw);
+    var rightZ = -Math.sin(yaw);
+    for (var side = -1; side <= 1; side += 2) {
+      for (var i = 0; i < count; i++) {
+        _vTmp1.set(
+          v.position.x + rightX * side * 0.45 + backX * 2.45 + (Math.random() - 0.5) * 0.08,
+          v.position.y + 1.2 + Math.random() * 0.08,
+          v.position.z + rightZ * side * 0.45 + backZ * 2.45 + (Math.random() - 0.5) * 0.08
+        );
+        Tracers.spawnSmoke(_vTmp1);
+      }
+    }
+  }
+
+  function spawnTankDamageSmoke(v, count) {
+    if (typeof Tracers === 'undefined' || !Tracers.spawnSmoke) return;
+    count = count || 1;
+    for (var i = 0; i < count; i++) {
+      _vTmp1.set(
+        v.position.x + (Math.random() - 0.5) * 0.8,
+        v.position.y + 1.6 + Math.random() * 0.35,
+        v.position.z + 0.6 + (Math.random() - 0.5) * 0.8
+      );
+      Tracers.spawnSmoke(_vTmp1);
+    }
+  }
+
+  function spawnTankImpactFeedback(v, amount, actualDmg) {
+    if (!v || !v.mesh) return;
+
+    var armorAbsorbed = Math.max(0, amount - actualDmg);
+    var mostlyDeflected = armorAbsorbed >= Math.max(4, amount * 0.4);
+    _vTmp1.set(
+      v.position.x + (Math.random() - 0.5) * 2.1,
+      v.position.y + 0.8 + Math.random() * 1.1,
+      v.position.z + (Math.random() - 0.5) * 3.3
+    );
+
+    if (typeof Tracers !== 'undefined') {
+      if (Tracers.spawnSparks) Tracers.spawnSparks(_vTmp1);
+      if (Tracers.spawnBlockImpact) Tracers.spawnBlockImpact(_vTmp1, mostlyDeflected ? 0xb8bfc7 : 0x5f666d);
+    }
+
+    if (mostlyDeflected) {
+      if (typeof AudioSystem !== 'undefined' && AudioSystem.playRicochet) AudioSystem.playRicochet();
+    } else if (typeof AudioSystem !== 'undefined' && AudioSystem.playHit) {
+      AudioSystem.playHit();
+    }
+
+    if (v === _occupiedVehicle && typeof CameraSystem !== 'undefined' && CameraSystem.shake) {
+      CameraSystem.shake(Math.min(0.18, 0.05 + actualDmg * 0.006), mostlyDeflected ? 0.12 : 0.18);
+      // Flash red vignette on the periscope overlay
+      var flashEl = document.getElementById('tank-hit-flash');
+      if (flashEl) {
+        flashEl.classList.remove('active');
+        void flashEl.offsetWidth;          // reflow to restart animation
+        flashEl.classList.add('active');
+      }
+    }
   }
 
   /* ── AI Patrol Waypoint System ─────────────────────────────────── */
@@ -896,6 +1485,7 @@ const VehicleSystem = (function () {
     if (!_scene || v.fireCooldown > 0 || v.cannonAmmo <= 0) return;
     v.fireCooldown = v.fireRate;
     v.cannonAmmo--;
+    v.cannonRecoil = 0.35;
     _tankCannonAmmo = v.cannonAmmo;
 
     var camYaw = CameraSystem.getYaw();
@@ -907,11 +1497,13 @@ const VehicleSystem = (function () {
       -Math.cos(camYaw) * Math.cos(camPitch)
     ).normalize();
 
-    // Spawn from turret muzzle position
-    _vTmp2.copy(v.position);
-    _vTmp2.y += 1.65; // turret height
-    _vTmp2.x += -Math.sin(camYaw) * 4.5;
-    _vTmp2.z += -Math.cos(camYaw) * 4.5;
+    // Spawn from actual cannon muzzle when available
+    if (!getTankWeaponMountWorld(v, 'cannon', _vTmp2)) {
+      _vTmp2.copy(v.position);
+      _vTmp2.y += 1.65;
+      _vTmp2.x += -Math.sin(camYaw) * 4.5;
+      _vTmp2.z += -Math.cos(camYaw) * 4.5;
+    }
 
     // Cannon shell (larger, faster projectile)
     var shellMesh = new THREE.Mesh(
@@ -933,6 +1525,31 @@ const VehicleSystem = (function () {
     if (typeof Tracers !== 'undefined' && Tracers.spawnMuzzleFlash) {
       Tracers.spawnMuzzleFlash(_vTmp2, _vTmp1);
     }
+    // Muzzle flash point light (brief orange light burst)
+    if (_scene) {
+      if (!_muzzleFlashLight) {
+        _muzzleFlashLight = new THREE.PointLight(0xff8800, 0, 18);
+        _scene.add(_muzzleFlashLight);
+      }
+      _muzzleFlashLight.position.copy(_vTmp2);
+      _muzzleFlashLight.intensity = 3.0;
+      _muzzleFlashTimer = 0.15;
+    }
+    // Shell tracer trail — glowing line that follows the projectile
+    if (_scene) {
+      var trailGeo = new THREE.BufferGeometry();
+      var positions = new Float32Array(6); // 2 vertices × 3 coords
+      positions[0] = _vTmp2.x; positions[1] = _vTmp2.y; positions[2] = _vTmp2.z;
+      positions[3] = _vTmp2.x; positions[4] = _vTmp2.y; positions[5] = _vTmp2.z;
+      trailGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      var trailLine = new THREE.Line(trailGeo,
+        new THREE.LineBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.9 })
+      );
+      _scene.add(trailLine);
+      var lastProj = turretProjectiles[turretProjectiles.length - 1];
+      shellTrails.push({ line: trailLine, proj: lastProj, origin: _vTmp2.clone(), life: 4.0 });
+    }
+    spawnTankExhaust(v, 3);
     // Reload notification
     if (typeof HUD !== 'undefined' && HUD.notifyPickup) {
       HUD.notifyPickup('\uD83D\uDCA5 CANNON FIRED! Reloading... (' + v.cannonAmmo + ' shells left)', '#ff8800');
@@ -957,10 +1574,12 @@ const VehicleSystem = (function () {
       -Math.cos(camYaw) * Math.cos(camPitch) + (Math.random() - 0.5) * spread
     ).normalize();
 
-    _vTmp2.copy(v.position);
-    _vTmp2.y += 1.6;
-    _vTmp2.x += -Math.sin(camYaw) * 2.5;
-    _vTmp2.z += -Math.cos(camYaw) * 2.5;
+    if (!getTankWeaponMountWorld(v, 'coax', _vTmp2)) {
+      _vTmp2.copy(v.position);
+      _vTmp2.y += 1.6;
+      _vTmp2.x += -Math.sin(camYaw) * 2.5;
+      _vTmp2.z += -Math.cos(camYaw) * 2.5;
+    }
 
     var bulletMesh = new THREE.Mesh(
       new THREE.BoxGeometry(0.04, 0.04, 0.2),
@@ -979,35 +1598,86 @@ const VehicleSystem = (function () {
       Tracers.spawnTracer(_vTmp2, _vTmp1, 0xffcc44, 100);
     }
     if (typeof AudioSystem !== 'undefined' && AudioSystem.playGunshot) AudioSystem.playGunshot('hmg');
+    // Shell casing ejection
+    spawnMGCasing(_vTmp2, camYaw);
+    // MG strobe flash light (brief yellow flash at coax mount)
+    if (_scene) {
+      if (!_mgStrobeLight) {
+        _mgStrobeLight = new THREE.PointLight(0xffdd44, 0, 10);
+        _scene.add(_mgStrobeLight);
+      }
+      _mgStrobeLight.position.copy(_vTmp2);
+      _mgStrobeLight.intensity = 1.5;
+      _mgStrobeTimer = 0.06;
+    }
   }
 
   /* ── Tank Turret Rotation (follows camera yaw) ──────────────────── */
   function updateTankTurret(v, delta) {
     if (!v.isTank || !v.mesh) return;
     var camYaw = CameraSystem.getYaw();
+    var camPitch = CameraSystem.getPitch();
     // Turret rotates relative to hull
     var targetTurretYaw = camYaw - v.rotation.y;
+    var targetTurretPitch = Math.max(TANK_MIN_PITCH, Math.min(TANK_MAX_PITCH, camPitch));
     // Smooth rotation
     var diff = targetTurretYaw - v.turretYaw;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
     v.turretYaw += diff * Math.min(1, delta * 5);
+    v.turretPitch += (targetTurretPitch - v.turretPitch) * Math.min(1, delta * 6);
     // Apply to turret group in mesh
     for (var ci = 0; ci < v.mesh.children.length; ci++) {
       if (v.mesh.children[ci].userData && v.mesh.children[ci].userData.isTurret) {
         v.mesh.children[ci].rotation.y = v.turretYaw;
+        for (var ti = 0; ti < v.mesh.children[ci].children.length; ti++) {
+          var turretChild = v.mesh.children[ci].children[ti];
+          if (turretChild.userData && (turretChild.userData.isMainGun || turretChild.userData.isTankMuzzle || turretChild.userData.isCoaxMG)) {
+            turretChild.rotation.x = (turretChild.userData.baseRotationX || (Math.PI / 2)) - v.turretPitch;
+          }
+        }
         break;
       }
     }
   }
 
+  function getTankWeaponMountWorld(v, mountType, outPos) {
+    if (!v || !v.mesh || !outPos) return false;
+    for (var ci = 0; ci < v.mesh.children.length; ci++) {
+      var child = v.mesh.children[ci];
+      if (!(child.userData && child.userData.isTurret)) continue;
+      for (var ti = 0; ti < child.children.length; ti++) {
+        var turretChild = child.children[ti];
+        if (mountType === 'cannon' && turretChild.userData && turretChild.userData.isTankMuzzle) {
+          turretChild.getWorldPosition(outPos);
+          outPos.z -= 0.12;
+          return true;
+        }
+        if (mountType === 'coax' && turretChild.userData && turretChild.userData.isCoaxMG) {
+          outPos.set(0, 0, turretChild.userData.coaxTipOffset || -0.75);
+          turretChild.localToWorld(outPos);
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /* ── Tank Ammo Getters ──────────────────────────────────────────── */
   function getTankAmmo() {
+    if (_occupiedVehicle && _occupiedVehicle.isTank) {
+      return {
+        cannon: _occupiedVehicle.cannonAmmo,
+        maxCannon: _tankMaxCannonAmmo,
+        mg: _occupiedVehicle.mgAmmo,
+        maxMG: _tankMaxMGAmmo,
+      };
+    }
     return { cannon: _tankCannonAmmo, maxCannon: _tankMaxCannonAmmo, mg: _tankMGAmmo, maxMG: _tankMaxMGAmmo };
   }
 
   function isTankReloading() {
-    return _tankReloading;
+    return !!(_occupiedVehicle && _occupiedVehicle.isTank && _occupiedVehicle.fireCooldown > 0);
   }
 
   function getTankReloadProgress() {
@@ -1066,6 +1736,10 @@ const VehicleSystem = (function () {
   function updateTurretProjectiles(delta) {
     for (let i = turretProjectiles.length - 1; i >= 0; i--) {
       const p = turretProjectiles[i];
+      // Gravity drop for cannon shells (realistic arc)
+      if (p.isCannonShell) {
+        p.dir.y -= 4.8 * delta / p.speed;  // ~4.8 m/s² effective gravity scaled to speed
+      }
       p.mesh.position.addScaledVector(p.dir, p.speed * delta);
       p.life -= delta;
 
@@ -1102,14 +1776,15 @@ const VehicleSystem = (function () {
       }
 
       // Check terrain collision
+      let terrainHit = null;
       if (!hit && typeof VoxelWorld !== 'undefined') {
         _vTmp2.copy(p.mesh.position);
         const fakeCamera = {
           position: _vTmp2,
           getWorldDirection: function(v) { return v.copy(p.dir); },
         };
-        const ray = VoxelWorld.raycastBlock(fakeCamera, p.speed * delta + 0.5);
-        if (ray) hit = true;
+        terrainHit = VoxelWorld.raycastBlock(fakeCamera, p.speed * delta + 0.5);
+        if (terrainHit) hit = true;
       }
 
       if (hit || p.life <= 0) {
@@ -1123,6 +1798,17 @@ const VehicleSystem = (function () {
           if (typeof WorldFeatures !== 'undefined' && WorldFeatures.applyExplosionDamage) {
             WorldFeatures.applyExplosionDamage(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, 4, 150);
           }
+          // Scorch mark at impact site
+          spawnScorchMark(p.mesh.position);
+          // Shockwave ring at impact
+          spawnShockwaveRing(p.mesh.position);
+        } else if (terrainHit) {
+          _vTmp2.set(
+            terrainHit.hit.x + 0.5,
+            terrainHit.hit.y + 0.5,
+            terrainHit.hit.z + 0.5
+          );
+          spawnBulletTerrainImpact(_vTmp2);
         }
         p.mesh.geometry.dispose();
         p.mesh.material.dispose();
@@ -1137,22 +1823,53 @@ const VehicleSystem = (function () {
     const v = vehicles.find(v => v.id === vehicleId);
     if (!v || !v.alive) return;
     const actualDmg = Math.max(1, amount - v.armor * 5);
+    if (v.isTank && v.impactFxCooldown <= 0) {
+      v.impactFxCooldown = actualDmg <= 2 ? 0.08 : 0.12;
+      spawnTankImpactFeedback(v, amount, actualDmg);
+    }
     v.health -= actualDmg;
     if (v.health <= 0) destroyVehicle(v);
   }
 
   function destroyVehicle(v) {
     v.alive = false;
+    if (_scene && typeof Tracers !== 'undefined' && Tracers.spawnExplosion) {
+      Tracers.spawnExplosion(v.position, v.isTank ? 3.8 : 2.4);
+    }
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.playExplosion) {
+      AudioSystem.playExplosion();
+    }
     if (v === _occupiedVehicle) {
       detachPlayerBody();
       exit();
     }
+    if (v.isTank && v.mesh) {
+      v.wrecked = true;
+      v.wreckTimer = 14;
+      v.wreckSmokeTimer = 0.05;
+      v.velocity.set(0, 0, 0);
+      v.rotation.z = (Math.random() - 0.5) * 0.12;
+      v.rotation.x = (Math.random() - 0.5) * 0.05;
+      v.mesh.rotation.copy(v.rotation);
+      v.mesh.position.copy(v.position);
+      v.mesh.traverse(function (child) {
+        if (child.material && child.material.color) {
+          child.material.color.multiplyScalar(0.55);
+        }
+      });
+      return;
+    }
+    disposeVehicleMesh(v);
+  }
+
+  function disposeVehicleMesh(v) {
     if (v.mesh) {
       v.mesh.traverse(function (child) {
         if (child.geometry) child.geometry.dispose();
         if (child.material) child.material.dispose();
       });
       if (_scene) _scene.remove(v.mesh);
+      v.mesh = null;
     }
   }
 
@@ -1203,6 +1920,59 @@ const VehicleSystem = (function () {
       }
     }
     turretProjectiles.length = 0;
+    // Clean up scorch marks
+    for (var si = 0; si < scorchMarks.length; si++) {
+      if (scorchMarks[si].mesh) {
+        scorchMarks[si].mesh.material.dispose();
+        if (_scene) _scene.remove(scorchMarks[si].mesh);
+      }
+    }
+    scorchMarks.length = 0;
+    if (_scorchGeo) { _scorchGeo.dispose(); _scorchGeo = null; }
+    if (_scorchMat) { _scorchMat.dispose(); _scorchMat = null; }
+    // Clean up muzzle flash light
+    if (_muzzleFlashLight) {
+      if (_scene) _scene.remove(_muzzleFlashLight);
+      _muzzleFlashLight.dispose();
+      _muzzleFlashLight = null;
+    }
+    _muzzleFlashTimer = 0;
+    // Clean up MG strobe light
+    if (_mgStrobeLight) {
+      if (_scene) _scene.remove(_mgStrobeLight);
+      _mgStrobeLight.dispose();
+      _mgStrobeLight = null;
+    }
+    _mgStrobeTimer = 0;
+    // Clean up shell trails
+    for (var ti = 0; ti < shellTrails.length; ti++) {
+      shellTrails[ti].line.geometry.dispose();
+      shellTrails[ti].line.material.dispose();
+      if (_scene) _scene.remove(shellTrails[ti].line);
+    }
+    shellTrails.length = 0;
+    // Clean up tread marks
+    for (var tri = 0; tri < treadMarks.length; tri++) {
+      treadMarks[tri].mesh.material.dispose();
+      if (_scene) _scene.remove(treadMarks[tri].mesh);
+    }
+    treadMarks.length = 0;
+    if (_treadGeo) { _treadGeo.dispose(); _treadGeo = null; }
+    _treadDistAccum = 0;
+    // Clean up shockwave rings
+    for (var sri = 0; sri < shockwaveRings.length; sri++) {
+      shockwaveRings[sri].mesh.material.dispose();
+      if (_scene) _scene.remove(shockwaveRings[sri].mesh);
+    }
+    shockwaveRings.length = 0;
+    if (_shockwaveGeo) { _shockwaveGeo.dispose(); _shockwaveGeo = null; }
+    // Clean up MG casings
+    for (var csi = 0; csi < mgCasings.length; csi++) {
+      if (_scene) _scene.remove(mgCasings[csi].mesh);
+    }
+    mgCasings.length = 0;
+    if (_casingGeo) { _casingGeo.dispose(); _casingGeo = null; }
+    if (_casingMat) { _casingMat.dispose(); _casingMat = null; }
   }
 
   /* ── Vehicle Repair ──────────────────────────────────────────────── */

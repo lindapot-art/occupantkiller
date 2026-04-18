@@ -16,6 +16,102 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [HIGH] Tank Headlight Beams + Suspension Pitch
+Status: DONE
+Requested: 2026-04-17
+Completed: 2026-04-17
+Details: Two SpotLights (0xffffcc, range 25, angle π/6, penumbra 0.6, decay 1.5) added per tank headlight mesh. Intensity toggled 0/1.8 based on v.occupied. Suspension pitch: hull X-rotation driven by speed delta (accelDelta * 0.4, capped ±0.04 rad, smoothed at 5×/s). Files changed: vehicles.js. Verified: syntax PASS, healthz 200, test-master 38/0/0, test-qa-v2 0 failed, gameplay Errors: NONE.
+
+### [HIGH] Antenna Spring Wobble + Hull Body Roll
+Status: DONE
+Requested: 2026-04-17
+Completed: 2026-04-17
+Details: Antenna mesh tagged with isAntenna userData; spring-damper system (K=25, D=4.5) drives rotation from velocity + cannon kick. Hull Z-rotation leans into turns (proportional to turnRate * hSpeed, capped at ±0.06 rad, smoothed). Files changed: vehicles.js. Verified: syntax PASS, healthz 200, test-master 38/0/0, test-qa-v2 0 failed, gameplay Errors: NONE.
+
+### [HIGH] MG Shell Casing Ejection + Periscope Speed Vignette
+Status: DONE
+Requested: 2026-04-17
+Completed: 2026-04-17
+Details: MG fire now ejects tumbling brass cylinders to the right (pooled at 30 max, gravity + rotation + fade). Periscope view has progressive edge darkening (#tank-speed-vignette) driven by horizontal speed in updateTankHUD. Files changed: vehicles.js, game-manager.js, index.html, style.css. Verified: syntax PASS, healthz 200, test-master 38/0/0, test-qa-v2 0 failed, gameplay Errors: NONE.
+
+### [HIGH] Bullet Terrain Impact Sparks + Tank Reload Screen Effect
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: MG and turret bullets now spawn Tracers.spawnSparks + AudioSystem.playRicochet on terrain block hits (via new spawnBulletTerrainImpact helper wired into updateTurretProjectiles terrain-hit branch). Tank periscope overlay now shows a subtle orange sweep animation (#tank-reload-flash) during cannon reload, driven from game-manager.js HUD update. Files changed: vehicles.js, game-manager.js, index.html, style.css. Verified: syntax PASS, healthz 200, test-master 38/0/0, test-qa-v2 21/0, gameplay exit 0.
+
+### [HIGH] Cannon Shell Gravity Drop + Tank Idle Engine Vibration
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Cannon shells now have ~4.8 m/s² effective gravity drop (dir.y decreases each frame), creating a realistic arc trajectory over long distances. When stationary in a tank (hSpeed < 0.5), the camera gets very subtle shake pulses (0.003 intensity every 0.25s) simulating engine idle rumble. File changed: `vehicles.js`. Verified locally: `/healthz` 200, `node --check vehicles.js` PASS, `tools/test-master.js` 38/0/0, `tools/test-qa-v2.js` 21/0, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`.
+
+### [HIGH] Hull Damage Darkening + Cannon Impact Shockwave Rings
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Tank hull materials now darken toward charred black as HP drops below 90% (original colors cached per vehicle, lerped by healthRatio). Cannon shell terrain impacts now spawn an expanding orange shockwave ring (RingGeometry, scales 1→12x over 0.4s, fades opacity, pooled at 8). Both properly disposed in `clear()`. File changed: `vehicles.js`. Verified locally: `/healthz` 200, `node --check vehicles.js` PASS, `tools/test-master.js` 38 passed, 0 failed, 0 warnings, `tools/test-qa-v2.js` 21 passed, 0 failed, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`.
+
+### [HIGH] Tank Tread Marks + MG Strobe Light
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Added dark tread mark segments (PlaneGeometry) spawned under both tank tracks when moving on ground (pooled at 120, fade over 12s), plus a brief yellow PointLight strobe (0.06s, intensity 1.5) at the coax MG mount on every MG shot. Both properly disposed in `clear()`. File changed: `vehicles.js`. Verified locally: `/healthz` 200, `node --check vehicles.js` PASS, `tools/test-master.js` 38 passed, 0 failed, 0 warnings, `tools/test-qa-v2.js` 21 passed, 0 failed, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`.
+
+### [HIGH] Cannon Muzzle Flash Light + Shell Tracer Trails
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Added a brief orange PointLight (intensity 3.0, fades over 0.15s) at the cannon muzzle on fire, plus glowing orange tracer line trails that follow cannon shell projectiles from origin to current position and fade over lifetime. Both cleaned up properly in `clear()`. File changed: `vehicles.js`. Verified locally: `/healthz` 200, `node --check vehicles.js` PASS, `tools/test-master.js` 38 passed, 0 failed, 0 warnings, `tools/test-qa-v2.js` 21 passed, 0 failed, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`.
+
+### [HIGH] Periscope Hit Flash + Cannon Scorch Marks
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Added a red vignette flash overlay (`#tank-hit-flash`) triggered on tank hit via `spawnTankImpactFeedback`, plus dark scorch mark circles spawned on terrain at cannon shell impact points (pooled, max 20, fade over 18s). Files changed: `vehicles.js`, `index.html`, `style.css`. Verified locally: `/healthz` 200, `node --check vehicles.js` PASS, `tools/test-master.js` 38 passed, 0 failed, 0 warnings, `tools/test-qa-v2.js` 21 passed, 0 failed, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`.
+
+### [HIGH] Tank Wreck Persistence
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Updated `vehicles.js` so destroyed tanks stay in-world briefly as smoking wrecks with occasional sparks before being cleaned up, instead of vanishing immediately on kill. Verified locally: `/healthz` 200, `node --check vehicles.js` PASS, `tools/test-master.js` 38 passed, 0 failed, 0 warnings, `tools/test-qa-v2.js` 21 passed, 0 failed, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`.
+
+### [HIGH] Tank Armored-Hit Feedback
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Added rate-limited armored-hit feedback in `vehicles.js` so tank impacts now throw sparks and metallic debris, play ricochet or hit audio depending on armor deflection, and shake the camera slightly when the player is inside the tank. Verified locally: `/healthz` 200, `node --check vehicles.js` PASS, `tools/test-master.js` 38 passed, 0 failed, 0 warnings, `tools/test-qa-v2.js` 21 passed, 0 failed, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`.
+
+### [HIGH] Tank Damage Feedback Readability
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Added low-health damage smoke for tanks plus a stronger destruction explosion/audio cue in `vehicles.js` so vehicle damage state is readable before and at kill time. Verified locally: `/healthz` 200, `node --check vehicles.js` PASS, `tools/test-master.js` 38 passed, 0 failed, 0 warnings, `tools/test-qa-v2.js` 21 passed, 0 failed, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`.
+
+### [HIGH] Tank Gun Pitch Visual Sync
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Updated `vehicles.js` so the visible tank barrel, muzzle, and coax machine gun elevate with camera pitch, matching the actual projectile trajectory and improving aim readability from both first- and third-person views. Verified locally: `/healthz` 200, `node --check vehicles.js` PASS, `tools/test-master.js` 38 passed, 0 failed, 0 warnings, `tools/test-qa-v2.js` 21 passed, 0 failed, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`.
+
+### [HIGH] Tank Feel Polish + HUD State Robustness
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Added cannon recoil, exhaust smoke, and track dust in `vehicles.js` so tanks read heavier in motion and on fire. Then updated `game-manager.js` so tank HUD visibility derives from the actual occupied vehicle state instead of only the direct-enter branch, covering hijack/commandeer completion paths too. Verified locally: `/healthz` 200, `node --check vehicles.js` PASS, `node --check game-manager.js` PASS, `tools/test-master.js` 38 passed, 0 failed, 0 warnings, `tools/test-qa-v2.js` 21 passed, 0 failed, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`.
+
+### [HIGH] Tank HUD Cleanup + Save API Restore
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Removed duplicated tank HUD and periscope overlay markup from the main page, moved tank HUD styling out of inline HTML into reusable CSS, added a live tank view-mode readout, and restored `GameManager.hasSave()`, `loadGame()`, and `deleteSave()` so the start screen no longer throws a pageerror during gameplay QA. Verified locally: `/healthz` 200, `node --check game-manager.js` PASS, `tools/test-master.js` 38 passed, 0 failed, 0 warnings, `tools/test-qa-v2.js` 21 passed, 0 failed, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`.
+
+### [HIGH] Fix Numeric Weapon Hotkeys
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Repaired weapon hotkeys so numeric/F-key slots map to the current unlocked loadout order instead of raw internal weapon indices. This fixes cases where keys like 3/4/5 did nothing because they targeted locked gaps in the arsenal. HUD weapon slots now render only unlocked weapons with matching hotkey labels, and the bar refreshes on unlock/lock/reset. Verified locally: Digit3/4/5 and Numpad3/4/5 switch correctly in-browser; `/healthz` 200; `node --check` on changed files PASS; `tools/test-master.js` 38 passed, 0 failed, 0 warnings; `tools/test-qa-v2.js` 21 passed, 0 failed; `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`.
+
 ### [HIGH] Fix Bounty Template + QA Bot Combat
 Status: DONE
 Requested: 2026-04-17

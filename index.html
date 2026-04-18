@@ -513,81 +513,41 @@
   </div>
 
   <!-- Tank Interior View Overlay (periscope reticle) -->
-  <div id="tank-interior-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:105">
-    <!-- Periscope vignette frame -->
-    <div style="position:absolute;top:0;left:0;width:100%;height:100%;border:8px solid #111;border-radius:12px;box-shadow:inset 0 0 80px 30px rgba(0,0,0,0.7)"></div>
-    <!-- Crosshair / reticle -->
-    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:3px;height:3px;background:#ff3333;border-radius:50%;box-shadow:0 0 6px #ff0000"></div>
-    <!-- Horizontal reticle lines -->
-    <div style="position:absolute;top:50%;left:calc(50% - 40px);width:30px;height:1px;background:rgba(255,50,50,0.6)"></div>
-    <div style="position:absolute;top:50%;left:calc(50% + 13px);width:30px;height:1px;background:rgba(255,50,50,0.6)"></div>
-    <!-- Vertical reticle lines -->
-    <div style="position:absolute;top:calc(50% - 40px);left:50%;width:1px;height:30px;background:rgba(255,50,50,0.6)"></div>
-    <div style="position:absolute;top:calc(50% + 13px);left:50%;width:1px;height:30px;background:rgba(255,50,50,0.6)"></div>
-    <!-- Range marks -->
-    <div style="position:absolute;top:calc(50% + 25px);left:calc(50% + 15px);font-size:9px;color:rgba(255,100,100,0.5);font-family:monospace">200m</div>
-    <div style="position:absolute;top:calc(50% + 45px);left:calc(50% + 15px);font-size:9px;color:rgba(255,100,100,0.4);font-family:monospace">400m</div>
+  <div id="tank-interior-overlay">
+    <div id="tank-hit-flash"></div>
+    <div id="tank-reload-flash"></div>
+    <div id="tank-speed-vignette"></div>
+    <div class="tank-periscope-frame"></div>
+    <div class="tank-reticle-dot"></div>
+    <div class="tank-reticle-line tank-reticle-line-h tank-reticle-line-h-left"></div>
+    <div class="tank-reticle-line tank-reticle-line-h tank-reticle-line-h-right"></div>
+    <div class="tank-reticle-line tank-reticle-line-v tank-reticle-line-v-top"></div>
+    <div class="tank-reticle-line tank-reticle-line-v tank-reticle-line-v-bottom"></div>
+    <div class="tank-range-mark tank-range-mark-near">200m</div>
+    <div class="tank-range-mark tank-range-mark-far">400m</div>
   </div>
 
   <!-- Tank HUD (bottom center — ammo, reload, controls) -->
-  <div id="tank-hud" style="display:none;position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(0,10,0,0.8);border:1px solid #4a6a2a;border-radius:8px;padding:10px 20px;z-index:120;text-align:center;pointer-events:none;min-width:380px">
-    <div style="color:#88cc44;font-weight:bold;font-size:14px;margin-bottom:6px">\uD83D\uDE94 TANK COMMANDER</div>
-    <div style="display:flex;gap:18px;justify-content:center;font-size:11px;color:#ccc;margin-bottom:6px">
-      <span><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">WASD</kbd> Drive</span>
-      <span><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">MOUSE</kbd> Aim Turret</span>
-      <span style="color:#ff6600"><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">LMB</kbd> Cannon</span>
-      <span style="color:#ffcc22"><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">RMB</kbd> Machine Gun</span>
-      <span><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">T</kbd> Toggle View</span>
-      <span><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">G</kbd> Exit</span>
+  <div id="tank-hud">
+    <div class="tank-hud-title">TANK COMMANDER</div>
+    <div class="tank-hud-controls">
+      <span><kbd>WASD</kbd> Drive</span>
+      <span><kbd>MOUSE</kbd> Aim Turret</span>
+      <span class="tank-hud-cannon"><kbd>LMB</kbd> Cannon</span>
+      <span class="tank-hud-mg"><kbd>RMB</kbd> Machine Gun</span>
+      <span><kbd>T</kbd> Toggle View</span>
+      <span><kbd>G</kbd> Exit</span>
     </div>
-    <div style="display:flex;gap:16px;justify-content:center;font-size:12px">
-      <span style="color:#ff6600">\uD83D\uDCA5 Cannon: <span id="tank-cannon-ammo">20</span>/<span id="tank-cannon-max">20</span></span>
-      <span style="color:#ffcc22">\uD83D\uDD2B MG: <span id="tank-mg-ammo">500</span></span>
-      <span id="tank-armor-display" style="color:#88cc44">\uD83D\uDEE1 Armor: <span id="tank-hp-pct">100</span>%</span>
+    <div class="tank-hud-stats">
+      <span class="tank-hud-cannon">Cannon: <span id="tank-cannon-ammo">20</span>/<span id="tank-cannon-max">20</span></span>
+      <span class="tank-hud-mg">MG: <span id="tank-mg-ammo">500</span></span>
+      <span id="tank-armor-display" class="tank-hud-armor">Armor: <span id="tank-hp-pct">100</span>%</span>
+      <span class="tank-hud-view">View: <span id="tank-view-mode">PERISCOPE</span></span>
     </div>
-    <div id="tank-reload-bar" style="margin-top:5px;height:4px;background:#333;border-radius:2px;overflow:hidden;display:none">
-      <div id="tank-reload-fill" style="height:100%;width:0%;background:#ff6600;transition:width 0.1s linear"></div>
+    <div id="tank-reload-bar">
+      <div id="tank-reload-fill"></div>
     </div>
-    <div id="tank-reload-text" style="font-size:10px;color:#ff6600;margin-top:2px;display:none">RELOADING...</div>
-  </div>
-
-  <!-- Tank Interior View Overlay (periscope reticle) -->
-  <div id="tank-interior-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:105">
-    <!-- Periscope vignette frame -->
-    <div style="position:absolute;top:0;left:0;width:100%;height:100%;border:8px solid #111;border-radius:12px;box-shadow:inset 0 0 80px 30px rgba(0,0,0,0.7)"></div>
-    <!-- Crosshair / reticle -->
-    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:3px;height:3px;background:#ff3333;border-radius:50%;box-shadow:0 0 6px #ff0000"></div>
-    <!-- Horizontal reticle lines -->
-    <div style="position:absolute;top:50%;left:calc(50% - 40px);width:30px;height:1px;background:rgba(255,50,50,0.6)"></div>
-    <div style="position:absolute;top:50%;left:calc(50% + 13px);width:30px;height:1px;background:rgba(255,50,50,0.6)"></div>
-    <!-- Vertical reticle lines -->
-    <div style="position:absolute;top:calc(50% - 40px);left:50%;width:1px;height:30px;background:rgba(255,50,50,0.6)"></div>
-    <div style="position:absolute;top:calc(50% + 13px);left:50%;width:1px;height:30px;background:rgba(255,50,50,0.6)"></div>
-    <!-- Range marks -->
-    <div style="position:absolute;top:calc(50% + 25px);left:calc(50% + 15px);font-size:9px;color:rgba(255,100,100,0.5);font-family:monospace">200m</div>
-    <div style="position:absolute;top:calc(50% + 45px);left:calc(50% + 15px);font-size:9px;color:rgba(255,100,100,0.4);font-family:monospace">400m</div>
-  </div>
-
-  <!-- Tank HUD (bottom center — ammo, reload, controls) -->
-  <div id="tank-hud" style="display:none;position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(0,10,0,0.8);border:1px solid #4a6a2a;border-radius:8px;padding:10px 20px;z-index:120;text-align:center;pointer-events:none;min-width:380px">
-    <div style="color:#88cc44;font-weight:bold;font-size:14px;margin-bottom:6px">\uD83D\uDE94 TANK COMMANDER</div>
-    <div style="display:flex;gap:18px;justify-content:center;font-size:11px;color:#ccc;margin-bottom:6px">
-      <span><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">WASD</kbd> Drive</span>
-      <span><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">MOUSE</kbd> Aim Turret</span>
-      <span style="color:#ff6600"><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">LMB</kbd> Cannon</span>
-      <span style="color:#ffcc22"><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">RMB</kbd> Machine Gun</span>
-      <span><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">T</kbd> Toggle View</span>
-      <span><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">G</kbd> Exit</span>
-    </div>
-    <div style="display:flex;gap:16px;justify-content:center;font-size:12px">
-      <span style="color:#ff6600">\uD83D\uDCA5 Cannon: <span id="tank-cannon-ammo">20</span>/<span id="tank-cannon-max">20</span></span>
-      <span style="color:#ffcc22">\uD83D\uDD2B MG: <span id="tank-mg-ammo">500</span></span>
-      <span id="tank-armor-display" style="color:#88cc44">\uD83D\uDEE1 Armor: <span id="tank-hp-pct">100</span>%</span>
-    </div>
-    <div id="tank-reload-bar" style="margin-top:5px;height:4px;background:#333;border-radius:2px;overflow:hidden;display:none">
-      <div id="tank-reload-fill" style="height:100%;width:0%;background:#ff6600;transition:width 0.1s linear"></div>
-    </div>
-    <div id="tank-reload-text" style="font-size:10px;color:#ff6600;margin-top:2px;display:none">RELOADING...</div>
+    <div id="tank-reload-text">RELOADING...</div>
   </div>
 
     <h1>PAUSED</h1>

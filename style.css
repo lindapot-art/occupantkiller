@@ -420,6 +420,198 @@ canvas {
   color: #000;
 }
 
+/* Tank HUD and periscope */
+#tank-interior-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+  z-index: 105;
+}
+
+#tank-hit-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(255, 20, 20, 0.55) 100%);
+  z-index: 2;
+}
+#tank-hit-flash.active {
+  animation: tankHitPulse 0.32s ease-out forwards;
+}
+#tank-reload-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse at center, rgba(255, 170, 40, 0.05) 0%, rgba(255, 120, 20, 0.14) 48%, transparent 78%),
+    linear-gradient(90deg, transparent 0%, rgba(255, 190, 80, 0.22) 50%, transparent 100%);
+  background-size: 100% 100%, 220px 100%;
+  background-position: center center, -240px 0;
+  z-index: 1;
+}
+#tank-reload-flash.active {
+  animation: tankReloadSweep 0.9s linear infinite;
+}
+@keyframes tankHitPulse {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes tankReloadSweep {
+  0%   { background-position: center center, -240px 0; }
+  100% { background-position: center center, calc(100% + 240px) 0; }
+}
+#tank-speed-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.45) 100%);
+  z-index: 1;
+  transition: opacity 0.25s ease-out;
+}
+
+.tank-periscope-frame {
+  position: absolute;
+  inset: 0;
+  border: 8px solid #111;
+  border-radius: 12px;
+  box-shadow: inset 0 0 80px 30px rgba(0, 0, 0, 0.7);
+}
+
+.tank-reticle-dot,
+.tank-reticle-line,
+.tank-range-mark {
+  position: absolute;
+}
+
+.tank-reticle-dot {
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  transform: translate(-50%, -50%);
+  background: #ff3333;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #ff0000;
+}
+
+.tank-reticle-line {
+  background: rgba(255, 50, 50, 0.6);
+}
+
+.tank-reticle-line-h {
+  top: 50%;
+  width: 30px;
+  height: 1px;
+}
+
+.tank-reticle-line-h-left { left: calc(50% - 40px); }
+.tank-reticle-line-h-right { left: calc(50% + 13px); }
+
+.tank-reticle-line-v {
+  left: 50%;
+  width: 1px;
+  height: 30px;
+}
+
+.tank-reticle-line-v-top { top: calc(50% - 40px); }
+.tank-reticle-line-v-bottom { top: calc(50% + 13px); }
+
+.tank-range-mark {
+  left: calc(50% + 15px);
+  font-size: 9px;
+  color: rgba(255, 100, 100, 0.5);
+  font-family: monospace;
+}
+
+.tank-range-mark-near { top: calc(50% + 25px); }
+.tank-range-mark-far {
+  top: calc(50% + 45px);
+  color: rgba(255, 100, 100, 0.4);
+}
+
+#tank-hud {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  display: none;
+  min-width: 380px;
+  padding: 10px 20px;
+  transform: translateX(-50%);
+  background: rgba(0, 10, 0, 0.82);
+  border: 1px solid #4a6a2a;
+  border-radius: 8px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+  color: #d2dec4;
+  text-align: center;
+  pointer-events: none;
+  z-index: 120;
+}
+
+.tank-hud-title {
+  margin-bottom: 6px;
+  color: #88cc44;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.tank-hud-controls,
+.tank-hud-stats {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.tank-hud-controls {
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: #ccc;
+}
+
+#tank-hud kbd {
+  padding: 1px 5px;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 3px;
+}
+
+.tank-hud-stats {
+  font-size: 12px;
+}
+
+.tank-hud-cannon { color: #ff6600; }
+.tank-hud-mg { color: #ffcc22; }
+.tank-hud-armor { color: #88cc44; }
+.tank-hud-view { color: #89d4ff; }
+
+#tank-reload-bar {
+  display: none;
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  background: #333;
+  border-radius: 2px;
+}
+
+#tank-reload-fill {
+  width: 0%;
+  height: 100%;
+  background: #ff6600;
+  transition: width 0.1s linear;
+}
+
+#tank-reload-text {
+  display: none;
+  margin-top: 2px;
+  font-size: 10px;
+  color: #ff6600;
+}
+
 /* ── Weapon section ──────────────────────────────────────── */
 #weapon-section {
   display: flex;

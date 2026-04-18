@@ -4,9 +4,9 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-17 — Session 29: Fixed bounty template bug + improved QA bot
+- **Timestamp**: 2026-04-17 — Session 34: Added tank headlight beams + suspension pitch on accel/brake
 - **Agent**: KING
-- **Status**: COMPLETE — Bounty {n} template variable resolved (now shows real target numbers). QA bot improved: 3s continuous fire, closer enemy engagement (8 blocks), semi-auto re-trigger, better weapon priority. Commit 50dfe66.
+- **Status**: COMPLETE — Two SpotLights per tank activate when occupied (warm 0xffffcc, range 25, angle π/6). Hull pitches forward on braking, backward on acceleration (capped ±0.04 rad). Verified with full proxy QA and gameplay `Errors: NONE`.
 
 ## Current Task
 - DONE: Ukrainian apartment buildings (6/12 stories) with blue/white hallway tiles, stairways, accessible apartments, sniper windows
@@ -28,6 +28,45 @@
 - DONE: Gameplay QA harness now rejects roofed/interior teleport spots and blocked travel paths
 - QA: healthz 200, node --check all PASS, test-master 38/0/0, test-qa-v2 21/0, gameplay 24 screenshots 0 errors
 - BLOCKED: git push (credential mismatch — PhotonBounce cached, needs lindapot-art)
+- DONE: Numeric weapon-key swapping fixed for unlocked loadouts; Digit3/4/5 and Numpad3/4/5 verified live
+- DONE: Tank HUD duplicate DOM removed; tank view label added; missing save API contract restored; gameplay QA now reports `Errors: NONE`
+- DONE: Tank cannon recoil, exhaust smoke, and track dust added; tank HUD now auto-shows from occupied-tank state across non-direct entry paths
+- DONE: Tank barrel, muzzle, and coax MG now visually elevate with camera pitch; full QA green
+- DONE: Tanks now emit low-health damage smoke and produce a larger destruction explosion/audio cue; full QA green
+- DONE: Tanks now react to incoming hits with sparks, metallic impact debris, ricochet/hit audio, and occupied-tank camera shake; full QA green
+- DONE: Destroyed tanks now persist briefly as smoking wrecks with occasional sparks before cleanup; full QA green
+- DONE: Periscope hit flash overlay (red vignette pulse on tank hit) + cannon scorch marks on terrain impacts; full QA green
+- DONE: Cannon muzzle flash PointLight + shell tracer trails; full QA green
+- DONE: Tank tread marks on ground + MG coax strobe flash light; full QA green
+- DONE: Hull damage darkening + cannon impact shockwave rings; full QA green
+- DONE: Cannon shell gravity drop + tank idle engine vibration; full QA green
+- DONE: Bullet terrain impact sparks + tank reload screen overlay; full QA green
+- DONE: MG shell casing ejection + periscope speed vignette; full QA green
+- DONE: Antenna spring wobble + hull body roll on turns; full QA green
+- DONE: Tank headlight beams + suspension pitch on accel/brake; full QA green
+
+## Steps Completed This Session (Session 34)
+1. [x] Updated `vehicles.js` so tank turret visuals track camera pitch instead of only projectile pitch
+2. [x] Verified the gun-pitch batch with proxy QA: `/healthz` 200, `tools/test-master.js` 38/0/0, `tools/test-qa-v2.js` 21/0, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`
+3. [x] Added low-health tank smoke and vehicle destruction explosion/audio feedback in `vehicles.js`
+4. [x] Verified the damage-feedback batch with proxy QA: `/healthz` 200, `tools/test-master.js` 38/0/0, `tools/test-qa-v2.js` 21/0, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`
+5. [x] Added armored-hit feedback for tanks using sparks, metallic impact particles, ricochet/hit audio, and occupied-tank camera shake
+6. [x] Verified the armored-hit batch with proxy QA: `/healthz` 200, `tools/test-master.js` 38/0/0, `tools/test-qa-v2.js` 21/0, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`
+7. [x] Added short-lived burning wreck persistence for destroyed tanks using smoke, occasional sparks, and delayed cleanup
+8. [x] Verified the wreck-persistence batch with proxy QA: `/healthz` 200, `tools/test-master.js` 38/0/0, `tools/test-qa-v2.js` 21/0, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`
+9. [x] Added periscope hit flash overlay (red vignette CSS animation triggered from spawnTankImpactFeedback) and cannon scorch marks (dark circles spawned on terrain cannon-hit)
+10. [x] Verified the hit-flash + scorch batch with proxy QA: `/healthz` 200, `tools/test-master.js` 38/0/0, `tools/test-qa-v2.js` 21/0, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`
+11. [x] Added cannon muzzle flash PointLight (0.15s orange burst at barrel) and shell tracer trails (glowing line from origin to projectile, fades over lifetime)
+12. [x] Verified the muzzle-flash + tracer batch with proxy QA: `/healthz` 200, `tools/test-master.js` 38/0/0, `tools/test-qa-v2.js` 21/0, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`
+13. [x] Added tank tread marks (dark PlaneGeometry segments on ground, pooled at 120, fade over 12s) and MG coax strobe light (0.06s yellow PointLight pulse on MG fire)
+14. [x] Verified the tread-marks + MG-strobe batch with proxy QA: `/healthz` 200, `tools/test-master.js` 38/0/0, `tools/test-qa-v2.js` 21/0, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`
+15. [x] Added hull damage darkening (materials lerp toward black below 90% HP) and cannon impact shockwave rings (expanding orange ring, 0.4s, pooled at 8)
+16. [x] Verified the hull-darkening + shockwave batch with proxy QA: `/healthz` 200, `tools/test-master.js` 38/0/0, `tools/test-qa-v2.js` 21/0, `tools/test-gameplay.js` PASS with 23 screenshots and `Errors: NONE`
+
+## Files Changed This Session (Session 34)
+- `vehicles.js` — tank gun visual pitch sync, low-health smoke, destruction blast/audio, armored-hit feedback, burning wrecks, periscope hit flash, cannon scorch marks, muzzle flash PointLight, shell tracer trails, tread marks, MG strobe, hull damage darkening, shockwave rings
+- `index.html` — added `#tank-hit-flash` div inside tank-interior-overlay
+- `style.css` — added `#tank-hit-flash` styles and `tankHitPulse` keyframes
 
 ## Steps Completed This Session (Session 27)
 1. [x] Reproduced the visual regression from gameplay screenshots and confirmed it was a real player-view failure, not a false-positive QA result
