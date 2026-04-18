@@ -236,6 +236,17 @@ const Weapons = (() => {
   function cur()      { return WEAPONS[currentIdx]; }
   function curState() { return states[currentIdx]; }
 
+  function refreshWeaponHud() {
+    if (typeof HUD === 'undefined' || !HUD.setWeapon) return;
+    HUD.setWeapon(cur().name, currentIdx);
+    if (cur().type === 'MELEE') {
+      HUD.setAmmo('∞', '—');
+      return;
+    }
+    const st = curState();
+    HUD.setAmmo(st.clip, st.reserve);
+  }
+
   // ── Terrain dig callbacks ────────────────────────────────
   let _onTerrainDig = null;    // called when shovel mines a block
   let _onTerrainShot = null;   // called when bullet/explosion destroys a block
@@ -1412,6 +1423,79 @@ const Weapons = (() => {
   }
 
 
+  // ── Gatling Machine Gun mesh (6 rotating barrels, heavy housing) ──
+  function buildGatlingMesh() {
+    const g = new THREE.Group();
+    // 6 rotating barrels
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const b = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.013, 0.013, 0.55, 6),
+        new THREE.MeshPhongMaterial({ color: 0x2a2a2e, shininess: 100, specular: 0x555566 })
+      );
+      b.rotation.x = Math.PI / 2;
+      b.position.set(0.17 + Math.cos(a) * 0.036, -0.12 + Math.sin(a) * 0.036, -0.52);
+      g.add(b);
+    }
+    // Front clamp ring
+    const frontRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.05, 0.007, 6, 12),
+      new THREE.MeshPhongMaterial({ color: 0x333338, shininess: 80, specular: 0x444455 })
+    );
+    frontRing.position.set(0.17, -0.12, -0.73);
+    g.add(frontRing);
+    // Rear clamp ring
+    const rearRing = frontRing.clone();
+    rearRing.position.z = -0.34;
+    g.add(rearRing);
+    // Motor/receiver housing
+    const housing = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.065, 0.065, 0.20, 10),
+      new THREE.MeshPhongMaterial({ color: 0x3a3a3e, shininess: 60, specular: 0x333344 })
+    );
+    housing.rotation.x = Math.PI / 2;
+    housing.position.set(0.17, -0.12, -0.20);
+    g.add(housing);
+    // Ammo drum
+    const drum = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.07, 0.075, 12),
+      new THREE.MeshPhongMaterial({ color: 0x4a4a2e, shininess: 35, specular: 0x222211 })
+    );
+    drum.position.set(0.17, -0.22, -0.17);
+    g.add(drum);
+    // Carry handle
+    const handle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.055, 0.010, 0.11),
+      new THREE.MeshPhongMaterial({ color: 0x333338, shininess: 60, specular: 0x333344 })
+    );
+    handle.position.set(0.17, -0.04, -0.20);
+    g.add(handle);
+    const handleL = new THREE.Mesh(
+      new THREE.BoxGeometry(0.010, 0.035, 0.010),
+      new THREE.MeshPhongMaterial({ color: 0x333338, shininess: 60, specular: 0x333344 })
+    );
+    handleL.position.set(0.14, -0.055, -0.25);
+    g.add(handleL);
+    const handleR = handleL.clone();
+    handleR.position.x = 0.20;
+    g.add(handleR);
+    // Pistol grip
+    const grip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.10, 0.04),
+      new THREE.MeshPhongMaterial({ color: 0x1a1a1e, shininess: 30, specular: 0x222222 })
+    );
+    grip.position.set(0.17, -0.22, -0.08);
+    g.add(grip);
+    // Trigger guard
+    const tGuard = new THREE.Mesh(
+      new THREE.BoxGeometry(0.032, 0.012, 0.035),
+      new THREE.MeshPhongMaterial({ color: 0x2a2a2e, shininess: 60, specular: 0x333344 })
+    );
+    tGuard.position.set(0.17, -0.17, -0.08);
+    g.add(tGuard);
+    return g;
+  }
+
   // Placeholder mesh builder for missing weapons
   function buildPlaceholderMesh() {
     const g = new THREE.Group();
@@ -1423,7 +1507,7 @@ const Weapons = (() => {
   }
 
   const meshBuilders = [
-    buildShovelMesh, buildMakarovMesh, buildAkMesh, buildRpkMesh,
+    buildGatlingMesh, buildShovelMesh, buildMakarovMesh, buildAkMesh, buildRpkMesh,
     buildSvdMesh, buildPkmMesh, buildNlawMesh, buildStugnaMesh, buildM4Mesh,
     buildJavelinMesh, buildRpg7Mesh, buildIglaMesh, buildGp25Mesh,
     buildScarHMesh, buildDshkMesh, buildMolotovMesh,
@@ -1444,6 +1528,10 @@ const Weapons = (() => {
     _camera = camera;
     for (let i = 0; i < WEAPONS.length; i++) {
       const m = meshBuilders[i]();
+      // Enhance with reflective materials, sub-details, and animation rigging
+      if (typeof WeaponDetails !== 'undefined' && WeaponDetails.enhanceMesh) {
+        WeaponDetails.enhanceMesh(m, WEAPONS[i], i);
+      }
       gunMeshes.push(m);
       m.visible = (i === currentIdx);
       camera.add(m);
@@ -1458,6 +1546,10 @@ const Weapons = (() => {
   function createMuzzleFlash(scene, camera) {
     _scene = scene;
     _camera = camera;
+    // Initialize weapon details visual system
+    if (typeof WeaponDetails !== 'undefined' && WeaponDetails.init) {
+      WeaponDetails.init(scene, camera);
+    }
     const geo = new THREE.PlaneGeometry(0.3, 0.3);
     const mat = new THREE.MeshBasicMaterial({
       color:       0xffdd44,
@@ -1629,12 +1721,16 @@ const Weapons = (() => {
   }
 
   function unlockWeapon(idx) {
-    if (idx >= 0 && idx < WEAPONS.length) unlocked[idx] = true;
+    if (idx >= 0 && idx < WEAPONS.length) {
+      unlocked[idx] = true;
+      refreshWeaponHud();
+    }
   }
 
   // ── Scope zoom ────────────────────────────────────────────
   function enterZoom() {
-    if (!_camera || !cur().hasScope) return;
+    if (!_camera) return;
+    if (cur().type === 'MELEE') return; // no zoom on melee
     zoomed = true;
     _adsTarget = 1;
   }
@@ -1647,7 +1743,7 @@ const Weapons = (() => {
 
   function handleRightDown() {
     rightMouseDown = true;
-    if (cur().hasScope) enterZoom();
+    enterZoom();
   }
 
   function handleRightUp() {
@@ -1963,6 +2059,11 @@ const Weapons = (() => {
     st.fireCooldown = wep.fireRate;
     _firedThisFrame = true;
 
+    // Trigger visual animations (bolt cycle, barrel spin, muzzle smoke)
+    if (typeof WeaponDetails !== 'undefined' && WeaponDetails.onFire) {
+      WeaponDetails.onFire(gunMeshes[currentIdx], wep);
+    }
+
     // ── Weapon jamming system ────────────────────────────
     if (wep.type !== 'MELEE' && wep.type !== 'MINE' && wep.type !== 'SMOKE' && wep.type !== 'FLASHBANG') {
       st.shotsSinceClean++;
@@ -2260,7 +2361,9 @@ const Weapons = (() => {
       var adsSpeed = 8;
       _adsLerp += (_adsTarget - _adsLerp) * Math.min(1, delta * adsSpeed);
       if (Math.abs(_adsLerp - _adsTarget) < 0.005) _adsLerp = _adsTarget;
-      _camera.fov = FOV_DEFAULT + (FOV_ZOOMED - FOV_DEFAULT) * _adsLerp;
+      var _zoomFov = (typeof WeaponDetails !== 'undefined' && WeaponDetails.getZoomFov)
+        ? WeaponDetails.getZoomFov(cur().type) : FOV_ZOOMED;
+      _camera.fov = FOV_DEFAULT + (_zoomFov - FOV_DEFAULT) * _adsLerp;
       _camera.updateProjectionMatrix();
     }
 
@@ -2340,9 +2443,12 @@ const Weapons = (() => {
       _fireKickRot *= (1 - Math.min(1, delta * 15));
       _fireKickZ *= (1 - Math.min(1, delta * 12));
 
-      mesh.position.x = swayX + _inertiaX - _adsLerp * swayX * 0.8;
-      mesh.position.z = recoilOffsetZ + recoilOffset + _sprintLowerZ + _fireKickZ;
-      mesh.position.y = recoilOffsetY + switchY + swayY + _sprintLowerY + _inertiaY + _adsLerp * 0.03;
+      // ADS iron-sight / scope alignment offset
+      var _adsOff = (typeof WeaponDetails !== 'undefined' && WeaponDetails.getAdsOffset)
+        ? WeaponDetails.getAdsOffset(cur(), _adsLerp) : { x: 0, y: 0, z: 0 };
+      mesh.position.x = swayX + _inertiaX - _adsLerp * swayX * 0.8 + _adsOff.x;
+      mesh.position.z = recoilOffsetZ + recoilOffset + _sprintLowerZ + _fireKickZ + _adsOff.z;
+      mesh.position.y = recoilOffsetY + switchY + swayY + _sprintLowerY + _inertiaY + _adsLerp * 0.03 + _adsOff.y;
       mesh.rotation.x = reloadAnimAngle + _sprintLowerRotX - _fireKickRot;
     }
 
@@ -2399,6 +2505,11 @@ const Weapons = (() => {
         });
         mesh._heatGlowing = false;
       }
+    }
+
+    // WeaponDetails visual animations (bolt, barrel spin, laser, smoke, scope overlay)
+    if (typeof WeaponDetails !== 'undefined' && WeaponDetails.update) {
+      WeaponDetails.update(delta, mesh, cur(), curState(), _firedThisFrame, zoomed);
     }
 
     // Reload
@@ -2545,10 +2656,9 @@ const Weapons = (() => {
       }
     }
     _smokeClouds.length = 0;
+    if (typeof WeaponDetails !== 'undefined' && WeaponDetails.clear) WeaponDetails.clear();
     gunMeshes.forEach(function (m, i) { if (m) m.visible = (i === 0); });
-    const st = curState();
-    HUD.setAmmo('∞', '—');
-    HUD.setWeapon(cur().name, 0);
+    refreshWeaponHud();
   }
 
   function addAmmo(amount) {
@@ -2713,6 +2823,7 @@ const Weapons = (() => {
       if (i < 2) return;  // can't lock starter weapons
       unlocked[i] = false;
       if (currentIdx === i) switchTo(0);
+      refreshWeaponHud();
     },
     getWeaponState: function (i) {
       if (!states[i]) return null;

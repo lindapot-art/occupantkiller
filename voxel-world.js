@@ -3563,6 +3563,47 @@ window.VoxelWorld = (function () {
     }
   }
 
+  /* ── Drone Nest Generator ──────────────────────────────────────── */
+  var _droneNestPositions = [];
+
+  function generateDroneNest(cx, cz) {
+    var surfH = getTerrainHeight(cx, cz);
+    // 5x5 concrete bunker with camo netting (metal roof)
+    for (var y = 0; y < 3; y++) {
+      for (var x = -2; x <= 2; x++) {
+        for (var z = -2; z <= 2; z++) {
+          var isWall = Math.abs(x) === 2 || Math.abs(z) === 2;
+          var isRoof = y === 2;
+          if (isWall || isRoof) {
+            setBlock(cx + x, surfH + y, cz + z, isRoof ? BLOCK.METAL : BLOCK.CONCRETE);
+          }
+        }
+      }
+    }
+    // Door opening on south side
+    setBlock(cx, surfH, cz - 2, BLOCK.AIR);
+    setBlock(cx, surfH + 1, cz - 2, BLOCK.AIR);
+    // Antenna mast on roof
+    for (var ay = 3; ay < 7; ay++) {
+      setBlock(cx + 1, surfH + ay, cz + 1, BLOCK.METAL);
+    }
+    // Red signal light at top
+    setBlock(cx + 1, surfH + 7, cz + 1, BLOCK.BRICK);
+    // Control equipment inside (table)
+    setBlock(cx - 1, surfH, cz, BLOCK.WOOD);
+    setBlock(cx - 1, surfH + 1, cz, BLOCK.METAL);
+    // Sandbag perimeter
+    for (var sx = -3; sx <= 3; sx++) {
+      setBlock(cx + sx, surfH, cz - 3, BLOCK.SAND);
+      setBlock(cx + sx, surfH, cz + 3, BLOCK.SAND);
+    }
+    for (var sz = -3; sz <= 3; sz++) {
+      setBlock(cx - 3, surfH, cz + sz, BLOCK.SAND);
+      setBlock(cx + 3, surfH, cz + sz, BLOCK.SAND);
+    }
+    _droneNestPositions.push({ x: cx, y: surfH, z: cz });
+  }
+
   /* ── Level Generation ──────────────────────────────────────────── */
   function generateLevel(index) {
     const level = getLevelDef(index);
@@ -3570,29 +3611,37 @@ window.VoxelWorld = (function () {
     _theme.seed = index * 3137;
 
     regenerate();
+    _droneNestPositions.length = 0; // Reset nests for this level
     if (level.id === 'HOSTOMEL') {
       generateHostomelAirport(0, 0);
-      // Ukrainian apartment buildings near the airport
-      generateUkrainianApartment(-35, -30, 6);   // 6-story khrushchyovka
-      generateUkrainianApartment(-35, -50, 12);  // 12-story panel building
-      generateUkrainianApartment(25, -35, 6);    // another 6-story
+      generateUkrainianApartment(-35, -30, 6);
+      generateUkrainianApartment(-35, -50, 12);
+      generateUkrainianApartment(25, -35, 6);
+      // Enemy drone nests around the airport perimeter
+      generateDroneNest(40, 25);
+      generateDroneNest(-38, 20);
     } else if (level.id === 'AVDIIVKA') {
-      // Dense residential zone for Avdiivka industrial area
       generateUkrainianApartment(-20, -20, 6);
       generateUkrainianApartment(-20, -42, 12);
       generateUkrainianApartment(10, -25, 6);
       generateUkrainianApartment(10, -47, 12);
+      generateDroneNest(35, -35);
+      generateDroneNest(-35, -55);
+      generateDroneNest(30, 15);
     } else if (level.id === 'BAKHMUT') {
-      // War-torn Bakhmut — mix of buildings
       generateUkrainianApartment(-25, -20, 6);
       generateUkrainianApartment(-25, -42, 6);
       generateUkrainianApartment(15, -15, 12);
       generateUkrainianApartment(15, -37, 6);
+      generateDroneNest(40, -30);
+      generateDroneNest(-40, -10);
+      generateDroneNest(20, 30);
     } else if (level.id === 'KHERSON') {
-      // Kherson residential area near the bridgehead
       generateUkrainianApartment(-30, -25, 12);
       generateUkrainianApartment(-30, -47, 6);
       generateUkrainianApartment(20, -30, 6);
+      generateDroneNest(35, -40);
+      generateDroneNest(-35, -55);
     }
     rebuildAll();
     _levelSpawnPoint = resolveLevelSpawnPoint(level);
@@ -3638,6 +3687,7 @@ window.VoxelWorld = (function () {
     getSpawnPoint,
     generateLevel: typeof generateLevel === 'function' ? generateLevel : function () { return null; },
     getRoadWaypoints: function () { return _roadWaypoints.slice(); },
+    getDroneNestPositions: function () { return _droneNestPositions.slice(); },
     spawnVehicle,
     updateVehicles,
     getActiveVehicles,

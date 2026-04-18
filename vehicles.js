@@ -12,6 +12,7 @@ const VehicleSystem = (function () {
     HELICOPTER: 'helicopter',
     PLANE:      'plane',
     TURRET_ROVER: 'turret_rover',
+    TANK:       'tank',
   });
 
   const VEHICLE_STATS = {
@@ -21,6 +22,7 @@ const VehicleSystem = (function () {
     helicopter:   { speed: 20, health: 150, seats: 4,  armor: 1,  flying: true },
     plane:        { speed: 35, health: 120, seats: 2,  armor: 1,  flying: true },
     turret_rover: { speed: 5,  health: 250, seats: 0,  armor: 3,  flying: false, damage: 35, ai: true },
+    tank:         { speed: 8,  health: 800, seats: 3,  armor: 6,  flying: false, damage: 200, cannonReload: 3.0, mgDamage: 15, mgRate: 0.1 },
   };
 
   /* ── State ───────────────────────────────────────────────────────── */
@@ -34,6 +36,17 @@ const VehicleSystem = (function () {
   /* ── Turret Projectile State ────────────────────────────────────── */
   const turretProjectiles = [];
   const TURRET_PROJ_SPEED = 40;
+
+  /* ── Tank-specific State ─────────────────────────────────────────── */
+  const TANK_CANNON_PROJ_SPEED = 60;
+  const TANK_MG_PROJ_SPEED = 80;
+  var _tankMGCooldown = 0;
+  var _tankCannonAmmo = 20;
+  var _tankMGAmmo = 500;
+  var _tankMaxCannonAmmo = 20;
+  var _tankMaxMGAmmo = 500;
+  var _tankReloading = false;
+  var _tankReloadTimer = 0;
 
   /* ── Build Vehicle Mesh ──────────────────────────────────────────── */
   function buildVehicleMesh(type) {
@@ -118,6 +131,165 @@ const VehicleSystem = (function () {
         barrel.position.set(0, 1.5, -1.2);
         group.add(barrel);
       }
+    }
+
+    group.castShadow = true;
+    return group;
+  }
+
+  /* ── Build Tank Mesh ─────────────────────────────────────────────── */
+  function buildTankMesh() {
+    var group = new THREE.Group();
+    var matHull  = new THREE.MeshLambertMaterial({ color: 0x3A4A2A }); // olive drab
+    var matDark  = new THREE.MeshLambertMaterial({ color: 0x2A2A1A });
+    var matTrack = new THREE.MeshLambertMaterial({ color: 0x1A1A1A });
+    var matGun   = new THREE.MeshLambertMaterial({ color: 0x333333 });
+    var matERA   = new THREE.MeshLambertMaterial({ color: 0x4A5A3A });
+
+    // ── Hull (lower body — sloped front) ──
+    var hull = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.8, 4.5), matHull);
+    hull.position.set(0, 0.6, 0);
+    group.add(hull);
+
+    // Front slope
+    var frontSlope = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.5, 1.2), matHull);
+    frontSlope.position.set(0, 0.85, -2.2);
+    frontSlope.rotation.x = 0.35;
+    group.add(frontSlope);
+
+    // Rear engine deck
+    var rearDeck = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.3, 0.8), matDark);
+    rearDeck.position.set(0, 1.1, 1.8);
+    group.add(rearDeck);
+
+    // Engine exhaust pipes
+    for (var ex = -1; ex <= 1; ex += 2) {
+      var exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 6), matGun);
+      exhaust.rotation.x = Math.PI / 2;
+      exhaust.position.set(ex * 0.4, 1.2, 2.3);
+      group.add(exhaust);
+    }
+
+    // ── Tracks (left and right) ──
+    for (var side = -1; side <= 1; side += 2) {
+      // Track housing
+      var trackHousing = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 4.8), matTrack);
+      trackHousing.position.set(side * 1.65, 0.4, 0);
+      group.add(trackHousing);
+
+      // Track top guard (fender)
+      var fender = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.08, 4.6), matHull);
+      fender.position.set(side * 1.65, 0.8, 0);
+      group.add(fender);
+
+      // Road wheels (6 per side)
+      for (var wi = 0; wi < 6; wi++) {
+        var wz = -2.0 + wi * 0.8;
+        var wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.25, 8), matGun);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(side * 1.65, 0.3, wz);
+        wheel.userData.isWheel = true;
+        group.add(wheel);
+      }
+
+      // Drive sprocket (front)
+      var sprocket = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.28, 8), matDark);
+      sprocket.rotation.z = Math.PI / 2;
+      sprocket.position.set(side * 1.65, 0.5, -2.5);
+      group.add(sprocket);
+
+      // Idler wheel (rear)
+      var idler = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.28, 8), matDark);
+      idler.rotation.z = Math.PI / 2;
+      idler.position.set(side * 1.65, 0.5, 2.3);
+      group.add(idler);
+
+      // ERA (Explosive Reactive Armor) blocks on sides
+      for (var ei = 0; ei < 4; ei++) {
+        var era = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.5), matERA);
+        era.position.set(side * 1.5, 0.95, -1.5 + ei * 0.8);
+        group.add(era);
+      }
+    }
+
+    // ── Turret (rotating group) ──
+    var turretGroup = new THREE.Group();
+    turretGroup.position.set(0, 1.3, -0.3);
+    turretGroup.userData.isTurret = true;
+
+    // Turret body (tapered)
+    var turretBody = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.6, 2.2), matHull);
+    turretBody.position.set(0, 0.3, 0);
+    turretGroup.add(turretBody);
+
+    // Turret top
+    var turretTop = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.15, 1.8), matDark);
+    turretTop.position.set(0, 0.65, 0);
+    turretGroup.add(turretTop);
+
+    // Main gun mantlet (thick part where gun emerges)
+    var mantlet = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.4, 8), matGun);
+    mantlet.rotation.z = Math.PI / 2;
+    mantlet.position.set(0, 0.35, -1.1);
+    turretGroup.add(mantlet);
+
+    // Main gun barrel (125mm cannon)
+    var mainGun = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 3.0, 8), matGun);
+    mainGun.rotation.x = Math.PI / 2;
+    mainGun.position.set(0, 0.35, -2.6);
+    mainGun.userData.isMainGun = true;
+    turretGroup.add(mainGun);
+
+    // Muzzle brake
+    var muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.08, 0.2, 8), matGun);
+    muzzle.rotation.x = Math.PI / 2;
+    muzzle.position.set(0, 0.35, -4.15);
+    turretGroup.add(muzzle);
+
+    // Coaxial MG (right of main gun)
+    var coaxMG = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 6), matGun);
+    coaxMG.rotation.x = Math.PI / 2;
+    coaxMG.position.set(0.25, 0.3, -1.8);
+    coaxMG.userData.isCoaxMG = true;
+    turretGroup.add(coaxMG);
+
+    // Commander's cupola (top hatch with MG)
+    var cupola = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.28, 0.2, 8), matDark);
+    cupola.position.set(-0.3, 0.75, 0.3);
+    turretGroup.add(cupola);
+
+    // Commander's MG (NSVT or similar)
+    var cmdMG = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.8, 6), matGun);
+    cmdMG.rotation.x = Math.PI / 2;
+    cmdMG.position.set(-0.3, 0.9, -0.1);
+    turretGroup.add(cmdMG);
+
+    // Turret ERA blocks (front face)
+    for (var te = -1; te <= 1; te++) {
+      var tEra = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.25, 0.1), matERA);
+      tEra.position.set(te * 0.55, 0.3, -1.15);
+      turretGroup.add(tEra);
+    }
+
+    // Turret basket / stowage at rear
+    var basket = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.4, 0.6), matDark);
+    basket.position.set(0, 0.3, 1.15);
+    turretGroup.add(basket);
+
+    group.add(turretGroup);
+
+    // ── Accessories ──
+    // Antenna
+    var antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.015, 1.5, 4), matGun);
+    antenna.position.set(0.8, 2.2, 0.5);
+    group.add(antenna);
+
+    // Headlights
+    for (var hl = -1; hl <= 1; hl += 2) {
+      var light = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.05, 8), new THREE.MeshLambertMaterial({ color: 0xffffaa }));
+      light.rotation.x = Math.PI / 2;
+      light.position.set(hl * 0.9, 0.75, -2.6);
+      group.add(light);
     }
 
     group.castShadow = true;
@@ -220,12 +392,19 @@ const VehicleSystem = (function () {
       npcGunner: null,           // reference to NPC using this vehicle's gun
       passengers: [],
       fireCooldown: 0,
-      fireRate: type === 'combat' ? 1.5 : type === 'turret_rover' ? 2.0 : 0,
-      crewExposed: (type === 'combat'),  // tank crew is exposed in hatches
-      viewMode: 'third',        // 'first' or 'third' — camera mode when occupied
+      fireRate: type === 'tank' ? 3.0 : type === 'combat' ? 1.5 : type === 'turret_rover' ? 2.0 : 0,
+      crewExposed: (type === 'combat'),  // tank crew is NOT exposed
+      viewMode: type === 'tank' ? 'first' : 'third',        // tanks start in first-person (interior view)
+      // Tank-specific
+      isTank: type === 'tank',
+      mgCooldown: 0,
+      mgFiring: false,
+      cannonAmmo: type === 'tank' ? _tankMaxCannonAmmo : 0,
+      mgAmmo: type === 'tank' ? _tankMaxMGAmmo : 0,
+      turretYaw: 0,   // independent turret rotation
     };
 
-    vehicle.mesh = buildVehicleMesh(type);
+    vehicle.mesh = type === 'tank' ? buildTankMesh() : buildVehicleMesh(type);
     vehicle.mesh.position.copy(vehicle.position);
     vehicle.mesh.userData.vehicleId = vehicle.id;
 
@@ -241,6 +420,11 @@ const VehicleSystem = (function () {
     v.occupied = true;
     _occupiedVehicle = v;
     attachPlayerBody(v);
+    // Tank-specific: sync ammo counters
+    if (v.isTank) {
+      _tankCannonAmmo = v.cannonAmmo;
+      _tankMGAmmo = v.mgAmmo;
+    }
     // Apply correct camera mode based on vehicle view preference
     if (v.viewMode === 'first') {
       CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
@@ -250,6 +434,10 @@ const VehicleSystem = (function () {
     CameraSystem.setVehicleTarget(v.mesh);
     if (typeof HUD !== 'undefined' && HUD.showVehicleHUD) HUD.showVehicleHUD(v);
     if (typeof AudioSystem !== 'undefined' && AudioSystem.startEngine) AudioSystem.startEngine();
+    // Tank-specific notification
+    if (v.isTank && typeof HUD !== 'undefined' && HUD.notifyPickup) {
+      HUD.notifyPickup('\uD83D\uDE94 TANK ENTERED! LMB=Cannon RMB=MG T=Toggle View', '#00ff88');
+    }
     return true;
   }
 
@@ -376,9 +564,13 @@ const VehicleSystem = (function () {
   function isInVehicle() { return _occupiedVehicle !== null; }
 
   /* ── Vehicle Input ───────────────────────────────────────────────── */
-  const _vKeys = { w: false, a: false, s: false, d: false, up: false, down: false, fire: false };
+  const _vKeys = { w: false, a: false, s: false, d: false, up: false, down: false, fire: false, mgFire: false };
   function setVehicleKey(key, pressed) {
     if (key in _vKeys) _vKeys[key] = pressed;
+    // Update MG firing state on occupied tank
+    if (key === 'mgFire' && _occupiedVehicle && _occupiedVehicle.isTank) {
+      _occupiedVehicle.mgFiring = pressed;
+    }
   }
 
   /* ── Update ──────────────────────────────────────────────────────── */
@@ -398,12 +590,19 @@ const VehicleSystem = (function () {
 
       // Fire cooldown
       if (v.fireCooldown > 0) v.fireCooldown -= delta;
+      if (v.mgCooldown > 0) v.mgCooldown -= delta;
 
       if (v === _occupiedVehicle) {
         updatePlayerVehicle(v, delta);
+        // Tank turret follows camera
+        if (v.isTank) updateTankTurret(v, delta);
         // Player vehicle fires with mouse/fire key
         if (_vKeys.fire && v.damage > 0 && v.fireCooldown <= 0) {
           fireTurret(v);
+        }
+        // Tank MG fire (secondary fire key)
+        if (v.isTank && v.mgFiring && v.mgCooldown <= 0 && v.mgAmmo > 0) {
+          fireTankMG(v);
         }
         // NPC gunner fires at nearby enemies while player drives
         if (v.occupiedByNPC && v.npcGunner && v.damage > 0) {
@@ -682,12 +881,139 @@ const VehicleSystem = (function () {
   /* ── Turret Fire ────────────────────────────────────────────────── */
   function fireTurret(v) {
     if (!_scene || v.fireCooldown > 0 || v.damage <= 0) return;
+    // Tank uses specific cannon fire
+    if (v.isTank) { fireTankCannon(v); return; }
     v.fireCooldown = v.fireRate;
     // Fire in the direction the camera is facing (player-controlled)
     const yaw = CameraSystem.getYaw();
     _vTmp1.set(-Math.sin(yaw), 0, -Math.cos(yaw));
     spawnTurretProjectile(v.position, _vTmp1, v.damage);
     if (typeof AudioSystem !== 'undefined') AudioSystem.playGunshot('hmg');
+  }
+
+  /* ── Tank Cannon Fire (LMB — heavy projectile with explosion) ──── */
+  function fireTankCannon(v) {
+    if (!_scene || v.fireCooldown > 0 || v.cannonAmmo <= 0) return;
+    v.fireCooldown = v.fireRate;
+    v.cannonAmmo--;
+    _tankCannonAmmo = v.cannonAmmo;
+
+    var camYaw = CameraSystem.getYaw();
+    var camPitch = CameraSystem.getPitch();
+    // Direction from camera aim (includes vertical aiming)
+    _vTmp1.set(
+      -Math.sin(camYaw) * Math.cos(camPitch),
+      Math.sin(camPitch),
+      -Math.cos(camYaw) * Math.cos(camPitch)
+    ).normalize();
+
+    // Spawn from turret muzzle position
+    _vTmp2.copy(v.position);
+    _vTmp2.y += 1.65; // turret height
+    _vTmp2.x += -Math.sin(camYaw) * 4.5;
+    _vTmp2.z += -Math.cos(camYaw) * 4.5;
+
+    // Cannon shell (larger, faster projectile)
+    var shellMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.04, 0.5, 6),
+      new THREE.MeshBasicMaterial({ color: 0xff6600 })
+    );
+    shellMesh.position.copy(_vTmp2);
+    shellMesh.lookAt(_vTmp2.x + _vTmp1.x, _vTmp2.y + _vTmp1.y, _vTmp2.z + _vTmp1.z);
+    _scene.add(shellMesh);
+    turretProjectiles.push({
+      mesh: shellMesh, dir: _vTmp1.clone(), speed: TANK_CANNON_PROJ_SPEED,
+      damage: v.damage, life: 4.0, isCannonShell: true,
+    });
+
+    // Screen shake for cannon blast
+    if (typeof CameraSystem !== 'undefined' && CameraSystem.shake) CameraSystem.shake(0.08, 0.3);
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.playGunshot) AudioSystem.playGunshot('launcher');
+    // Muzzle flash
+    if (typeof Tracers !== 'undefined' && Tracers.spawnMuzzleFlash) {
+      Tracers.spawnMuzzleFlash(_vTmp2, _vTmp1);
+    }
+    // Reload notification
+    if (typeof HUD !== 'undefined' && HUD.notifyPickup) {
+      HUD.notifyPickup('\uD83D\uDCA5 CANNON FIRED! Reloading... (' + v.cannonAmmo + ' shells left)', '#ff8800');
+    }
+  }
+
+  /* ── Tank MG Fire (RMB — rapid fire coaxial machine gun) ─────── */
+  function fireTankMG(v) {
+    if (!_scene || v.mgCooldown > 0 || v.mgAmmo <= 0) return;
+    var stats = VEHICLE_STATS[v.type];
+    v.mgCooldown = stats.mgRate || 0.1;
+    v.mgAmmo--;
+    _tankMGAmmo = v.mgAmmo;
+
+    var camYaw = CameraSystem.getYaw();
+    var camPitch = CameraSystem.getPitch();
+    // Slight spread for MG
+    var spread = 0.02;
+    _vTmp1.set(
+      -Math.sin(camYaw) * Math.cos(camPitch) + (Math.random() - 0.5) * spread,
+      Math.sin(camPitch) + (Math.random() - 0.5) * spread,
+      -Math.cos(camYaw) * Math.cos(camPitch) + (Math.random() - 0.5) * spread
+    ).normalize();
+
+    _vTmp2.copy(v.position);
+    _vTmp2.y += 1.6;
+    _vTmp2.x += -Math.sin(camYaw) * 2.5;
+    _vTmp2.z += -Math.cos(camYaw) * 2.5;
+
+    var bulletMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.04, 0.2),
+      new THREE.MeshBasicMaterial({ color: 0xffcc22 })
+    );
+    bulletMesh.position.copy(_vTmp2);
+    bulletMesh.lookAt(_vTmp2.x + _vTmp1.x, _vTmp2.y + _vTmp1.y, _vTmp2.z + _vTmp1.z);
+    _scene.add(bulletMesh);
+    turretProjectiles.push({
+      mesh: bulletMesh, dir: _vTmp1.clone(), speed: TANK_MG_PROJ_SPEED,
+      damage: stats.mgDamage || 15, life: 2.0, isCannonShell: false,
+    });
+
+    // Tracer every 3rd shot
+    if (v.mgAmmo % 3 === 0 && typeof Tracers !== 'undefined' && Tracers.spawnTracer) {
+      Tracers.spawnTracer(_vTmp2, _vTmp1, 0xffcc44, 100);
+    }
+    if (typeof AudioSystem !== 'undefined' && AudioSystem.playGunshot) AudioSystem.playGunshot('hmg');
+  }
+
+  /* ── Tank Turret Rotation (follows camera yaw) ──────────────────── */
+  function updateTankTurret(v, delta) {
+    if (!v.isTank || !v.mesh) return;
+    var camYaw = CameraSystem.getYaw();
+    // Turret rotates relative to hull
+    var targetTurretYaw = camYaw - v.rotation.y;
+    // Smooth rotation
+    var diff = targetTurretYaw - v.turretYaw;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    v.turretYaw += diff * Math.min(1, delta * 5);
+    // Apply to turret group in mesh
+    for (var ci = 0; ci < v.mesh.children.length; ci++) {
+      if (v.mesh.children[ci].userData && v.mesh.children[ci].userData.isTurret) {
+        v.mesh.children[ci].rotation.y = v.turretYaw;
+        break;
+      }
+    }
+  }
+
+  /* ── Tank Ammo Getters ──────────────────────────────────────────── */
+  function getTankAmmo() {
+    return { cannon: _tankCannonAmmo, maxCannon: _tankMaxCannonAmmo, mg: _tankMGAmmo, maxMG: _tankMaxMGAmmo };
+  }
+
+  function isTankReloading() {
+    return _tankReloading;
+  }
+
+  function getTankReloadProgress() {
+    if (!_occupiedVehicle || !_occupiedVehicle.isTank) return 0;
+    if (_occupiedVehicle.fireCooldown <= 0) return 1;
+    return 1 - (_occupiedVehicle.fireCooldown / _occupiedVehicle.fireRate);
   }
 
   function fireTurretAt(v, targetPos) {
@@ -757,6 +1083,21 @@ const VehicleSystem = (function () {
           if (enemy && enemy.alive) {
             Enemies.damage(enemy, p.damage);
           }
+          // Cannon shell: splash damage to nearby enemies
+          if (p.isCannonShell) {
+            var shellPos = p.mesh.position;
+            var splashRadius = 6;
+            var allE = Enemies.getAll ? Enemies.getAll() : [];
+            for (var se = 0; se < allE.length; se++) {
+              var sEnemy = allE[se];
+              if (!sEnemy.alive || !sEnemy.mesh || sEnemy === enemy) continue;
+              var sDist = shellPos.distanceTo(sEnemy.mesh.position);
+              if (sDist < splashRadius) {
+                var splashDmg = Math.floor(p.damage * 0.5 * (1 - sDist / splashRadius));
+                if (splashDmg > 0) Enemies.damage(sEnemy, splashDmg);
+              }
+            }
+          }
         }
       }
 
@@ -772,6 +1113,17 @@ const VehicleSystem = (function () {
       }
 
       if (hit || p.life <= 0) {
+        // Cannon shell explosion effect
+        if (p.isCannonShell && hit) {
+          if (typeof Tracers !== 'undefined' && Tracers.spawnExplosion) {
+            Tracers.spawnExplosion(p.mesh.position, 2.5);
+          }
+          if (typeof AudioSystem !== 'undefined' && AudioSystem.playExplosion) AudioSystem.playExplosion();
+          // Terrain destruction from cannon
+          if (typeof WorldFeatures !== 'undefined' && WorldFeatures.applyExplosionDamage) {
+            WorldFeatures.applyExplosionDamage(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, 4, 150);
+          }
+        }
         p.mesh.geometry.dispose();
         p.mesh.material.dispose();
         if (_scene) _scene.remove(p.mesh);
@@ -993,5 +1345,11 @@ const VehicleSystem = (function () {
     consumeFuel: consumeFuel,
     refuelVehicle: refuelVehicle,
     getFuel: getFuel,
+    // Tank System
+    fireTankCannon: fireTankCannon,
+    fireTankMG: fireTankMG,
+    getTankAmmo: getTankAmmo,
+    isTankReloading: isTankReloading,
+    getTankReloadProgress: getTankReloadProgress,
   };
 })();

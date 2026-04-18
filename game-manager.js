@@ -32,22 +32,13 @@ const GameManager = (function () {
   var _waveStartTimer = null;
   var _hudSlowTimer = 0; // throttle slow HUD updates (dailies, bounties, prestige)
   var _musicIntTimer = 0; // throttle music intensity calc
-  var _escapeHTML = (typeof window !== 'undefined' && window.Feedback && window.Feedback.escapeHTML)
-    ? window.Feedback.escapeHTML
-    : function (str) {
-        return String(str).replace(/[&<>"']/g, function (c) {
-          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
-        });
-      };
   var _buildMatHud = null; // cached DOM ref for build materials HUD
   var _buildMatList = null;
-  var _buildMatHtml = '';
   // Cached per-frame HUD indicator DOM refs
   var _domLean = null, _domInspect = null, _domBayonet = null;
   var _domHeatBar = null, _domOverheat = null, _domMaint = null;
   var _domSwim = null, _domBreathContainer = null, _domBreathBar = null;
   var _domMantle = null;
-  var _enemyDroneWarnCooldown = 0;
 
   /* ── Player State ────────────────────────────────────────────────── */
   const GOD_MODE_HP = 999999;
@@ -118,8 +109,6 @@ const GameManager = (function () {
   /* ── Wave State ──────────────────────────────────────────────────── */
   let currentWave = 0;
   const SCORE_WAVE_BONUS = 500;
-  let _activeWavePlan = null;
-  let _wavePlanReminderTimer = null;
 
   /* ── Stamina Config ──────────────────────────────────────────────── */
   const STAMINA_DRAIN_RATE = 0.15;  // per second while sprinting
@@ -140,213 +129,6 @@ const GameManager = (function () {
     { id: 'EMP',            label: '⚡ EMP BLAST!',             color: '#4400ff', chance: 0.04 },
     { id: 'TUNNEL_BREACH',  label: '🕳 TUNNEL BREACH!',        color: '#884400', chance: 0.06 },
   ];
-
-  const WAVE_PLAN_TEMPLATES = {
-    INFANTRY_PUSH: {
-      id: 'INFANTRY_PUSH',
-      name: 'INFANTRY PUSH',
-      briefing: 'Rifle squads and engineers are massing for a frontal rush.',
-      objectiveText: 'Break the first push before it collapses your line.',
-      rewardText: 'Discipline bonus: accuracy 35%+',
-      color: '#88ff88',
-      enemyPool: ['CONSCRIPT', 'CONSCRIPT', 'STORMER', 'ENGINEER', 'OFFICER'],
-      initialTypes: ['STORMER', 'ENGINEER'],
-      groupDelta: 1,
-      extraMultiplier: 0.95,
-      spawnIntervalMultiplier: 1.05,
-      missionType: 'CAPTURE_ZONE',
-      pickupTypes: ['AMMO', 'AMMO', 'MEDKIT'],
-      bonusLabel: 'HOLD THE LINE',
-      bonusScore: 150,
-      bonusOKC: 20,
-      bonusCheck: function (stats) { return stats.accuracy >= 0.35; },
-    },
-    MORTAR_LOCKDOWN: {
-      id: 'MORTAR_LOCKDOWN',
-      name: 'MORTAR LOCKDOWN',
-      briefing: 'Indirect fire pins the field while spotters call the range.',
-      objectiveText: 'Stay mobile and erase the mortar crews quickly.',
-      rewardText: 'Counter-battery bonus: take 40 damage or less',
-      color: '#ff9966',
-      enemyPool: ['MORTAR', 'CONSCRIPT', 'HEAVY_SNIPER', 'STORMER'],
-      initialTypes: ['MORTAR'],
-      groupDelta: -1,
-      extraMultiplier: 0.85,
-      spawnIntervalMultiplier: 0.9,
-      missionType: 'ASSASSINATION',
-      pickupTypes: ['ARMOR', 'AMMO', 'MEDKIT'],
-      bonusLabel: 'COUNTER-BATTERY',
-      bonusScore: 200,
-      bonusOKC: 25,
-      bonusCheck: function (stats) { return stats.damageTaken <= 40; },
-    },
-    DRONE_HUNT: {
-      id: 'DRONE_HUNT',
-      name: 'DRONE HUNT',
-      briefing: 'EW crews are coordinating FPV strikes over the battlefield.',
-      objectiveText: 'Prioritize drone crews before the swarm builds.',
-      rewardText: 'Intercept bonus: finish with 2+ headshots',
-      color: '#ff66bb',
-      enemyPool: ['EW_OPERATOR', 'SPETSNAZ', 'STORMER', 'CONSCRIPT'],
-      initialTypes: ['EW_OPERATOR'],
-      extraMultiplier: 0.9,
-      spawnIntervalMultiplier: 0.95,
-      extraDroneWaves: 1,
-      pickupTypes: ['AMMO', 'STIM', 'MEDKIT'],
-      bonusLabel: 'DRONE INTERCEPT',
-      bonusScore: 175,
-      bonusOKC: 25,
-      bonusCheck: function (stats) { return stats.headshots >= 2; },
-    },
-    ARMOR_BREACH: {
-      id: 'ARMOR_BREACH',
-      name: 'ARMOR BREACH',
-      briefing: 'Mechanized armor is probing for a breakthrough.',
-      objectiveText: 'Crack the heavy units first, then clean up the escort.',
-      rewardText: 'Breach bonus: accuracy 25%+ and damage under 80',
-      color: '#ff5555',
-      enemyPool: ['ARMORED', 'BTR', 'CONSCRIPT', 'THERMOBARIC', 'ENGINEER'],
-      initialTypes: ['ARMORED'],
-      groupDelta: -1,
-      extraMultiplier: 0.8,
-      spawnIntervalMultiplier: 1.0,
-      forceArmor: true,
-      missionType: 'DEMOLITION',
-      pickupTypes: ['ARMOR', 'AMMO', 'GRENADE'],
-      bonusLabel: 'ARMOR BREACH',
-      bonusScore: 225,
-      bonusOKC: 30,
-      bonusCheck: function (stats) { return stats.accuracy >= 0.25 && stats.damageTaken <= 80; },
-    },
-    COUNTER_SNIPERS: {
-      id: 'COUNTER_SNIPERS',
-      name: 'COUNTER-SNIPERS',
-      briefing: 'Long sightlines are covered by elite marksmen and escorts.',
-      objectiveText: 'Pick the marksmen fast before they bleed your armor away.',
-      rewardText: 'Marksman bonus: clear inside 90 seconds',
-      color: '#66ccff',
-      enemyPool: ['HEAVY_SNIPER', 'SNIPER', 'SPETSNAZ', 'CONSCRIPT'],
-      initialTypes: ['HEAVY_SNIPER'],
-      groupDelta: -1,
-      extraMultiplier: 0.85,
-      spawnIntervalMultiplier: 1.1,
-      missionType: 'ASSASSINATION',
-      pickupTypes: ['AMMO', 'STIM', 'SHIELD'],
-      bonusLabel: 'COUNTER-SNIPER',
-      bonusScore: 175,
-      bonusOKC: 20,
-      bonusCheck: function (stats) { return stats.time <= 90; },
-    },
-    BREACH_AND_CLEAR: {
-      id: 'BREACH_AND_CLEAR',
-      name: 'BREACH AND CLEAR',
-      briefing: 'Shock troops are stacking for a close-range breach.',
-      objectiveText: 'Survive the breach, then punish the second wave of entries.',
-      rewardText: 'Breach bonus: finish with 8+ kills inside 75 seconds',
-      color: '#ffaa44',
-      enemyPool: ['STORMER', 'ARMORED', 'KADYROVITE', 'WAGNER', 'THERMOBARIC'],
-      initialTypes: ['STORMER', 'STORMER'],
-      groupDelta: 1,
-      extraMultiplier: 1.1,
-      spawnIntervalMultiplier: 0.95,
-      missionType: 'RESCUE',
-      pickupTypes: ['MEDKIT', 'ARMOR', 'GRENADE'],
-      bonusLabel: 'ROOM CLEAR',
-      bonusScore: 200,
-      bonusOKC: 25,
-      bonusCheck: function (stats) { return stats.kills >= 8 && stats.time <= 75; },
-    },
-  };
-
-  const STAGE_WAVE_PLAN_ROTATIONS = {
-    1:  ['INFANTRY_PUSH', 'MORTAR_LOCKDOWN', 'DRONE_HUNT'],
-    2:  ['INFANTRY_PUSH', 'COUNTER_SNIPERS', 'ARMOR_BREACH'],
-    3:  ['BREACH_AND_CLEAR', 'MORTAR_LOCKDOWN', 'COUNTER_SNIPERS'],
-    4:  ['COUNTER_SNIPERS', 'INFANTRY_PUSH', 'DRONE_HUNT'],
-    5:  ['BREACH_AND_CLEAR', 'ARMOR_BREACH', 'MORTAR_LOCKDOWN'],
-    6:  ['COUNTER_SNIPERS', 'ARMOR_BREACH', 'DRONE_HUNT'],
-    7:  ['MORTAR_LOCKDOWN', 'COUNTER_SNIPERS', 'DRONE_HUNT'],
-    8:  ['COUNTER_SNIPERS', 'DRONE_HUNT', 'ARMOR_BREACH'],
-    9:  ['MORTAR_LOCKDOWN', 'DRONE_HUNT', 'ARMOR_BREACH'],
-    10: ['BREACH_AND_CLEAR', 'MORTAR_LOCKDOWN', 'ARMOR_BREACH'],
-    11: ['ARMOR_BREACH', 'COUNTER_SNIPERS', 'DRONE_HUNT'],
-    12: ['DRONE_HUNT', 'ARMOR_BREACH', 'BREACH_AND_CLEAR'],
-  };
-
-  function pickRandom(list) {
-    return list[Math.floor(Math.random() * list.length)];
-  }
-
-  function spawnPlanPickups(types, radius) {
-    if (!types || !types.length || typeof Pickups === 'undefined' || !window.VoxelWorld) return;
-    for (var i = 0; i < types.length; i++) {
-      var angle = (i / types.length) * Math.PI * 2 + Math.random() * 0.4;
-      var dist = 2 + Math.random() * (radius || 4);
-      var px = player.position.x + Math.cos(angle) * dist;
-      var pz = player.position.z + Math.sin(angle) * dist;
-      var py = window.VoxelWorld.getTerrainHeight(px, pz);
-      Pickups.spawn(new THREE.Vector3(px, py, pz), types[i]);
-    }
-  }
-
-  function getWaveBattlePlan(stageDef, waveNum) {
-    var rotation = STAGE_WAVE_PLAN_ROTATIONS[stageDef.id] || ['INFANTRY_PUSH', 'COUNTER_SNIPERS', 'ARMOR_BREACH'];
-    var planId = rotation[(waveNum - 1) % rotation.length];
-    if (waveNum === 1) planId = rotation[0] || 'INFANTRY_PUSH';
-    if (waveNum === stageDef.wavesPerStage) {
-      planId = stageDef.id >= 9 ? 'ARMOR_BREACH' : 'BREACH_AND_CLEAR';
-    }
-    var template = WAVE_PLAN_TEMPLATES[planId] || WAVE_PLAN_TEMPLATES.INFANTRY_PUSH;
-    var plan = Object.assign({}, template);
-    plan.stageId = stageDef.id;
-    plan.stageName = stageDef.name;
-    plan.wave = waveNum;
-    return plan;
-  }
-
-  function scheduleWavePlanReminder(plan) {
-    if (_wavePlanReminderTimer) clearTimeout(_wavePlanReminderTimer);
-    if (!plan || !HUD || !HUD.showObjective) return;
-    _wavePlanReminderTimer = setTimeout(function () {
-      HUD.showObjective(plan.name + ' — ' + plan.objectiveText);
-    }, 7000);
-  }
-
-  function tryStartPlanMission(plan) {
-    if (!plan || !plan.missionType || typeof MissionTypes === 'undefined' || !MissionTypes.TYPES || !MissionTypes.startMission) return false;
-    if (MissionTypes.getActive && MissionTypes.getActive()) return false;
-    var zoneX = player.position.x + (Math.random() - 0.5) * 34;
-    var zoneZ = player.position.z + (Math.random() - 0.5) * 34;
-    if (!MissionTypes.startMission(plan.missionType, zoneX, zoneZ)) return false;
-    HUD.notifyPickup('📍 PLAN OBJECTIVE: ' + MissionTypes.TYPES[plan.missionType].name, '#ffcc00');
-    return true;
-  }
-
-  function getWavePlanStats() {
-    return {
-      kills: player.waveKills || 0,
-      accuracy: player.waveShots > 0 ? (player.waveHits / player.waveShots) : 0,
-      headshots: player.waveHeadshots || 0,
-      damageTaken: Math.round(player.waveDamageTaken || 0),
-      time: Math.round((performance.now() - (player.waveStartTime || performance.now())) / 1000),
-      hpRatio: player.maxHp > 0 ? (player.hp / player.maxHp) : 0,
-    };
-  }
-
-  function applyWavePlanCompletion(plan) {
-    if (!plan || typeof plan.bonusCheck !== 'function') return;
-    var stats = getWavePlanStats();
-    if (!plan.bonusCheck(stats)) return;
-
-    player.score += plan.bonusScore || 0;
-    HUD.setScore(player.score);
-    if (typeof Marketplace !== 'undefined' && Marketplace.addOKC && plan.bonusOKC) {
-      Marketplace.addOKC(plan.bonusOKC);
-      if (HUD.updateOKC) HUD.updateOKC(Marketplace.getOKC());
-    }
-    spawnPlanPickups(plan.pickupTypes, 5);
-    HUD.notifyPickup('★ ' + plan.bonusLabel + ' +' + (plan.bonusScore || 0), plan.color || '#ffdd44');
-  }
 
   function triggerBattlefieldEvent() {
     const roll = Math.random();
@@ -630,13 +412,11 @@ const GameManager = (function () {
       theme:        'grassland',
       wavesPerStage: 7,
       difficulty:   0.8,
-      fogColor:     0x8FA0AF,
-      bgColor:      0xC3D2DE,
-      sunColor:     0xF0D8A6,
-      sunIntensity: 1.1,
-      exposure:     0.88,
-      fogNear:      55,
-      fogFar:       210,
+      fogColor:     0x4a5a3a,
+      bgColor:      0x4a5a3a,
+      sunColor:     0xff8833,
+      sunIntensity: 0.85,
+      exposure:     0.9,
       description:  'Stop the airborne assault at Hostomel Airport.',
     },
     {
@@ -671,11 +451,11 @@ const GameManager = (function () {
       theme:        'grassland',
       wavesPerStage: 7,
       difficulty:   1.8,
-      fogColor:     0xD4A017,
-      bgColor:      0xFFD500,
-      sunColor:     0xFFEE44,
-      sunIntensity: 1.0,
-      exposure:     1.0,
+      fogColor:     0x4a5a3a,
+      bgColor:      0x4a5a3a,
+      sunColor:     0xffcc55,
+      sunIntensity: 0.9,
+      exposure:     0.9,
       description:  'Cross the Dnipro at Kherson. Liberate the bridgehead.',
     },
     {
@@ -762,11 +542,11 @@ const GameManager = (function () {
       theme:        'grassland',
       wavesPerStage: 8,
       difficulty:   4.6,
-      fogColor:     0xD4A017,
-      bgColor:      0xFFD500,
-      sunColor:     0xFFEE44,
-      sunIntensity: 0.9,
-      exposure:     0.95,
+      fogColor:     0x3a4a2a,
+      bgColor:      0x3a4a2a,
+      sunColor:     0xffaa44,
+      sunIntensity: 0.75,
+      exposure:     0.85,
       description:  'Cross into enemy territory. Take the fight to them.',
     },
     {
@@ -861,24 +641,14 @@ const GameManager = (function () {
   /* ── Init ────────────────────────────────────────────────────────── */
   function init() {
     // Create renderer
-    try {
-      _renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-      _renderer.setSize(window.innerWidth, window.innerHeight);
-      _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-      _renderer.shadowMap.enabled = true;
-      _renderer.shadowMap.type = THREE.PCFShadowMap;
-      _renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      _renderer.toneMappingExposure = 0.85;
-      document.getElementById('game-container').appendChild(_renderer.domElement);
-    } catch (e) {
-      console.error('[GameManager] WebGL init failed:', e.message);
-      // Allow QA mode to continue without renderer
-      if (window.__QA_MODE) {
-        _renderer = null;
-      } else {
-        throw e;
-      }
-    }
+    _renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    _renderer.setSize(window.innerWidth, window.innerHeight);
+    _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    _renderer.shadowMap.enabled = true;
+    _renderer.shadowMap.type = THREE.PCFShadowMap;
+    _renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    _renderer.toneMappingExposure = 0.85;
+    document.getElementById('game-container').appendChild(_renderer.domElement);
 
     // Create scene — Ukrainian theme (golden sky)
     _scene = new THREE.Scene();
@@ -973,9 +743,6 @@ const GameManager = (function () {
     Weapons.createGunMesh(_camera);
     Weapons.createMuzzleFlash(_scene, _camera);
 
-    // Create weapon HUD slots (must be after Weapons is initialized)
-    if (HUD && HUD.createWeaponSlots) HUD.createWeaponSlots();
-
     // Wire terrain destruction callbacks for loot & mining
     Weapons.setOnTerrainDig(function (x, y, z, blockType) {
       onShovelMine(x, y, z, blockType);
@@ -988,6 +755,20 @@ const GameManager = (function () {
       if (isExpl && typeof WorldFeatures !== 'undefined' && WorldFeatures.applyExplosionDamage) {
         var bRadius = Weapons.getBlastRadius() || 3;
         WorldFeatures.applyExplosionDamage(x, y, z, bRadius, 100);
+      }
+      // Damage nearby drone nests from explosions and bullets
+      if (typeof DroneSystem !== 'undefined' && DroneSystem.damageNest) {
+        var nests = DroneSystem.getNests();
+        for (var ni = 0; ni < nests.length; ni++) {
+          var n = nests[ni];
+          if (!n.alive) continue;
+          var ndx = n.x - x, ndz = n.z - z;
+          var nestDist = Math.sqrt(ndx * ndx + ndz * ndz);
+          if (nestDist < 8) {
+            var dmg = isExpl ? 40 : 5;
+            DroneSystem.damageNest(ni, dmg);
+          }
+        }
       }
     });
 
@@ -1014,12 +795,9 @@ const GameManager = (function () {
       }, 10000);
     });
 
-    resetPlayerPresentationState();
-
     // Set player spawn on terrain
-    var initSpawn = getPlayerSpawnPosition();
-    player.position.set(initSpawn.x, initSpawn.y, initSpawn.z);
-    orientCameraForStageSpawn(currentStage, initSpawn);
+    const spawnH = window.VoxelWorld.getTerrainHeight(0, 0);
+    player.position.set(0, spawnH + player.height, 0);
 
     // Spawn organized assault groups (4 squads of 4-5 armed NPCs)
     NPCSystem.spawnAssaultGroups();
@@ -1035,6 +813,10 @@ const GameManager = (function () {
     VehicleSystem.spawn(_rp1.x, startVh2, _rp1.z, 'combat');
     var startVh3 = window.VoxelWorld.getTerrainHeight(_rp2.x, _rp2.z);
     VehicleSystem.spawn(_rp2.x, startVh3, _rp2.z, 'turret_rover');
+    // Spawn a tank near the player start
+    var _rp3 = roadWPs.length > 14 ? roadWPs[14] : new THREE.Vector3(0, 0, 15);
+    var startVh4 = window.VoxelWorld.getTerrainHeight(_rp3.x, _rp3.z);
+    VehicleSystem.spawn(_rp3.x, startVh4, _rp3.z, 'tank');
 
     // Spawn starter drones
     const startDh1 = window.VoxelWorld.getTerrainHeight(5, 5) + 8;
@@ -1055,8 +837,6 @@ const GameManager = (function () {
 
     // Handle resize
     window.addEventListener('resize', onResize);
-
-    ensureUpdateLoopRunning();
 
     return { scene: _scene, camera: _camera, renderer: _renderer };
   }
@@ -1109,6 +889,7 @@ const GameManager = (function () {
           // Priority 1: release drone if possessing
           if (DroneSystem.isPossessing()) {
             DroneSystem.release();
+            hideDroneControlsHUD();
             fHandled = true;
           }
           // Priority 2: mission zone interaction
@@ -1139,6 +920,7 @@ const GameManager = (function () {
             const drones = DroneSystem.getAll();
             if (drones.length > 0) {
               DroneSystem.possess(drones[0].id);
+              showDroneControlsHUD(drones[0].type);
               fHandled = true;
             }
           }
@@ -1168,6 +950,7 @@ const GameManager = (function () {
             VehicleSystem.cancelHijack();
             HUD.notifyPickup('❌ HIJACK CANCELLED', '#ff4444');
           } else if (VehicleSystem.isInVehicle()) {
+            hideTankHUD(); // Hide tank HUD on exit
             const exitPos = VehicleSystem.exit();
             if (exitPos) {
               player.position.copy(exitPos);
@@ -1187,6 +970,8 @@ const GameManager = (function () {
                 HUD.notifyPickup('🚗 COMMANDEERING…', '#ffaa00');
               } else {
                 VehicleSystem.enter(targetVehicle.id);
+                // Show tank HUD if entering a tank
+                if (targetVehicle.isTank) showTankHUD();
                 HUD.notifyPickup('🚗 ENTERED VEHICLE', '#44ff44');
               }
             }
@@ -1646,6 +1431,14 @@ const GameManager = (function () {
         handleBuildRemove();
       }
       if (e.button === 2 && gameState === STATE.PLAYING) {
+        // Tank MG: RMB fires coaxial machine gun
+        if (VehicleSystem.isInVehicle()) {
+          var occ = VehicleSystem.getOccupied();
+          if (occ && occ.isTank) {
+            VehicleSystem.setVehicleKey('mgFire', true);
+            return;
+          }
+        }
         // Minecraft-style building: right-click with shovel places a block
         if (Weapons.getCurrentType() === 'MELEE') {
           handleMinecraftPlace();
@@ -1657,7 +1450,13 @@ const GameManager = (function () {
 
     document.addEventListener('mouseup', function (e) {
       if (e.button === 0) { mouseDown = false; mouseNewPress = false; }
-      if (e.button === 2) { Weapons.handleRightUp(); }
+      if (e.button === 2) {
+        // Stop tank MG fire on RMB release
+        if (VehicleSystem.isInVehicle()) {
+          VehicleSystem.setVehicleKey('mgFire', false);
+        }
+        Weapons.handleRightUp();
+      }
     });
 
     document.addEventListener('mousemove', function (e) {
@@ -1688,7 +1487,7 @@ const GameManager = (function () {
     });
 
     /* ── Touch look controls (right half of canvas) ──────────── */
-    if (isMobile && _renderer) {
+    if (isMobile) {
       const canvas = _renderer.domElement;
       canvas.addEventListener('touchstart', function (e) {
         for (let i = 0; i < e.changedTouches.length; i++) {
@@ -1833,7 +1632,7 @@ const GameManager = (function () {
   /* ── Pointer lock helpers ────────────────────────────────────────── */
   function requestPointerLock() {
     if (isMobile) return;   // Touch controls replace pointer lock on mobile
-    if (_renderer && _renderer.domElement) _renderer.domElement.requestPointerLock();
+    _renderer.domElement.requestPointerLock();
   }
 
   /* ── Overlay helpers ─────────────────────────────────────────────── */
@@ -1845,7 +1644,226 @@ const GameManager = (function () {
 
   function hideOverlays() {
     document.querySelectorAll('.overlay').forEach(function (el) { el.style.display = 'none'; });
-    if (typeof HUD !== 'undefined' && HUD.hideWaveSummary) HUD.hideWaveSummary();
+  }
+
+  /* ── Drone Selection Flow ────────────────────────────────────────── */
+  var _droneSelectionCallback = null;
+  var _droneControlsVisible = false;
+
+  function showDroneSelection(onComplete) {
+    // In QA mode, skip drone selection entirely
+    if (typeof window !== 'undefined' && window.__QA_MODE) {
+      if (onComplete) onComplete();
+      return;
+    }
+    _droneSelectionCallback = onComplete;
+    var overlay = document.getElementById('overlay-drone-select');
+    if (!overlay) { if (onComplete) onComplete(); return; }
+
+    // Show the overlay
+    hideOverlays();
+    overlay.style.display = 'flex';
+
+    // Remove old listeners by cloning
+    var options = overlay.querySelectorAll('.drone-option');
+    for (var i = 0; i < options.length; i++) {
+      var opt = options[i];
+      var clone = opt.cloneNode(true);
+      opt.parentNode.replaceChild(clone, opt);
+    }
+
+    // Re-query and attach listeners
+    var freshOptions = overlay.querySelectorAll('.drone-option');
+    for (var j = 0; j < freshOptions.length; j++) {
+      (function (el) {
+        el.addEventListener('click', function () {
+          var droneType = el.getAttribute('data-drone');
+          selectAndLaunchDrone(droneType);
+        });
+      })(freshOptions[j]);
+    }
+
+    // Skip button
+    var skipBtn = document.getElementById('drone-skip-btn');
+    if (skipBtn) {
+      var skipClone = skipBtn.cloneNode(true);
+      skipBtn.parentNode.replaceChild(skipClone, skipBtn);
+      skipClone.addEventListener('click', function () {
+        overlay.style.display = 'none';
+        gameState = STATE.PLAYING;
+        requestPointerLock();
+        if (_droneSelectionCallback) _droneSelectionCallback();
+        _droneSelectionCallback = null;
+      });
+    }
+  }
+
+  function selectAndLaunchDrone(droneType) {
+    var overlay = document.getElementById('overlay-drone-select');
+    if (overlay) overlay.style.display = 'none';
+
+    gameState = STATE.PLAYING;
+    requestPointerLock();
+
+    // Spawn player drone at elevated position near player
+    var spawnH = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(player.position.x, player.position.z) : 0;
+    var drone = DroneSystem.spawn(player.position.x, spawnH + 15, player.position.z + 5, droneType);
+    DroneSystem.possess(drone.id);
+
+    // Show controls HUD
+    showDroneControlsHUD(droneType);
+
+    if (typeof HUD !== 'undefined' && HUD.notifyPickup) {
+      var names = { fpv_attack: 'FPV ATTACK', surveillance: 'SURVEILLANCE', bomb: 'BOMBER' };
+      HUD.notifyPickup('\uD83D\uDEE9 ' + (names[droneType] || 'DRONE') + ' LAUNCHED! Press F to exit.', '#00ccff');
+    }
+
+    // Start wave after a short delay
+    if (_droneSelectionCallback) {
+      setTimeout(function () {
+        _droneSelectionCallback();
+        _droneSelectionCallback = null;
+      }, 1500);
+    }
+  }
+
+  function showDroneControlsHUD(droneType) {
+    var hud = document.getElementById('drone-controls-hud');
+    if (!hud) return;
+    hud.style.display = 'block';
+    _droneControlsVisible = true;
+
+    var typeLabel = document.getElementById('drone-type-label');
+    var actionText = document.getElementById('drone-action-text');
+    var actionHint = document.getElementById('drone-action-hint');
+    var payloadDisp = document.getElementById('drone-payload-display');
+
+    var names = { fpv_attack: 'FPV ATTACK', surveillance: 'SURVEILLANCE', bomb: 'BOMBER', recon: 'RECON' };
+    if (typeLabel) typeLabel.textContent = '\u2014 ' + (names[droneType] || droneType.toUpperCase());
+
+    if (droneType === 'fpv_attack') {
+      if (actionText) actionText.textContent = 'Kamikaze Dive';
+      if (actionHint) actionHint.style.display = '';
+      if (payloadDisp) payloadDisp.style.display = 'none';
+    } else if (droneType === 'bomb') {
+      if (actionText) actionText.textContent = 'Drop Bomb';
+      if (actionHint) actionHint.style.display = '';
+      if (payloadDisp) payloadDisp.style.display = '';
+    } else {
+      if (actionHint) actionHint.style.display = 'none';
+      if (payloadDisp) payloadDisp.style.display = 'none';
+    }
+  }
+
+  function hideDroneControlsHUD() {
+    var hud = document.getElementById('drone-controls-hud');
+    if (hud) hud.style.display = 'none';
+    _droneControlsVisible = false;
+  }
+
+  function updateDroneControlsHUD() {
+    if (!_droneControlsVisible) return;
+    if (!DroneSystem.isPossessing()) {
+      hideDroneControlsHUD();
+      return;
+    }
+    var drone = DroneSystem.getPossessed();
+    if (!drone) { hideDroneControlsHUD(); return; }
+
+    var batteryPct = Math.round((drone.battery / drone.maxBattery) * 100);
+    var hpPct = Math.round((drone.health / (DroneSystem.DRONE_STATS[drone.type] ? DroneSystem.DRONE_STATS[drone.type].health : 100)) * 100);
+
+    var battEl = document.getElementById('drone-battery-display');
+    var hpEl = document.getElementById('drone-hp-display');
+    var payloadEl = document.getElementById('drone-payload-display');
+    var nestHint = document.getElementById('drone-nest-hint');
+
+    if (battEl) battEl.textContent = batteryPct;
+    if (hpEl) hpEl.textContent = hpPct;
+    if (payloadEl) {
+      if (drone.type === 'bomb') {
+        payloadEl.style.display = '';
+        payloadEl.textContent = drone.hasPayload ? '\uD83D\uDCA3 PAYLOAD READY' : '\uD83D\uDCA3 PAYLOAD DROPPED';
+        payloadEl.style.color = drone.hasPayload ? '#ffaa00' : '#666';
+      } else {
+        payloadEl.style.display = 'none';
+      }
+    }
+
+    // Nest proximity hint
+    if (nestHint && typeof DroneSystem.getNearestNest === 'function') {
+      var ni = DroneSystem.getNearestNest(drone.position.x, drone.position.z);
+      if (ni >= 0) {
+        var nests = DroneSystem.getNests();
+        var nest = nests[ni];
+        var ndx = nest.x - drone.position.x;
+        var ndz = nest.z - drone.position.z;
+        var nestDist = Math.sqrt(ndx * ndx + ndz * ndz);
+        if (nestDist < 25) {
+          nestHint.style.display = '';
+          nestHint.textContent = '\u25B6 Enemy nest ' + Math.round(nestDist) + 'm! Destroy it!';
+        } else {
+          nestHint.style.display = 'none';
+        }
+      } else {
+        nestHint.style.display = 'none';
+      }
+    }
+  }
+
+  /* ── Tank HUD Management ─────────────────────────────────────────── */
+  var _tankHUDVisible = false;
+
+  function showTankHUD() {
+    var hud = document.getElementById('tank-hud');
+    if (hud) hud.style.display = 'block';
+    _tankHUDVisible = true;
+  }
+
+  function hideTankHUD() {
+    var hud = document.getElementById('tank-hud');
+    if (hud) hud.style.display = 'none';
+    var overlay = document.getElementById('tank-interior-overlay');
+    if (overlay) overlay.style.display = 'none';
+    _tankHUDVisible = false;
+  }
+
+  function updateTankHUD() {
+    if (!_tankHUDVisible) return;
+    var v = VehicleSystem.getOccupied();
+    if (!v || !v.isTank) { hideTankHUD(); return; }
+
+    // Update ammo
+    var ammo = VehicleSystem.getTankAmmo();
+    var cannonEl = document.getElementById('tank-cannon-ammo');
+    var cannonMax = document.getElementById('tank-cannon-max');
+    var mgEl = document.getElementById('tank-mg-ammo');
+    var hpEl = document.getElementById('tank-hp-pct');
+
+    if (cannonEl) cannonEl.textContent = ammo.cannon;
+    if (cannonMax) cannonMax.textContent = ammo.maxCannon;
+    if (mgEl) mgEl.textContent = ammo.mg;
+    if (hpEl) hpEl.textContent = Math.round((v.health / v.maxHealth) * 100);
+
+    // Reload bar
+    var reloadBar = document.getElementById('tank-reload-bar');
+    var reloadFill = document.getElementById('tank-reload-fill');
+    var reloadText = document.getElementById('tank-reload-text');
+    if (v.fireCooldown > 0) {
+      var prog = VehicleSystem.getTankReloadProgress();
+      if (reloadBar) reloadBar.style.display = 'block';
+      if (reloadFill) reloadFill.style.width = (prog * 100) + '%';
+      if (reloadText) reloadText.style.display = 'block';
+    } else {
+      if (reloadBar) reloadBar.style.display = 'none';
+      if (reloadText) reloadText.style.display = 'none';
+    }
+
+    // Interior overlay (periscope view) — show only in first person
+    var overlay = document.getElementById('tank-interior-overlay');
+    if (overlay) {
+      overlay.style.display = v.viewMode === 'first' ? 'block' : 'none';
+    }
   }
 
   /* ── Start Game ──────────────────────────────────────────────────── */
@@ -1927,14 +1945,11 @@ const GameManager = (function () {
       Progression.refreshDailies();
     }
 
-    resetPlayerPresentationState();
-
     // Apply first stage
     applyStage(0);
 
-    var startSpawn = getPlayerSpawnPosition();
-    player.position.set(startSpawn.x, startSpawn.y, startSpawn.z);
-    orientCameraForStageSpawn(currentStage, startSpawn);
+    const spawnH = window.VoxelWorld.getTerrainHeight(0, 0);
+    player.position.set(0, spawnH + player.height, 0);
 
     Weapons.reset();
     if (player.godMode) {
@@ -1968,6 +1983,9 @@ const GameManager = (function () {
     VehicleSystem.spawn(_sp1.x, sgVh2, _sp1.z, 'combat');
     var sgVh3 = window.VoxelWorld.getTerrainHeight(_sp2.x, _sp2.z);
     VehicleSystem.spawn(_sp2.x, sgVh3, _sp2.z, 'turret_rover');
+    var _sp3 = _rwps.length > 14 ? _rwps[14] : new THREE.Vector3(0, 0, 15);
+    var sgVh4 = window.VoxelWorld.getTerrainHeight(_sp3.x, _sp3.z);
+    VehicleSystem.spawn(_sp3.x, sgVh4, _sp3.z, 'tank');
 
     // Respawn drones
     const sgDh1 = window.VoxelWorld.getTerrainHeight(5, 5) + 8;
@@ -1991,11 +2009,11 @@ const GameManager = (function () {
       requestPointerLock();
     }, 100);
 
-    // Announce first stage then begin first wave after delay
+    // Announce first stage then show drone selection
     HUD.announceStage(STAGES[0].id, STAGES[0].name, STAGES[0].description);
     if (_waveStartTimer) clearTimeout(_waveStartTimer);
     _waveStartTimer = setTimeout(function () {
-      beginWave(1);
+      showDroneSelection(function () { beginWave(1); });
     }, 3200);
 
     // Generate an initial mission
@@ -2006,60 +2024,6 @@ const GameManager = (function () {
   }
 
   /* ── Stage Management ───────────────────────────────────────────── */
-  function resetPlayerPresentationState() {
-    player.prone = false;
-    player.isCrouching = false;
-    player.inCover = false;
-    player.slideTimer = 0;
-    player.slideDir = null;
-    player.sprinting = false;
-    player.onGround = false;
-    player.height = 1.7;
-
-    if (typeof HUD !== 'undefined' && HUD.showProne) HUD.showProne(false);
-
-    if (window.CameraSystem) {
-      if (window.CameraSystem.setMode && window.CameraSystem.MODE) {
-        window.CameraSystem.setMode(window.CameraSystem.MODE.FIRST_PERSON);
-      }
-      if (window.CameraSystem.setVehicleTarget) window.CameraSystem.setVehicleTarget(null);
-      if (window.CameraSystem.setDroneTarget) window.CameraSystem.setDroneTarget(null);
-      if (window.CameraSystem.setStrafeDir) window.CameraSystem.setStrafeDir(0);
-      if (window.CameraSystem.setYaw) window.CameraSystem.setYaw(0);
-      if (window.CameraSystem.setPitch) window.CameraSystem.setPitch(0);
-    }
-  }
-
-  function getPlayerSpawnPosition() {
-    var spawn = (window.VoxelWorld && window.VoxelWorld.getSpawnPoint) ? window.VoxelWorld.getSpawnPoint() : null;
-    if (!spawn || !isFinite(spawn.x) || !isFinite(spawn.y) || !isFinite(spawn.z)) {
-      var fallbackH = window.VoxelWorld.getTerrainHeight(0, 0);
-      spawn = { x: 0, y: fallbackH, z: 0 };
-    }
-    return {
-      x: spawn.x,
-      y: spawn.y + player.height + 0.15,
-      z: spawn.z,
-    };
-  }
-
-  function orientCameraForStageSpawn(stageIndex, spawnPos) {
-    if (!window.CameraSystem || !window.CameraSystem.setYaw || !window.CameraSystem.setPitch) return;
-
-    var lookTarget = { x: spawnPos.x, z: spawnPos.z + 24 };
-    var pitch = 0;
-    var stageDef = STAGES[stageIndex];
-    if (stageDef && stageDef.id === 'HOSTOMEL') {
-      lookTarget = { x: 0, z: 18 };
-      pitch = -0.03;
-    }
-
-    var dx = lookTarget.x - spawnPos.x;
-    var dz = lookTarget.z - spawnPos.z;
-    window.CameraSystem.setYaw(Math.atan2(-dx, -dz));
-    window.CameraSystem.setPitch(pitch);
-  }
-
   function applyStage(stageIndex) {
     const stageDef = STAGES[stageIndex];
 
@@ -2068,7 +2032,7 @@ const GameManager = (function () {
 
     // Update scene colors
     _scene.background = new THREE.Color(stageDef.bgColor);
-    _scene.fog = new THREE.Fog(stageDef.fogColor, stageDef.fogNear || 30, stageDef.fogFar || 140);
+    _scene.fog = new THREE.Fog(stageDef.fogColor, 30, 140);
 
     // Update sky dome colors for this stage
     if (_skyDome) {
@@ -2159,13 +2123,10 @@ const GameManager = (function () {
     player.hp = Math.min(player.maxHp, player.hp + Math.ceil(missingHp * 0.5));
     HUD.setHealth(player.hp, player.maxHp);
 
-    resetPlayerPresentationState();
-
     // Reset player position on new terrain
-    var nextStageSpawn = getPlayerSpawnPosition();
-    player.position.set(nextStageSpawn.x, nextStageSpawn.y, nextStageSpawn.z);
+    const spawnH = VoxelWorld.getTerrainHeight(0, 0);
+    player.position.set(0, spawnH + player.height, 0);
     player.velocity.set(0, 0, 0);
-    orientCameraForStageSpawn(currentStage, nextStageSpawn);
 
     // Clear enemies, pickups, and module state from old stage
     Enemies.clear();
@@ -2198,6 +2159,9 @@ const GameManager = (function () {
     VehicleSystem.spawn(_nsp1.x, vh2, _nsp1.z, 'combat');
     var vh3 = VoxelWorld.getTerrainHeight(_nsp2.x, _nsp2.z);
     VehicleSystem.spawn(_nsp2.x, vh3, _nsp2.z, 'turret_rover');
+    var _nsp3 = _nsWps.length > 14 ? _nsWps[14] : new THREE.Vector3(0, 0, 15);
+    var vh4 = VoxelWorld.getTerrainHeight(_nsp3.x, _nsp3.z);
+    VehicleSystem.spawn(_nsp3.x, vh4, _nsp3.z, 'tank');
 
     // Spawn drones
     const dh1 = VoxelWorld.getTerrainHeight(5, 5) + 8;
@@ -2215,11 +2179,11 @@ const GameManager = (function () {
     gameState = STATE.PLAYING;
     requestPointerLock();
 
-    // Announce new stage then begin first wave after delay
+    // Announce new stage then show drone selection
     HUD.announceStage(stageDef.id, stageDef.name, stageDef.description);
     if (_waveStartTimer) clearTimeout(_waveStartTimer);
     _waveStartTimer = setTimeout(function () {
-      beginWave(1);
+      showDroneSelection(function () { beginWave(1); });
     }, 3200);
   }
 
@@ -2238,10 +2202,6 @@ const GameManager = (function () {
     player.waveStartTime = performance.now();
     const stageDef = STAGES[currentStage];
     const mlDiff = MLSystem.getDifficultyMult();
-    _activeWavePlan = getWaveBattlePlan(stageDef, w);
-
-    if (HUD.hideWaveSummary) HUD.hideWaveSummary();
-    if (HUD.hideObjective) HUD.hideObjective();
 
     // AI Smart Learning: classify combat style each wave and pass counter-strategy
     MLSystem.classifyCombatStyle();
@@ -2253,14 +2213,10 @@ const GameManager = (function () {
     }
 
     // Pass AI strategy to enemies for adaptive behavior
-    Enemies.startWave(w, _scene, stageDef.difficulty * mlDiff, aiStrategy, stageDef.id, _activeWavePlan);
+    Enemies.startWave(w, _scene, stageDef.difficulty * mlDiff, aiStrategy, stageDef.id);
     window.AudioSystem.playWaveStart();
     HUD.setWave(w, stageDef.wavesPerStage);
-    HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage, _activeWavePlan);
-    if (HUD.showObjective && _activeWavePlan && _activeWavePlan.objectiveText) {
-      HUD.showObjective(_activeWavePlan.objectiveText);
-    }
-    scheduleWavePlanReminder(_activeWavePlan);
+    HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage);
     if (typeof Feedback !== 'undefined' && Feedback.radioChatter) Feedback.radioChatter('wave_start');
 
     // ═══ Stage Boss on final wave ═══
@@ -2321,7 +2277,7 @@ const GameManager = (function () {
     }
 
     // Spawn enemy vehicles on later waves (Russian armored assault)
-    if (w >= 3 && (!_activeWavePlan || _activeWavePlan.forceArmor || _activeWavePlan.id === 'ARMOR_BREACH')) {
+    if (w >= 3) {
       var enemySpawnAngle = Math.random() * Math.PI * 2;
       var enemySpawnDist = 35 + Math.random() * 10;
       var evx = Math.cos(enemySpawnAngle) * enemySpawnDist;
@@ -2330,7 +2286,7 @@ const GameManager = (function () {
       VehicleSystem.spawnEnemy(evx, evy, evz, 'combat');
       HUD.notifyPickup('⚠ ENEMY ARMOR SPOTTED!', '#ff4444');
     }
-    if (w >= 5 && (!_activeWavePlan || _activeWavePlan.forceArmor || _activeWavePlan.id === 'ARMOR_BREACH')) {
+    if (w >= 5) {
       var evAngle2 = Math.random() * Math.PI * 2;
       var evDist2 = 30 + Math.random() * 10;
       var evx2 = Math.cos(evAngle2) * evDist2;
@@ -2339,58 +2295,49 @@ const GameManager = (function () {
       VehicleSystem.spawnEnemy(evx2, evy2, evz2, 'transport');
     }
 
-    // Spawn enemy drones (more per wave, with observers)
+    // Spawn enemy drones (from nests if alive, reduced if nests destroyed)
     if (w >= 2 && typeof DroneSystem !== 'undefined' && DroneSystem.spawnEnemyDrone) {
+      var aliveNests = DroneSystem.getAliveNestCount();
+      var nestMult = aliveNests > 0 ? 1.0 : 0.3;
+      var nests = DroneSystem.getNests();
       var droneSpawnH = 20 + Math.random() * 10;
-      var droneAngle = Math.random() * Math.PI * 2;
-      var droneDist = 30 + Math.random() * 15;
-      var extraDroneWaves = _activeWavePlan && _activeWavePlan.extraDroneWaves ? _activeWavePlan.extraDroneWaves : 0;
-      
-      // FPV drone
-      var fpvX = player.position.x + Math.cos(droneAngle) * droneDist;
-      var fpvZ = player.position.z + Math.sin(droneAngle) * droneDist;
-      DroneSystem.spawnEnemyDrone(fpvX, droneSpawnH, fpvZ, 'enemy_fpv');
-      
-      // Second FPV from opposite side (always from wave 2+)
-      var fpv2Angle = droneAngle + Math.PI;
-      var fpv2X = player.position.x + Math.cos(fpv2Angle) * droneDist;
-      var fpv2Z = player.position.z + Math.sin(fpv2Angle) * droneDist;
-      DroneSystem.spawnEnemyDrone(fpv2X, droneSpawnH, fpv2Z, 'enemy_fpv');
-      
-      if (w >= 3) {
-        // Observer drone at high altitude — calls reinforcements
-        var obsAngle = droneAngle + Math.PI * 0.25;
-        var obsX = player.position.x + Math.cos(obsAngle) * (droneDist + 15);
-        var obsZ = player.position.z + Math.sin(obsAngle) * (droneDist + 15);
-        DroneSystem.spawnEnemyDrone(obsX, droneSpawnH + 15, obsZ, 'enemy_observer');
+
+      function _nestSpawnPos(idx) {
+        if (nests.length > 0 && nests[idx % nests.length] && nests[idx % nests.length].alive) {
+          var n = nests[idx % nests.length];
+          return { x: n.x + (Math.random() - 0.5) * 6, z: n.z + (Math.random() - 0.5) * 6 };
+        }
+        var a = Math.random() * Math.PI * 2;
+        var d = 30 + Math.random() * 15;
+        return { x: player.position.x + Math.cos(a) * d, z: player.position.z + Math.sin(a) * d };
       }
-      
-      if (w >= 4 || extraDroneWaves > 0) {
-        // Bomber drone
-        var bomberAngle = droneAngle + Math.PI * 0.5;
-        var bomberX = player.position.x + Math.cos(bomberAngle) * droneDist;
-        var bomberZ = player.position.z + Math.sin(bomberAngle) * droneDist;
-        DroneSystem.spawnEnemyDrone(bomberX, droneSpawnH + 5, bomberZ, 'enemy_bomber');
-        
-        // Extra FPV
-        var fpv3Angle = droneAngle + Math.PI * 0.75;
-        var fpv3X = player.position.x + Math.cos(fpv3Angle) * droneDist;
-        var fpv3Z = player.position.z + Math.sin(fpv3Angle) * droneDist;
-        DroneSystem.spawnEnemyDrone(fpv3X, droneSpawnH, fpv3Z, 'enemy_fpv');
+
+      if (Math.random() < nestMult) {
+        var fp = _nestSpawnPos(0);
+        DroneSystem.spawnEnemyDrone(fp.x, droneSpawnH, fp.z, 'enemy_fpv');
       }
-      
-      if (w >= 6 || extraDroneWaves > 0) {
-        // Drone swarm — additional bombers, FPVs, and observers
-        for (var ei = 0; ei < 3 + extraDroneWaves; ei++) {
-          var extraAngle = Math.random() * Math.PI * 2;
-          var exX = player.position.x + Math.cos(extraAngle) * (droneDist + 10);
-          var exZ = player.position.z + Math.sin(extraAngle) * (droneDist + 10);
-          var exType = ei === 0 ? 'enemy_bomber' : ei === 1 ? 'enemy_observer' : 'enemy_fpv';
-          DroneSystem.spawnEnemyDrone(exX, droneSpawnH + ei * 3, exZ, exType);
+
+      if (w >= 4 && Math.random() < nestMult) {
+        var bp = _nestSpawnPos(1);
+        DroneSystem.spawnEnemyDrone(bp.x, droneSpawnH + 5, bp.z, 'enemy_bomber');
+        var fp2 = _nestSpawnPos(2);
+        DroneSystem.spawnEnemyDrone(fp2.x, droneSpawnH, fp2.z, 'enemy_fpv');
+      }
+
+      if (w >= 6 && Math.random() < nestMult) {
+        for (var ei = 0; ei < 2; ei++) {
+          var ep = _nestSpawnPos(ei);
+          DroneSystem.spawnEnemyDrone(ep.x, droneSpawnH + ei * 3, ep.z, ei === 0 ? 'enemy_bomber' : 'enemy_fpv');
         }
       }
-      
-      HUD.notifyPickup('WARNING: ENEMY DRONES INBOUND!', '#ff4488');
+
+      if (aliveNests > 0) {
+        HUD.notifyPickup('⚠ ENEMY DRONES FROM NESTS! Destroy nests to stop them!', '#ff4488');
+      } else if (nestMult < 1) {
+        HUD.notifyPickup('⚠ Enemy drone operations crippled!', '#44ff88');
+      } else {
+        HUD.notifyPickup('⚠ ENEMY DRONES DETECTED!', '#ff4488');
+      }
     }
 
     // ═══ NEW: Wave-begin integrations for 59 features ═══
@@ -2400,14 +2347,14 @@ const GameManager = (function () {
       Progression.trackStat('wavesCleared', 0); // track at begin; increment at complete
     }
     // Spawn a random mission type every 3 waves
-    if (!tryStartPlanMission(_activeWavePlan) && w % 3 === 0 && typeof MissionTypes !== 'undefined') {
+    if (w % 3 === 0 && typeof MissionTypes !== 'undefined') {
       var mTypes = Object.keys(MissionTypes.TYPES);
       var mType = mTypes[Math.floor(Math.random() * mTypes.length)];
       MissionTypes.startMission(mType, player.position.x + (Math.random() - 0.5) * 40, player.position.z + (Math.random() - 0.5) * 40);
       HUD.notifyPickup('📍 NEW MISSION: ' + MissionTypes.TYPES[mType].name, '#ffcc00');
     }
     // Spawn supply airdrop every 4 waves
-    if ((w % 4 === 0 || (_activeWavePlan && _activeWavePlan.id === 'ARMOR_BREACH')) && typeof WorldFeatures !== 'undefined') {
+    if (w % 4 === 0 && typeof WorldFeatures !== 'undefined') {
       var adX = player.position.x + (Math.random() - 0.5) * 30;
       var adZ = player.position.z + (Math.random() - 0.5) * 30;
       var adY = VoxelWorld.getTerrainHeight(adX, adZ);
@@ -2416,9 +2363,7 @@ const GameManager = (function () {
     }
     // Place enemy landmines on later waves
     if (w >= 4 && typeof WorldFeatures !== 'undefined') {
-      var mineCount = Math.min(w, 8);
-      if (_activeWavePlan && _activeWavePlan.id === 'BREACH_AND_CLEAR') mineCount += 2;
-      for (var lmi = 0; lmi < mineCount; lmi++) {
+      for (var lmi = 0; lmi < Math.min(w, 8); lmi++) {
         var lmAngle = Math.random() * Math.PI * 2;
         var lmDist = 10 + Math.random() * 20;
         var lmX = player.position.x + Math.cos(lmAngle) * lmDist;
@@ -2428,7 +2373,7 @@ const GameManager = (function () {
       }
     }
     // Spawn radiation zones on wave 6+
-    if ((w === 6 || (_activeWavePlan && _activeWavePlan.id === 'MORTAR_LOCKDOWN' && w >= 5)) && typeof WorldFeatures !== 'undefined') {
+    if (w === 6 && typeof WorldFeatures !== 'undefined') {
       WorldFeatures.addRadiationZone(player.position.x + 30, player.position.z + 30, 8);
       HUD.notifyPickup('☢ RADIATION ZONE DETECTED!', '#00ff00');
     }
@@ -2439,8 +2384,6 @@ const GameManager = (function () {
   }
 
   function onWaveComplete() {
-    if (_wavePlanReminderTimer) clearTimeout(_wavePlanReminderTimer);
-    if (HUD.hideObjective) HUD.hideObjective();
     player.score += SCORE_WAVE_BONUS;
     HUD.setScore(player.score);
     MLSystem.onWaveComplete(currentWave, currentStage, player.hp / player.maxHp);
@@ -2469,7 +2412,18 @@ const GameManager = (function () {
       });
     }
 
-    applyWavePlanCompletion(_activeWavePlan);
+    // Show last wave summary overlay (NEW FEATURE)
+    if (typeof HUD !== 'undefined' && HUD.showWaveSummary) {
+      var elapsedSec = Math.round((performance.now() - player.waveStartTime) / 1000);
+      HUD.showWaveSummary({
+        wave: currentWave,
+        kills: player.waveKills,
+        score: player.score,
+        headshots: player.waveHeadshots,
+        damageTaken: Math.round(player.waveDamageTaken),
+        time: elapsedSec
+      });
+    }
     // Play-to-Earn: OKC for wave clear
     if (typeof Marketplace !== 'undefined') {
       Marketplace.onWaveClear();
@@ -2634,7 +2588,6 @@ const GameManager = (function () {
       gameState = STATE.STAGE_CLEAR;
       if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playLevelComplete) window.AudioSystem.playLevelComplete();
       showOverlay('stageclear');
-      saveGame();
       document.getElementById('stageclear-num').textContent = stageDef.id;
       document.getElementById('stageclear-name').textContent = stageDef.name;
       document.getElementById('stageclear-score').textContent = player.score;
@@ -2657,12 +2610,11 @@ const GameManager = (function () {
     }
 
     gameState = STATE.WAVE_CLEAR;
-    saveGame();
     showOverlay('waveclear');
     document.getElementById('waveclear-num').textContent = currentWave;
     document.getElementById('waveclear-total').textContent = stageDef.wavesPerStage;
     document.getElementById('waveclear-stage-info').textContent =
-      'Stage ' + stageDef.id + ': ' + stageDef.name + (_activeWavePlan ? ' · ' + _activeWavePlan.name : '');
+      'Stage ' + stageDef.id + ': ' + stageDef.name;
 
     // Populate wave shop stats
     var shopKills = document.getElementById('shop-kills');
@@ -2956,14 +2908,6 @@ const GameManager = (function () {
           targets.push(veh.mesh);
         }
       }
-      // Add enemy drone meshes as shootable targets
-      var allDrones = typeof DroneSystem !== 'undefined' ? DroneSystem.getAll() : [];
-      for (var dri = 0; dri < allDrones.length; dri++) {
-        var drn = allDrones[dri];
-        if (drn.mesh && drn.alive && drn.faction === 'russian') {
-          targets.push(drn.mesh);
-        }
-      }
       const weaponType = Weapons.getCurrentType();
       const weaponId = Weapons.getCurrentId();
       // Map weapon type to audio sound type
@@ -2977,30 +2921,7 @@ const GameManager = (function () {
             break;
           }
         }
-        // Check if hit a drone mesh
-        var hitDrone = null;
-        for (var hdi = 0; hdi < allDrones.length; hdi++) {
-          if (allDrones[hdi].mesh === hit.object || (hit.object.parent && allDrones[hdi].mesh === hit.object.parent)) {
-            hitDrone = allDrones[hdi];
-            break;
-          }
-        }
-        if (hitDrone) {
-          // Drone hit — deal damage, bonus for AA weapons
-          var droneDmg = Weapons.getDamage();
-          var curWepType = Weapons.getCurrentType();
-          if (curWepType === 'AA') droneDmg *= 3;
-          else if (curWepType === 'AMR' || curWepType === 'SNIPER') droneDmg *= 2;
-          DroneSystem.damageDrone(hitDrone.id, droneDmg);
-          if (window.AudioSystem && window.AudioSystem.playHit) window.AudioSystem.playHit();
-          if (HUD.addCombatLog) HUD.addCombatLog('Hit drone (-' + droneDmg + ')', '#00aaff');
-          if (hitDrone.health <= 0) {
-            player.score += 100;
-            player.kills++;
-            HUD.setScore(player.score);
-            HUD.notifyPickup('DRONE DESTROYED! +100', '#00aaff');
-          }
-        } else if (hitVehicle) {
+        if (hitVehicle) {
           onVehicleHit(hitVehicle, Weapons.getDamage());
         } else {
           onEnemyHit(hit);
@@ -3248,7 +3169,7 @@ const GameManager = (function () {
         if (isHeadshot) Progression.updateBounty('headshot_wave', 1);
         Progression.updateBounty('damage', dmg);
         for (var cbi = 0; cbi < completedBounties.length; cbi++) {
-          HUD.notifyPickup('💰 BOUNTY COMPLETE! +' + _escapeHTML(completedBounties[cbi].reward) + ' OKC', '#ffaa00');
+          HUD.notifyPickup('💰 BOUNTY COMPLETE! +' + escapeHTML(completedBounties[cbi].reward) + ' OKC', '#ffaa00');
           if (typeof Marketplace !== 'undefined') Marketplace.addOKC(completedBounties[cbi].reward);
           if (typeof AudioSystem !== 'undefined' && AudioSystem.playBountyComplete) AudioSystem.playBountyComplete();
         }
@@ -3528,6 +3449,8 @@ const GameManager = (function () {
       if (_waveStartTimer) { clearTimeout(_waveStartTimer); _waveStartTimer = null; }
       // Force exit vehicle / release drone on death
       if (VehicleSystem.isInVehicle()) VehicleSystem.exit();
+      hideTankHUD();
+      hideDroneControlsHUD();
       if (DroneSystem.isPossessing()) DroneSystem.release();
       if (window.AudioSystem.stopMusic) window.AudioSystem.stopMusic();
       Weapons.exitZoom();
@@ -3645,14 +3568,6 @@ const GameManager = (function () {
   var _fpsSamples = 0;
   var _perfCheckTimer = 0;
   var _qualityReduced = false;
-  var _updateLoopStarted = false;
-
-  function ensureUpdateLoopRunning() {
-    if (_updateLoopStarted) return;
-    _updateLoopStarted = true;
-    prevTime = performance.now();
-    update();
-  }
 
   function update() {
     requestAnimationFrame(update);
@@ -3774,7 +3689,7 @@ const GameManager = (function () {
             player.hp = Math.max(1, player.hp - bombDmg);
             HUD.setHealth(player.hp, player.maxHp);
             if (HUD.showDamageFlash) HUD.showDamageFlash(0x2244aa, 0.3);
-            if (typeof Feedback !== 'undefined' && Feedback.triggerScreenShake) Feedback.triggerScreenShake(0.6);
+            if (typeof Feedback !== 'undefined' && Feedback.screenShake) Feedback.screenShake(0.6);
             if (HUD.notifyPickup) HUD.notifyPickup('⚓ Naval bombardment!', '#4477ff');
           }
         }
@@ -3790,7 +3705,7 @@ const GameManager = (function () {
             player.hp = Math.max(1, player.hp - mortarDmg);
             HUD.setHealth(player.hp, player.maxHp);
             if (HUD.showDamageFlash) HUD.showDamageFlash(0xff3300, 0.4);
-            if (typeof Feedback !== 'undefined' && Feedback.triggerScreenShake) Feedback.triggerScreenShake(1.0);
+            if (typeof Feedback !== 'undefined' && Feedback.screenShake) Feedback.screenShake(1.0);
             if (HUD.notifyPickup) HUD.notifyPickup('💥 Mortar barrage!', '#ff3300');
           }
         }
@@ -3899,21 +3814,16 @@ const GameManager = (function () {
           if (matList) {
             var mats = player.buildMaterials;
             var eco = Economy.getResources();
-            var buildMatHtml =
+            matList.innerHTML =
               '🪵 Wood: ' + ((mats.wood || 0) + (eco.wood || 0)) + '<br>' +
               '🪨 Stone: ' + ((mats.stone || 0) + (eco.stone || 0)) + '<br>' +
               '🔩 Metal: ' + ((mats.metal || 0) + (eco.metal || 0)) + '<br>' +
               '🟫 Dirt: ' + (mats.dirt || 0) + '<br>' +
               '🏖 Sand: ' + (mats.sand || 0) + '<br>' +
               '🧱 Brick: ' + (mats.brick || 0);
-            if (_buildMatHtml !== buildMatHtml) {
-              matList.innerHTML = buildMatHtml;
-              _buildMatHtml = buildMatHtml;
-            }
           }
         } else {
           _buildMatHud.style.display = 'none';
-          _buildMatHtml = '';
         }
       }
 
@@ -4005,6 +3915,12 @@ const GameManager = (function () {
       Automation.update(delta);
       MissionSystem.update(delta);
 
+      // Update drone controls HUD
+      updateDroneControlsHUD();
+
+      // Update tank HUD
+      updateTankHUD();
+
       // ── B29: NPC combat barks (random chance per second) ──
       if (typeof NPCSystem !== 'undefined' && NPCSystem.triggerBark) {
         var allNpcsBark = NPCSystem.getAll();
@@ -4050,9 +3966,8 @@ const GameManager = (function () {
         }
       }
 
-      // Voxel chunk rebuilds + cover degradation healing
+      // Voxel chunk rebuilds
       VoxelWorld.updateDirtyChunks();
-      if (VoxelWorld.updateCoverDegradation) VoxelWorld.updateCoverDegradation(delta);
 
       // Update loot particles
       updateLootParticles(delta);
@@ -4110,16 +4025,14 @@ const GameManager = (function () {
       }
 
       // Enemy drone proximity warning
-      if (_enemyDroneWarnCooldown > 0) _enemyDroneWarnCooldown -= delta;
       if (typeof DroneSystem !== 'undefined' && DroneSystem.getAll) {
         var allDrones = DroneSystem.getAll();
         for (var di = 0; di < allDrones.length; di++) {
           var dr = allDrones[di];
-          if (dr.faction === 'russian' && dr.alive !== false && dr.position) {
+          if (dr.faction === 'enemy' && dr.alive !== false && dr.position) {
             var ddist = player.position.distanceTo(dr.position);
-            if (ddist < 20 && _enemyDroneWarnCooldown <= 0) {
+            if (ddist < 20) {
               HUD.notifyPickup('⚠ ENEMY DRONE NEARBY!', '#ff4488');
-              _enemyDroneWarnCooldown = 3;
               break;
             }
           }
@@ -4448,8 +4361,9 @@ const GameManager = (function () {
               mTracker.style.display = 'block';
               var mTitle = document.getElementById('mission-tracker-title');
               if (mTitle) mTitle.textContent = '📍 ' + (MissionTypes.getActive() ? MissionTypes.getActive().config.name : 'MISSION');
-              if (typeof HUD !== 'undefined' && HUD.showTimer && missionResult.timeRemaining !== undefined) {
-                HUD.showTimer(missionResult.timeRemaining);
+              var mTimer = document.getElementById('mission-tracker-timer');
+              if (mTimer && missionResult.timeRemaining !== undefined) {
+                mTimer.textContent = '⏱ ' + Math.ceil(missionResult.timeRemaining) + 's';
               }
             } else if (missionResult.state === 'COMPLETE') {
               var reward = MissionTypes.completeMission();
@@ -4501,7 +4415,7 @@ const GameManager = (function () {
                 var d = dailies[di2];
                 var pct = Math.min(100, Math.round((d.progress / d.target) * 100));
                 var color = d.completed ? '#44ff44' : '#ccc';
-                dHTML += '<div style="color:' + color + '">' + (d.completed ? '✅' : '⬜') + ' ' + _escapeHTML(d.name) + ': ' + _escapeHTML(d.progress) + '/' + _escapeHTML(d.target) + ' (' + _escapeHTML(pct) + '%)</div>';
+                dHTML += '<div style="color:' + color + '">' + (d.completed ? '✅' : '⬜') + ' ' + d.name + ': ' + d.progress + '/' + d.target + ' (' + pct + '%)</div>';
               }
               dailyList.innerHTML = dHTML;
             }
@@ -4521,7 +4435,7 @@ const GameManager = (function () {
                 var b = bounties[bi2];
                 var bpct = Math.min(100, Math.round((b.progress / b.target) * 100));
                 var bcolor = b.completed ? '#44ff44' : '#ffaa00';
-                bHTML += '<div style="color:' + bcolor + '">' + (b.completed ? '✅' : '💰') + ' ' + _escapeHTML(b.name) + ': ' + _escapeHTML(b.progress) + '/' + _escapeHTML(b.target) + ' (+' + _escapeHTML(b.reward) + ' OKC)</div>';
+                bHTML += '<div style="color:' + bcolor + '">' + (b.completed ? '✅' : '💰') + ' ' + b.name + ': ' + b.progress + '/' + b.target + ' (+' + b.reward + ' OKC)</div>';
               }
               bountyList.innerHTML = bHTML;
             }
@@ -4553,7 +4467,6 @@ const GameManager = (function () {
       }
     }
 
-    if (!_renderer || !_scene || !_camera) return;
     _renderer.render(_scene, _camera);
   }
 
@@ -4954,7 +4867,7 @@ const GameManager = (function () {
   function onResize() {
     _camera.aspect = window.innerWidth / window.innerHeight;
     _camera.updateProjectionMatrix();
-    if (_renderer) _renderer.setSize(window.innerWidth, window.innerHeight);
+    _renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
   /* ── Marketplace UI Builder ─────────────────────────────────────── */
@@ -5269,22 +5182,8 @@ const GameManager = (function () {
       if (equipped[i]) {
         slot.style.display = 'block';
         slot.textContent = equipped[i].icon + ' ' + equipped[i].name;
-        slot.style.cursor = (typeof equipped[i].effect === 'function') ? 'pointer' : 'default';
-        slot.onclick = (function (perk) {
-          return function () {
-            if (!perk || typeof Perks.activatePerk !== 'function') return;
-            var activated = Perks.activatePerk(perk.id);
-            if (activated) {
-              HUD.notifyPickup(perk.icon + ' ' + perk.name + ' ACTIVATED!', '#44aaff');
-            } else if (typeof perk.effect === 'function') {
-              HUD.notifyPickup('⏳ ' + perk.name + ' cooling down', '#ffaa44');
-            }
-          };
-        })(equipped[i]);
       } else {
         slot.style.display = 'none';
-        slot.style.cursor = 'default';
-        slot.onclick = null;
       }
     }
   }
@@ -5371,73 +5270,6 @@ const GameManager = (function () {
     if (HUD.notifyPickup) HUD.notifyPickup('💉 Speed Boost ' + duration + 's', '#ff8a65');
   }
 
-  /* ── Save / Load System ──────────────────────────────────────────── */
-  function saveGame() {
-    try {
-      var data = {
-        v: 1,
-        stage: currentStage,
-        wave: currentWave,
-        score: player.score,
-        kills: player.kills,
-        hp: player.hp,
-        maxHp: player.maxHp,
-        armor: player.armor || 0,
-        currency: typeof Economy !== 'undefined' ? Economy.getCurrency() : 0,
-        weapons: Weapons.getUnlockedList ? Weapons.getUnlockedList() : [],
-        currentWeapon: Weapons.getCurrentIdx ? Weapons.getCurrentIdx() : 0,
-        ts: Date.now()
-      };
-      localStorage.setItem('ok_save', JSON.stringify(data));
-      if (HUD.notifyPickup) HUD.notifyPickup('💾 GAME SAVED', '#44ff88');
-      return true;
-    } catch (e) { return false; }
-  }
-
-  function loadGame() {
-    try {
-      var raw = localStorage.getItem('ok_save');
-      if (!raw) return false;
-      var data = JSON.parse(raw);
-      if (!data || data.v !== 1) return false;
-
-      currentStage = data.stage || 0;
-      currentWave = data.wave || 0;
-      player.score = data.score || 0;
-      player.kills = data.kills || 0;
-      player.hp = data.hp || 100;
-      player.maxHp = data.maxHp || 100;
-      player.armor = data.armor || 0;
-
-      if (data.currency && typeof Economy !== 'undefined' && Economy.setCurrency) {
-        Economy.setCurrency(data.currency);
-      }
-      if (data.weapons && Weapons.unlockWeapon) {
-        for (var i = 0; i < data.weapons.length; i++) Weapons.unlockWeapon(data.weapons[i]);
-      }
-      if (data.currentWeapon != null && Weapons.switchTo) {
-        Weapons.switchTo(data.currentWeapon);
-      }
-
-      // Apply stage visuals
-      applyStage(currentStage);
-
-      // Update HUD
-      HUD.setHealth(player.hp, player.maxHp);
-      HUD.setWeapon(Weapons.getCurrentName(), Weapons.getCurrentIdx());
-      HUD.notifyPickup('📂 GAME LOADED — Stage ' + (currentStage + 1) + ' Wave ' + (currentWave + 1), '#44ff88');
-      return true;
-    } catch (e) { return false; }
-  }
-
-  function hasSave() {
-    try { return !!localStorage.getItem('ok_save'); } catch (e) { return false; }
-  }
-
-  function deleteSave() {
-    try { localStorage.removeItem('ok_save'); } catch (e) {}
-  }
-
   /* ── Public API ──────────────────────────────────────────────────── */
   return {
     STATE,
@@ -5459,10 +5291,6 @@ const GameManager = (function () {
     populateWeaponsGrid,
     updateRoleIndicator,
     refreshMarketplaceUI,
-    saveGame,
-    loadGame,
-    hasSave,
-    deleteSave,
     getState:        function () { return gameState; },
     setState:        function (s) { gameState = s; },
     getPlayer:       function () { return player; },
@@ -5514,13 +5342,8 @@ const GameManager = (function () {
           var hudEl = document.getElementById('hud');
           if (hudEl) hudEl.style.display = 'block';
           gameState = STATE.PLAYING;
-          if (typeof GameManager.startGame === 'function') {
-            GameManager.startGame();
-            if (_waveStartTimer) clearTimeout(_waveStartTimer);
-            _waveStartTimer = setTimeout(function () {
-              beginWave(1);
-            }, 150);
-          }
+          if (typeof GameManager.startGame === 'function') GameManager.startGame();
+          if (typeof GameManager.beginWave === 'function') GameManager.beginWave(1);
           if (typeof HUD !== 'undefined' && HUD.show) HUD.show();
         } catch (e) {
           if (typeof console !== 'undefined') console.error('forceStartGame error:', e);

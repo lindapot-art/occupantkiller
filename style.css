@@ -321,6 +321,16 @@ canvas {
 }
 .btn:hover { background: #ff4444; color: #000; }
 
+/* Drone selection option cards */
+.drone-option:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(0, 204, 255, 0.3);
+}
+.drone-option.selected {
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+  border-color: #44ff88 !important;
+}
+
 #controls-hint {
   position: absolute;
   bottom: 24px;
@@ -877,7 +887,36 @@ canvas {
   0%, 100% { box-shadow: 0 0 8px rgba(255,215,0,0.4); }
   50% { box-shadow: 0 0 16px rgba(255,215,0,0.8); }
 }
-
+/* ── Scope Overlay (ADS vignette for scoped weapons) ──────────── */
+#scope-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 150;
+  background: radial-gradient(
+    circle at center,
+    transparent 28%,
+    rgba(0,0,0,0.65) 50%,
+    rgba(0,0,0,0.95) 70%
+  );
+}
+#scope-overlay::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 1px; height: 100%;
+  background: rgba(255,255,255,0.15);
+  transform: translate(-50%, -50%);
+}
+#scope-overlay::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 100%; height: 1px;
+  background: rgba(255,255,255,0.15);
+  transform: translate(-50%, -50%);
+}
 /* ── Kill Cam Overlay ────────────────────────────────────── */
 #killcam-overlay {
   display: none;

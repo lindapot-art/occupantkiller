@@ -1,9 +1,3 @@
-/**
- * hud.js – Heads-Up Display helpers
- * Depends on: nothing (pure DOM)
- */
-
-const HUD = (() => {
   // ── Skill HUD Overlay ─────────────────────────────────────────────
   // Import escapeHTML from feedback.js
   const escapeHTML = window.Feedback && window.Feedback.escapeHTML ? window.Feedback.escapeHTML : (str => String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]));
@@ -64,9 +58,9 @@ const HUD = (() => {
         idx = 21 + parseInt(e.key, 10);
       }
       // Defensive: ensure slot exists and is unlocked
-      if (idx >= 0 && typeof window.Weapons !== 'undefined' && window.Weapons.switchTo) {
-        if (window.Weapons.getWeaponCount && idx < window.Weapons.getWeaponCount()) {
-          window.Weapons.switchTo(idx);
+      if (idx >= 0 && typeof window.Weapons !== 'undefined' && window.Weapons.select) {
+        if (window.Weapons.getCount && idx < window.Weapons.getCount()) {
+          window.Weapons.select(idx);
           e.preventDefault();
         } else {
           console.warn('[HUD] Weapon slot index out of range:', idx);
@@ -79,8 +73,6 @@ const HUD = (() => {
 
   // Map: npcId → {el, lastMorale}
   let _moraleIndicators = {};
-  const _moraleProjPos = typeof THREE !== 'undefined' ? new THREE.Vector3() : null;
-  const _moraleSeen = new Set();
 
   // Call this every frame with [{id, position, morale, alive}]
   function updateNpcMoraleIndicators(npcList, camera, renderer) {
@@ -88,10 +80,10 @@ const HUD = (() => {
     const width = renderer.domElement.width;
     const height = renderer.domElement.height;
     // Track which NPCs are present this frame
-    _moraleSeen.clear();
+    const seen = new Set();
     for (const npc of npcList) {
       if (!npc.alive) continue;
-      _moraleSeen.add(npc.id);
+      seen.add(npc.id);
       let ind = _moraleIndicators[npc.id];
       if (!ind) {
         const el = document.createElement('div');
@@ -106,8 +98,7 @@ const HUD = (() => {
         _moraleIndicators[npc.id] = ind;
       }
       // Project world position to screen
-      if (!_moraleProjPos) continue;
-      const pos = _moraleProjPos.copy(npc.position);
+      const pos = npc.position.clone();
       pos.y += 1.7; // above head
       pos.project(camera);
       const sx = (pos.x * 0.5 + 0.5) * width;
@@ -133,12 +124,18 @@ const HUD = (() => {
     }
     // Remove indicators for NPCs not present
     for (const id in _moraleIndicators) {
-      if (!_moraleSeen.has(Number(id))) {
+      if (!seen.has(Number(id))) {
         moraleHudEl.removeChild(_moraleIndicators[id].el);
         delete _moraleIndicators[id];
       }
     }
   }
+/**
+ * hud.js – Heads-Up Display helpers
+ * Depends on: nothing (pure DOM)
+ */
+
+const HUD = (() => {
   const el = {
     hud:          document.getElementById('hud'),
     score:        document.getElementById('score-display'),
@@ -162,14 +159,14 @@ const HUD = (() => {
 
   // Dynamically generate weapon slots based on WEAPONS array
   function createWeaponSlots() {
-    const slotContainer = document.getElementById('weapon-slots');
-    if (!slotContainer || typeof Weapons === 'undefined' || !Weapons.getWeaponCount) return;
+    const slotContainer = document.getElementById('weapon-slot-container');
+    if (!slotContainer || typeof Weapons === 'undefined' || !Weapons.getAll) return;
     slotContainer.innerHTML = '';
     el.weaponSlots = [];
-    const weaponCount = Weapons.getWeaponCount();
+    const weapons = Weapons.getAll();
     // Limit to 26 slots (1-9, 0, F1-F12, Shift+1-4)
     const maxSlots = 26;
-    for (let i = 0; i < Math.min(weaponCount, maxSlots); i++) {
+    for (let i = 0; i < Math.min(weapons.length, maxSlots); i++) {
       const slot = document.createElement('div');
       slot.className = 'weapon-slot';
       slot.id = 'wslot-' + i;
@@ -250,30 +247,6 @@ const HUD = (() => {
     else    el.reload.classList.remove('visible');
   }
 
-  function showTimer(secondsLeft) {
-    const trackerEl = document.getElementById('mission-tracker');
-    const titleEl = document.getElementById('mission-tracker-title');
-    const objectivesEl = document.getElementById('mission-tracker-objectives');
-    const timerEl = document.getElementById('mission-tracker-timer');
-    if (!timerEl) return;
-
-    const totalSeconds = Math.max(0, Math.ceil(Number(secondsLeft) || 0));
-    if (totalSeconds <= 0) {
-      timerEl.textContent = '';
-      const titleText = titleEl ? titleEl.textContent.trim() : '';
-      const hasObjectives = objectivesEl && objectivesEl.textContent.trim().length > 0;
-      if (trackerEl && !hasObjectives && (titleText === '' || titleText === '📍 MISSION')) {
-        trackerEl.style.display = 'none';
-      }
-      return;
-    }
-
-    if (trackerEl) trackerEl.style.display = 'block';
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = String(totalSeconds % 60).padStart(2, '0');
-    timerEl.textContent = 'Time left: ' + minutes + ':' + seconds;
-  }
-
   let _chFlashTimer = null;
   function flashHit(isHeadshot, isKill) {
     el.hitMarker.classList.remove('visible', 'headshot', 'kill');
@@ -346,19 +319,13 @@ const HUD = (() => {
     pickupTimer = setTimeout(() => el.pickupNotif.classList.remove('visible'), 1600);
   }
 
-  function announceWave(number, enemyCount, totalWaves, plan) {
+  function announceWave(number, enemyCount, totalWaves) {
     const progress = totalWaves ? ' OF ' + totalWaves : '';
-    let html = '<h2>WAVE ' + escapeHTML(number) + progress + '</h2><p>' + escapeHTML(enemyCount) + ' OCCUPANTS STORMING</p>';
-    if (plan) {
-      html += '<p style="font-size:16px;color:' + escapeHTML(plan.color || '#ffcc44') + ';margin-top:8px">' + escapeHTML(plan.name) + '</p>';
-      html += '<p style="font-size:13px;color:#ddd;max-width:520px;margin:4px auto 0">' + escapeHTML(plan.briefing || '') + '</p>';
-      html += '<p style="font-size:12px;color:#aaa;max-width:520px;margin:6px auto 0">' + escapeHTML(plan.rewardText || '') + '</p>';
-    }
-    el.waveAnn.innerHTML = html;
+    el.waveAnn.innerHTML = '<h2>WAVE ' + escapeHTML(number) + progress + '</h2><p>' + escapeHTML(enemyCount) + ' OCCUPANTS STORMING</p>';
     el.waveAnn.classList.remove('visible');
     void el.waveAnn.offsetWidth;
     el.waveAnn.classList.add('visible');
-    setTimeout(() => el.waveAnn.classList.remove('visible'), plan ? 3200 : 2200);
+    setTimeout(() => el.waveAnn.classList.remove('visible'), 2200);
   }
 
   function announceStage(stageNum, stageName, description) {
@@ -409,8 +376,6 @@ const HUD = (() => {
   const MM_SCALE = 2.5;
   var _minimapJammed = false;
   var _compassJammed = false;
-  var _jamNoiseImage = minimapCtx ? minimapCtx.createImageData(MM_SIZE, MM_SIZE) : null;
-  var _jamNoiseStamp = 0;
 
   function setMinimapJammed(jammed) { _minimapJammed = !!jammed; }
   function setCompassJammed(jammed) { _compassJammed = !!jammed; }
@@ -420,18 +385,13 @@ const HUD = (() => {
     const ctx = minimapCtx;
     ctx.clearRect(0, 0, MM_SIZE, MM_SIZE);
     if (_minimapJammed) {
-      var now = performance.now();
-      if (_jamNoiseImage && now - _jamNoiseStamp > 100) {
-        for (var pi = 0; pi < _jamNoiseImage.data.length; pi += 4) {
-          var v = Math.random() * 100 | 0;
-          _jamNoiseImage.data[pi] = v;
-          _jamNoiseImage.data[pi + 1] = v + 20;
-          _jamNoiseImage.data[pi + 2] = v;
-          _jamNoiseImage.data[pi + 3] = 220;
-        }
-        _jamNoiseStamp = now;
+      var imgData = ctx.createImageData(MM_SIZE, MM_SIZE);
+      for (var pi = 0; pi < imgData.data.length; pi += 4) {
+        var v = Math.random() * 100 | 0;
+        imgData.data[pi] = v; imgData.data[pi+1] = v + 20; imgData.data[pi+2] = v;
+        imgData.data[pi+3] = 220;
       }
-      if (_jamNoiseImage) ctx.putImageData(_jamNoiseImage, 0, 0);
+      ctx.putImageData(imgData, 0, 0);
       ctx.fillStyle = '#ff0000'; ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
       ctx.fillText('JAMMED', MM_HALF, MM_HALF);
       return;
@@ -1328,17 +1288,11 @@ const HUD = (() => {
       _waveSummaryEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.93);border:2px solid #44aaff;border-radius:12px;padding:32px 48px;z-index:10001;color:#fff;font-family:monospace;min-width:340px;text-align:center;box-shadow:0 0 40px #44aaff44;display:none;';
       document.body.appendChild(_waveSummaryEl);
     }
-    const wave = escapeHTML(stats.wave);
-    const kills = escapeHTML(stats.kills);
-    const score = escapeHTML(stats.score);
-    const headshots = escapeHTML(stats.headshots);
-    const damageTaken = escapeHTML(stats.damageTaken);
-    const time = escapeHTML(stats.time);
     let html = '<h2 style="color:#44aaff;margin-bottom:18px">WAVE COMPLETE!</h2>';
-    html += `<div style='font-size:18px;margin-bottom:10px'>Wave <b>${wave}</b> cleared</div>`;
-    html += `<div>Kills: <b>${kills}</b> &nbsp; | &nbsp; Score: <b>${score}</b></div>`;
-    html += `<div>Headshots: <b>${headshots}</b> &nbsp; | &nbsp; Damage Taken: <b>${damageTaken}</b></div>`;
-    html += `<div style='margin-top:12px;font-size:13px;color:#aaa'>Time: <b>${time}s</b></div>`;
+    html += `<div style='font-size:18px;margin-bottom:10px'>Wave <b>${stats.wave}</b> cleared</div>`;
+    html += `<div>Kills: <b>${stats.kills}</b> &nbsp; | &nbsp; Score: <b>${stats.score}</b></div>`;
+    html += `<div>Headshots: <b>${stats.headshots}</b> &nbsp; | &nbsp; Damage Taken: <b>${stats.damageTaken}</b></div>`;
+    html += `<div style='margin-top:12px;font-size:13px;color:#aaa'>Time: <b>${stats.time}s</b></div>`;
     html += `<button id='wave-summary-close' style='margin-top:18px;padding:8px 28px;background:#44aaff;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:15px;'>CONTINUE</button>`;
     _waveSummaryEl.innerHTML = html;
     _waveSummaryEl.style.display = 'block';
@@ -1347,15 +1301,10 @@ const HUD = (() => {
     };
   }
 
-  function hideWaveSummary() {
-    if (_waveSummaryEl) _waveSummaryEl.style.display = 'none';
-  }
-
   return {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
     setHealth, setAmmo, setWeapon, showReload,
-    showTimer,
     flashHit, flashDamage, showBloodDrops,
     showHeadshot, notifyPickup,
     announceWave, announceStage,
@@ -1385,8 +1334,6 @@ const HUD = (() => {
     toggleFPS, updateFPS, toggleSettings, getSettings,
     refreshIndicators,
     showWeaponUnlockCard,
-    createWeaponSlots,
-    showWaveSummary, hideWaveSummary,
     // ── NPC Morale HUD Overlay ──
     updateNpcMoraleIndicators,
   };

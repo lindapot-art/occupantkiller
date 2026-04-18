@@ -49,6 +49,103 @@ const DroneSystem = (function () {
   var _droneCacheDirty = true;
   var _cacheStamp = 1;
 
+  /* ── Drone Nests ─────────────────────────────────────────────────── */
+  var _droneNests = [];  // { x, y, z, alive, hp, mesh }
+  var _nestMaxHp = 120;
+
+  function registerNest(x, y, z) {
+    _droneNests.push({ x: x, y: y, z: z, alive: true, hp: _nestMaxHp, mesh: null });
+  }
+
+  function buildNestMarker(nest) {
+    if (!_scene) return;
+    var g = new THREE.Group();
+    // Red antenna beacon
+    var poleGeo = new THREE.CylinderGeometry(0.08, 0.08, 4, 6);
+    var poleMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
+    var pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.set(0, 5, 0);
+    g.add(pole);
+    // Blinking red light
+    var lightGeo = new THREE.SphereGeometry(0.2, 6, 6);
+    var lightMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    var light = new THREE.Mesh(lightGeo, lightMat);
+    light.position.set(0, 7.2, 0);
+    light.userData.isNestLight = true;
+    g.add(light);
+    // Radar dish
+    var dishGeo = new THREE.ConeGeometry(0.5, 0.3, 8);
+    var dishMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+    var dish = new THREE.Mesh(dishGeo, dishMat);
+    dish.position.set(0, 6.5, 0);
+    dish.rotation.x = Math.PI * 0.5;
+    g.add(dish);
+    g.position.set(nest.x, nest.y, nest.z);
+    _scene.add(g);
+    nest.mesh = g;
+  }
+
+  function initNests() {
+    if (typeof window.VoxelWorld === 'undefined' || !window.VoxelWorld.getDroneNestPositions) return;
+    var positions = window.VoxelWorld.getDroneNestPositions();
+    for (var i = 0; i < positions.length; i++) {
+      registerNest(positions[i].x, positions[i].y, positions[i].z);
+      buildNestMarker(_droneNests[_droneNests.length - 1]);
+    }
+  }
+
+  function damageNest(nestIndex, amount) {
+    if (nestIndex < 0 || nestIndex >= _droneNests.length) return;
+    var nest = _droneNests[nestIndex];
+    if (!nest.alive) return;
+    nest.hp -= amount;
+    if (nest.hp <= 0) {
+      nest.alive = false;
+      nest.hp = 0;
+      if (nest.mesh) {
+        nest.mesh.traverse(function (child) {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) child.material.dispose();
+        });
+        if (_scene) _scene.remove(nest.mesh);
+        nest.mesh = null;
+      }
+      // Destroy voxel structure
+      if (typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.setBlock) {
+        for (var bx = -3; bx <= 3; bx++) {
+          for (var by = 0; by < 8; by++) {
+            for (var bz = -3; bz <= 3; bz++) {
+              window.VoxelWorld.setBlock(Math.floor(nest.x) + bx, Math.floor(nest.y) + by, Math.floor(nest.z) + bz, 0);
+            }
+          }
+        }
+      }
+      if (typeof HUD !== 'undefined' && HUD.notifyPickup) {
+        HUD.notifyPickup('\uD83D\uDCA5 ENEMY DRONE NEST DESTROYED!', '#44ff88');
+      }
+    }
+  }
+
+  function getNearestNest(x, z) {
+    var best = -1, bestDist = Infinity;
+    for (var i = 0; i < _droneNests.length; i++) {
+      if (!_droneNests[i].alive) continue;
+      var dx = _droneNests[i].x - x;
+      var dz = _droneNests[i].z - z;
+      var d = dx * dx + dz * dz;
+      if (d < bestDist) { bestDist = d; best = i; }
+    }
+    return best;
+  }
+
+  function getAliveNestCount() {
+    var c = 0;
+    for (var i = 0; i < _droneNests.length; i++) if (_droneNests[i].alive) c++;
+    return c;
+  }
+
+  function getNests() { return _droneNests; }
+
   /* ── Create Drone Mesh ───────────────────────────────────────────── */
   function addRussianFlag(group) {
     const stripeGeo = new THREE.BoxGeometry(0.3, 0.02, 0.05);
@@ -150,6 +247,15 @@ const DroneSystem = (function () {
     nextId = 1;
     _possessedDrone = null;
     _invalidateDroneCaches();
+    // Clear old nests and rebuild from level
+    for (var ni = 0; ni < _droneNests.length; ni++) {
+      if (_droneNests[ni].mesh) {
+        _droneNests[ni].mesh.traverse(function (c) { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+        if (_scene) _scene.remove(_droneNests[ni].mesh);
+      }
+    }
+    _droneNests.length = 0;
+    initNests();
   }
 
   function _invalidateDroneCaches() {
@@ -416,6 +522,17 @@ const DroneSystem = (function () {
         _droneMotorActive = false;
       }
     }
+
+    // Nest light blinking
+    for (var ni = 0; ni < _droneNests.length; ni++) {
+      var nest = _droneNests[ni];
+      if (!nest.alive || !nest.mesh) continue;
+      nest.mesh.traverse(function (c) {
+        if (c.userData && c.userData.isNestLight) {
+          c.visible = (Math.floor(performance.now() / 500) % 2 === 0);
+        }
+      });
+    }
   }
 
   function updatePossessedDrone(drone, delta) {
@@ -660,6 +777,14 @@ const DroneSystem = (function () {
     drones.length = 0;
     _possessedDrone = null;
     _invalidateDroneCaches();
+    // Clear nests
+    for (var ni = 0; ni < _droneNests.length; ni++) {
+      if (_droneNests[ni].mesh) {
+        _droneNests[ni].mesh.traverse(function (c) { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+        if (_scene) _scene.remove(_droneNests[ni].mesh);
+      }
+    }
+    _droneNests.length = 0;
   }
 
   /* ── Drone Swarm ─────────────────────────────────────────────────── */
@@ -829,5 +954,10 @@ const DroneSystem = (function () {
     DRONE_UPGRADES: DRONE_UPGRADES,
     upgradeDrone: upgradeDrone,
     getDroneUpgrades: getDroneUpgrades,
+    // Drone Nests
+    getNests: getNests,
+    getAliveNestCount: getAliveNestCount,
+    damageNest: damageNest,
+    getNearestNest: getNearestNest,
   };
 })();
