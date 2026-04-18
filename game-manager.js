@@ -1860,7 +1860,9 @@ const GameManager = (function () {
     var reloadFill = document.getElementById('tank-reload-fill');
     var reloadText = document.getElementById('tank-reload-text');
     var reloadFlash = document.getElementById('tank-reload-flash');
+    var readyFlash = document.getElementById('tank-ready-flash');
     if (v.fireCooldown > 0) {
+      v._reloadFxArmed = true;
       var prog = VehicleSystem.getTankReloadProgress();
       if (reloadBar) reloadBar.style.display = 'block';
       if (reloadFill) reloadFill.style.width = (prog * 100) + '%';
@@ -1875,6 +1877,17 @@ const GameManager = (function () {
       if (reloadFlash) {
         reloadFlash.classList.remove('active');
         reloadFlash.style.opacity = '0';
+      }
+      if (v._reloadFxArmed) {
+        v._reloadFxArmed = false;
+        if (readyFlash) {
+          readyFlash.classList.remove('active');
+          void readyFlash.offsetWidth;
+          readyFlash.classList.add('active');
+        }
+        if (typeof AudioSystem !== 'undefined' && AudioSystem.playReadyChime) {
+          AudioSystem.playReadyChime();
+        }
       }
     }
 

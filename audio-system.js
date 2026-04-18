@@ -483,6 +483,45 @@ window.AudioSystem = (function () {
     _engineGain = null;
   }
 
+  function playTurretTraverse() {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    var filter = ctx.createBiquadFilter();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(180 + Math.random() * 30, now);
+    osc.frequency.linearRampToValueAtTime(120 + Math.random() * 20, now + 0.08);
+    filter.type = 'bandpass';
+    filter.frequency.value = 340;
+    gain.gain.setValueAtTime(0.035, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  }
+
+  function playReadyChime() {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    [740, 980].forEach(function(freq, idx) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.045);
+      gain.gain.setValueAtTime(0.06, now + idx * 0.045);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.045 + 0.14);
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(now + idx * 0.045);
+      osc.stop(now + idx * 0.045 + 0.15);
+    });
+  }
+
   // Ricochet ping — metallic high-freq chirp
   function playRicochet() {
     if (!enabled || !ctx) return;
@@ -1592,6 +1631,8 @@ window.AudioSystem = (function () {
     startEngine: startEngine,
     updateEngine: updateEngine,
     stopEngine: stopEngine,
+    playTurretTraverse: playTurretTraverse,
+    playReadyChime: playReadyChime,
     playAmbientWind: playAmbientWind,
     startAmbientLoop: startAmbientLoop,
     stopAmbientLoop: stopAmbientLoop,

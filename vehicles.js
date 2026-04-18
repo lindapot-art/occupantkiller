@@ -506,6 +506,7 @@ const VehicleSystem = (function () {
       // Hull roll state
       hullRoll: 0,
       hullPitch: 0,
+      turretSfxTimer: 0,
       _prevYaw: 0,
       _prevHSpeed: 0,
       _headlightsOn: false,
@@ -1673,8 +1674,16 @@ const VehicleSystem = (function () {
     var diff = targetTurretYaw - v.turretYaw;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
+    var pitchDiff = targetTurretPitch - v.turretPitch;
     v.turretYaw += diff * Math.min(1, delta * 5);
-    v.turretPitch += (targetTurretPitch - v.turretPitch) * Math.min(1, delta * 6);
+    v.turretPitch += pitchDiff * Math.min(1, delta * 6);
+    v.turretSfxTimer = Math.max(0, (v.turretSfxTimer || 0) - delta);
+    if (v === _occupiedVehicle && v.turretSfxTimer <= 0 && (Math.abs(diff) > 0.03 || Math.abs(pitchDiff) > 0.018)) {
+      v.turretSfxTimer = 0.07;
+      if (typeof AudioSystem !== 'undefined' && AudioSystem.playTurretTraverse) {
+        AudioSystem.playTurretTraverse();
+      }
+    }
     // Apply to turret group in mesh
     for (var ci = 0; ci < v.mesh.children.length; ci++) {
       if (v.mesh.children[ci].userData && v.mesh.children[ci].userData.isTurret) {

@@ -455,6 +455,17 @@ canvas {
 #tank-reload-flash.active {
   animation: tankReloadSweep 0.9s linear infinite;
 }
+#tank-ready-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(170, 255, 170, 0.18) 0%, rgba(70, 255, 120, 0.12) 38%, transparent 74%);
+  z-index: 2;
+}
+#tank-ready-flash.active {
+  animation: tankReadyPulse 0.28s ease-out forwards;
+}
 @keyframes tankHitPulse {
   0%   { opacity: 1; }
   100% { opacity: 0; }
@@ -462,6 +473,10 @@ canvas {
 @keyframes tankReloadSweep {
   0%   { background-position: center center, -240px 0; }
   100% { background-position: center center, calc(100% + 240px) 0; }
+}
+@keyframes tankReadyPulse {
+  0%   { opacity: 0.95; }
+  100% { opacity: 0; }
 }
 #tank-speed-vignette {
   position: absolute;

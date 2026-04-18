@@ -250,3 +250,23 @@
   - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
   - `tools/test-qa-v2.js http://localhost:3000`: 0 failed
   - `tools/test-gameplay.js http://localhost:3000`: PASS, 23 screenshots, `Errors: NONE`
+
+- Latest task: Tank turret traverse audio + reload-ready flash/chime
+- Status: Complete
+- Files changed:
+  - audio-system.js
+  - vehicles.js
+  - game-manager.js
+  - index.html
+  - style.css
+- Fix shipped:
+  - Added a short procedural mechanical traverse sound that plays while the occupied tank turret is rotating meaningfully.
+  - Added a green periscope-ready flash and a two-note ready chime when cannon reload completes.
+- Verified:
+  - `node --check vehicles.js` passed
+  - `node --check game-manager.js` passed
+  - `node --check audio-system.js` passed
+  - `/healthz` returned 200
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 0 failed
+  - `tools/test-gameplay.js http://localhost:3000`: PASS, 23 screenshots, `Errors: NONE`

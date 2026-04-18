@@ -16,6 +16,12 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [HIGH] Tank Turret Traverse Audio + Reload-Ready Flash/Chime
+Status: DONE
+Requested: 2026-04-18
+Completed: 2026-04-18
+Details: Added procedural turret traverse audio pulses while the occupied tank turret slews meaningfully in yaw/pitch, plus a green ready overlay pulse and two-note chime when cannon reload completes. Files changed: audio-system.js, vehicles.js, index.html, style.css, game-manager.js. Verified: syntax PASS, healthz 200, test-master 38/0/0, test-qa-v2 0 failed, gameplay Errors: NONE.
+
 ### [HIGH] Tank Rear Brake/Reverse Lights + HUD Speed Readout
 Status: DONE
 Requested: 2026-04-18

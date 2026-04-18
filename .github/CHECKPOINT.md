@@ -4,9 +4,9 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-18 — Session 34: Added tank rear brake/reverse lights + HUD speed readout
+- **Timestamp**: 2026-04-18 — Session 34: Added tank turret traverse audio + reload-ready flash/chime
 - **Agent**: KING
-- **Status**: COMPLETE — Tanks now show active rear brake lights, reverse lamps, and a live speed HUD readout. Verified with full proxy QA and gameplay `Errors: NONE`. Push remains blocked by GitHub auth mismatch (`PhotonBounce` lacks access to `lindapot-art/occupantkiller`).
+- **Status**: COMPLETE — Tanks now emit mechanical traverse audio while slewing the turret and pulse a green ready flash/chime when cannon reload completes. Verified with full proxy QA and gameplay `Errors: NONE`. Push remains blocked by GitHub auth mismatch (`PhotonBounce` lacks access to `lindapot-art/occupantkiller`).
 
 ## Current Task
 - DONE: Ukrainian apartment buildings (6/12 stories) with blue/white hallway tiles, stairways, accessible apartments, sniper windows
@@ -45,6 +45,7 @@
 - DONE: Antenna spring wobble + hull body roll on turns; full QA green
 - DONE: Tank headlight beams + suspension pitch on accel/brake; full QA green
 - DONE: Tank rear brake/reverse lights + HUD speed readout; full QA green
+- DONE: Tank turret traverse audio + reload-ready flash/chime; full QA green
 
 ## Steps Completed This Session (Session 34)
 1. [x] Updated `vehicles.js` so tank turret visuals track camera pitch instead of only projectile pitch
