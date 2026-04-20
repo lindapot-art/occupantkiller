@@ -75,6 +75,7 @@ body {
   overflow: hidden;
   font-family: 'Courier New', Courier, monospace;
   color: #fff;
+  overscroll-behavior: none;
 }
 
 #game-container {
@@ -507,7 +508,7 @@ canvas {
   left: 50%;
   width: 3px;
   height: 3px;
-  transform: translate(-50%, -50%);
+  transform: translate(calc(-50% + var(--tank-reticle-x, 0px)), calc(-50% + var(--tank-reticle-y, 0px)));
   background: #ff3333;
   border-radius: 50%;
   box-shadow: 0 0 6px #ff0000;
@@ -515,6 +516,7 @@ canvas {
 
 .tank-reticle-line {
   background: rgba(255, 50, 50, 0.6);
+  transform: translate(var(--tank-reticle-x, 0px), var(--tank-reticle-y, 0px));
 }
 
 .tank-reticle-line-h {
@@ -540,6 +542,7 @@ canvas {
   font-size: 9px;
   color: rgba(255, 100, 100, 0.5);
   font-family: monospace;
+  transform: translate(var(--tank-reticle-x, 0px), var(--tank-reticle-y, 0px));
 }
 
 .tank-range-mark-near { top: calc(50% + 25px); }
@@ -793,10 +796,67 @@ canvas {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   pointer-events: none;
-  z-index: 100;
+  z-index: 230;
   touch-action: none;
 }
 #mobile-controls * { pointer-events: auto; }
+
+#mobile-look-zone {
+  position: absolute;
+  right: 18px;
+  bottom: 120px;
+  width: min(42vw, 220px);
+  height: min(42vw, 220px);
+  border-radius: 26px;
+  border: 1px solid rgba(90, 220, 255, 0.24);
+  background: radial-gradient(circle at center, rgba(90, 220, 255, 0.08), rgba(4, 16, 30, 0.18));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 12px 28px rgba(0,0,0,0.22);
+  backdrop-filter: blur(3px);
+}
+
+.mobile-look-label {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: rgba(170, 225, 255, 0.85);
+}
+
+.mobile-look-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 42px;
+  height: 42px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(170, 225, 255, 0.3);
+  border-radius: 50%;
+}
+
+.mobile-look-reticle::before,
+.mobile-look-reticle::after {
+  content: '';
+  position: absolute;
+  background: rgba(170, 225, 255, 0.35);
+}
+
+.mobile-look-reticle::before {
+  top: 50%;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.mobile-look-reticle::after {
+  left: 50%;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  transform: translateX(-50%);
+}
 
 #joystick-zone {
   position: absolute;
@@ -831,6 +891,16 @@ canvas {
   align-items: center;
 }
 
+#mobile-utility {
+  position: absolute;
+  right: 18px;
+  bottom: 350px;
+  display: grid;
+  grid-template-columns: repeat(4, 52px);
+  gap: 8px;
+  justify-items: center;
+}
+
 .mobile-btn {
   width: 64px; height: 64px;
   border-radius: 50%;
@@ -853,6 +923,21 @@ canvas {
   width: 44px; height: 44px;
   font-size: 18px;
 }
+
+.utility-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  font-size: 20px;
+  background: rgba(14, 20, 28, 0.55);
+  border-color: rgba(170, 225, 255, 0.26);
+}
+
+.utility-btn.emphasis {
+  border-color: rgba(255, 214, 102, 0.52);
+  color: #ffe69a;
+}
+
 .fire-btn {
   width: 80px; height: 80px;
   background: rgba(255,50,50,0.3);
@@ -947,6 +1032,48 @@ canvas {
   #controls-legend { display: none; }
   #controls-hint { font-size: 2vw; }
   #health-bar-container { width: 120px; }
+  #inventory-btn,
+  #skill-hud-btn,
+  #weather-indicator,
+  #role-indicator,
+  #ai-learning-indicator,
+  #combat-log,
+  #daily-challenges,
+  #bounty-display {
+    display: none !important;
+  }
+  #top-bar {
+    width: calc(100% - 18px);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  #resource-bar {
+    top: 54px;
+    font-size: 10px;
+    padding: 4px 18px;
+  }
+  #minimap-canvas {
+    width: 124px;
+    height: 124px;
+    bottom: 186px;
+    right: 10px;
+  }
+  #start-weapons-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    max-width: 92vw !important;
+  }
+  #mobile-look-zone {
+    right: 12px;
+    bottom: 118px;
+    width: min(46vw, 220px);
+    height: min(46vw, 220px);
+  }
+  #mobile-utility {
+    right: 12px;
+    bottom: 356px;
+    grid-template-columns: repeat(4, 48px);
+    gap: 6px;
+  }
 }
 @media (max-width: 480px) {
   #joystick-zone { width: 110px; height: 110px; bottom: 10px; left: 10px; }
@@ -954,6 +1081,41 @@ canvas {
   #joystick-thumb { width: 48px; height: 48px; left: 31px; top: 31px; }
   .mobile-btn { width: 54px; height: 54px; font-size: 20px; }
   .fire-btn { width: 68px; height: 68px; font-size: 26px; }
+  #mobile-actions {
+    right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+  #mobile-utility {
+    right: 12px;
+    bottom: 288px;
+    grid-template-columns: repeat(3, 46px);
+  }
+  .utility-btn {
+    width: 46px;
+    height: 46px;
+    font-size: 17px;
+  }
+  #mobile-look-zone {
+    width: min(48vw, 180px);
+    height: min(48vw, 180px);
+    bottom: 104px;
+  }
+  #top-bar {
+    font-size: 11px;
+    gap: 8px;
+  }
+  #bottom-bar {
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    bottom: 86px;
+  }
+  #weapon-name-display {
+    font-size: 13px;
+    text-align: center;
+  }
 }
 
 /* ── Vehicle HUD ────────────────────────────────────────────── */
@@ -1134,6 +1296,63 @@ canvas {
   z-index: 196;
   border: 3px solid rgba(255,100,0,0.3);
   box-shadow: inset 0 0 60px rgba(255,100,0,0.1);
+}
+
+/* ── Targeting Assistant (on-weapon digital readout) ──────────── */
+#target-assist {
+  position: fixed;
+  bottom: 180px; right: 20px;
+  width: 180px;
+  padding: 6px 8px;
+  background: rgba(0, 20, 0, 0.75);
+  border: 1px solid rgba(0, 255, 68, 0.4);
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  color: #00ff44;
+  pointer-events: none;
+  z-index: 130;
+  text-shadow: 0 0 4px #00ff44;
+  box-shadow: inset 0 0 8px rgba(0,255,68,0.1);
+}
+#ta-header {
+  text-align: center;
+  font-weight: bold;
+  font-size: 9px;
+  letter-spacing: 2px;
+  border-bottom: 1px solid rgba(0,255,68,0.3);
+  padding-bottom: 3px;
+  margin-bottom: 3px;
+  color: #44ff88;
+}
+#ta-entries .ta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1px 0;
+  line-height: 1.2;
+}
+#ta-entries .ta-row .ta-dir {
+  color: #ffaa00;
+  font-weight: bold;
+  min-width: 20px;
+  text-align: center;
+}
+#ta-entries .ta-row .ta-dist {
+  color: #00ddff;
+  min-width: 32px;
+  text-align: right;
+}
+#ta-entries .ta-row .ta-type {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 4px;
+}
+#ta-entries .ta-row.ta-priority {
+  color: #ff4444;
+  text-shadow: 0 0 6px #ff0000;
 }
 
 /* ── Blink Animation (already exists but ensure it's here) ──── */

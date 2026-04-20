@@ -656,3 +656,204 @@ const WorldFeatures = (function () {
     detonateBarrel: detonateBarrel,
   };
 })();
+
+// ══════════════════════════════════════════════════════════════
+//  WATER SYSTEM — Ponds, rivers, reflections, fishable fish
+// ══════════════════════════════════════════════════════════════
+// (Appended outside IIFE but integrated via WorldFeatures)
+(function() {
+  var _scene = null;
+  var _waterBodies = [];
+  var _fish = [];
+  var _fishPool = [];
+  var _waterMat = null;
+  var _fishGeo = null;
+  var _fishMat = null;
+
+  function initWaterSystem(scene) {
+    _scene = scene;
+    _waterMat = new THREE.MeshPhongMaterial({
+      color: 0x2266aa, transparent: true, opacity: 0.55,
+      shininess: 200, specular: 0xaaddff,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    _fishGeo = new THREE.BoxGeometry(0.3, 0.12, 0.08);
+    _fishMat = new THREE.MeshLambertMaterial({ color: 0x886644 });
+  }
+
+  function spawnWaterBody(cx, cz, radiusX, radiusZ, depth) {
+    if (!_scene || !_waterMat) return null;
+    depth = depth || 1.5;
+    radiusX = radiusX || 8;
+    radiusZ = radiusZ || 6;
+
+    // Water surface plane
+    var geo = new THREE.PlaneGeometry(radiusX * 2, radiusZ * 2, 4, 4);
+    var mesh = new THREE.Mesh(geo, _waterMat.clone());
+    var surfaceY = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
+      ? VoxelWorld.getTerrainHeight(cx, cz) - 0.3 : 2;
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(cx, surfaceY, cz);
+    _scene.add(mesh);
+
+    // Riverbed (dark bottom)
+    var bedGeo = new THREE.PlaneGeometry(radiusX * 2 - 1, radiusZ * 2 - 1);
+    var bedMat = new THREE.MeshLambertMaterial({ color: 0x2a2210, side: THREE.DoubleSide });
+    var bed = new THREE.Mesh(bedGeo, bedMat);
+    bed.rotation.x = -Math.PI / 2;
+    bed.position.set(cx, surfaceY - depth, cz);
+    _scene.add(bed);
+
+    var body = {
+      cx: cx, cz: cz, rx: radiusX, rz: radiusZ,
+      surfaceY: surfaceY, depth: depth,
+      mesh: mesh, bed: bed, time: 0
+    };
+    _waterBodies.push(body);
+
+    // Spawn fish in water body
+    var fishCount = Math.max(2, Math.floor(radiusX * radiusZ / 12));
+    for (var i = 0; i < fishCount; i++) {
+      spawnFish(body);
+    }
+
+    return body;
+  }
+
+  function spawnFish(waterBody) {
+    if (!_scene || !_fishGeo) return;
+    var mesh;
+    if (_fishPool.length > 0) {
+      mesh = _fishPool.pop();
+      mesh.visible = true;
+    } else {
+      mesh = new THREE.Mesh(_fishGeo, _fishMat.clone());
+    }
+    var angle = Math.random() * Math.PI * 2;
+    var rx = (Math.random() * 0.7) * waterBody.rx;
+    var rz = (Math.random() * 0.7) * waterBody.rz;
+    mesh.position.set(
+      waterBody.cx + Math.cos(angle) * rx,
+      waterBody.surfaceY - 0.3 - Math.random() * (waterBody.depth * 0.6),
+      waterBody.cz + Math.sin(angle) * rz
+    );
+    mesh.rotation.y = angle;
+    _scene.add(mesh);
+    _fish.push({
+      mesh: mesh, waterBody: waterBody,
+      angle: angle, speed: 0.5 + Math.random() * 1.5,
+      radius: Math.sqrt(rx * rx + rz * rz),
+      alive: true, caught: false
+    });
+  }
+
+  function updateWater(delta) {
+    // Animate water surfaces (gentle wave via vertex displacement)
+    for (var wi = 0; wi < _waterBodies.length; wi++) {
+      var wb = _waterBodies[wi];
+      wb.time += delta;
+      // Simple wave: oscillate Y position
+      wb.mesh.position.y = wb.surfaceY + Math.sin(wb.time * 1.5) * 0.05;
+      // Update opacity for "reflection" shimmer
+      if (wb.mesh.material) {
+        wb.mesh.material.opacity = 0.50 + Math.sin(wb.time * 2.5) * 0.08;
+      }
+    }
+    // Animate fish
+    for (var fi = _fish.length - 1; fi >= 0; fi--) {
+      var f = _fish[fi];
+      if (!f.alive || f.caught) continue;
+      f.angle += f.speed * delta * 0.3;
+      var wb2 = f.waterBody;
+      var fr = f.radius * 0.8;
+      f.mesh.position.x = wb2.cx + Math.cos(f.angle) * fr;
+      f.mesh.position.z = wb2.cz + Math.sin(f.angle) * fr;
+      f.mesh.rotation.y = f.angle + Math.PI / 2;
+      // Subtle bob
+      f.mesh.position.y += Math.sin(f.angle * 3) * 0.01;
+    }
+  }
+
+  function checkInWater(px, pz) {
+    for (var i = 0; i < _waterBodies.length; i++) {
+      var wb = _waterBodies[i];
+      var dx = (px - wb.cx) / wb.rx;
+      var dz = (pz - wb.cz) / wb.rz;
+      if (dx * dx + dz * dz <= 1) {
+        return { inWater: true, surfaceY: wb.surfaceY, depth: wb.depth, body: wb };
+      }
+    }
+    return { inWater: false };
+  }
+
+  function tryFish(px, pz) {
+    // Try to catch a fish near the player
+    for (var i = 0; i < _fish.length; i++) {
+      var f = _fish[i];
+      if (!f.alive || f.caught) continue;
+      var dx = f.mesh.position.x - px;
+      var dz = f.mesh.position.z - pz;
+      if (Math.sqrt(dx * dx + dz * dz) < 3) {
+        f.caught = true;
+        f.alive = false;
+        if (_scene) _scene.remove(f.mesh);
+        f.mesh.visible = false;
+        _fishPool.push(f.mesh);
+        // Respawn after 30s
+        var wb = f.waterBody;
+        _fish.splice(i, 1);
+        setTimeout(function() { spawnFish(wb); }, 30000);
+        return { caught: true, resource: 'FISH', foodValue: 25, materialValue: 5 };
+      }
+    }
+    return { caught: false };
+  }
+
+  function getFish() { return _fish; }
+  function getWaterBodies() { return _waterBodies; }
+
+  function clearWater() {
+    for (var i = 0; i < _waterBodies.length; i++) {
+      if (_scene) {
+        _scene.remove(_waterBodies[i].mesh);
+        _scene.remove(_waterBodies[i].bed);
+      }
+      _waterBodies[i].mesh.geometry.dispose();
+      _waterBodies[i].mesh.material.dispose();
+      _waterBodies[i].bed.geometry.dispose();
+      _waterBodies[i].bed.material.dispose();
+    }
+    _waterBodies.length = 0;
+    for (var j = 0; j < _fish.length; j++) {
+      if (_scene) _scene.remove(_fish[j].mesh);
+    }
+    _fish.length = 0;
+    _fishPool.length = 0;
+  }
+
+  // Patch into WorldFeatures
+  if (typeof WorldFeatures !== 'undefined') {
+    var origInit = WorldFeatures.init;
+    WorldFeatures.init = function(scene, THREE_ref) {
+      origInit(scene, THREE_ref);
+      initWaterSystem(scene);
+    };
+    var origClear = WorldFeatures.clear;
+    WorldFeatures.clear = function() {
+      origClear();
+      clearWater();
+    };
+    var origUpdate = WorldFeatures.update;
+    WorldFeatures.update = function(delta, px, py, pz) {
+      var result = origUpdate(delta, px, py, pz);
+      updateWater(delta);
+      return result;
+    };
+    WorldFeatures.spawnWaterBody = spawnWaterBody;
+    WorldFeatures.getWaterBodies = getWaterBodies;
+    WorldFeatures.checkInWater = checkInWater;
+    WorldFeatures.updateWater = updateWater;
+    WorldFeatures.tryFish = tryFish;
+    WorldFeatures.getFish = getFish;
+  }
+})();

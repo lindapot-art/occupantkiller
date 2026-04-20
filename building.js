@@ -344,6 +344,74 @@ const Building = (function () {
     structures.length = 0;
   }
 
+  /* ── Auto-Build: AI selects best location near player and builds ── */
+  function autoBuild(templateName, px, py, pz) {
+    var tmpl = TEMPLATES[templateName];
+    if (!tmpl) return { ok: false, reason: 'unknown template' };
+    var sz = tmpl.size;
+    // Search spiral pattern around player for valid placement
+    var bestX = null, bestZ = null, bestY = null;
+    var getH = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
+      ? VoxelWorld.getTerrainHeight : function() { return 2; };
+    var isSolid = (typeof VoxelWorld !== 'undefined' && VoxelWorld.isSolid)
+      ? VoxelWorld.isSolid : function() { return false; };
+    for (var ring = 3; ring < 25; ring += 2) {
+      for (var trial = 0; trial < 8; trial++) {
+        var angle = trial * Math.PI * 0.25 + ring * 0.3;
+        var tx = Math.round(px + Math.cos(angle) * ring);
+        var tz = Math.round(pz + Math.sin(angle) * ring);
+        var ty = Math.floor(getH(tx, tz));
+        // Check flatness: all corners within 1 block height
+        var flat = true;
+        var cornerH = [
+          getH(tx, tz), getH(tx + sz.x, tz),
+          getH(tx, tz + sz.z), getH(tx + sz.x, tz + sz.z)
+        ];
+        var minH = cornerH[0], maxH = cornerH[0];
+        for (var ci = 1; ci < 4; ci++) {
+          if (cornerH[ci] < minH) minH = cornerH[ci];
+          if (cornerH[ci] > maxH) maxH = cornerH[ci];
+        }
+        if (maxH - minH > 2) continue;
+        // Check no solid blocks in build area
+        var blocked = false;
+        for (var bx = 0; bx < sz.x && !blocked; bx++) {
+          for (var bz = 0; bz < sz.z && !blocked; bz++) {
+            for (var by = 1; by <= sz.y; by++) {
+              if (isSolid(tx + bx, ty + by, tz + bz)) { blocked = true; break; }
+            }
+          }
+        }
+        if (blocked) continue;
+        bestX = tx; bestZ = tz; bestY = ty;
+        break;
+      }
+      if (bestX !== null) break;
+    }
+    if (bestX === null) return { ok: false, reason: 'no valid location found' };
+    // Select template and place
+    _selectedTemplate = tmpl;
+    var result = placeTemplate(bestX, bestY, bestZ);
+    return { ok: result, x: bestX, y: bestY, z: bestZ, template: templateName };
+  }
+
+  /* ── Auto-Fortify: builds defenses around a position automatically ── */
+  function autoFortify(px, py, pz) {
+    var built = [];
+    // Build turret nearby
+    selectTemplate('turret');
+    var t1 = autoBuild('turret', px, py, pz);
+    if (t1.ok) built.push(t1);
+    // Build wall sections on two sides
+    selectTemplate('wall');
+    var w1 = autoBuild('wall', px + 8, py, pz);
+    if (w1.ok) built.push(w1);
+    var w2 = autoBuild('wall', px - 8, py, pz);
+    if (w2.ok) built.push(w2);
+    cancelTemplate();
+    return built;
+  }
+
   return {
     TEMPLATES,
     init,
@@ -366,5 +434,7 @@ const Building = (function () {
     getTotalNPCCapacity,
     getTotalDroneCapacity,
     hasUnlock,
+    autoBuild,
+    autoFortify,
   };
 })();

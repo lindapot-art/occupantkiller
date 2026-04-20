@@ -368,6 +368,65 @@ const HUD = (() => {
     setTimeout(function () { if (arc.parentNode) arc.parentNode.removeChild(arc); }, 800);
   }
 
+  // ── Targeting Assistant (on-weapon digital readout) ─────────
+  var _taEl = null;
+  var _taEntries = null;
+  var _taTimer = 0;
+
+  function updateTargetAssist(px, pz, pyaw, enemies) {
+    if (!_taEl) _taEl = document.getElementById('target-assist');
+    if (!_taEntries) _taEntries = document.getElementById('ta-entries');
+    if (!_taEl || !_taEntries) return;
+
+    _taTimer += 0.05;
+    // Show only during gameplay
+    if (!enemies || enemies.length === 0) { _taEl.style.display = 'none'; return; }
+    _taEl.style.display = '';
+
+    // Find closest 5 living enemies
+    var sorted = [];
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (!e || !e.mesh || e.health <= 0) continue;
+      var dx = e.mesh.position.x - px;
+      var dz = e.mesh.position.z - pz;
+      var dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist > 80) continue; // range limit
+      // Direction arrow: angle relative to player facing
+      var angle = Math.atan2(dx, -dz) - pyaw;
+      sorted.push({ dist: dist, angle: angle, type: e.type || 'INF', health: e.health, maxHp: e.maxHealth || 100 });
+    }
+    sorted.sort(function(a, b) { return a.dist - b.dist; });
+    if (sorted.length > 5) sorted.length = 5;
+
+    // Render entries
+    var html = '';
+    for (var si = 0; si < sorted.length; si++) {
+      var s = sorted[si];
+      // Direction arrow
+      var a = ((s.angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      var arrow;
+      if (a < 0.39 || a > 5.89) arrow = '↑';
+      else if (a < 1.18) arrow = '↗';
+      else if (a < 1.96) arrow = '→';
+      else if (a < 2.75) arrow = '↘';
+      else if (a < 3.53) arrow = '↓';
+      else if (a < 4.32) arrow = '↙';
+      else if (a < 5.10) arrow = '←';
+      else arrow = '↖';
+
+      var cls = si === 0 ? 'ta-row ta-priority' : 'ta-row';
+      var distStr = s.dist < 10 ? s.dist.toFixed(1) : Math.round(s.dist);
+      var hpPct = Math.round((s.health / s.maxHp) * 100);
+      html += '<div class="' + cls + '">'
+        + '<span class="ta-dir">' + arrow + '</span>'
+        + '<span class="ta-type">' + (s.type.substring(0, 6)) + ' ' + hpPct + '%</span>'
+        + '<span class="ta-dist">' + distStr + 'm</span>'
+        + '</div>';
+    }
+    _taEntries.innerHTML = html;
+  }
+
   // ── Minimap / Radar ────────────────────────────────────────
   const minimapCanvas = document.getElementById('minimap-canvas');
   const minimapCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
@@ -1336,5 +1395,7 @@ const HUD = (() => {
     showWeaponUnlockCard,
     // ── NPC Morale HUD Overlay ──
     updateNpcMoraleIndicators,
+    // ── Targeting Assistant ──
+    updateTargetAssist,
   };
 })();

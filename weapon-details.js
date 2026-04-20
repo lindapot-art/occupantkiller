@@ -326,6 +326,117 @@ const WeaponDetails = (() => {
   }
 
   // ══════════════════════════════════════════════════════════
+  //  VOXEL SUBDIVISION SYSTEM — Lego-like detail (Feature 40)
+  // ══════════════════════════════════════════════════════════
+  var VOXEL_SIZE = 0.006; // 6mm voxels — chunky Lego look
+  var _voxelBoxGeo = null;
+
+  function getVoxelGeo() {
+    if (!_voxelBoxGeo) _voxelBoxGeo = new THREE.BoxGeometry(VOXEL_SIZE * 0.92, VOXEL_SIZE * 0.92, VOXEL_SIZE * 0.92);
+    return _voxelBoxGeo;
+  }
+
+  /**
+   * Voxelize a THREE.Group: replace each mesh child with an InstancedMesh
+   * grid of small cubes, giving a Lego-like aesthetic.
+   * Preserves named sub-groups (moving parts) and recurses into them.
+   */
+  function voxelizeGroup(group, vs) {
+    vs = vs || VOXEL_SIZE;
+    var directChildren = [];
+    for (var ci = 0; ci < group.children.length; ci++) directChildren.push(group.children[ci]);
+
+    for (var di = 0; di < directChildren.length; di++) {
+      var child = directChildren[di];
+      // Recurse into named sub-groups (slide, bolt, etc.)
+      if (child.isGroup && child.name && child.name.charAt(0) === '_') {
+        voxelizeGroup(child, vs);
+        continue;
+      }
+      if (!child.isMesh || !child.geometry) continue;
+      // Skip transparent/emissive/basic materials
+      if (child.material && (child.material.transparent || child.material.type === 'MeshBasicMaterial')) continue;
+
+      child.geometry.computeBoundingBox();
+      var bb = child.geometry.boundingBox;
+      if (!bb) continue;
+      var sx = (bb.max.x - bb.min.x) || 0.001;
+      var sy = (bb.max.y - bb.min.y) || 0.001;
+      var sz = (bb.max.z - bb.min.z) || 0.001;
+      var maxDim = Math.max(sx, sy, sz);
+      if (maxDim < vs * 0.3) continue; // too tiny
+
+      var color = child.material.color ? child.material.color.getHex() : 0x333333;
+      var shin = child.material.shininess || 60;
+      var spec = child.material.specular ? child.material.specular.getHex() : 0x444444;
+
+      var nx = Math.max(1, Math.round(sx / vs));
+      var ny = Math.max(1, Math.round(sy / vs));
+      var nz = Math.max(1, Math.round(sz / vs));
+      var count = nx * ny * nz;
+      if (count > 2000) continue; // safety cap
+
+      // For cylinder geometries, carve to approximate circular cross-section
+      var isCylinder = !!(child.geometry.parameters && child.geometry.parameters.radiusTop !== undefined);
+      var cylR = isCylinder ? (child.geometry.parameters.radiusTop || 0.01) : 0;
+      var cylAxis = 1; // default: Y-axis cylinder
+      // Detect rotated cylinders (rotated to Z-axis is common for barrels)
+      if (isCylinder && child.rotation && Math.abs(child.rotation.x - Math.PI / 2) < 0.1) cylAxis = 2;
+
+      var geo = new THREE.BoxGeometry(vs * 0.92, vs * 0.92, vs * 0.92);
+      var mat = new THREE.MeshPhongMaterial({ color: color, shininess: shin, specular: spec });
+      // Add slight color variation per voxel for realism
+      var inst = new THREE.InstancedMesh(geo, mat, count);
+      var m4 = new THREE.Matrix4();
+      var col = new THREE.Color();
+      var idx = 0;
+      for (var ix = 0; ix < nx; ix++) {
+        for (var iy = 0; iy < ny; iy++) {
+          for (var iz = 0; iz < nz; iz++) {
+            var lx = bb.min.x + (ix + 0.5) * sx / nx;
+            var ly = bb.min.y + (iy + 0.5) * sy / ny;
+            var lz = bb.min.z + (iz + 0.5) * sz / nz;
+            // Cylinder carving: skip voxels outside the radius
+            if (isCylinder) {
+              var cdx, cdy;
+              if (cylAxis === 1) { cdx = lx; cdy = lz; }
+              else { cdx = lx; cdy = ly; }
+              if (Math.sqrt(cdx * cdx + cdy * cdy) > cylR * 1.1) { continue; }
+            }
+            m4.makeTranslation(lx, ly, lz);
+            // Slight color jitter for voxel texture
+            var jitter = 0.95 + Math.random() * 0.1;
+            col.setHex(color);
+            col.r *= jitter; col.g *= jitter; col.b *= jitter;
+            inst.setMatrixAt(idx, m4);
+            inst.setColorAt(idx, col);
+            idx++;
+          }
+        }
+      }
+      // Trim if cylinder carving removed some
+      if (idx < count) { inst.count = idx; }
+      inst.instanceMatrix.needsUpdate = true;
+      if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+
+      var vg = new THREE.Group();
+      vg.position.copy(child.position);
+      vg.rotation.copy(child.rotation);
+      vg.scale.copy(child.scale);
+      vg.name = child.name;
+      if (child.userData) Object.assign(vg.userData, child.userData);
+      // For cylinders that were rotated, reset rotation since voxels are axis-aligned
+      if (isCylinder && cylAxis === 2) vg.rotation.x = 0;
+      vg.add(inst);
+
+      group.remove(child);
+      child.geometry.dispose();
+      if (child.material && child.material.dispose) child.material.dispose();
+      group.add(vg);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════
   //  MATERIAL UPGRADE — Lambert → Phong with reflections (Feature 1)
   // ══════════════════════════════════════════════════════════
   function upgradeMaterials(group) {
@@ -480,9 +591,26 @@ const WeaponDetails = (() => {
       group.add(bipodDetail(0.17, -0.18, -0.50));
     }
 
-    // 16. Laser module on rifles and SMGs (Feature 34)
-    if (isRifle || SMG.indexOf(type) >= 0) {
-      group.add(laserModule(0.15, -0.07, -0.40));
+    // 16. Laser module on rifles, SMGs, pistols, and launchers (Feature 34)
+    if (isRifle || SMG.indexOf(type) >= 0 || isPistol || isLauncher) {
+      var laserZ = isPistol ? -0.30 : isLauncher ? -0.35 : -0.40;
+      var laserY = isPistol ? -0.16 : -0.07;
+      group.add(laserModule(0.15, laserY, laserZ));
+    }
+
+    // 16b. Scope mounts + optics on pistols and launchers (tactical rail scope)
+    if (isPistol) {
+      group.add(railSegment(0.17, -0.115, -0.26, 0.06));
+      group.add(scopeRing(0.17, -0.095, -0.24, 0.008));
+      group.add(scopeRing(0.17, -0.095, -0.28, 0.008));
+    }
+    if (isLauncher && !weaponDef.hasScope) {
+      group.add(railSegment(0.17, -0.04, -0.30, 0.08));
+      group.add(scopeRing(0.17, -0.02, -0.26));
+      group.add(scopeRing(0.17, -0.02, -0.34));
+      group.add(scopeTurret(0.17, -0.01, -0.30));
+      var launchLens = scopeLens(0.17, -0.02, -0.38, 0.012);
+      group.add(launchLens);
     }
 
     // 17. Ammo counter on Gatling/Minigun (Feature 36)
@@ -526,6 +654,44 @@ const WeaponDetails = (() => {
     group.userData._anim = anim;
     group.userData._weaponType = type;
     group.userData._weaponId = id;
+
+    // 19. Pistol slide grouping for animation (Feature 41)
+    if (isPistol) {
+      var slideGroup = null;
+      for (var si = group.children.length - 1; si >= 0; si--) {
+        var sch = group.children[si];
+        if (sch.isGroup && sch.name === '_slide') { slideGroup = sch; break; }
+      }
+      if (!slideGroup) {
+        // Auto-detect: barrel + top body meshes → slide
+        slideGroup = new THREE.Group();
+        slideGroup.name = '_slide';
+        var slideParts = [];
+        for (var si2 = group.children.length - 1; si2 >= 0; si2--) {
+          var sch2 = group.children[si2];
+          if (sch2.isMesh && sch2.position.y > -0.16 && sch2.position.y < -0.10) {
+            slideParts.push(sch2);
+          }
+        }
+        if (slideParts.length > 0) {
+          for (var sp = 0; sp < slideParts.length; sp++) {
+            group.remove(slideParts[sp]);
+            slideGroup.add(slideParts[sp]);
+          }
+          group.add(slideGroup);
+        }
+      }
+      if (slideGroup.children.length > 0) {
+        anim.slide = slideGroup;
+        anim.slideHome = slideGroup.position.z;
+      }
+    }
+
+    // 20. VOXEL SUBDIVISION — Convert all mesh parts to Lego-like voxel cubes (Feature 40)
+    // Skip melee and thrown for performance; voxelize everything else
+    if (type !== 'MELEE' && THROWN.indexOf(type) < 0) {
+      voxelizeGroup(group, VOXEL_SIZE);
+    }
   }
 
   // ══════════════════════════════════════════════════════════
@@ -533,6 +699,8 @@ const WeaponDetails = (() => {
   // ══════════════════════════════════════════════════════════
   var _boltTimer = 0;
   var _boltActive = false;
+  var _slideTimer = 0;
+  var _slideActive = false;
   var _gatlingAngle = 0;
   var _gatlingSpeed = 0;
   var _smokeParticles = [];
@@ -548,6 +716,12 @@ const WeaponDetails = (() => {
     if (anim.bolt) {
       _boltTimer = 0.055;
       _boltActive = true;
+    }
+
+    // Pistol slide cycling (Feature 41)
+    if (anim.slide) {
+      _slideTimer = 0.065;
+      _slideActive = true;
     }
 
     // Trigger pull (Feature 28)
@@ -599,6 +773,20 @@ const WeaponDetails = (() => {
       } else {
         anim.bolt.position.z = home;
         _boltActive = false;
+      }
+    }
+
+    // Pistol slide cycling (Feature 41) — slide snaps back then returns
+    if (_slideActive && anim.slide) {
+      _slideTimer -= delta;
+      var shome = anim.slideHome || 0;
+      if (_slideTimer > 0.035) {
+        anim.slide.position.z = shome + (0.065 - _slideTimer) * 50 * 0.012;
+      } else if (_slideTimer > 0) {
+        anim.slide.position.z = shome + _slideTimer * 50 * 0.012;
+      } else {
+        anim.slide.position.z = shome;
+        _slideActive = false;
       }
     }
 

@@ -42,6 +42,12 @@
     <div id="flashbang-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;opacity:0;pointer-events:none;z-index:200;transition:opacity 0.05s"></div>
     <div id="scope-overlay"></div>
 
+    <!-- ── Targeting Assistant (on-weapon digital readout) ── -->
+    <div id="target-assist" style="display:none;">
+      <div id="ta-header">TGT ASSIST</div>
+      <div id="ta-entries"></div>
+    </div>
+
     <!-- ── Extended top info bar ───────────────────────────── -->
     <div id="extended-top-bar">
       <span id="hud-time">07:00 DAY | Day 1 | Spring</span>
@@ -724,10 +730,25 @@
 
   <!-- Mobile Controls -->
   <div id="mobile-controls" style="display:none">
+    <div id="mobile-look-zone" class="mobile-ctrl">
+      <div class="mobile-look-label">LOOK</div>
+      <div class="mobile-look-reticle"></div>
+    </div>
+
     <!-- Left joystick area -->
     <div id="joystick-zone" class="mobile-ctrl">
       <div id="joystick-base"></div>
       <div id="joystick-thumb"></div>
+    </div>
+
+    <div id="mobile-utility" class="mobile-ctrl">
+      <button id="btn-aim" class="mobile-btn utility-btn emphasis" title="Aim / Alt Fire">◎</button>
+      <button id="btn-use" class="mobile-btn utility-btn" title="Use / Interact / Drone">✋</button>
+      <button id="btn-vehicle" class="mobile-btn utility-btn" title="Enter Vehicle">🚗</button>
+      <button id="btn-build" class="mobile-btn utility-btn" title="Build Mode">🔨</button>
+      <button id="btn-view" class="mobile-btn utility-btn" title="Switch Camera">👁</button>
+      <button id="btn-night" class="mobile-btn utility-btn" title="Night Vision">🌙</button>
+      <button id="btn-inventory-mobile" class="mobile-btn utility-btn" title="Inventory">🎒</button>
     </div>
 
     <!-- Action buttons (right side) -->

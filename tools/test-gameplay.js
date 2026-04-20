@@ -1,18 +1,56 @@
 /**
  * Full gameplay test — tries to play through a level.
- * Captures screenshots every 5 seconds for QA evidence.
+ * Captures screenshots every 4 seconds for QA evidence.
  */
 const puppeteer = require('puppeteer');
 const path = require('path');
 const fs = require('fs');
+const { Jimp } = require('jimp');
 
 const SCREENSHOT_DIR = path.join(__dirname, 'screenshots');
 if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+
+const READABILITY_SAMPLE = Object.freeze({ x0: 0.28, y0: 0.22, x1: 0.72, y1: 0.68 });
+const DARK_FRAME_MAX_CENTER_LUMA = 8;
+const DARK_FRAME_MAX_LIT_RATIO = 0.01;
+
+async function analyzeScreenshotReadability(imagePath) {
+  const image = await Jimp.read(imagePath);
+  const width = image.bitmap.width;
+  const height = image.bitmap.height;
+  const startX = Math.max(0, Math.floor(width * READABILITY_SAMPLE.x0));
+  const endX = Math.min(width, Math.ceil(width * READABILITY_SAMPLE.x1));
+  const startY = Math.max(0, Math.floor(height * READABILITY_SAMPLE.y0));
+  const endY = Math.min(height, Math.ceil(height * READABILITY_SAMPLE.y1));
+
+  let sumLuma = 0;
+  let litPixels = 0;
+  let totalPixels = 0;
+
+  image.scan(startX, startY, endX - startX, endY - startY, function (_x, _y, idx) {
+    const r = this.bitmap.data[idx + 0];
+    const g = this.bitmap.data[idx + 1];
+    const b = this.bitmap.data[idx + 2];
+    const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    sumLuma += luma;
+    totalPixels++;
+    if (luma >= 24) litPixels++;
+  });
+
+  const centerAvgLuma = totalPixels > 0 ? (sumLuma / totalPixels) : 0;
+  const litRatio = totalPixels > 0 ? (litPixels / totalPixels) : 0;
+  return { centerAvgLuma, litRatio };
+}
+
+function isNearBlackGameplayFrame(sample) {
+  return sample.centerAvgLuma < DARK_FRAME_MAX_CENTER_LUMA && sample.litRatio < DARK_FRAME_MAX_LIT_RATIO;
+}
 
 (async () => {
   const url = process.argv[2] || 'http://localhost:3000';
   console.log('Testing:', url);
   const screenshots = [];
+  const readabilitySamples = [];
   let screenshotIdx = 0;
 
   async function captureScreenshot(page, label) {
@@ -22,6 +60,11 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
     screenshots.push(fpath);
     screenshotIdx++;
     console.log(`📸 Screenshot: ${fname}`);
+    if (label !== 'menu' && label !== 'no-webgl-final') {
+      const sample = await analyzeScreenshotReadability(fpath);
+      readabilitySamples.push({ label, path: fpath, sample });
+      console.log(`   Visual QA: centerAvgLuma=${sample.centerAvgLuma.toFixed(2)} litRatio=${(sample.litRatio * 100).toFixed(2)}%`);
+    }
     return fpath;
   }
 
@@ -215,15 +258,83 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
   }));
   console.log('After 5s:', JSON.stringify(state));
 
-  // Weapon switch schedule — prioritize effective ranged weapons for kill-testing
-  // god mode unlocks all weapons; lead with assault/LMG/sniper for best kill rate
-  const WEAPON_SCHEDULE = [2,3,4,5,8,2,3,14,15,16,9,10,11,12,13,2,3,5,8,2];
+  // Weapon switch schedule — cycle ALL weapons aggressively for inventory QA
+  // god mode unlocks all weapons; cover melee, pistols, rifles, snipers, explosives, specials
+  const WEAPON_SCHEDULE = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36];
 
+  // ══ MULTI-GAME QA LOOP ══
+  // Run multiple games to capture 200+ screenshots
+  const NUM_GAMES = 3;
+  const ROUNDS_PER_GAME = [75, 70, 65]; // ~210 gameplay shots + specials = 220+
 
-  // EXTENDED QA: 20 gameplay rounds, 5s interval (fast QA pass)
-  for (let shot = 0; shot < 20; shot++) {
-    // Simulate a round of gameplay actions every 5 seconds
-    const weaponIdx = WEAPON_SCHEDULE[shot % WEAPON_SCHEDULE.length];
+  for (let gameNum = 0; gameNum < NUM_GAMES; gameNum++) {
+    console.log(`\n════ GAME ${gameNum + 1}/${NUM_GAMES} ════`);
+
+    if (gameNum > 0) {
+      // Restart game for subsequent rounds
+      await page.evaluate(() => {
+        // Force back to menu and restart
+        if (typeof GameManager !== 'undefined') {
+          if (GameManager.getState() !== 'menu') {
+            // Trigger game restart by going to menu then starting again
+            GameManager.toMenu && GameManager.toMenu();
+          }
+        }
+      });
+      await new Promise(r => setTimeout(r, 1500));
+      await captureScreenshot(page, `game${gameNum + 1}-menu`);
+
+      // Re-enable god mode and pointer lock
+      await page.evaluate(() => {
+        if (typeof GameManager !== 'undefined' && GameManager.toggleGodMode) GameManager.toggleGodMode();
+        Object.defineProperty(document, 'pointerLockElement', {
+          get: () => document.body, configurable: true
+        });
+      });
+
+      // Start game
+      await page.evaluate(() => {
+        if (typeof window.forceStartGame === 'function') window.forceStartGame();
+      });
+      let gTries = 0;
+      let gState = await page.evaluate(() => GameManager.getState());
+      while (gState !== 'playing' && gTries < 10) {
+        await new Promise(r => setTimeout(r, 1000));
+        gState = await page.evaluate(() => GameManager.getState());
+        gTries++;
+      }
+      if (gState !== 'playing') {
+        console.log(`Game ${gameNum + 1}: Could not start, skipping.`);
+        continue;
+      }
+      await new Promise(r => setTimeout(r, 1500));
+
+      // Position player at different scenic spots per game
+      const startPositions = [
+        { x: 10, z: -15 },
+        { x: -15, z: 10 },
+        { x: 5, z: 25 },
+      ];
+      const sp = startPositions[gameNum % startPositions.length];
+      await page.evaluate(({ sp }) => {
+        const player = GameManager.getPlayer();
+        player.position.x = sp.x;
+        player.position.z = sp.z;
+        player.position.y = VoxelWorld.getTerrainHeight(sp.x, sp.z) + 1.7;
+        window.__qaAnchor = { x: sp.x, z: sp.z };
+        CameraSystem.setYaw(Math.random() * Math.PI * 2);
+        CameraSystem.setPitch(-0.1);
+      }, { sp });
+      await new Promise(r => setTimeout(r, 500));
+      await captureScreenshot(page, `game${gameNum + 1}-start`);
+    }
+
+    const maxRounds = ROUNDS_PER_GAME[gameNum] || 65;
+
+  // EXTENDED QA: screenshots every 2s for dense coverage, cycle ALL weapons
+  for (let shot = 0; shot < maxRounds; shot++) {
+    // Aggressively cycle weapons — every shot gets a different weapon
+    const weaponIdx = WEAPON_SCHEDULE[(shot + gameNum * 13) % WEAPON_SCHEDULE.length];
     await page.evaluate(({ wIdx, shot }) => {
       try {
         const player = GameManager.getPlayer();
@@ -394,15 +505,29 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
         }, 3000);
       } catch (e) { /* ignore movement errors */ }
     }, { wIdx: weaponIdx, shot });
-    // Wait 5 seconds, then screenshot
-    await new Promise(r => setTimeout(r, 5000));
-    await captureScreenshot(page, `shot${shot + 1}`);
+    // Wait 2 seconds, then screenshot (dense coverage for 200+ total)
+    await new Promise(r => setTimeout(r, 2000));
+    const wName = await page.evaluate(() => typeof Weapons !== 'undefined' && Weapons.getCurrentName ? Weapons.getCurrentName() : 'unknown');
+    const shortName = wName.replace(/[^a-zA-Z0-9]/g, '').substring(0, 12);
+    await captureScreenshot(page, `g${gameNum + 1}-r${shot + 1}-${shortName}`);
     // Optionally, check for win/dead and break early
     const state = await page.evaluate(() => GameManager.getState());
     if (state === 'win' || state === 'dead') break;
+
+    // Extra screenshot on weapon switch (inventory usage evidence)
+    if (shot % 5 === 4) {
+      // Quick inventory cycle — switch to next weapon and capture
+      const nextWIdx = WEAPON_SCHEDULE[(shot + gameNum * 13 + 3) % WEAPON_SCHEDULE.length];
+      await page.evaluate((idx) => {
+        if (typeof Weapons !== 'undefined' && Weapons.switchTo) Weapons.switchTo(idx);
+      }, nextWIdx);
+      await new Promise(r => setTimeout(r, 300));
+      const invName = await page.evaluate(() => typeof Weapons !== 'undefined' && Weapons.getCurrentName ? Weapons.getCurrentName() : 'inv');
+      await captureScreenshot(page, `g${gameNum + 1}-inv${shot}-${invName.replace(/[^a-zA-Z0-9]/g, '').substring(0, 12)}`);
+    }
   }
 
-  // Final state
+  // Final state for this game
   const finalState = await page.evaluate(() => ({
     state: GameManager.getState(),
     wave: GameManager.getCurrentWave(),
@@ -411,8 +536,27 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
     kills: GameManager.getPlayer().kills,
     hp: GameManager.getPlayer().hp,
   }));
-  console.log('\nFINAL:', JSON.stringify(finalState));
-  await captureScreenshot(page, 'final');
+  console.log(`\nGAME ${gameNum + 1} FINAL:`, JSON.stringify(finalState));
+  await captureScreenshot(page, `game${gameNum + 1}-final`);
+
+  } // end multi-game loop
+
+  const darkFrames = readabilitySamples.filter(entry => isNearBlackGameplayFrame(entry.sample));
+  if (darkFrames.length > 0) {
+    console.log(`Visual readability failures: ${darkFrames.length}/${readabilitySamples.length}`);
+    for (const frame of darkFrames.slice(0, 8)) {
+      console.log(
+        `   DARK FRAME ${frame.label}: centerAvgLuma=${frame.sample.centerAvgLuma.toFixed(2)} litRatio=${(frame.sample.litRatio * 100).toFixed(2)}%`
+      );
+    }
+    if (
+      darkFrames.some(frame => frame.label === 'wave1-start' || frame.label === 'final') ||
+      darkFrames.length >= Math.max(2, Math.ceil(readabilitySamples.length * 0.35))
+    ) {
+      errors.push(`VISUAL QA FAIL: ${darkFrames.length}/${readabilitySamples.length} gameplay frames were near-black`);
+    }
+  }
+
   console.log('Errors:', errors.length > 0 ? JSON.stringify(errors) : 'NONE');
   if (audioWarnings.length > 0) {
     console.log(`Audio warnings (headless-only, non-blocking): ${audioWarnings.length}`);

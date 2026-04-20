@@ -632,23 +632,183 @@ const GameManager = (function () {
     moveStartX: 0, moveStartY: 0,
   };
 
+  let _rendererProfile = 'desktop';
+  let _mobileControlsReady = false;
+
+  function showStartupError(message) {
+    var overlay = document.getElementById('error-overlay');
+    if (!overlay) return;
+    overlay.style.display = 'block';
+    overlay.innerText = 'STARTUP ERROR:\n' + message;
+  }
+
+  function getPreferredPixelRatio() {
+    var dpr = window.devicePixelRatio || 1;
+    if (_rendererProfile === 'compatibility') return 1;
+    return Math.min(dpr, isMobile ? 1.1 : 1.5);
+  }
+
+  function createRendererWithFallback() {
+    var container = document.getElementById('game-container');
+    var profiles = [
+      {
+        name: isMobile ? 'mobile' : 'desktop',
+        powerPreference: isMobile ? 'default' : 'high-performance',
+        precision: isMobile ? 'mediump' : 'highp',
+        shadows: !isMobile,
+        toneMapping: true,
+        exposure: isMobile ? 0.92 : 0.85,
+      },
+      {
+        name: 'compatibility',
+        powerPreference: 'default',
+        precision: 'lowp',
+        shadows: false,
+        toneMapping: false,
+        exposure: 1.0,
+      }
+    ];
+    var lastError = null;
+    for (var pi = 0; pi < profiles.length; pi++) {
+      var profile = profiles[pi];
+      try {
+        var canvas = document.createElement('canvas');
+        var attrs = {
+          alpha: false,
+          antialias: false,
+          depth: true,
+          stencil: false,
+          premultipliedAlpha: false,
+          preserveDrawingBuffer: false,
+          powerPreference: profile.powerPreference,
+          failIfMajorPerformanceCaveat: false,
+        };
+        var context = canvas.getContext('webgl2', attrs) ||
+                      canvas.getContext('webgl', attrs) ||
+                      canvas.getContext('experimental-webgl', attrs);
+        if (!context) continue;
+        var renderer = new THREE.WebGLRenderer({
+          canvas: canvas,
+          context: context,
+          antialias: false,
+          alpha: false,
+          depth: true,
+          stencil: false,
+          premultipliedAlpha: false,
+          preserveDrawingBuffer: false,
+          powerPreference: profile.powerPreference,
+          precision: profile.precision,
+        });
+        _rendererProfile = profile.name;
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(getPreferredPixelRatio());
+        renderer.shadowMap.enabled = profile.shadows;
+        renderer.shadowMap.type = THREE.PCFShadowMap;
+        renderer.toneMapping = profile.toneMapping ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
+        renderer.toneMappingExposure = profile.exposure;
+        renderer.domElement.style.touchAction = 'none';
+        renderer.domElement.addEventListener('webglcontextlost', function (e) {
+          e.preventDefault();
+          showStartupError('WebGL context was lost. Reload the page or close background tabs and try again.');
+        }, false);
+        container.appendChild(renderer.domElement);
+        return renderer;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw (lastError || new Error('Unable to create a WebGL context on this device.'));
+  }
+
+  function updateMobileControlsVisibility() {
+    if (!isMobile) return;
+    var mobileControls = document.getElementById('mobile-controls');
+    if (!mobileControls) return;
+    var shouldShow = gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE;
+    mobileControls.style.display = shouldShow ? 'block' : 'none';
+  }
+
+  function syncTouchDriveKeys() {
+    if (!isMobile) return;
+    var forwardActive = touch.moveActive && touch.moveY < -0.2;
+    var backActive = touch.moveActive && touch.moveY > 0.2;
+    var leftActive = touch.moveActive && touch.moveX < -0.2;
+    var rightActive = touch.moveActive && touch.moveX > 0.2;
+
+    if (DroneSystem && DroneSystem.setDroneKey) {
+      DroneSystem.setDroneKey('w', DroneSystem.isPossessing() && forwardActive);
+      DroneSystem.setDroneKey('s', DroneSystem.isPossessing() && backActive);
+      DroneSystem.setDroneKey('a', DroneSystem.isPossessing() && leftActive);
+      DroneSystem.setDroneKey('d', DroneSystem.isPossessing() && rightActive);
+      DroneSystem.setDroneKey('up', DroneSystem.isPossessing() && !!touch.jumping);
+      DroneSystem.setDroneKey('down', DroneSystem.isPossessing() && !!touch.sprinting);
+    }
+    if (VehicleSystem && VehicleSystem.setVehicleKey) {
+      VehicleSystem.setVehicleKey('w', VehicleSystem.isInVehicle() && forwardActive);
+      VehicleSystem.setVehicleKey('s', VehicleSystem.isInVehicle() && backActive);
+      VehicleSystem.setVehicleKey('a', VehicleSystem.isInVehicle() && leftActive);
+      VehicleSystem.setVehicleKey('d', VehicleSystem.isInVehicle() && rightActive);
+      VehicleSystem.setVehicleKey('up', VehicleSystem.isInVehicle() && !!touch.jumping);
+      VehicleSystem.setVehicleKey('down', VehicleSystem.isInVehicle() && !!touch.sprinting);
+    }
+  }
+
+  function getKeyValueFromCode(code) {
+    var map = {
+      Escape: 'Escape',
+      Tab: 'Tab',
+      Space: ' ',
+      KeyB: 'b',
+      KeyC: 'c',
+      KeyF: 'f',
+      KeyG: 'g',
+      KeyL: 'l',
+      KeyV: 'v',
+      KeyX: 'x',
+      KeyZ: 'z'
+    };
+    return map[code] || code;
+  }
+
+  function tapVirtualKey(code, holdMs) {
+    var key = getKeyValueFromCode(code);
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: code, key: key, bubbles: true, cancelable: true }));
+    window.setTimeout(function () {
+      document.dispatchEvent(new KeyboardEvent('keyup', { code: code, key: key, bubbles: true, cancelable: true }));
+    }, holdMs || 70);
+  }
+
+  function setMobileAim(active) {
+    if (VehicleSystem && VehicleSystem.isInVehicle && VehicleSystem.isInVehicle()) {
+      var occupied = VehicleSystem.getOccupied ? VehicleSystem.getOccupied() : null;
+      if (occupied && occupied.isTank && VehicleSystem.setVehicleKey) {
+        VehicleSystem.setVehicleKey('mgFire', active);
+        return;
+      }
+    }
+    if (active) {
+      if (Weapons && Weapons.handleRightDown) Weapons.handleRightDown();
+    } else if (Weapons && Weapons.handleRightUp) {
+      Weapons.handleRightUp();
+    }
+  }
+
   /* ── Lighting References ─────────────────────────────────────────── */
   let sunLight  = null;
   var _skyDome = null;
   let ambLight  = null;
   let hemiLight = null;
+  let _updateLoopStarted = false;
 
   /* ── Init ────────────────────────────────────────────────────────── */
   function init() {
-    // Create renderer
-    _renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-    _renderer.setSize(window.innerWidth, window.innerHeight);
-    _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-    _renderer.shadowMap.enabled = true;
-    _renderer.shadowMap.type = THREE.PCFShadowMap;
-    _renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    _renderer.toneMappingExposure = 0.85;
-    document.getElementById('game-container').appendChild(_renderer.domElement);
+    try {
+      _renderer = createRendererWithFallback();
+    } catch (err) {
+      console.error('[INIT] Renderer creation failed:', err);
+      showStartupError('This browser could not start WebGL rendering. Try refreshing, closing background tabs, or using a newer browser/GPU profile.');
+      return;
+    }
 
     // Create scene — Ukrainian theme (golden sky)
     _scene = new THREE.Scene();
@@ -831,12 +991,22 @@ const GameManager = (function () {
 
     // Mobile controls
     if (isMobile) {
-      document.getElementById('mobile-controls').style.display = 'block';
-      setupMobileControls();
+      if (!_mobileControlsReady) setupMobileControls();
+      updateMobileControlsVisibility();
+      var controlsHint = document.getElementById('controls-hint');
+      if (controlsHint) {
+        controlsHint.innerHTML = 'LEFT PAD · MOVE &nbsp;|&nbsp; RIGHT PAD · LOOK &nbsp;|&nbsp; 🔫 FIRE &nbsp;|&nbsp; ◎ AIM &nbsp;|&nbsp; ✋ USE &nbsp;|&nbsp; 🚗 VEHICLE &nbsp;|&nbsp; 🎒 INVENTORY';
+      }
     }
 
     // Handle resize
     window.addEventListener('resize', onResize);
+
+    if (!_updateLoopStarted) {
+      _updateLoopStarted = true;
+      prevTime = performance.now();
+      update();
+    }
 
     return { scene: _scene, camera: _camera, renderer: _renderer };
   }
@@ -1488,21 +1658,21 @@ const GameManager = (function () {
 
     /* ── Touch look controls (right half of canvas) ──────────── */
     if (isMobile) {
-      const canvas = _renderer.domElement;
-      canvas.addEventListener('touchstart', function (e) {
+      const lookZone = document.getElementById('mobile-look-zone') || _renderer.domElement;
+      lookZone.addEventListener('touchstart', function (e) {
+        e.preventDefault();
         for (let i = 0; i < e.changedTouches.length; i++) {
           const t = e.changedTouches[i];
-          if (t.clientX < window.innerWidth * 0.4) {
-            // Left side — movement handled by joystick zone
-          } else if (t.clientX > window.innerWidth * 0.5 && touch.lookTouchId === null) {
+          if (touch.lookTouchId === null) {
             touch.lookTouchId = t.identifier;
             touch.lookActive = true;
             touch._lookPrevX = t.clientX;
             touch._lookPrevY = t.clientY;
           }
         }
-      }, { passive: true });
-      canvas.addEventListener('touchmove', function (e) {
+      }, { passive: false });
+      lookZone.addEventListener('touchmove', function (e) {
+        e.preventDefault();
         for (let i = 0; i < e.changedTouches.length; i++) {
           const t = e.changedTouches[i];
           if (t.identifier === touch.lookTouchId) {
@@ -1514,8 +1684,8 @@ const GameManager = (function () {
             touch._lookPrevY = t.clientY;
           }
         }
-      }, { passive: true });
-      canvas.addEventListener('touchend', function (e) {
+      }, { passive: false });
+      lookZone.addEventListener('touchend', function (e) {
         for (let i = 0; i < e.changedTouches.length; i++) {
           if (e.changedTouches[i].identifier === touch.lookTouchId) {
             touch.lookTouchId = null;
@@ -1525,7 +1695,7 @@ const GameManager = (function () {
           }
         }
       }, { passive: true });
-      canvas.addEventListener('touchcancel', function (e) {
+      lookZone.addEventListener('touchcancel', function (e) {
         for (let i = 0; i < e.changedTouches.length; i++) {
           if (e.changedTouches[i].identifier === touch.lookTouchId) {
             touch.lookTouchId = null;
@@ -1902,6 +2072,14 @@ const GameManager = (function () {
     // Interior overlay (periscope view) — show only in first person
     var overlay = document.getElementById('tank-interior-overlay');
     if (overlay) {
+      if (v.velocity) {
+        var yaw = v.rotation ? v.rotation.y : 0;
+        var lateral = Math.cos(yaw) * v.velocity.x - Math.sin(yaw) * v.velocity.z;
+        var reticleX = Math.max(-6, Math.min(6, -lateral * 1.4 + (v._turnRate || 0) * 1.6));
+        var reticleY = Math.max(-4, Math.min(4, v.hullPitch ? -v.hullPitch * 90 : 0));
+        overlay.style.setProperty('--tank-reticle-x', reticleX.toFixed(2) + 'px');
+        overlay.style.setProperty('--tank-reticle-y', reticleY.toFixed(2) + 'px');
+      }
       overlay.style.display = v.viewMode === 'first' ? 'block' : 'none';
     }
   }
@@ -2153,6 +2331,25 @@ const GameManager = (function () {
     // Start stage-specific environmental VFX
     if (typeof StageVFX !== 'undefined' && StageVFX.startStageEffects) {
       StageVFX.startStageEffects(stageDef.theme);
+    }
+
+    // Spawn water bodies per stage
+    if (typeof WorldFeatures !== 'undefined' && WorldFeatures.spawnWaterBody) {
+      // Each stage gets 2-3 water features (pond/river)
+      var waterConfigs = [
+        // Stage 0 — Hostomel: marshland ponds
+        [{ cx: 25, cz: -15, rx: 10, rz: 7, d: 1.5 }, { cx: -20, cz: 30, rx: 6, rz: 12, d: 2 }],
+        // Stage 1 — Avdiivka: shell crater pools
+        [{ cx: 15, cz: 20, rx: 5, rz: 5, d: 1 }, { cx: -30, cz: -10, rx: 4, rz: 4, d: 0.8 }, { cx: 10, cz: -35, rx: 3, rz: 3, d: 0.6 }],
+        // Stage 2 — Bakhmut: river crossing
+        [{ cx: 0, cz: 25, rx: 30, rz: 5, d: 2.5 }, { cx: -25, cz: -20, rx: 7, rz: 6, d: 1.2 }],
+        // Stage 3 — Kherson: Dnipro river edge
+        [{ cx: 0, cz: 40, rx: 50, rz: 8, d: 3 }, { cx: 35, cz: -15, rx: 8, rz: 6, d: 1.5 }],
+      ];
+      var wc = waterConfigs[stageIndex] || waterConfigs[0];
+      for (var wi = 0; wi < wc.length; wi++) {
+        WorldFeatures.spawnWaterBody(wc[wi].cx, wc[wi].cz, wc[wi].rx, wc[wi].rz, wc[wi].d);
+      }
     }
   }
 
@@ -3687,6 +3884,9 @@ const GameManager = (function () {
     // ── B26: FPS counter ──
     if (HUD.updateFPS) HUD.updateFPS();
 
+    updateMobileControlsVisibility();
+    syncTouchDriveKeys();
+
     // ── Indicator priority stack refresh (picks up direct DOM changes) ──
     if (HUD.refreshIndicators) HUD.refreshIndicators();
 
@@ -4108,6 +4308,12 @@ const GameManager = (function () {
         HUD.updateMinimap(player.position.x, player.position.z, CameraSystem.getYaw(), mmEnemies, mmNPCs, mmVehicles, mmDrones);
       }
 
+      // Targeting assistant (on-weapon enemy readout)
+      if (HUD.updateTargetAssist) {
+        var taEnemies = Enemies.getAll();
+        HUD.updateTargetAssist(player.position.x, player.position.z, CameraSystem.getYaw(), taEnemies);
+      }
+
       // Enemy drone proximity warning
       if (typeof DroneSystem !== 'undefined' && DroneSystem.getAll) {
         var allDrones = DroneSystem.getAll();
@@ -4401,6 +4607,18 @@ const GameManager = (function () {
           player.hp = Math.max(0, player.hp - wireCheck.tickDmg * delta);
           HUD.setHealth(player.hp, player.maxHp);
         }
+
+        // Water check — slow movement when wading
+        if (typeof WorldFeatures !== 'undefined' && WorldFeatures.checkInWater) {
+          var waterCheck = WorldFeatures.checkInWater(player.position.x, player.position.z);
+          if (waterCheck.inWater) {
+            player._inWater = true;
+            player._waterSpeedMult = 0.55; // 55% speed in water
+          } else {
+            player._inWater = false;
+            player._waterSpeedMult = 1;
+          }
+        }
       }
 
       // Perks update
@@ -4635,6 +4853,9 @@ const GameManager = (function () {
 
   /* ── Mobile Controls Setup ─────────────────────────────────────── */
   function setupMobileControls() {
+    if (_mobileControlsReady) return;
+    _mobileControlsReady = true;
+
     const joystickZone  = document.getElementById('joystick-zone');
     const joystickThumb = document.getElementById('joystick-thumb');
     const baseSize      = joystickZone.offsetWidth || 140;
@@ -4711,6 +4932,23 @@ const GameManager = (function () {
       btnFire.classList.remove('active');
     });
 
+    const btnAim = document.getElementById('btn-aim');
+    if (btnAim) {
+      btnAim.addEventListener('touchstart', function (e) {
+        e.preventDefault();
+        setMobileAim(true);
+        btnAim.classList.add('active');
+      }, { passive: false });
+      btnAim.addEventListener('touchend', function () {
+        setMobileAim(false);
+        btnAim.classList.remove('active');
+      });
+      btnAim.addEventListener('touchcancel', function () {
+        setMobileAim(false);
+        btnAim.classList.remove('active');
+      });
+    }
+
     // Reload button
     const btnReload = document.getElementById('btn-reload');
     btnReload.addEventListener('touchstart', function (e) {
@@ -4758,11 +4996,30 @@ const GameManager = (function () {
     }, { passive: false });
     btnNext.addEventListener('touchend', function () { btnNext.classList.remove('active'); });
 
+    function bindTapButton(id, handler) {
+      var btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener('touchstart', function (e) {
+        e.preventDefault();
+        handler();
+        btn.classList.add('active');
+      }, { passive: false });
+      btn.addEventListener('touchend', function () { btn.classList.remove('active'); });
+      btn.addEventListener('touchcancel', function () { btn.classList.remove('active'); });
+    }
+
+    bindTapButton('btn-use', function () { tapVirtualKey('KeyF'); });
+    bindTapButton('btn-vehicle', function () { tapVirtualKey('KeyG'); });
+    bindTapButton('btn-build', function () { tapVirtualKey('KeyB'); });
+    bindTapButton('btn-view', function () { tapVirtualKey('KeyV'); });
+    bindTapButton('btn-night', function () { tapVirtualKey('KeyL'); });
+    bindTapButton('btn-inventory-mobile', function () { toggleInventory(); });
+
     // Pause / inventory button
     const btnPause = document.getElementById('btn-pause');
     btnPause.addEventListener('touchstart', function (e) {
       e.preventDefault();
-      toggleInventory();
+      tapVirtualKey('Escape');
     }, { passive: false });
   }
 
@@ -4952,6 +5209,7 @@ const GameManager = (function () {
     _camera.aspect = window.innerWidth / window.innerHeight;
     _camera.updateProjectionMatrix();
     _renderer.setSize(window.innerWidth, window.innerHeight);
+    _renderer.setPixelRatio(getPreferredPixelRatio());
   }
 
   /* ── Marketplace UI Builder ─────────────────────────────────────── */

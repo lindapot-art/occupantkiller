@@ -16,6 +16,11 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [HIGH] Fix Pitch-Dark Gameplay Regression + Add Visual QA Gate
+Status: IN-PROGRESS
+Requested: 2026-04-18
+Details: Investigate the current regression where gameplay screenshots are effectively black while the HUD still renders, and harden `tools/test-gameplay.js` so near-black gameplay frames fail QA instead of passing on JS-error absence alone.
+
 ### [HIGH] Tank Turret Traverse Audio + Reload-Ready Flash/Chime
 Status: DONE
 Requested: 2026-04-18

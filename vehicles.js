@@ -491,6 +491,8 @@ const VehicleSystem = (function () {
       turretYaw: 0,   // independent turret rotation
       turretPitch: 0,
       cannonRecoil: 0,
+      barrelSmokeTimer: 0,
+      barrelSmokePulseTimer: 0,
       dustTimer: 0,
       exhaustTimer: 0,
       damageSmokeTimer: 0,
@@ -1105,6 +1107,14 @@ const VehicleSystem = (function () {
     if (v.cannonRecoil > 0) {
       v.cannonRecoil = Math.max(0, v.cannonRecoil - delta * 1.4);
     }
+    if (v.barrelSmokeTimer > 0) {
+      v.barrelSmokeTimer = Math.max(0, v.barrelSmokeTimer - delta);
+      v.barrelSmokePulseTimer -= delta;
+      if (v.barrelSmokePulseTimer <= 0) {
+        v.barrelSmokePulseTimer = 0.08;
+        spawnTankBarrelSmoke(v, v.barrelSmokeTimer > 0.18 ? 2 : 1);
+      }
+    }
 
     for (var ci = 0; ci < v.mesh.children.length; ci++) {
       var child = v.mesh.children[ci];
@@ -1293,6 +1303,23 @@ const VehicleSystem = (function () {
         );
         Tracers.spawnSmoke(_vTmp1);
       }
+    }
+  }
+
+  function spawnTankBarrelSmoke(v, count) {
+    if (typeof Tracers === 'undefined' || !Tracers.spawnSmoke) return;
+    count = count || 1;
+    if (!getTankWeaponMountWorld(v, 'cannon', _vTmp1)) return;
+    var turretYaw = (v.rotation.y || 0) + (v.turretYaw || 0);
+    var dirX = -Math.sin(turretYaw);
+    var dirZ = -Math.cos(turretYaw);
+    for (var i = 0; i < count; i++) {
+      _vTmp2.set(
+        _vTmp1.x + dirX * (0.12 + i * 0.06) + (Math.random() - 0.5) * 0.08,
+        _vTmp1.y + 0.02 + Math.random() * 0.05,
+        _vTmp1.z + dirZ * (0.12 + i * 0.06) + (Math.random() - 0.5) * 0.08
+      );
+      Tracers.spawnSmoke(_vTmp2);
     }
   }
 
@@ -1536,6 +1563,8 @@ const VehicleSystem = (function () {
     v.fireCooldown = v.fireRate;
     v.cannonAmmo--;
     v.cannonRecoil = 0.35;
+    v.barrelSmokeTimer = 0.34;
+    v.barrelSmokePulseTimer = 0;
     _tankCannonAmmo = v.cannonAmmo;
 
     var camYaw = CameraSystem.getYaw();

@@ -198,12 +198,32 @@
   - Added rate-limited tank hit feedback with sparks and metallic impact debris at the hull.
   - Played ricochet audio for mostly deflected hits and hit audio for heavier penetrations.
   - Added small camera shake when the player is inside the tank and taking hits.
+
+- Current task: Fix GitHub Pages black screen and make the game playable on phone browsers
+- Status: In progress
+- Reproduced:
+  - Live deployed page at https://lindapot-art.github.io/occupantkiller/ shows start UI, then throws `Error creating WebGL context` from `three.min.js` during `GameManager.init()`.
+  - Existing mobile control shell is present but incomplete: no explicit look zone UI, limited utility actions, and touch movement does not properly drive vehicle/drone input.
+- Plan:
+  - Harden renderer creation in `game-manager.js` with low-power WebGL fallback profiles for Pages/mobile browsers.
+  - Upgrade mobile HUD/controls in `index.html` and `style.css` with a visible look pad and utility buttons sized for phones.
+  - Wire touch helpers in `game-manager.js` so phone controls can operate on-foot, vehicle, and drone play loops.
+  - Re-run proxy QA locally against the repaired build.
 - Verified:
   - `node --check vehicles.js` passed
   - `/healthz` returned 200
   - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
   - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
   - `tools/test-gameplay.js http://localhost:3000`: PASS, 23 screenshots, `Errors: NONE`, final state `playing`, wave 1
+
+- Latest task: Dark gameplay QA incident investigation
+- Status: In progress
+- Root cause under investigation:
+  - Fresh gameplay screenshots show a pitch-dark scene with HUD still visible, which means prior proxy QA passed without validating visual readability.
+- Immediate plan:
+  - Add a luminance/readability gate to `tools/test-gameplay.js` so near-black gameplay screenshots fail QA.
+  - Re-run gameplay QA to confirm the harness now catches the current failure.
+  - Continue tracing the rendering regression separately once the false-pass hole is closed.
 
 - Latest task: Tank damage feedback readability
 - Status: Complete
