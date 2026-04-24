@@ -896,11 +896,13 @@ canvas {
   position: absolute;
   bottom: 20px;
   right: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 8px;
   align-items: center;
+  justify-items: center;
 }
+#mobile-actions #btn-fire { grid-column: span 3; margin-bottom: 4px; }
 
 #mobile-utility {
   position: absolute;
@@ -1030,6 +1032,100 @@ canvas {
   animation: hitArcFade 0.8s ease-out forwards;
 }
 @keyframes hitArcFade { from { opacity: 1; } to { opacity: 0; } }
+
+/* ── Orientation warning rotation animation ───────────────── */
+@keyframes rotateHint {
+  0%   { transform: rotate(0deg); }
+  40%  { transform: rotate(-90deg); }
+  60%  { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* ── Landscape-optimized mobile controls ──────────────────── */
+html.is-mobile body { overflow: hidden; touch-action: none; }
+
+@media (orientation: landscape) {
+  html.is-mobile #joystick-zone {
+    width: 130px; height: 130px;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    left: max(14px, env(safe-area-inset-left));
+  }
+  html.is-mobile #joystick-base { width: 130px; height: 130px; }
+  html.is-mobile #joystick-thumb { width: 54px; height: 54px; left: 38px; top: 38px; }
+  html.is-mobile #mobile-look-zone {
+    right: max(14px, env(safe-area-inset-right));
+    bottom: 150px;
+    width: min(34vh, 200px);
+    height: min(34vh, 200px);
+  }
+  html.is-mobile #mobile-actions {
+    right: max(14px, env(safe-area-inset-right));
+    bottom: max(14px, env(safe-area-inset-bottom));
+    grid-template-columns: repeat(3, auto);
+    gap: 6px;
+  }
+  html.is-mobile .mobile-btn { width: 52px; height: 52px; font-size: 20px; }
+  html.is-mobile .mobile-btn.sm { width: 40px; height: 40px; font-size: 16px; }
+  html.is-mobile .fire-btn { width: 64px; height: 64px; font-size: 24px; }
+  html.is-mobile #mobile-utility {
+    bottom: auto;
+    top: max(50px, env(safe-area-inset-top));
+    right: max(14px, env(safe-area-inset-right));
+    grid-template-columns: repeat(7, 40px);
+    gap: 5px;
+  }
+  html.is-mobile .utility-btn { width: 40px; height: 40px; font-size: 16px; }
+  /* Hide non-essential HUD in mobile landscape to avoid clutter */
+  html.is-mobile #controls-legend,
+  html.is-mobile #controls-legend-toggle,
+  html.is-mobile #kill-feed,
+  html.is-mobile #ai-learning-indicator,
+  html.is-mobile #role-indicator,
+  html.is-mobile #bleed-indicator,
+  html.is-mobile #target-assist,
+  html.is-mobile #daily-challenges,
+  html.is-mobile #bounty-display,
+  html.is-mobile #perk-display,
+  html.is-mobile #killstreak-panel,
+  html.is-mobile #missions-panel,
+  html.is-mobile #npc-morale-display,
+  html.is-mobile #hud-npcs,
+  html.is-mobile #mission-hud,
+  html.is-mobile #objective-tracker { display: none !important; }
+  html.is-mobile #top-bar { font-size: 10px; gap: 10px; top: 20px; }
+  html.is-mobile #extended-top-bar { font-size: 9px; padding: 3px 8px; }
+  html.is-mobile #resource-bar { font-size: 9px; top: 40px; }
+  html.is-mobile #tactical-compass { top: 58px; width: 240px; }
+  html.is-mobile #hud-okc-bar { top: 82px; font-size: 10px; }
+  html.is-mobile #weather-indicator { top: 44px; font-size: 9px; }
+  html.is-mobile #minimap-canvas { width: 110px; height: 110px; bottom: 170px; right: 14px; }
+  html.is-mobile #bottom-bar { padding: 0 14px; bottom: 14px; }
+  html.is-mobile #health-bar-container { width: 140px; }
+  html.is-mobile #ammo-display { font-size: 22px; }
+  html.is-mobile #inventory-btn,
+  html.is-mobile #skill-hud-btn { font-size: 10px; padding: 2px 8px; }
+  html.is-mobile #crosshair { width: 16px; height: 16px; }
+  html.is-mobile #weapon-label { font-size: 11px; bottom: 54px; }
+  html.is-mobile #weapon-name { font-size: 14px; bottom: 36px; right: 220px; }
+  html.is-mobile #stage-info { font-size: 10px; }
+}
+@media (orientation: landscape) and (max-height: 420px) {
+  /* Phone landscape — aggressively shrink */
+  html.is-mobile #joystick-zone { width: 110px; height: 110px; }
+  html.is-mobile #joystick-base { width: 110px; height: 110px; }
+  html.is-mobile #joystick-thumb { width: 46px; height: 46px; left: 32px; top: 32px; }
+  html.is-mobile #mobile-look-zone { width: 110px; height: 110px; bottom: 130px; }
+  html.is-mobile .mobile-btn { width: 46px; height: 46px; font-size: 18px; }
+  html.is-mobile .mobile-btn.sm { width: 36px; height: 36px; font-size: 14px; }
+  html.is-mobile .fire-btn { width: 56px; height: 56px; font-size: 22px; }
+  html.is-mobile #mobile-actions { gap: 5px; }
+}
+
+/* ── Portrait on mobile: hide HUD behind overlay ──────────── */
+@media (orientation: portrait) {
+  html.is-mobile #hud,
+  html.is-mobile #mobile-controls { visibility: hidden; }
+}
 
 /* ── Responsive adjustments ─────────────────────────────── */
 @media (max-width: 768px) {

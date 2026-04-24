@@ -609,8 +609,14 @@ const GameManager = (function () {
   const JUMP_SPEED   = 7.0;
 
   /* ── Mobile Detection ──────────────────────────────────────────── */
-  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
-                   ('ontouchstart' in window && window.innerWidth < 1200);
+  // iPadOS 13+ identifies as Mac; treat touch-capable devices as mobile.
+  const _uaIsMobile = /Android|iPhone|iPad|iPod|Mobile|Tablet|Silk|PlayBook|BB10|Opera Mini/i.test(navigator.userAgent);
+  const _isIpadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  const _isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  const isMobile = _uaIsMobile || _isIpadOS || (_isTouch && Math.min(window.innerWidth, window.innerHeight) < 900);
+  if (isMobile) {
+    try { document.documentElement.classList.add('is-mobile'); } catch (e) {}
+  }
 
   /* ── Input State ─────────────────────────────────────────────────── */
   const keys = {};
@@ -1028,6 +1034,7 @@ const GameManager = (function () {
     if (isMobile) {
       if (!_mobileControlsReady) setupMobileControls();
       updateMobileControlsVisibility();
+      setupOrientationHandling();
       var controlsHint = document.getElementById('controls-hint');
       if (controlsHint) {
         controlsHint.innerHTML = 'LEFT PAD · MOVE &nbsp;|&nbsp; RIGHT PAD · LOOK &nbsp;|&nbsp; 🔫 FIRE &nbsp;|&nbsp; ◎ AIM &nbsp;|&nbsp; ✋ USE &nbsp;|&nbsp; 🚗 VEHICLE &nbsp;|&nbsp; 🎒 INVENTORY';
@@ -5060,6 +5067,39 @@ const GameManager = (function () {
     bindTapButton('btn-view', function () { tapVirtualKey('KeyV'); });
     bindTapButton('btn-night', function () { tapVirtualKey('KeyL'); });
     bindTapButton('btn-inventory-mobile', function () { toggleInventory(); });
+    bindTapButton('btn-crouch', function () { tapVirtualKey('KeyZ', 140); });
+    bindTapButton('btn-melee', function () {
+      // Switch to melee (slot 0), swing, and return to previous weapon
+      if (!Weapons) return;
+      var prev = Weapons.getCurrentIdx();
+      Weapons.switchTo(0);
+      if (Weapons.handleLeftDown) Weapons.handleLeftDown();
+      setTimeout(function () {
+        if (Weapons.handleLeftUp) Weapons.handleLeftUp();
+        if (prev !== 0) Weapons.switchTo(prev);
+      }, 260);
+    });
+    bindTapButton('btn-grenade', function () {
+      // Cycle to grenade weapon if available, fire once
+      if (!Weapons) return;
+      var count = Weapons.getWeaponCount ? Weapons.getWeaponCount() : 0;
+      var prev = Weapons.getCurrentIdx();
+      var grenadeIdx = -1;
+      for (var gi = 0; gi < count; gi++) {
+        var nm = Weapons.getWeaponName ? Weapons.getWeaponName(gi) : '';
+        if (/grenade|molotov/i.test(nm) && Weapons.isUnlocked && Weapons.isUnlocked(gi)) {
+          grenadeIdx = gi;
+          break;
+        }
+      }
+      if (grenadeIdx < 0) return;
+      Weapons.switchTo(grenadeIdx);
+      if (Weapons.handleLeftDown) Weapons.handleLeftDown();
+      setTimeout(function () {
+        if (Weapons.handleLeftUp) Weapons.handleLeftUp();
+        if (prev !== grenadeIdx) Weapons.switchTo(prev);
+      }, 200);
+    });
 
     // Pause / inventory button
     const btnPause = document.getElementById('btn-pause');
@@ -5067,6 +5107,63 @@ const GameManager = (function () {
       e.preventDefault();
       tapVirtualKey('Escape');
     }, { passive: false });
+  }
+
+  /* ── Orientation + Fullscreen (mobile) ──────────────────────────── */
+  function requestFullscreenAndLockLandscape() {
+    try {
+      var el = document.documentElement;
+      var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+      if (req) {
+        var p = req.call(el);
+        if (p && p.then) {
+          p.then(function () {
+            if (screen.orientation && screen.orientation.lock) {
+              screen.orientation.lock('landscape').catch(function () {});
+            }
+          }).catch(function () {});
+        }
+      }
+    } catch (e) {}
+  }
+
+  function isPortraitNow() {
+    // Prefer matchMedia where available; fall back to dims.
+    if (window.matchMedia) {
+      var mm = window.matchMedia('(orientation: portrait)');
+      if (mm && typeof mm.matches === 'boolean') return mm.matches;
+    }
+    return window.innerHeight > window.innerWidth;
+  }
+
+  function updateOrientationOverlay() {
+    var overlay = document.getElementById('orientation-overlay');
+    if (!overlay) return;
+    var portrait = isPortraitNow();
+    overlay.style.display = (isMobile && portrait) ? 'flex' : 'none';
+  }
+
+  function setupOrientationHandling() {
+    updateOrientationOverlay();
+    window.addEventListener('resize', updateOrientationOverlay);
+    window.addEventListener('orientationchange', updateOrientationOverlay);
+    if (screen.orientation && screen.orientation.addEventListener) {
+      screen.orientation.addEventListener('change', updateOrientationOverlay);
+    }
+    var fsBtn = document.getElementById('orientation-fullscreen-btn');
+    if (fsBtn) {
+      fsBtn.addEventListener('click', requestFullscreenAndLockLandscape);
+      fsBtn.addEventListener('touchstart', function (e) {
+        e.preventDefault();
+        requestFullscreenAndLockLandscape();
+      }, { passive: false });
+    }
+    // Request fullscreen on first user tap anywhere on mobile
+    var firstTap = function () {
+      requestFullscreenAndLockLandscape();
+      window.removeEventListener('touchend', firstTap);
+    };
+    window.addEventListener('touchend', firstTap, { once: true, passive: true });
   }
 
   /* ── Inventory / Pause Toggle ───────────────────────────────────── */

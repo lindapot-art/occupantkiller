@@ -758,12 +758,23 @@
       <button id="btn-reload" class="mobile-btn">🔄</button>
       <button id="btn-jump" class="mobile-btn">⬆</button>
       <button id="btn-sprint" class="mobile-btn">🏃</button>
+      <button id="btn-crouch" class="mobile-btn sm" title="Crouch / Prone">⬇</button>
+      <button id="btn-melee" class="mobile-btn sm" title="Melee">🔪</button>
+      <button id="btn-grenade" class="mobile-btn sm" title="Grenade">💣</button>
       <button id="btn-weapon-prev" class="mobile-btn sm">◀</button>
       <button id="btn-weapon-next" class="mobile-btn sm">▶</button>
     </div>
 
     <!-- Inventory/Pause button -->
     <button id="btn-pause" class="mobile-btn pause-btn">⏸</button>
+  </div>
+
+  <!-- Portrait orientation warning (mobile only) -->
+  <div id="orientation-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.96);color:#fff;z-index:99998;align-items:center;justify-content:center;flex-direction:column;font-family:monospace;text-align:center;padding:20px">
+    <div style="font-size:64px;animation:rotateHint 2s ease-in-out infinite">📱↻</div>
+    <div style="font-size:22px;margin-top:20px;font-weight:bold;color:#ffd700">ROTATE YOUR DEVICE</div>
+    <div style="font-size:14px;margin-top:10px;color:#aaa;max-width:300px">This game is designed for landscape mode. Please rotate your device horizontally.</div>
+    <button id="orientation-fullscreen-btn" style="margin-top:20px;padding:10px 20px;background:#ffd700;border:none;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer">Enter Fullscreen</button>
   </div>
 </div>
 
