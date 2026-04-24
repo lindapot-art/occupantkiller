@@ -394,7 +394,9 @@ const HUD = (() => {
       if (dist > 80) continue; // range limit
       // Direction arrow: angle relative to player facing
       var angle = Math.atan2(dx, -dz) - pyaw;
-      sorted.push({ dist: dist, angle: angle, type: e.type || 'INF', health: e.health, maxHp: e.maxHealth || 100 });
+      var mh = (typeof e.maxHealth === 'number' && e.maxHealth > 0) ? e.maxHealth : 100;
+      var hh = (typeof e.health === 'number' && isFinite(e.health)) ? e.health : mh;
+      sorted.push({ dist: dist, angle: angle, type: e.type || 'INF', health: hh, maxHp: mh });
     }
     sorted.sort(function(a, b) { return a.dist - b.dist; });
     if (sorted.length > 5) sorted.length = 5;
@@ -417,7 +419,7 @@ const HUD = (() => {
 
       var cls = si === 0 ? 'ta-row ta-priority' : 'ta-row';
       var distStr = s.dist < 10 ? s.dist.toFixed(1) : Math.round(s.dist);
-      var hpPct = Math.round((s.health / s.maxHp) * 100);
+      var hpPct = s.maxHp > 0 ? Math.max(0, Math.min(100, Math.round((s.health / s.maxHp) * 100))) : 0;
       html += '<div class="' + cls + '">'
         + '<span class="ta-dir">' + arrow + '</span>'
         + '<span class="ta-type">' + (s.type.substring(0, 6)) + ' ' + hpPct + '%</span>'

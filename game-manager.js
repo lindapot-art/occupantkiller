@@ -803,7 +803,42 @@ const GameManager = (function () {
   /* ── Init ────────────────────────────────────────────────────────── */
   function init() {
     try {
-      _renderer = createRendererWithFallback();
+        _renderer = createRendererWithFallback();
+        // Create scene — dynamic background/fog per stage
+        _scene = new THREE.Scene();
+        let stageCfg = (typeof getCurrentStageConfig === 'function') ? getCurrentStageConfig() : null;
+        let bgColor = stageCfg && stageCfg.bgColor !== undefined ? stageCfg.bgColor : 0xFFD700;
+        let fogColor = stageCfg && stageCfg.fogColor !== undefined ? stageCfg.fogColor : 0xFFD700;
+        _scene.background = new THREE.Color(bgColor);
+        _scene.fog = new THREE.Fog(fogColor, 14, 80);
+
+        // If running in compatibility mode, show a warning overlay
+        if (_rendererProfile === 'compatibility') {
+          let compatOverlay = document.getElementById('compat-overlay');
+          if (!compatOverlay) {
+            compatOverlay = document.createElement('div');
+            compatOverlay.id = 'compat-overlay';
+            compatOverlay.style.position = 'fixed';
+            compatOverlay.style.top = '0';
+            compatOverlay.style.left = '0';
+            compatOverlay.style.width = '100vw';
+            compatOverlay.style.height = '32px';
+            compatOverlay.style.background = 'rgba(0,0,0,0.7)';
+            compatOverlay.style.color = '#FFD700';
+            compatOverlay.style.font = 'bold 16px sans-serif';
+            compatOverlay.style.zIndex = '9999';
+            compatOverlay.style.display = 'flex';
+            compatOverlay.style.alignItems = 'center';
+            compatOverlay.style.justifyContent = 'center';
+            compatOverlay.innerText = 'Compatibility Mode: Reduced graphics for maximum device support';
+            document.body.appendChild(compatOverlay);
+          } else {
+            compatOverlay.style.display = 'flex';
+          }
+        } else {
+          let compatOverlay = document.getElementById('compat-overlay');
+          if (compatOverlay) compatOverlay.style.display = 'none';
+        }
     } catch (err) {
       console.error('[INIT] Renderer creation failed:', err);
       showStartupError('This browser could not start WebGL rendering. Try refreshing, closing background tabs, or using a newer browser/GPU profile.');
@@ -1364,6 +1399,17 @@ const GameManager = (function () {
 
         // ── B30: Quick Weapon Swap (double-tap Q) ──
         if (e.code === 'KeyQ' && keys['AltLeft'] && typeof CombatExtras !== 'undefined' && CombatExtras.quickSwap) {
+                  // Try to re-initialize lighting and fog after context restore
+                  setTimeout(() => {
+                    if (_scene) {
+                      let stageCfg = (typeof getCurrentStageConfig === 'function') ? getCurrentStageConfig() : null;
+                      let bgColor = stageCfg && stageCfg.bgColor !== undefined ? stageCfg.bgColor : 0xFFD700;
+                      let fogColor = stageCfg && stageCfg.fogColor !== undefined ? stageCfg.fogColor : 0xFFD700;
+                      _scene.background = new THREE.Color(bgColor);
+                      _scene.fog = new THREE.Fog(fogColor, 14, 80);
+                    }
+                    // Optionally re-init lighting here if needed
+                  }, 100);
           CombatExtras.quickSwap();
         }
 

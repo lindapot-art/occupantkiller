@@ -136,14 +136,16 @@ canvas {
 
 #top-bar {
   position: absolute;
-  top: 16px;
+  top: 24px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 40px;
-  font-size: 18px;
+  gap: 18px;
+  font-size: 12px;
   font-weight: bold;
   text-shadow: 0 0 8px #f00;
+  white-space: nowrap;
+  z-index: 11;
 }
 
 #score-display { color: #ff4444; }
@@ -691,7 +693,7 @@ canvas {
   width: 100%;
   display: flex;
   justify-content: space-between;
-  padding: 4px 16px;
+  padding: 4px 120px 4px 16px;
   font-size: 11px;
   letter-spacing: 1px;
   color: #aaa;
@@ -704,15 +706,17 @@ canvas {
 
 #resource-bar {
   position: absolute;
-  top: 44px;
-  left: 0;
-  width: 100%;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
   text-align: center;
   font-size: 11px;
   letter-spacing: 1px;
   color: #ccc;
-  padding: 2px 0;
+  padding: 2px 12px;
   background: rgba(0,0,0,0.3);
+  border-radius: 4px;
 }
 
 #info-panel-left {
@@ -761,15 +765,22 @@ canvas {
   text-align: center;
 }
 
-/* ── Controls legend (top-right) ──────────────────────────── */
+/* ── Controls legend (top-right, toggleable with ?) ───────── */
 #controls-legend {
   position: absolute;
-  top: 64px;
+  top: 58px;
   right: 12px;
-  font-size: 9px;
-  color: rgba(255,255,255,0.35);
+  font-size: 10px;
+  color: rgba(255,255,255,0.7);
   line-height: 1.5;
   text-align: right;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  padding: 6px 10px;
+  max-height: 70vh;
+  overflow-y: auto;
+  z-index: 210;
 }
 
 /* ── Inventory Grid ──────────────────────────────────────── */
@@ -1301,7 +1312,7 @@ canvas {
 /* ── Targeting Assistant (on-weapon digital readout) ──────────── */
 #target-assist {
   position: fixed;
-  bottom: 180px; right: 20px;
+  bottom: 120px; left: 16px;
   width: 180px;
   padding: 6px 8px;
   background: rgba(0, 20, 0, 0.75);

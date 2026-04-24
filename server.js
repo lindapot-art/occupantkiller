@@ -80,18 +80,28 @@ server = http.createServer((req, res) => {
     return res.end('Forbidden');
   }
 
-  // Block sensitive files from being served
+  // Block only truly sensitive files from being served (allow .js, .css, etc. in root)
   const rel = safePath.replace(/\\/g, '/').replace(/^\//, '');
-  if (/^\.git(\/|$)/.test(rel) || /^\.github(\/|$)/.test(rel) ||
-      /^memories(\/|$)/.test(rel) || /^tools(\/|$)/.test(rel) ||
-      /^node_modules(\/|$)/.test(rel) ||
-      rel === 'server.js' || rel === 'package.json' || rel === 'package-lock.json' ||
-      rel === 'wrangler.toml' || rel === 'render.yaml' || rel === '.env' ||
-      rel === 'start.bat') {
+  if (
+    rel === 'server.js' ||
+    rel === '.env' ||
+    rel === 'wrangler.toml' ||
+    rel === 'render.yaml' ||
+    rel === 'start.bat' ||
+    /^\.git(\/|$)/.test(rel) ||
+    /^\.github(\/|$)/.test(rel) ||
+    /^node_modules(\/|$)/.test(rel) ||
+    /^memories(\/|$)/.test(rel) ||
+    /^tools(\/|$)/.test(rel)
+  ) {
     res.writeHead(403, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });
     return res.end('Forbidden');
   }
 
+  console.log(`[SERVER] Requested URL: ${url} | SafePath: ${safePath} | FilePath: ${filePath}`);
+  if (!fs.existsSync(filePath)) {
+    console.error(`[SERVER][404][DIAG] File does not exist: ${filePath}`);
+  }
   fs.readFile(filePath, (err, data) => {
     const ext = path.extname(filePath).toLowerCase();
     if (err) {

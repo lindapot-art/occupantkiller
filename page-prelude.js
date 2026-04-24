@@ -14,6 +14,27 @@
   checkConn();
 })();
 
+// Controls legend toggle (? button + keyboard '?')
+(function () {
+  function bind() {
+    var btn = document.getElementById('controls-legend-toggle');
+    var legend = document.getElementById('controls-legend');
+    if (!btn || !legend) return;
+    function toggle() {
+      legend.style.display = (legend.style.display === 'none' || !legend.style.display) ? 'block' : 'none';
+    }
+    btn.addEventListener('click', toggle);
+    window.addEventListener('keydown', function (e) {
+      if (e.key === '?' || (e.key === '/' && e.shiftKey)) toggle();
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bind);
+  } else {
+    bind();
+  }
+})();
+
 window.showAudioWarning = function (msg) {
   var overlayEl = document.getElementById('error-overlay');
   if (!overlayEl) return;
