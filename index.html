@@ -781,11 +781,15 @@
 <!-- Three.js r137 (local copy, patched for CVE XSS < 0.137.0) -->
 <script src="three.min.js"></script>
 
+<!-- ethers v6 (CDN — used by blockchain.js for contract calls) -->
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+
 <!-- Core modules (order matters: dependencies first) -->
 <script src="voxel-world.js"></script>
 <script src="camera-system.js"></script>
 <script src="time-system.js"></script>
 <script src="economy.js"></script>
+<script src="api-client.js"></script>
 <script src="blockchain.js"></script>
 <script src="marketplace.js"></script>
 <script src="skills.js"></script>

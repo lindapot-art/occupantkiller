@@ -1,0 +1,17 @@
+{
+  "name": "occupantkiller-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Solidity contracts + compile/deploy scripts for OccupantKiller P2E",
+  "scripts": {
+    "compile": "node scripts/deploy/compile.js",
+    "deploy:amoy": "node scripts/deploy/deploy-all.js amoy",
+    "deploy:polygon": "node scripts/deploy/deploy-all.js polygon",
+    "verify:amoy": "node scripts/deploy/verify.js amoy"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.4",
+    "solc": "0.8.20"
+  }
+}

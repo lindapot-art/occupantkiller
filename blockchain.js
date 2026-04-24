@@ -225,6 +225,136 @@ const Blockchain = (function () {
   function getUkraineWallet(){ return UKRAINE_WALLET; }
   function getDonationPct()  { return DONATION_PERCENT; }
 
+  /* ══════════════════════════════════════════════════════════════════
+     CONTRACT INTERACTIONS (OKC + Veteran NFT + Weapons + Market)
+     Requires ethers v6 loaded (window.ethers) + ApiClient for addresses.
+     ══════════════════════════════════════════════════════════════════ */
+  const OKC_ABI = [
+    'function balanceOf(address) view returns (uint256)',
+    'function claim(uint256 amount, bytes32 nonce, uint8 v, bytes32 r, bytes32 s)',
+    'function nonceUsed(bytes32) view returns (bool)',
+    'function totalClaimed() view returns (uint256)',
+    'event Claimed(address indexed player, uint256 amount, bytes32 nonce)',
+  ];
+  const VETERAN_ABI = [
+    'function mintTier(uint8 tierId, uint256 kills, bytes32 nonce, uint8 v, bytes32 r, bytes32 s)',
+    'function getMultiplierBps(address) view returns (uint16)',
+    'function balanceOf(address) view returns (uint256)',
+    'function tierBitmask(address) view returns (uint8)',
+    'function tokensOf(address) view returns (uint256[])',
+    'event VeteranMinted(address indexed player, uint8 tier, uint256 tokenId, uint256 kills)',
+  ];
+  const WEAPONS_ABI = [
+    'function balanceOf(address account, uint256 id) view returns (uint256)',
+    'function claimMint(uint256 id, uint256 amount, bytes32 nonce, uint8 v, bytes32 r, bytes32 s)',
+    'function setApprovalForAll(address operator, bool approved)',
+    'function isApprovedForAll(address account, address operator) view returns (bool)',
+    'event ClaimMinted(address indexed player, uint256 indexed id, uint256 amount, bytes32 nonce)',
+  ];
+
+  let _deployments = null;
+  let _ethersProvider = null;
+  let _ethersSigner   = null;
+
+  async function _ensureEthers() {
+    if (typeof window === 'undefined' || !window.ethers) throw new Error('ethers not loaded');
+    if (!window.ethereum || !_connected) throw new Error('wallet not connected');
+    if (!_ethersProvider) _ethersProvider = new window.ethers.BrowserProvider(window.ethereum);
+    _ethersSigner = await _ethersProvider.getSigner();
+    return _ethersSigner;
+  }
+
+  async function loadDeployments() {
+    if (_deployments) return _deployments;
+    if (typeof window === 'undefined' || !window.ApiClient) return null;
+    try { _deployments = await window.ApiClient.deployments(); } catch (_) { _deployments = null; }
+    return _deployments;
+  }
+
+  function _contract(name) {
+    if (!_deployments || !_deployments.deployed) throw new Error('contracts not deployed');
+    const addr = _deployments.contracts && _deployments.contracts[name];
+    if (!addr) throw new Error('contract address missing: ' + name);
+    const abi = name === 'OKC_Token' ? OKC_ABI
+              : name === 'OccupantVeteranNFT' ? VETERAN_ABI
+              : name === 'OccupantWeaponsNFT' ? WEAPONS_ABI
+              : null;
+    if (!abi) throw new Error('no ABI for ' + name);
+    return new window.ethers.Contract(addr, abi, _ethersSigner || _ethersProvider);
+  }
+
+  async function getOkcBalance() {
+    await _ensureEthers(); await loadDeployments();
+    const okc = _contract('OKC_Token');
+    const bn = await okc.balanceOf(_account);
+    return window.ethers.formatUnits(bn, 18);
+  }
+
+  async function claimOkcOnChain(claimProof) {
+    // claimProof = { amountWei, nonce, v, r, s } from ApiClient.claimOkc()
+    await _ensureEthers(); await loadDeployments();
+    const okc = _contract('OKC_Token');
+    const tx  = await okc.claim(claimProof.amountWei, claimProof.nonce, claimProof.v, claimProof.r, claimProof.s);
+    emit('tx:sent', { kind: 'okc-claim', hash: tx.hash });
+    const rcpt = await tx.wait();
+    emit('tx:confirmed', { kind: 'okc-claim', hash: tx.hash, blockNumber: rcpt.blockNumber });
+    return rcpt;
+  }
+
+  async function getMultiplierBps() {
+    await _ensureEthers(); await loadDeployments();
+    const vet = _contract('OccupantVeteranNFT');
+    return Number(await vet.getMultiplierBps(_account));
+  }
+
+  async function getOwnedVeteranMask() {
+    await _ensureEthers(); await loadDeployments();
+    const vet = _contract('OccupantVeteranNFT');
+    return Number(await vet.tierBitmask(_account));
+  }
+
+  async function mintVeteranOnChain(mintProof) {
+    // mintProof = { tierId, kills, nonce, v, r, s } from ApiClient.mintVeteran()
+    await _ensureEthers(); await loadDeployments();
+    const vet = _contract('OccupantVeteranNFT');
+    const tx  = await vet.mintTier(mintProof.tierId, mintProof.kills, mintProof.nonce, mintProof.v, mintProof.r, mintProof.s);
+    emit('tx:sent', { kind: 'veteran-mint', tier: mintProof.tierId, hash: tx.hash });
+    const rcpt = await tx.wait();
+    emit('tx:confirmed', { kind: 'veteran-mint', hash: tx.hash, blockNumber: rcpt.blockNumber });
+    return rcpt;
+  }
+
+  async function claimWeaponOnChain(mintProof) {
+    // mintProof = { tokenId, amount, nonce, v, r, s } from ApiClient.buyCosmetic()
+    await _ensureEthers(); await loadDeployments();
+    const wep = _contract('OccupantWeaponsNFT');
+    const tx  = await wep.claimMint(mintProof.tokenId, mintProof.amount, mintProof.nonce, mintProof.v, mintProof.r, mintProof.s);
+    emit('tx:sent', { kind: 'weapon-mint', hash: tx.hash });
+    const rcpt = await tx.wait();
+    emit('tx:confirmed', { kind: 'weapon-mint', hash: tx.hash, blockNumber: rcpt.blockNumber });
+    return rcpt;
+  }
+
+  async function getWeaponBalance(tokenId) {
+    await _ensureEthers(); await loadDeployments();
+    const wep = _contract('OccupantWeaponsNFT');
+    return Number(await wep.balanceOf(_account, tokenId));
+  }
+
+  // Produce an EIP-191 personal_sign over the link-wallet challenge, used by
+  // ApiClient.linkWallet(address, sig, ts) to prove wallet ownership.
+  async function signLinkWalletChallenge() {
+    if (!_connected || !_account) throw new Error('wallet not connected');
+    const anonId = (window.ApiClient && window.ApiClient.getAnonId && window.ApiClient.getAnonId()) || 'unknown';
+    const ts     = Date.now();
+    const msg    = `OccupantKiller link-wallet: anonId=${anonId} ts=${ts}`;
+    const hex    = '0x' + Array.from(new TextEncoder().encode(msg)).map(b => b.toString(16).padStart(2,'0')).join('');
+    const sig    = await window.ethereum.request({ method: 'personal_sign', params: [hex, _account] });
+    return { address: _account, signature: sig, timestamp: ts, message: msg };
+  }
+
+
+
   /* ── Events ────────────────────────────────────────────────────── */
   function onEvent(callback) { _listeners.push(callback); }
   function offEvent(callback) {
@@ -253,5 +383,15 @@ const Blockchain = (function () {
     shortAddr,
     ethToWei,
     weiToEth,
+    // Contract interactions (require ethers v6 + deployed contracts)
+    loadDeployments,
+    getOkcBalance,
+    claimOkcOnChain,
+    getMultiplierBps,
+    getOwnedVeteranMask,
+    mintVeteranOnChain,
+    claimWeaponOnChain,
+    getWeaponBalance,
+    signLinkWalletChallenge,
   };
 })();

@@ -1,1 +1,19 @@
 node_modules/
+
+# Backend
+backend/game.db
+backend/game.db-*
+backend/test.db
+backend/.env
+backend/out.log
+backend/err.log
+
+# Contracts
+contracts/build/
+contracts/deployments/*.local.json
+contracts/.env
+contracts/node_modules/
+
+# Server logs
+srv.log
+srverr.log
