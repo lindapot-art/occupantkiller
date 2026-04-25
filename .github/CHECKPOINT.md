@@ -4,11 +4,12 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-25 — Session 37: Drone remote control hardening batch
+- **Timestamp**: 2026-04-25 — Session 37: Drone remote shipped, blocker revalidated
 - **Agent**: KING
-- **Status**: COMPLETE — Drone remote flow shipped and QA passed
+- **Status**: COMPLETE — Local implementation + proxy QA complete; external Render verification still blocked
 
 ## Current Task
+- DONE: Revalidated Render blocker state (`https://occupantkiller.onrender.com`) — endpoint still times out on 2026-04-25 recheck
 - DONE: Drone remote usability hardening in `game-manager.js` (launch/link helper chain, reliable release flow, dedicated drone view toggle helper, KeyV guard while controlling drone/vehicle)
 - DONE: Mobile remote controls upgraded (`btn-use` exits drone remote when possessing; `btn-view` toggles drone eye/chase while possessing)
 - DONE: Drone HUD telemetry expanded in `index.html` + `game-manager.js` (signal quality and remote status fields)

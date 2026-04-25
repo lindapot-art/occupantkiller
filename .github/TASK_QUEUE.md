@@ -235,7 +235,7 @@ Details: Added zlib gzip compression (80% reduction), in-memory cache, Cache-Con
 ### [LOW] Render.com Live Deployment Verification
 Status: BLOCKED
 Requested: 2026-04-06
-Details: https://occupantkiller.onrender.com times out (free tier suspended). Code is correct (verified locally). Will recheck periodically.
+Details: https://occupantkiller.onrender.com still times out on recheck (2026-04-25, Invoke-WebRequest timeout after 20s). Code is correct (verified locally). Will recheck periodically.
 
 ### [LOW] Code Cleanup & Dead Code Sweep
 Status: DONE

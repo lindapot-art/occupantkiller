@@ -1,5 +1,15 @@
 # Session Progress
 
+- Task: Close remaining active items after drone remote shipment
+- Status: Complete (local) / Blocked (external deploy reachability)
+- Recheck performed:
+  - Render URL `https://occupantkiller.onrender.com` still timed out (20s timeout on 2026-04-25)
+  - No remaining local implementation tasks are pending in task queue
+- Current state:
+  - Drone remote implementation is shipped and pushed
+  - Proxy QA suites are green locally
+  - Only external Render availability remains blocked
+
 - Task: Full drone remote control functionality (launch, possess, remote HUD, eye/chase toggle, return to player)
 - Status: Complete
 - Files changed in this batch:
