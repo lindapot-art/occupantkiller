@@ -4,11 +4,16 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-18 — Session 36: Massive weapon overhaul + new features batch
+- **Timestamp**: 2026-04-25 — Session 37: Drone remote control hardening batch
 - **Agent**: KING
-- **Status**: COMPLETE — All features implemented and QA passed
+- **Status**: COMPLETE — Drone remote flow shipped and QA passed
 
 ## Current Task
+- DONE: Drone remote usability hardening in `game-manager.js` (launch/link helper chain, reliable release flow, dedicated drone view toggle helper, KeyV guard while controlling drone/vehicle)
+- DONE: Mobile remote controls upgraded (`btn-use` exits drone remote when possessing; `btn-view` toggles drone eye/chase while possessing)
+- DONE: Drone HUD telemetry expanded in `index.html` + `game-manager.js` (signal quality and remote status fields)
+- DONE: Cache-bust updated in `index.html` to force latest `game-manager.js` client load
+- QA: `/healthz` 200, `/api/health` 200, live puppeteer drone-flow probe PASS (`launch/link -> T toggle -> F release`), `test-master` 38/0/0, `test-qa-v2` 21/0
 - DONE: Voxelization system (voxelizeGroup in weapon-details.js — Lego-like cube rendering for all firearms)
 - DONE: 5 weapon mesh builders rebuilt with extreme detail (Makarov, AK-74M, Glock, SVD, M4 — 30-40+ sub-parts each)
 - DONE: Pistol slide animation system (auto-detects _slide group, cycles on fire)

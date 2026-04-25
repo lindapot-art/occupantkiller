@@ -1129,8 +1129,10 @@ const GameManager = (function () {
         }
         // KeyP reserved for perks menu in PLAYING state (see below)
 
-        // Camera mode toggle
-        if (e.code === 'KeyV') CameraSystem.cycleMode();
+        // Camera mode toggle (disabled while driving a drone/vehicle)
+        if (e.code === 'KeyV' && !DroneSystem.isPossessing() && !VehicleSystem.isInVehicle()) {
+          CameraSystem.cycleMode();
+        }
 
         // Build mode
         if (e.code === 'KeyB') {
@@ -1150,9 +1152,7 @@ const GameManager = (function () {
         if (e.code === 'KeyF') {
           var fHandled = false;
           // Priority 1: release drone if possessing
-          if (DroneSystem.isPossessing()) {
-            DroneSystem.release();
-            hideDroneControlsHUD();
+          if (releaseDroneRemote()) {
             fHandled = true;
           }
           // Priority 2: mission zone interaction
@@ -1178,12 +1178,10 @@ const GameManager = (function () {
             }
             } // end mt && mt.config
           }
-          // Priority 3: possess nearest drone
+          // Priority 3: possess nearest drone or launch one
           if (!fHandled) {
-            const drones = DroneSystem.getAll();
-            if (drones.length > 0) {
-              DroneSystem.possess(drones[0].id);
-              showDroneControlsHUD(drones[0].type);
+            var linkedDrone = connectOrLaunchDrone('recon');
+            if (linkedDrone) {
               fHandled = true;
             }
           }
@@ -1204,6 +1202,11 @@ const GameManager = (function () {
               }
             }
           }
+        }
+
+        // Toggle drone camera view (eye/chase)
+        if (e.code === 'KeyT' && DroneSystem.isPossessing()) {
+          toggleDroneRemoteView();
         }
 
         // Vehicle enter/exit/hijack
@@ -1989,6 +1992,43 @@ const GameManager = (function () {
     }
   }
 
+  function getNearestFriendlyDrone(maxDist) {
+    if (typeof DroneSystem === 'undefined' || !DroneSystem.getAll) return null;
+    var drones = DroneSystem.getAll();
+    if (!drones || drones.length === 0) return null;
+
+    var range = (typeof maxDist === 'number' ? maxDist : 120);
+    var maxDistSq = range * range;
+    var best = null;
+    var bestDistSq = Infinity;
+    for (var i = 0; i < drones.length; i++) {
+      var d = drones[i];
+      if (!d || !d.alive || !d.active || d.faction !== 'player') continue;
+      var dx = d.position.x - player.position.x;
+      var dz = d.position.z - player.position.z;
+      var dsq = dx * dx + dz * dz;
+      if (dsq <= maxDistSq && dsq < bestDistSq) {
+        best = d;
+        bestDistSq = dsq;
+      }
+    }
+    return best;
+  }
+
+  function launchAndPossessDrone(droneType) {
+    if (typeof DroneSystem === 'undefined' || !DroneSystem.spawn || !DroneSystem.possess) return null;
+    var spawnH = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
+      ? VoxelWorld.getTerrainHeight(player.position.x, player.position.z)
+      : 0;
+    var type = droneType || 'recon';
+    var drone = DroneSystem.spawn(player.position.x, spawnH + 15, player.position.z + 5, type);
+    if (!drone) return null;
+    var ok = DroneSystem.possess(drone.id);
+    if (!ok) return null;
+    showDroneControlsHUD(drone.type || type);
+    return drone;
+  }
+
   function selectAndLaunchDrone(droneType) {
     var overlay = document.getElementById('overlay-drone-select');
     if (overlay) overlay.style.display = 'none';
@@ -1996,17 +2036,12 @@ const GameManager = (function () {
     gameState = STATE.PLAYING;
     requestPointerLock();
 
-    // Spawn player drone at elevated position near player
-    var spawnH = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(player.position.x, player.position.z) : 0;
-    var drone = DroneSystem.spawn(player.position.x, spawnH + 15, player.position.z + 5, droneType);
-    DroneSystem.possess(drone.id);
-
-    // Show controls HUD
-    showDroneControlsHUD(droneType);
+    var drone = launchAndPossessDrone(droneType);
+    if (!drone) return;
 
     if (typeof HUD !== 'undefined' && HUD.notifyPickup) {
       var names = { fpv_attack: 'FPV ATTACK', surveillance: 'SURVEILLANCE', bomb: 'BOMBER' };
-      HUD.notifyPickup('\uD83D\uDEE9 ' + (names[droneType] || 'DRONE') + ' LAUNCHED! Press F to exit.', '#00ccff');
+      HUD.notifyPickup('\uD83D\uDEE9 ' + (names[droneType] || 'DRONE') + ' LAUNCHED! [T] VIEW [F] EXIT', '#00ccff');
     }
 
     // Start wave after a short delay
@@ -2028,9 +2063,11 @@ const GameManager = (function () {
     var actionText = document.getElementById('drone-action-text');
     var actionHint = document.getElementById('drone-action-hint');
     var payloadDisp = document.getElementById('drone-payload-display');
+    var modeEl = document.getElementById('drone-view-mode');
 
     var names = { fpv_attack: 'FPV ATTACK', surveillance: 'SURVEILLANCE', bomb: 'BOMBER', recon: 'RECON' };
     if (typeLabel) typeLabel.textContent = '\u2014 ' + (names[droneType] || droneType.toUpperCase());
+    if (modeEl) modeEl.textContent = 'EYE';
 
     if (droneType === 'fpv_attack') {
       if (actionText) actionText.textContent = 'Kamikaze Dive';
@@ -2052,6 +2089,43 @@ const GameManager = (function () {
     _droneControlsVisible = false;
   }
 
+  function toggleDroneRemoteView() {
+    if (!DroneSystem.isPossessing() || typeof CameraSystem === 'undefined' || !CameraSystem.toggleDroneViewMode) return null;
+    var droneViewMode = CameraSystem.toggleDroneViewMode();
+    if (typeof HUD !== 'undefined' && HUD.notifyPickup) {
+      HUD.notifyPickup(droneViewMode === 'chase' ? 'DRONE CHASE VIEW' : 'DRONE EYE VIEW', '#00ccff');
+    }
+    return droneViewMode;
+  }
+
+  function releaseDroneRemote() {
+    if (!DroneSystem.isPossessing()) return false;
+    DroneSystem.release();
+    hideDroneControlsHUD();
+    if (typeof HUD !== 'undefined' && HUD.notifyPickup) {
+      HUD.notifyPickup('DRONE REMOTE DISCONNECTED', '#88ccff');
+    }
+    return true;
+  }
+
+  function connectOrLaunchDrone(preferredType) {
+    var nearestDrone = getNearestFriendlyDrone(100);
+    if (nearestDrone) {
+      DroneSystem.possess(nearestDrone.id);
+      showDroneControlsHUD(nearestDrone.type);
+      if (typeof HUD !== 'undefined' && HUD.notifyPickup) {
+        HUD.notifyPickup('REMOTE LINKED: ' + (nearestDrone.type || 'DRONE').toUpperCase() + ' [T] VIEW [F] EXIT', '#00ccff');
+      }
+      return nearestDrone;
+    }
+
+    var launchedDrone = launchAndPossessDrone(preferredType || 'recon');
+    if (launchedDrone && typeof HUD !== 'undefined' && HUD.notifyPickup) {
+      HUD.notifyPickup('RECON DRONE LAUNCHED [T] VIEW [F] EXIT', '#00ccff');
+    }
+    return launchedDrone;
+  }
+
   function updateDroneControlsHUD() {
     if (!_droneControlsVisible) return;
     if (!DroneSystem.isPossessing()) {
@@ -2068,9 +2142,66 @@ const GameManager = (function () {
     var hpEl = document.getElementById('drone-hp-display');
     var payloadEl = document.getElementById('drone-payload-display');
     var nestHint = document.getElementById('drone-nest-hint');
+    var viewEl = document.getElementById('drone-view-mode');
+    var altEl = document.getElementById('drone-altitude-display');
+    var speedEl = document.getElementById('drone-speed-display');
+    var distEl = document.getElementById('drone-distance-display');
+    var linkEl = document.getElementById('drone-link-quality');
+    var statusEl = document.getElementById('drone-remote-status');
 
     if (battEl) battEl.textContent = batteryPct;
     if (hpEl) hpEl.textContent = hpPct;
+    if (viewEl && typeof CameraSystem !== 'undefined' && CameraSystem.getDroneViewMode) {
+      viewEl.textContent = (CameraSystem.getDroneViewMode() || 'eye').toUpperCase();
+    }
+    if (altEl) {
+      var groundH = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
+        ? VoxelWorld.getTerrainHeight(drone.position.x, drone.position.z)
+        : 0;
+      altEl.textContent = Math.max(0, Math.round(drone.position.y - groundH));
+    }
+    if (speedEl && drone.velocity) {
+      speedEl.textContent = Math.round(Math.sqrt(
+        drone.velocity.x * drone.velocity.x +
+        drone.velocity.y * drone.velocity.y +
+        drone.velocity.z * drone.velocity.z
+      ));
+    }
+    if (distEl) {
+      var pdx = drone.position.x - player.position.x;
+      var pdy = drone.position.y - player.position.y;
+      var pdz = drone.position.z - player.position.z;
+      var linkDist = Math.round(Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz));
+      distEl.textContent = linkDist;
+
+      var linkRange = Math.max(30, drone.range || 80);
+      var qualityPct = Math.max(0, Math.round(100 - (linkDist / linkRange) * 100));
+      if (linkEl) {
+        if (qualityPct >= 70) {
+          linkEl.textContent = 'GOOD';
+          linkEl.style.color = '#66ddff';
+        } else if (qualityPct >= 35) {
+          linkEl.textContent = 'FAIR';
+          linkEl.style.color = '#ffd166';
+        } else {
+          linkEl.textContent = 'WEAK';
+          linkEl.style.color = '#ff8866';
+        }
+      }
+
+      if (statusEl) {
+        if (batteryPct <= 15) {
+          statusEl.textContent = 'LOW BATTERY';
+          statusEl.style.color = '#ff6666';
+        } else if (qualityPct < 35) {
+          statusEl.textContent = 'LINK WEAK';
+          statusEl.style.color = '#ffbb66';
+        } else {
+          statusEl.textContent = 'REMOTE STABLE';
+          statusEl.style.color = '#66ddff';
+        }
+      }
+    }
     if (payloadEl) {
       if (drone.type === 'bomb') {
         payloadEl.style.display = '';
@@ -5178,10 +5309,24 @@ const GameManager = (function () {
       btn.addEventListener('touchcancel', function () { btn.classList.remove('active'); });
     }
 
-    bindTapButton('btn-use', function () { tapVirtualKey('KeyF'); });
+    bindTapButton('btn-use', function () {
+      if (DroneSystem.isPossessing()) {
+        releaseDroneRemote();
+      } else {
+        tapVirtualKey('KeyF');
+      }
+    });
     bindTapButton('btn-vehicle', function () { tapVirtualKey('KeyG'); });
     bindTapButton('btn-build', function () { tapVirtualKey('KeyB'); });
-    bindTapButton('btn-view', function () { tapVirtualKey('KeyV'); });
+    bindTapButton('btn-view', function () {
+      if (DroneSystem.isPossessing()) {
+        toggleDroneRemoteView();
+      } else if (VehicleSystem.isInVehicle()) {
+        tapVirtualKey('KeyT');
+      } else {
+        tapVirtualKey('KeyV');
+      }
+    });
     bindTapButton('btn-night', function () { tapVirtualKey('KeyL'); });
     bindTapButton('btn-inventory-mobile', function () { toggleInventory(); });
     bindTapButton('btn-crouch', function () { tapVirtualKey('KeyZ', 140); });

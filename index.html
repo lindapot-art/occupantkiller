@@ -514,11 +514,18 @@
       <span><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">SHIFT</kbd> Down</span>
       <span><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">MOUSE</kbd> Look</span>
       <span id="drone-action-hint" style="color:#ff4444"><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">LMB</kbd> <span id="drone-action-text">Attack</span></span>
+      <span><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">T</kbd> View</span>
       <span><kbd style="background:#333;padding:1px 5px;border-radius:3px;border:1px solid #555">F</kbd> Exit Drone</span>
     </div>
-    <div style="margin-top:5px;font-size:11px;display:flex;gap:12px;justify-content:center">
+    <div style="margin-top:5px;font-size:11px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
       <span style="color:#00ccff">\uD83D\uDD0B <span id="drone-battery-display">100</span>%</span>
       <span style="color:#ff4444">\u2764 <span id="drone-hp-display">100</span>%</span>
+      <span style="color:#66ccff">VIEW <span id="drone-view-mode">EYE</span></span>
+      <span style="color:#99ddff">ALT <span id="drone-altitude-display">0</span>m</span>
+      <span style="color:#99ddff">SPD <span id="drone-speed-display">0</span></span>
+      <span style="color:#99ddff">LINK <span id="drone-distance-display">0</span>m</span>
+      <span style="color:#99ddff">SIG <span id="drone-link-quality">GOOD</span></span>
+      <span style="color:#66ddff"><span id="drone-remote-status">REMOTE STABLE</span></span>
       <span id="drone-payload-display" style="color:#ffaa00;display:none">\uD83D\uDCA3 PAYLOAD READY</span>
       <span id="drone-nest-hint" style="color:#ff8888;display:none">\u25B6 Nest nearby! Dive to destroy!</span>
     </div>
@@ -821,7 +828,7 @@
 <script src="progression.js"></script>
 
 
-<script src="game-manager.js?v=20260425-major-audit-fix"></script>
+<script src="game-manager.js?v=20260425-drone-remote"></script>
 
 
 <!-- Defensive global export for VoxelWorld and AudioSystem -->

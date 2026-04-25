@@ -16,6 +16,12 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [HIGH] Full Drone Remote Control + Eye/Chase Switching
+Status: DONE
+Requested: 2026-04-25
+Completed: 2026-04-25
+Details: Hardened the drone remote flow so players can reliably launch/link drones, toggle drone eye/chase view, and return to player control on both keyboard and mobile controls. Added remote telemetry (signal quality + remote status) to the drone HUD. Verified with live browser probe plus full proxy QA: `tools/test-master.js` 38/0/0 and `tools/test-qa-v2.js` 21/0, `/healthz` 200, `/api/health` 200.
+
 ### [HIGH] Fix Pitch-Dark Gameplay Regression + Add Visual QA Gate
 Status: DONE
 Requested: 2026-04-18

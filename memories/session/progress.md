@@ -1,5 +1,27 @@
 # Session Progress
 
+- Task: Full drone remote control functionality (launch, possess, remote HUD, eye/chase toggle, return to player)
+- Status: Complete
+- Files changed in this batch:
+  - game-manager.js
+  - index.html
+  - .github/CHECKPOINT.md
+  - .github/TASK_QUEUE.md
+- Fix shipped:
+  - Added explicit helpers for drone remote control flow: launch/link, view toggle, and release/disconnect.
+  - Updated keyboard controls so `F` handles remote release/link/launch consistently and `T` toggles drone eye/chase via a dedicated helper.
+  - Guarded generic camera cycle (`V`) while controlling drone/vehicle.
+  - Improved mobile controls: `USE` exits remote if possessing; `VIEW` toggles drone mode when possessing.
+  - Extended drone remote HUD with signal quality and remote status fields.
+  - Bumped `game-manager.js` cache-bust query in HTML for immediate client pickup.
+- Verified:
+  - Live probe PASS (`F` launch/link -> `T` eye/chase switch -> `F` release)
+  - `/healthz`: 200
+  - `/api/health`: 200
+  - `node --check game-manager.js`: PASS
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+
 - Task: Restore gameplay start flow and live render stability in D:\occupantkiller\occupantkiller
 - Status: Complete
 - Files changed:
