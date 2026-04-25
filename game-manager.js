@@ -741,18 +741,21 @@ const GameManager = (function () {
   }
 
   function enforcePlayerGroundSnap() {
-    if (typeof window.VoxelWorld === 'undefined' || shouldSkipGroundSnap()) return;
+    if (typeof window.VoxelWorld === 'undefined') return;
 
     var terrainY = window.VoxelWorld.getTerrainHeight(player.position.x, player.position.z) + player.height;
     var gap = player.position.y - terrainY;
 
-    // Hard-correct under-surface cases immediately.
+    // Hard-correct under-surface cases immediately, regardless of traversal state.
     if (gap < -0.02) {
       player.position.y = terrainY;
       if (player.velocity.y < 0) player.velocity.y = 0;
       player.onGround = true;
       return;
     }
+
+    // Skip soft snapping while special movement states control vertical motion.
+    if (shouldSkipGroundSnap()) return;
 
     // Soft snap small downward gaps so movement stops feeling floaty.
     if (gap <= GROUND_SNAP_EPS && player.velocity.y <= 0) {
@@ -3245,6 +3248,11 @@ const GameManager = (function () {
     }
 
     if (newPos.y <= terrainH + GROUND_SNAP_EPS && player.velocity.y <= 0) {
+      if (newPos.y < terrainH - 0.02) {
+        newPos.y = terrainH;
+        if (player.velocity.y < 0) player.velocity.y = 0;
+        player.onGround = true;
+      } else {
       newPos.y = terrainH;
       // Landing impact detection
       if (!player.onGround && player.velocity.y < -2) {
@@ -3259,6 +3267,7 @@ const GameManager = (function () {
       }
       player.velocity.y = 0;
       player.onGround = true;
+      }
     } else {
       player.onGround = false;
     }
@@ -5277,14 +5286,17 @@ const GameManager = (function () {
   /* ── Inventory / Pause Toggle ───────────────────────────────────── */
   function toggleInventory() {
     const invOverlay = document.getElementById('inventory-overlay');
+    if (!invOverlay) return;
     if (gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE) {
       gameState = STATE.PAUSED;
       showInventory();
       invOverlay.style.display = 'flex';
+      updateMobileControlsVisibility();
     } else if (gameState === STATE.PAUSED) {
       gameState = STATE.PLAYING;
       invOverlay.style.display = 'none';
       hideOverlays();
+      updateMobileControlsVisibility();
       requestPointerLock();
     }
   }
@@ -5897,7 +5909,7 @@ const GameManager = (function () {
     updateRoleIndicator,
     refreshMarketplaceUI,
     getState:        function () { return gameState; },
-    setState:        function (s) { gameState = s; },
+    setState:        function (s) { gameState = s; updateMobileControlsVisibility(); },
     getPlayer:       function () { return player; },
     getScene:        function () { return _scene; },
     getCamera:       function () { return _camera; },

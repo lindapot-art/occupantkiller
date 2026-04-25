@@ -1,15 +1,20 @@
 @echo off
+setlocal EnableExtensions
 cd /d "%~dp0"
 chcp 65001 >nul 2>&1
-title OccupantKiller - Local Dev Server
+title OccupantKiller - Local Dev Launcher
 echo ============================================
-echo   OCCUPANTKILLER - Local Development Server
+echo   OCCUPANTKILLER - Full Local Launcher
 echo ============================================
 echo.
 
-:: Kill anything already on port 3000
+:: Kill anything already on frontend/backend ports
 for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":3000" ^| findstr "LISTENING"') do (
     echo Killing existing process on port 3000 [PID %%a]...
+    taskkill /PID %%a /F >nul 2>&1
+)
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":3001" ^| findstr "LISTENING"') do (
+    echo Killing existing process on port 3001 [PID %%a]...
     taskkill /PID %%a /F >nul 2>&1
 )
 timeout /t 1 /nobreak >nul
@@ -30,11 +35,22 @@ if not exist server.js (
     exit /b 1
 )
 
-echo Starting server on http://localhost:3000
-echo Press Ctrl+C to stop.
-echo.
-node server.js
+echo Starting API backend on http://localhost:3001
+if exist backend\index.js (
+    start "OccupantKiller API" /D "%~dp0backend" cmd /k node index.js
+) else (
+    echo WARNING: backend\index.js not found, API service skipped.
+)
+
+echo Starting game server on http://localhost:3000
+start "OccupantKiller Game" /D "%~dp0" cmd /k node server.js
+
+timeout /t 2 /nobreak >nul
+echo Opening game in browser...
+start "" "http://localhost:3000"
 
 echo.
-echo Server stopped. Press any key to close...
+echo Frontend and backend launch commands were started in separate windows.
+echo Close those windows or press Ctrl+C in each window to stop services.
+echo.
 pause >nul

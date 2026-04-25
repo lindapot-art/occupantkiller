@@ -343,6 +343,7 @@ canvas {
   color: #555;
   letter-spacing: 1px;
   text-align: center;
+  pointer-events: none;
 }
 
 /* Wave announcement */
@@ -1261,7 +1262,11 @@ html.is-mobile #minimap-canvas {
   #crosshair { width: 16px; height: 16px; }
   #extended-top-bar { font-size: 2vw; }
   #controls-legend { display: none; }
-  #controls-hint { font-size: 2vw; }
+  #controls-hint { display: none; }
+  #overlay-start .subtitle,
+  #overlay-start #show-advanced-start {
+    display: none;
+  }
   #health-bar-container { width: 120px; }
   #inventory-btn,
   #skill-hud-btn,
@@ -1312,6 +1317,26 @@ html.is-mobile #minimap-canvas {
     max-height: 86vh !important;
     padding: 12px 10px;
     overflow-x: hidden;
+  }
+  #inventory-overlay .inv-panel h3 {
+    margin: 4px 0 6px 0 !important;
+    font-size: 13px !important;
+  }
+  #inventory-overlay #ukraine-donation-banner {
+    display: none;
+  }
+  #inventory-overlay #inv-panel-shop > p,
+  #inventory-overlay #inv-panel-sell > p,
+  #inventory-overlay #inv-panel-premium > p,
+  #inventory-overlay #inv-panel-assets > p {
+    display: none;
+  }
+  #inventory-overlay #stealth-toggle-btn,
+  #inventory-overlay #pause-god-mode-btn,
+  #inventory-overlay #resume-btn,
+  #inventory-overlay #quit-btn {
+    width: 100%;
+    margin-top: 6px;
   }
   #inventory-overlay h1 {
     font-size: 20px;
@@ -1389,6 +1414,10 @@ html.is-mobile #minimap-canvas {
     font-size: 11px;
     gap: 8px;
   }
+  #overlay-start p {
+    margin: 4px 0;
+    font-size: 12px;
+  }
   #bottom-bar {
     gap: 10px;
     align-items: center;
@@ -1417,6 +1446,18 @@ html.is-mobile #minimap-canvas {
     width: 98vw;
     max-height: 84vh !important;
     padding: 10px 8px;
+  }
+  #inventory-overlay #inv-wallet-bar {
+    align-items: flex-start;
+  }
+  #inventory-overlay #inv-wallet-info,
+  #inventory-overlay #inv-pol-display {
+    width: 100%;
+    text-align: center;
+  }
+  #inventory-overlay .btn {
+    font-size: 11px;
+    padding: 7px 10px;
   }
   #inventory-overlay h1 {
     font-size: 17px;
