@@ -13,6 +13,15 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
 const READABILITY_SAMPLE = Object.freeze({ x0: 0.28, y0: 0.22, x1: 0.72, y1: 0.68 });
 const DARK_FRAME_MAX_CENTER_LUMA = 8;
 const DARK_FRAME_MAX_LIT_RATIO = 0.01;
+const LOW_VIS_MAX_CENTER_LUMA = 30;
+const LOW_VIS_MAX_LIT_RATIO = 0.08;
+
+function parseIntEnv(name, fallback) {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
 
 async function analyzeScreenshotReadability(imagePath) {
   const image = await Jimp.read(imagePath);
@@ -46,8 +55,15 @@ function isNearBlackGameplayFrame(sample) {
   return sample.centerAvgLuma < DARK_FRAME_MAX_CENTER_LUMA && sample.litRatio < DARK_FRAME_MAX_LIT_RATIO;
 }
 
+function isLowVisibilityGameplayFrame(sample) {
+  return sample.centerAvgLuma < LOW_VIS_MAX_CENTER_LUMA && sample.litRatio < LOW_VIS_MAX_LIT_RATIO;
+}
+
 (async () => {
   const url = process.argv[2] || 'http://localhost:3000';
+  const configuredGameCount = parseIntEnv('QA_GAMES', 3);
+  const configuredRoundsBase = parseIntEnv('QA_ROUNDS_BASE', 75);
+  const configuredRoundsStep = parseIntEnv('QA_ROUNDS_STEP', 5);
   console.log('Testing:', url);
   const screenshots = [];
   const readabilitySamples = [];
@@ -263,9 +279,11 @@ function isNearBlackGameplayFrame(sample) {
   const WEAPON_SCHEDULE = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36];
 
   // ══ MULTI-GAME QA LOOP ══
-  // Run multiple games to capture 200+ screenshots
-  const NUM_GAMES = 3;
-  const ROUNDS_PER_GAME = [75, 70, 65]; // ~210 gameplay shots + specials = 220+
+  // Default remains a long-run stress pass, but can be tuned via env vars for faster proxy verification.
+  const NUM_GAMES = configuredGameCount;
+  const ROUNDS_PER_GAME = Array.from({ length: NUM_GAMES }, function (_v, i) {
+    return Math.max(10, configuredRoundsBase - i * configuredRoundsStep);
+  });
 
   for (let gameNum = 0; gameNum < NUM_GAMES; gameNum++) {
     console.log(`\n════ GAME ${gameNum + 1}/${NUM_GAMES} ════`);
@@ -542,6 +560,17 @@ function isNearBlackGameplayFrame(sample) {
   } // end multi-game loop
 
   const darkFrames = readabilitySamples.filter(entry => isNearBlackGameplayFrame(entry.sample));
+  const lowVisFrames = readabilitySamples.filter(entry => isLowVisibilityGameplayFrame(entry.sample));
+  var lowVisStreak = 0;
+  var maxLowVisStreak = 0;
+  for (const entry of readabilitySamples) {
+    if (isLowVisibilityGameplayFrame(entry.sample)) {
+      lowVisStreak++;
+      if (lowVisStreak > maxLowVisStreak) maxLowVisStreak = lowVisStreak;
+    } else {
+      lowVisStreak = 0;
+    }
+  }
   if (darkFrames.length > 0) {
     console.log(`Visual readability failures: ${darkFrames.length}/${readabilitySamples.length}`);
     for (const frame of darkFrames.slice(0, 8)) {
@@ -550,10 +579,26 @@ function isNearBlackGameplayFrame(sample) {
       );
     }
     if (
-      darkFrames.some(frame => frame.label === 'wave1-start' || frame.label === 'final') ||
+      darkFrames.some(frame => frame.label === 'wave1-start' || /-final$/.test(frame.label)) ||
       darkFrames.length >= Math.max(2, Math.ceil(readabilitySamples.length * 0.35))
     ) {
       errors.push(`VISUAL QA FAIL: ${darkFrames.length}/${readabilitySamples.length} gameplay frames were near-black`);
+    }
+  }
+
+  if (lowVisFrames.length > 0) {
+    console.log(`Low-visibility frames: ${lowVisFrames.length}/${readabilitySamples.length} (max streak ${maxLowVisStreak})`);
+    for (const frame of lowVisFrames.slice(0, 8)) {
+      console.log(
+        `   LOW-VIS ${frame.label}: centerAvgLuma=${frame.sample.centerAvgLuma.toFixed(2)} litRatio=${(frame.sample.litRatio * 100).toFixed(2)}%`
+      );
+    }
+    if (
+      lowVisFrames.some(frame => frame.label === 'wave1-start' || /-final$/.test(frame.label)) ||
+      maxLowVisStreak >= 3 ||
+      lowVisFrames.length >= Math.max(5, Math.ceil(readabilitySamples.length * 0.4))
+    ) {
+      errors.push(`VISUAL QA FAIL: sustained low visibility detected (${lowVisFrames.length}/${readabilitySamples.length}, max streak ${maxLowVisStreak})`);
     }
   }
 

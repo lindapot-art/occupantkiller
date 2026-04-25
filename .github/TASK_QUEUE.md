@@ -17,9 +17,10 @@ Details: [what you want done]
 ## Active Tasks
 
 ### [HIGH] Fix Pitch-Dark Gameplay Regression + Add Visual QA Gate
-Status: IN-PROGRESS
+Status: DONE
 Requested: 2026-04-18
-Details: Investigate the current regression where gameplay screenshots are effectively black while the HUD still renders, and harden `tools/test-gameplay.js` so near-black gameplay frames fail QA instead of passing on JS-error absence alone.
+Completed: 2026-04-25
+Details: Hardened `tools/test-gameplay.js` visual gate with low-visibility detection (near-black + sustained low-visibility streak checks), fixed final-frame label matching (`-final`), and added env-driven fast profile controls (`QA_GAMES`, `QA_ROUNDS_BASE`, `QA_ROUNDS_STEP`) so gameplay QA can complete deterministically in proxy runs. Verified: node --check PASS, /healthz 200, /api/health 200, test-master 38/0/0, test-qa-v2 21/0, gameplay harness fast profile PASS with `Errors: NONE` and readability metrics printed per frame.
 
 ### [HIGH] Tank Turret Traverse Audio + Reload-Ready Flash/Chime
 Status: DONE
