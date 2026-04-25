@@ -46,6 +46,7 @@ const CameraSystem = (function () {
   let bobActive  = false;
   const BOB_AMP  = 0.038;
   const BOB_FREQ = 10;
+  let _fpsSmoothedY = null;
 
   /* ── Screen Shake ───────────────────────────────────────────────── */
   let shakeIntensity = 0;
@@ -75,6 +76,7 @@ const CameraSystem = (function () {
     currentMode = MODE.FIRST_PERSON;
     yaw = 0;
     pitch = 0;
+    _fpsSmoothedY = null;
     rtsTarget.set(0, 0, 0);
   }
 
@@ -219,9 +221,14 @@ const CameraSystem = (function () {
     }
     const bobOffset = Math.sin(bobPhase) * BOB_AMP * (bobActive ? 1 : 0);
 
+    var targetY = playerPos.y + bobOffset + shakeOffsetY;
+    if (_fpsSmoothedY === null) _fpsSmoothedY = targetY;
+    var yLerpRate = isGrounded ? 16 : 9;
+    _fpsSmoothedY += (targetY - _fpsSmoothedY) * Math.min(1, delta * yLerpRate);
+
     _camera.position.set(
       playerPos.x + shakeOffsetX,
-      playerPos.y + bobOffset + shakeOffsetY,
+      _fpsSmoothedY,
       playerPos.z
     );
 

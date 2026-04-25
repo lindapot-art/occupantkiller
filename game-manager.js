@@ -607,6 +607,7 @@ const GameManager = (function () {
   const SPRINT_MULT  = 1.65;
   const GRAVITY      = 18;
   const JUMP_SPEED   = 7.0;
+  const GROUND_SNAP_EPS = 0.35;
 
   /* ── Mobile Detection ──────────────────────────────────────────── */
   // iPadOS 13+ identifies as Mac; treat touch-capable devices as mobile.
@@ -724,6 +725,41 @@ const GameManager = (function () {
       }
     }
     throw (lastError || new Error('Unable to create a WebGL context on this device.'));
+  }
+
+  function shouldSkipGroundSnap() {
+    if (typeof DroneSystem !== 'undefined' && DroneSystem.isPossessing && DroneSystem.isPossessing()) return true;
+    if (typeof VehicleSystem !== 'undefined' && VehicleSystem.isInVehicle && VehicleSystem.isInVehicle()) return true;
+    if (typeof Traversal !== 'undefined') {
+      if (Traversal.isMantling && Traversal.isMantling()) return true;
+      if (Traversal.isHanging && Traversal.isHanging()) return true;
+      if (Traversal.isGrappling && Traversal.isGrappling()) return true;
+      if (Traversal.isWallRunning && Traversal.isWallRunning()) return true;
+      if (Traversal.isSwimming && Traversal.isSwimming()) return true;
+    }
+    return false;
+  }
+
+  function enforcePlayerGroundSnap() {
+    if (typeof window.VoxelWorld === 'undefined' || shouldSkipGroundSnap()) return;
+
+    var terrainY = window.VoxelWorld.getTerrainHeight(player.position.x, player.position.z) + player.height;
+    var gap = player.position.y - terrainY;
+
+    // Hard-correct under-surface cases immediately.
+    if (gap < -0.02) {
+      player.position.y = terrainY;
+      if (player.velocity.y < 0) player.velocity.y = 0;
+      player.onGround = true;
+      return;
+    }
+
+    // Soft snap small downward gaps so movement stops feeling floaty.
+    if (gap <= GROUND_SNAP_EPS && player.velocity.y <= 0) {
+      player.position.y = terrainY;
+      player.velocity.y = 0;
+      player.onGround = true;
+    }
   }
 
   function updateMobileControlsVisibility() {
@@ -3191,7 +3227,7 @@ const GameManager = (function () {
       }
     }
 
-    if (newPos.y <= terrainH) {
+    if (newPos.y <= terrainH + GROUND_SNAP_EPS && player.velocity.y <= 0) {
       newPos.y = terrainH;
       // Landing impact detection
       if (!player.onGround && player.velocity.y < -2) {
@@ -4591,6 +4627,9 @@ const GameManager = (function () {
         player.position.x += combatResult.roll.moveX;
         player.position.z += combatResult.roll.moveZ;
       }
+
+      // Final grounding pass after traversal/roll adjustments.
+      enforcePlayerGroundSnap();
 
       // ── B29: Hazard zone check ──
       if (typeof WorldFeatures !== 'undefined' && WorldFeatures.checkHazards) {
