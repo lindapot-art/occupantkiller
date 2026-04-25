@@ -2211,7 +2211,21 @@ const GameManager = (function () {
     if (typeof Perks !== 'undefined') Perks.reset();
     if (typeof MissionTypes !== 'undefined') MissionTypes.clear();
     if (typeof Feedback !== 'undefined') Feedback.clear();
-    if (typeof Marketplace !== 'undefined') Marketplace.setOKC(0);
+    if (typeof Marketplace !== 'undefined') {
+      if (typeof ApiClient === 'undefined') {
+        Marketplace.setOKC(0);
+      } else if (Marketplace.initBackendSync) {
+        Marketplace.initBackendSync().then(function () {
+          if (typeof HUD !== 'undefined' && HUD.updateOKC) {
+            HUD.updateOKC(Marketplace.getOKC());
+          }
+        }).catch(function () {
+          Marketplace.setOKC(0);
+        });
+      } else {
+        Marketplace.setOKC(0);
+      }
+    }
     if (typeof Progression !== 'undefined') {
       Progression.refreshDailies();
     }

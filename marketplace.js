@@ -157,6 +157,104 @@ const Marketplace = (function () {
   /* ── Transaction History ───────────────────────────────────────── */
   let txHistory = [];
   const MAX_HISTORY = 50;
+  let dynamicAssets = null;
+  let backendReady = false;
+  let apiFailCount = 0;
+  let apiBackoffUntil = 0;
+
+  function hasApi() {
+    return (typeof ApiClient !== 'undefined' && ApiClient);
+  }
+
+  function canUseApi() {
+    return hasApi() && Date.now() >= apiBackoffUntil;
+  }
+
+  function markApiFailure() {
+    apiFailCount += 1;
+    if (apiFailCount >= 3) {
+      apiBackoffUntil = Date.now() + 60000;
+      apiFailCount = 0;
+    }
+  }
+
+  function markApiSuccess() {
+    apiFailCount = 0;
+    apiBackoffUntil = 0;
+  }
+
+  async function initBackendSync() {
+    if (!canUseApi()) return false;
+    if (backendReady) return true;
+    try {
+      ApiClient.init();
+      var profile = await ApiClient.auth();
+      if (profile && profile.stats && typeof profile.stats.okc_balance === 'number') {
+        okcBalance = Math.floor(profile.stats.okc_balance);
+      }
+      await refreshCatalog();
+      backendReady = true;
+      markApiSuccess();
+      return true;
+    } catch (_) {
+      markApiFailure();
+      return false;
+    }
+  }
+
+  async function refreshFromBackend() {
+    if (!canUseApi()) return null;
+    try {
+      await initBackendSync();
+      var profile = await ApiClient.profile();
+      if (profile && profile.stats && typeof profile.stats.okc_balance === 'number') {
+        okcBalance = Math.floor(profile.stats.okc_balance);
+      }
+      markApiSuccess();
+      return profile;
+    } catch (_) {
+      markApiFailure();
+      return null;
+    }
+  }
+
+  async function refreshCatalog() {
+    if (!canUseApi()) return null;
+    try {
+      var cat = await ApiClient.catalog();
+      if (!cat || !Array.isArray(cat.items)) return null;
+      dynamicAssets = cat.items.map(function (it) {
+        return {
+          id: String(it.token_id),
+          name: it.label || ('Asset #' + it.token_id),
+          polCost: it.price_pol_wei ? 0 : 0,
+          okcCost: Number(it.price_okc || 0),
+          type: 'cosmetic',
+          tokenId: String(it.token_id),
+          rarity: Number(it.rarity || 0),
+          bonusBps: Number(it.bonus_bps || 0),
+          itemType: Number(it.item_type || 0),
+          weapon: it.weapon_key || null,
+        };
+      });
+      markApiSuccess();
+      return dynamicAssets;
+    } catch (_) {
+      markApiFailure();
+      return null;
+    }
+  }
+
+  function _earnViaApi(reason, count) {
+    if (!canUseApi()) return;
+    ApiClient.earn(reason, count || 1).then(function (r) {
+      if (r && typeof r.balance === 'number') okcBalance = Math.floor(r.balance);
+      markApiSuccess();
+    }).catch(function () {
+      markApiFailure();
+      /* keep local fallback if backend is unavailable */
+    });
+  }
 
   function addTx(type, desc, amount, currency) {
     txHistory.unshift({ type: type, desc: desc, amount: amount, currency: currency, time: Date.now() });
@@ -353,24 +451,70 @@ const Marketplace = (function () {
   /* ── Play-to-Earn Reward Hooks ─────────────────────────────────── */
   function onKill(isHeadshot) {
     addOKC(isHeadshot ? EARN_RATES.headshot : EARN_RATES.kill);
+    _earnViaApi(isHeadshot ? 'headshot' : 'kill', 1);
   }
 
   function onWaveClear() {
     addOKC(EARN_RATES.wave);
+    _earnViaApi('wave', 1);
   }
 
   function onStageClear() {
     addOKC(EARN_RATES.stage);
+    _earnViaApi('stage', 1);
   }
 
   function onStreak(count) {
-    if (count === 3) addOKC(EARN_RATES.streak3);
-    else if (count === 5) addOKC(EARN_RATES.streak5);
-    else if (count >= 10) addOKC(EARN_RATES.streak10);
+    if (count === 3) { addOKC(EARN_RATES.streak3); _earnViaApi('streak3', 1); }
+    else if (count === 5) { addOKC(EARN_RATES.streak5); _earnViaApi('streak5', 1); }
+    else if (count >= 10) { addOKC(EARN_RATES.streak10); _earnViaApi('streak10', 1); }
   }
 
   function onMissionComplete() {
     addOKC(EARN_RATES.mission);
+    _earnViaApi('mission', 1);
+  }
+
+  async function claimOKC(amount) {
+    if (!hasApi() || typeof Blockchain === 'undefined') return false;
+    try {
+      await initBackendSync();
+      var proof = await ApiClient.claimOkc(amount);
+      if (!proof) return false;
+      await Blockchain.claimOkcOnChain(proof);
+      await refreshFromBackend();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function mintVeteranTier(tierId) {
+    if (!hasApi() || typeof Blockchain === 'undefined') return false;
+    try {
+      await initBackendSync();
+      var proof = await ApiClient.mintVeteran(tierId);
+      if (!proof) return false;
+      await Blockchain.mintVeteranOnChain(proof);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function buyCatalogAssetWithOKC(tokenId, amount) {
+    if (!hasApi() || typeof Blockchain === 'undefined') return false;
+    try {
+      await initBackendSync();
+      var proof = await ApiClient.buyCosmetic(tokenId, amount || 1);
+      if (!proof) return false;
+      await Blockchain.claimWeaponOnChain(proof);
+      await refreshFromBackend();
+      addTx('asset', 'Bought cosmetic #' + tokenId, -Number(proof.cost || 0), 'OKC');
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /* ── Convert OKC to/from Gold (in-game economy bridge) ─────────── */
@@ -405,7 +549,7 @@ const Marketplace = (function () {
   /* ── Getters ───────────────────────────────────────────────────── */
   function getShopItems()    { return SHOP_ITEMS; }
   function getPremiumTiers() { return PREMIUM_TIERS; }
-  function getGameAssets()   { return GAME_ASSETS; }
+  function getGameAssets()   { return (dynamicAssets && dynamicAssets.length) ? dynamicAssets : GAME_ASSETS; }
   function getOwnedAssets()  { return ownedAssets.slice(); }
   function ownsAsset(id)     { return ownedAssets.indexOf(id) >= 0; }
   function getTxHistory()    { return txHistory.slice(); }
@@ -442,6 +586,8 @@ const Marketplace = (function () {
     getTxHistory, getEarnRates,
     getWeaponPriceOKC, getWeaponPricePOL,
     getDiscountedPrice,
+    initBackendSync, refreshFromBackend, refreshCatalog,
+    claimOKC, mintVeteranTier, buyCatalogAssetWithOKC,
 
     /* lifecycle */
     reset,
