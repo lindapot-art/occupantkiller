@@ -1275,7 +1275,23 @@ html.is-mobile #minimap-canvas {
   #ai-learning-indicator,
   #combat-log,
   #daily-challenges,
-  #bounty-display {
+  #bounty-display,
+  #slide-indicator,
+  #focus-indicator,
+  #dual-wield-indicator,
+  #bayonet-indicator,
+  #maintenance-indicator,
+  #laststand-indicator,
+  #heat-bar-container,
+  #ammo-type-indicator,
+  #lean-indicator,
+  #inspect-overlay,
+  #wallrun-indicator,
+  #tacsprint-indicator,
+  #radiation-warning,
+  #adrenaline-indicator,
+  #mine-counter,
+  #uav-indicator {
     display: none !important;
   }
   #top-bar {

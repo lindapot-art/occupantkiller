@@ -471,6 +471,11 @@
 
   <!-- Pause screen -->
   <div id="overlay-pause" class="overlay" style="display:none">
+    <h1>PAUSED</h1>
+    <p>Game paused. Click to resume.</p>
+    <button class="btn" id="pause-resume-btn">▶ RESUME</button>
+    <button class="btn" id="pause-quit-btn" style="margin-top:8px;border-color:#888;color:#888">✕ QUIT TO MENU</button>
+  </div>
 
   <!-- Drone Selection Overlay (shown before wave 1) -->
   <div id="overlay-drone-select" class="overlay" style="display:none">
@@ -557,12 +562,6 @@
       <div id="tank-reload-fill"></div>
     </div>
     <div id="tank-reload-text">RELOADING...</div>
-  </div>
-
-    <h1>PAUSED</h1>
-    <p>Game paused. Click to resume.</p>
-    <button class="btn" id="pause-resume-btn" onclick="document.getElementById('overlay-pause').style.display='none';GameManager.setState(GameManager.STATE.PLAYING);GameManager.requestPointerLock()">▶ RESUME</button>
-    <button class="btn" id="pause-quit-btn" onclick="document.getElementById('overlay-pause').style.display='none';GameManager.hideOverlays();GameManager.showOverlay('start');GameManager.setState(GameManager.STATE.MENU)" style="margin-top:8px;border-color:#888;color:#888">✕ QUIT TO MENU</button>
   </div>
 
   <!-- Dead screen -->
@@ -805,24 +804,7 @@
 <script src="weapon-details.js"></script>
 <script src="weapons.js"></script>
 <script src="enemies.js"></script>
-  <script src="audio-system.js"></script>
-  <script>
-    // Global error overlay for unhandled JS exceptions
-    (function(){
-      var overlay = document.getElementById('error-overlay');
-      function showError(msg, url, line, col, err) {
-        if (!overlay) return;
-        overlay.style.display = 'block';
-        overlay.innerText = 'UNHANDLED ERROR:\n' + msg + '\n' + (url||'') + ' @ ' + line + ':' + col + (err && err.stack ? '\n' + err.stack : '');
-      }
-      window.addEventListener('error', function(e) {
-        showError(e.message, e.filename, e.lineno, e.colno, e.error);
-      });
-      window.addEventListener('unhandledrejection', function(e) {
-        showError('Unhandled Promise rejection: ' + (e.reason && e.reason.message ? e.reason.message : e.reason), '', '', '', e.reason);
-      });
-    })();
-  </script>
+<script src="audio-system.js"></script>
 <script src="weather-system.js"></script>
 <script src="ml-system.js"></script>
 <script src="tracers.js"></script>
@@ -839,7 +821,7 @@
 <script src="progression.js"></script>
 
 
-<script src="game-manager.js?v=20260425-pointerlock-fix"></script>
+<script src="game-manager.js?v=20260425-major-audit-fix"></script>
 
 
 <!-- Defensive global export for VoxelWorld and AudioSystem -->
@@ -849,7 +831,7 @@
     window.VoxelWorld = VoxelWorld;
   }
   // Ensure AudioSystem is always available on window for all modules
-  if (typeof window !== 'undefined' && (typeof window.AudioSystem === 'undefined' || Object.keys(window.AudioSystem).length < 5) && typeof AudioSystem !== 'undefined') {
+  if (typeof window !== 'undefined' && typeof AudioSystem !== 'undefined') {
     window.AudioSystem = AudioSystem;
   }
 </script>
@@ -862,10 +844,15 @@ document.addEventListener('DOMContentLoaded', function () {
   function bootWhenReady(attempts) {
     if (typeof window.GameManager !== 'undefined' && typeof window.GameManager.init === 'function') {
       window.GameManager.init();
-    } else if ((attempts || 0) < 50) {
+    } else if ((attempts || 0) < 500) {
       setTimeout(function() { bootWhenReady((attempts||0)+1); }, 20);
     } else {
       console.error('[BOOT] GameManager not ready after waiting');
+      var overlay = document.getElementById('error-overlay');
+      if (overlay) {
+        overlay.style.display = 'block';
+        overlay.innerText = 'BOOT ERROR:\nGameManager did not initialize in time.\nTry reloading the page.';
+      }
     }
   }
   bootWhenReady(0);
@@ -947,20 +934,43 @@ document.addEventListener('DOMContentLoaded', function () {
     GameManager.nextStage();
   });
 
-  document.getElementById('resume-btn').addEventListener('click', function () {
+  function resumeFromPauseUI() {
+    if (GameManager.resumeFromPause) {
+      GameManager.resumeFromPause();
+      return;
+    }
     var invOv = document.getElementById('inventory-overlay');
+    var pauseOv = document.getElementById('overlay-pause');
     if (invOv) invOv.style.display = 'none';
+    if (pauseOv) pauseOv.style.display = 'none';
     GameManager.hideOverlays();
     GameManager.setState(GameManager.STATE.PLAYING);
     GameManager.requestPointerLock();
-  });
+  }
 
-  document.getElementById('quit-btn').addEventListener('click', function () {
+  function quitToMenuUI() {
+    if (GameManager.quitToMenu) {
+      GameManager.quitToMenu();
+      return;
+    }
     var invOv = document.getElementById('inventory-overlay');
+    var pauseOv = document.getElementById('overlay-pause');
     if (invOv) invOv.style.display = 'none';
+    if (pauseOv) pauseOv.style.display = 'none';
     GameManager.hideOverlays();
     GameManager.showOverlay('start');
     GameManager.setState(GameManager.STATE.MENU);
+  }
+
+  document.getElementById('pause-resume-btn').addEventListener('click', resumeFromPauseUI);
+  document.getElementById('pause-quit-btn').addEventListener('click', quitToMenuUI);
+
+  document.getElementById('resume-btn').addEventListener('click', function () {
+    resumeFromPauseUI();
+  });
+
+  document.getElementById('quit-btn').addEventListener('click', function () {
+    quitToMenuUI();
   });
 
   document.getElementById('play-again-btn').addEventListener('click', function () {

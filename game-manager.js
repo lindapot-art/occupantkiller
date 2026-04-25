@@ -5301,6 +5301,28 @@ const GameManager = (function () {
     }
   }
 
+  function resumeFromPause() {
+    var invOverlay = document.getElementById('inventory-overlay');
+    var pauseOverlay = document.getElementById('overlay-pause');
+    if (invOverlay) invOverlay.style.display = 'none';
+    if (pauseOverlay) pauseOverlay.style.display = 'none';
+    hideOverlays();
+    gameState = STATE.PLAYING;
+    updateMobileControlsVisibility();
+    requestPointerLock();
+  }
+
+  function quitToMenu() {
+    var invOverlay = document.getElementById('inventory-overlay');
+    var pauseOverlay = document.getElementById('overlay-pause');
+    if (invOverlay) invOverlay.style.display = 'none';
+    if (pauseOverlay) pauseOverlay.style.display = 'none';
+    hideOverlays();
+    showOverlay('start');
+    gameState = STATE.MENU;
+    updateMobileControlsVisibility();
+  }
+
   function showInventory() {
     // ── Materials / Resources section ──
     var matGrid = document.getElementById('materials-grid');
@@ -5900,6 +5922,8 @@ const GameManager = (function () {
     hideOverlays,
     requestPointerLock,
     toggleInventory,
+    resumeFromPause,
+    quitToMenu,
     isMobile,
     setRole,
     toggleStealth,

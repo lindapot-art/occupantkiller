@@ -190,7 +190,7 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('UNHANDLED REJECTION:', reason);
   if (reason && reason.stack) console.error(reason.stack);
-  process.exit(1);
+  // Keep server alive for transient async errors; investigate via logs.
 });
 
 process.on('exit', (code) => {

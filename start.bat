@@ -45,7 +45,23 @@ if exist backend\index.js (
 echo Starting game server on http://localhost:3000
 start "OccupantKiller Game" /D "%~dp0" cmd /k node server.js
 
-timeout /t 2 /nobreak >nul
+set _tries=0
+:wait_game_ready
+set /a _tries+=1
+powershell -NoProfile -Command "try { $r = Invoke-WebRequest 'http://localhost:3000/healthz' -UseBasicParsing -TimeoutSec 1; if ($r.StatusCode -eq 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+if not errorlevel 1 goto game_ready
+if %_tries% GEQ 15 goto game_not_ready
+timeout /t 1 /nobreak >nul
+goto wait_game_ready
+
+:game_ready
+echo Game server is healthy.
+goto open_browser
+
+:game_not_ready
+echo WARNING: Game server health check did not return 200 in time. Opening browser anyway.
+
+:open_browser
 echo Opening game in browser...
 start "" "http://localhost:3000"
 
