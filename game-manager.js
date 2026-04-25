@@ -984,6 +984,18 @@ const GameManager = (function () {
     // Mission completion callback — with replenishment
     MissionSystem.onMissionComplete(function (mission, reward) {
       HUD.notifyPickup('MISSION COMPLETE: ' + mission.name + ' +' + (reward || 0), '#00FF88');
+      if (reward > 0 && typeof Marketplace !== 'undefined') {
+        if (Marketplace.awardCustomOKC) {
+          Marketplace.awardCustomOKC(reward, 'mission_complete', {
+            missionName: mission && mission.name ? mission.name : null,
+            missionType: mission && mission.type ? mission.type : null,
+          }).then(function () {
+            if (HUD && HUD.updateOKC) HUD.updateOKC(Marketplace.getOKC());
+          });
+        } else {
+          Marketplace.addOKC(reward);
+        }
+      }
       // Replenish: generate a new mission after 10s
       setTimeout(function () {
         if (gameState === STATE.PLAYING) {
@@ -2867,7 +2879,15 @@ const GameManager = (function () {
         hp: player.hp, ammoRatio: 0.5, spotted: false, explosiveMulti: 0,
       });
       if (sideResult && sideResult.completed) {
-        if (typeof Marketplace !== 'undefined') Marketplace.addOKC(sideResult.reward);
+        if (typeof Marketplace !== 'undefined' && Marketplace.awardCustomOKC) {
+          Marketplace.awardCustomOKC(sideResult.reward, 'side_objective', {
+            name: sideResult.name || 'side-objective', wave: currentWave,
+          }).then(function () {
+            if (HUD && HUD.updateOKC) HUD.updateOKC(Marketplace.getOKC());
+          });
+        } else if (typeof Marketplace !== 'undefined') {
+          Marketplace.addOKC(sideResult.reward);
+        }
         HUD.notifyPickup('⭐ SIDE OBJ COMPLETE: ' + sideResult.name + ' (+' + sideResult.reward + ' OKC)', '#ffdd00');
       }
       if (MissionSystem.generateSideObjective) MissionSystem.generateSideObjective();
@@ -3519,7 +3539,16 @@ const GameManager = (function () {
         Progression.updateBounty('damage', dmg);
         for (var cbi = 0; cbi < completedBounties.length; cbi++) {
           HUD.notifyPickup('💰 BOUNTY COMPLETE! +' + escapeHTML(completedBounties[cbi].reward) + ' OKC', '#ffaa00');
-          if (typeof Marketplace !== 'undefined') Marketplace.addOKC(completedBounties[cbi].reward);
+          if (typeof Marketplace !== 'undefined' && Marketplace.awardCustomOKC) {
+            Marketplace.awardCustomOKC(completedBounties[cbi].reward, 'bounty_reward', {
+              bountyId: completedBounties[cbi].id || null,
+              bountyType: completedBounties[cbi].type || null,
+            }).then(function () {
+              if (HUD && HUD.updateOKC) HUD.updateOKC(Marketplace.getOKC());
+            });
+          } else if (typeof Marketplace !== 'undefined') {
+            Marketplace.addOKC(completedBounties[cbi].reward);
+          }
           if (typeof AudioSystem !== 'undefined' && AudioSystem.playBountyComplete) AudioSystem.playBountyComplete();
         }
         // Achievement checks
@@ -4739,7 +4768,15 @@ const GameManager = (function () {
               var reward = MissionTypes.completeMission();
               if (reward) {
                 HUD.notifyPickup('✅ MISSION COMPLETE! +' + reward.okc + ' OKC +' + reward.xp + ' XP', '#44ff88');
-                if (typeof Marketplace !== 'undefined') Marketplace.addOKC(reward.okc);
+                if (typeof Marketplace !== 'undefined' && Marketplace.awardCustomOKC) {
+                  Marketplace.awardCustomOKC(reward.okc, 'mission_type_complete', {
+                    missionType: MissionTypes.getActive() ? MissionTypes.getActive().config.id : null,
+                  }).then(function () {
+                    if (HUD && HUD.updateOKC) HUD.updateOKC(Marketplace.getOKC());
+                  });
+                } else if (typeof Marketplace !== 'undefined') {
+                  Marketplace.addOKC(reward.okc);
+                }
                 if (typeof RankSystem !== 'undefined') RankSystem.addXP(reward.xp);
                 if (typeof Progression !== 'undefined') Progression.trackStat('wavesCleared', 0); // mission tracking
               }
@@ -5610,7 +5647,16 @@ const GameManager = (function () {
           btnOkc.style.cssText = 'font-size:9px;padding:2px 6px;border-color:#ffd700;color:#ffd700;margin:2px';
           btnOkc.textContent = 'Buy (OKC)';
           btnOkc.addEventListener('click', function () {
-            if (Marketplace.buyAssetWithOKC(idx)) {
+            if (asset.tokenId && Marketplace.buyCatalogAssetWithOKC) {
+              Marketplace.buyCatalogAssetWithOKC(asset.tokenId, 1).then(function (ok) {
+                if (ok) {
+                  HUD.notifyPickup('🎨 ' + asset.name + ' unlocked!', '#00ffcc');
+                  refreshMarketplaceUI('assets');
+                } else {
+                  HUD.notifyPickup('❌ Purchase failed', '#ff4444');
+                }
+              });
+            } else if (Marketplace.buyAssetWithOKC(idx)) {
               HUD.notifyPickup('🎨 ' + asset.name + ' unlocked!', '#00ffcc');
               refreshMarketplaceUI('assets');
             } else {

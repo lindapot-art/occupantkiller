@@ -88,6 +88,10 @@ const ApiClient = (function () {
     return _request('POST', '/api/player/okc-earn', { reason, count: count || 1, meta });
   }
 
+  async function grantOkc(amount, reason, meta) {
+    return _request('POST', '/api/player/okc-grant', { amount, reason, meta });
+  }
+
   async function claimOkc(amount) {
     return _request('POST', '/api/player/okc-claim', { amount });
   }
@@ -114,7 +118,7 @@ const ApiClient = (function () {
   return {
     init, getAnonId, getBaseUrl,
     health, config, auth, profile, ledger,
-    linkWallet, earn, claimOkc,
+    linkWallet, earn, grantOkc, claimOkc,
     mintVeteran, catalog, buyCosmetic,
     marketActive, marketList, marketCancel,
     deployments, cachedProfile,

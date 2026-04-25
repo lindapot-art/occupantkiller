@@ -261,6 +261,28 @@ const Marketplace = (function () {
     });
   }
 
+  async function awardCustomOKC(amount, reason, meta) {
+    var amt = Math.floor(Number(amount) || 0);
+    if (amt <= 0) return 0;
+
+    // Backend-first: when API is available, use exact amount grant to avoid drift.
+    if (canUseApi() && ApiClient.grantOkc) {
+      try {
+        await initBackendSync();
+        var r = await ApiClient.grantOkc(amt, reason || 'custom', meta || null);
+        if (r && typeof r.balance === 'number') okcBalance = Math.floor(r.balance);
+        addTx('earn', '+' + amt + ' OKC', amt, 'OKC');
+        markApiSuccess();
+        return amt;
+      } catch (_) {
+        markApiFailure();
+      }
+    }
+
+    // Offline fallback: preserve gameplay reward responsiveness.
+    return addOKC(amt);
+  }
+
   function addTx(type, desc, amount, currency) {
     txHistory.unshift({ type: type, desc: desc, amount: amount, currency: currency, time: Date.now() });
     if (txHistory.length > MAX_HISTORY) txHistory.pop();
@@ -605,6 +627,7 @@ const Marketplace = (function () {
     getWeaponPriceOKC, getWeaponPricePOL,
     getDiscountedPrice,
     initBackendSync, refreshFromBackend, refreshCatalog,
+    awardCustomOKC,
     claimOKC, mintVeteranTier, buyCatalogAssetWithOKC,
 
     /* lifecycle */

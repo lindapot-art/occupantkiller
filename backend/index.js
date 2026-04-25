@@ -151,6 +151,21 @@ app.post('/api/player/okc-earn', authAnon, financialLimiter, (req, res) => {
   res.json({ ok: true, earned: amount, balance: stats.okc_balance, stats });
 });
 
+// ── Exact custom OKC reward grant (for mission/progression payouts) ──
+app.post('/api/player/okc-grant', authAnon, financialLimiter, (req, res) => {
+  const { amount, reason = 'custom', meta } = req.body || {};
+  const amt = Number(amount);
+  if (!Number.isFinite(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be > 0' });
+  if (amt > 5000) return res.status(400).json({ error: 'amount too large' });
+  if (typeof reason !== 'string' || reason.length < 2 || reason.length > 64) {
+    return res.status(400).json({ error: 'invalid reason' });
+  }
+
+  creditOKC(db, req.player.id, amt, reason, meta);
+  const stats = getStats(db, req.player.id);
+  res.json({ ok: true, earned: amt, balance: stats.okc_balance, stats });
+});
+
 // ── Request an on-chain OKC claim signature ──
 app.post('/api/player/okc-claim', authAnon, financialLimiter, async (req, res) => {
   try {
