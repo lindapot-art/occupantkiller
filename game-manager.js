@@ -1903,7 +1903,24 @@ const GameManager = (function () {
   /* ── Pointer lock helpers ────────────────────────────────────────── */
   function requestPointerLock() {
     if (isMobile) return;   // Touch controls replace pointer lock on mobile
-    _renderer.domElement.requestPointerLock();
+    if (!_renderer || !_renderer.domElement) return;
+
+    var canvas = _renderer.domElement;
+    var ownerDoc = canvas.ownerDocument || document;
+
+    // Pointer lock can fail when canvas is detached or not from the active root document.
+    if (!canvas.isConnected || ownerDoc !== document || !document.contains(canvas)) return;
+    if (ownerDoc.pointerLockElement === canvas) return;
+    if (ownerDoc.visibilityState && ownerDoc.visibilityState !== 'visible') return;
+
+    try {
+      var req = canvas.requestPointerLock();
+      if (req && typeof req.catch === 'function') {
+        req.catch(function () { /* Prevent unhandled promise rejection noise */ });
+      }
+    } catch (_) {
+      // Ignore hard failures; game remains playable without pointer lock.
+    }
   }
 
   /* ── Overlay helpers ─────────────────────────────────────────────── */
