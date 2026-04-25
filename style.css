@@ -1208,6 +1208,41 @@ html.is-mobile #minimap-canvas {
     padding: 5px 7px;
   }
   html.is-mobile #health-bar-container { width: 92px; }
+
+  /* Ensure pause/inventory overlay stays usable on short landscape screens. */
+  #inventory-overlay .overlay-content {
+    width: min(96vw, 640px);
+    max-height: 84vh !important;
+    padding: 10px 8px;
+  }
+  #inventory-overlay h1 {
+    font-size: 18px;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  #inventory-overlay .btn {
+    margin-top: 8px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  #inv-tabs {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  #inv-tabs .inv-tab {
+    flex: 1 1 48% !important;
+    min-width: 0;
+  }
+  #materials-grid,
+  #inventory-grid,
+  #pause-weapons-grid,
+  #shop-items-grid,
+  #sell-weapons-grid,
+  #sell-ammo-grid,
+  #assets-grid,
+  #premium-tiers-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
 }
 
 /* ── Portrait on mobile: hide HUD behind overlay ──────────── */
@@ -1270,6 +1305,58 @@ html.is-mobile #minimap-canvas {
     grid-template-columns: repeat(4, 48px);
     gap: 6px;
   }
+
+  /* Inventory / pause overlay mobile layout hardening */
+  #inventory-overlay .overlay-content {
+    width: min(96vw, 700px);
+    max-height: 86vh !important;
+    padding: 12px 10px;
+    overflow-x: hidden;
+  }
+  #inventory-overlay h1 {
+    font-size: 20px;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+  #inventory-overlay .btn {
+    margin-top: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+  #inv-wallet-bar {
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center !important;
+  }
+  #inv-tabs {
+    flex-wrap: wrap;
+  }
+  #inv-tabs .inv-tab {
+    min-width: 120px;
+    flex: 1 1 32% !important;
+  }
+  #pause-role-select {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+  }
+  #materials-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  #pause-weapons-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    max-width: 100% !important;
+  }
+  #shop-items-grid,
+  #sell-weapons-grid,
+  #sell-ammo-grid,
+  #assets-grid,
+  #premium-tiers-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
 }
 @media (max-width: 480px) {
   html.is-mobile #hud { --mobile-touch-reserve: 88px; }
@@ -1324,6 +1411,30 @@ html.is-mobile #minimap-canvas {
   #weapon-name-display {
     font-size: 13px;
     text-align: center;
+  }
+
+  #inventory-overlay .overlay-content {
+    width: 98vw;
+    max-height: 84vh !important;
+    padding: 10px 8px;
+  }
+  #inventory-overlay h1 {
+    font-size: 17px;
+    letter-spacing: 1px;
+  }
+  #inv-tabs .inv-tab {
+    flex: 1 1 48% !important;
+    min-width: 0;
+  }
+  #materials-grid,
+  #inventory-grid,
+  #pause-weapons-grid,
+  #shop-items-grid,
+  #sell-weapons-grid,
+  #sell-ammo-grid,
+  #assets-grid,
+  #premium-tiers-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
   }
 }
 
