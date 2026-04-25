@@ -1,16 +1,43 @@
 // Top-of-page bootstrap helpers that need the initial DOM shell to exist.
 (function () {
   var dot = document.getElementById('conn-dot');
+  var _connTimer = null;
+  var _connDelayMs = 4000;
+  var _connDelayMin = 4000;
+  var _connDelayMax = 30000;
+
+  function scheduleConnCheck(delayMs) {
+    if (_connTimer) clearTimeout(_connTimer);
+    _connTimer = setTimeout(checkConn, delayMs);
+  }
 
   function checkConn() {
-    fetch('/healthz').then(function () {
+    if (document.hidden) {
+      scheduleConnCheck(Math.min(_connDelayMax, _connDelayMs + 4000));
+      return;
+    }
+
+    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timeoutId = setTimeout(function () {
+      if (ctrl) ctrl.abort();
+    }, 2500);
+
+    fetch('/healthz', {
+      cache: 'no-store',
+      signal: ctrl ? ctrl.signal : undefined,
+    }).then(function () {
+      clearTimeout(timeoutId);
       if (dot) { dot.style.background = '#3f3'; dot.title = 'Connected'; }
+      _connDelayMs = _connDelayMin;
+      scheduleConnCheck(_connDelayMs);
     }).catch(function () {
+      clearTimeout(timeoutId);
       if (dot) { dot.style.background = '#f33'; dot.title = 'Disconnected'; }
+      _connDelayMs = Math.min(_connDelayMax, Math.floor(_connDelayMs * 1.6));
+      scheduleConnCheck(_connDelayMs);
     });
   }
 
-  setInterval(checkConn, 2000);
   checkConn();
 })();
 
