@@ -2215,12 +2215,13 @@ const GameManager = (function () {
       if (typeof ApiClient === 'undefined') {
         Marketplace.setOKC(0);
       } else if (Marketplace.initBackendSync) {
-        Marketplace.initBackendSync().then(function () {
-          if (typeof HUD !== 'undefined' && HUD.updateOKC) {
+        Marketplace.initBackendSync().then(function (ok) {
+          // Keep local balance intact on transient backend failures.
+          if (ok && typeof HUD !== 'undefined' && HUD.updateOKC) {
             HUD.updateOKC(Marketplace.getOKC());
           }
         }).catch(function () {
-          Marketplace.setOKC(0);
+          /* no-op: preserve local balance fallback */
         });
       } else {
         Marketplace.setOKC(0);

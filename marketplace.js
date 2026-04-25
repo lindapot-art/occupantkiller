@@ -224,10 +224,15 @@ const Marketplace = (function () {
       var cat = await ApiClient.catalog();
       if (!cat || !Array.isArray(cat.items)) return null;
       dynamicAssets = cat.items.map(function (it) {
+        var polCost = 0;
+        if (it.price_pol_wei != null) {
+          var weiNum = Number(it.price_pol_wei);
+          if (Number.isFinite(weiNum) && weiNum > 0) polCost = weiNum / 1e18;
+        }
         return {
           id: String(it.token_id),
           name: it.label || ('Asset #' + it.token_id),
-          polCost: it.price_pol_wei ? 0 : 0,
+          polCost: polCost,
           okcCost: Number(it.price_okc || 0),
           type: 'cosmetic',
           tokenId: String(it.token_id),
@@ -421,8 +426,14 @@ const Marketplace = (function () {
   }
 
   /* ── Buy Game Asset ────────────────────────────────────────────── */
+  function _getAssetAtIndex(assetIdx) {
+    var assets = getGameAssets();
+    if (!assets || assetIdx < 0 || assetIdx >= assets.length) return null;
+    return assets[assetIdx];
+  }
+
   function buyAssetWithOKC(assetIdx) {
-    var asset = GAME_ASSETS[assetIdx];
+    var asset = _getAssetAtIndex(assetIdx);
     if (!asset) return false;
     if (ownedAssets.indexOf(asset.id) >= 0) return false; // already owned
     var cost = getDiscountedPrice(asset.okcCost);
@@ -434,7 +445,7 @@ const Marketplace = (function () {
   }
 
   async function buyAssetWithPOL(assetIdx) {
-    var asset = GAME_ASSETS[assetIdx];
+    var asset = _getAssetAtIndex(assetIdx);
     if (!asset) return false;
     if (ownedAssets.indexOf(asset.id) >= 0) return false;
     if (!Blockchain.isConnected()) return false;
@@ -476,34 +487,38 @@ const Marketplace = (function () {
   }
 
   async function claimOKC(amount) {
-    if (!hasApi() || typeof Blockchain === 'undefined') return false;
+    if (!canUseApi() || typeof Blockchain === 'undefined') return false;
     try {
       await initBackendSync();
       var proof = await ApiClient.claimOkc(amount);
       if (!proof) return false;
       await Blockchain.claimOkcOnChain(proof);
       await refreshFromBackend();
+      markApiSuccess();
       return true;
     } catch (_) {
+      markApiFailure();
       return false;
     }
   }
 
   async function mintVeteranTier(tierId) {
-    if (!hasApi() || typeof Blockchain === 'undefined') return false;
+    if (!canUseApi() || typeof Blockchain === 'undefined') return false;
     try {
       await initBackendSync();
       var proof = await ApiClient.mintVeteran(tierId);
       if (!proof) return false;
       await Blockchain.mintVeteranOnChain(proof);
+      markApiSuccess();
       return true;
     } catch (_) {
+      markApiFailure();
       return false;
     }
   }
 
   async function buyCatalogAssetWithOKC(tokenId, amount) {
-    if (!hasApi() || typeof Blockchain === 'undefined') return false;
+    if (!canUseApi() || typeof Blockchain === 'undefined') return false;
     try {
       await initBackendSync();
       var proof = await ApiClient.buyCosmetic(tokenId, amount || 1);
@@ -511,8 +526,11 @@ const Marketplace = (function () {
       await Blockchain.claimWeaponOnChain(proof);
       await refreshFromBackend();
       addTx('asset', 'Bought cosmetic #' + tokenId, -Number(proof.cost || 0), 'OKC');
+      if (ownedAssets.indexOf(String(tokenId)) < 0) ownedAssets.push(String(tokenId));
+      markApiSuccess();
       return true;
     } catch (_) {
+      markApiFailure();
       return false;
     }
   }
