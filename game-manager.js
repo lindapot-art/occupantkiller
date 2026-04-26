@@ -562,6 +562,21 @@ const GameManager = (function () {
       exposure:     0.5,
       description:  'The ultimate battle for peace. Storm the Kremlin. End the war.',
     },
+    {
+      id:           13,
+      name:         'SIEGE OF KYIV',
+      theme:        'urban',
+      wavesPerStage: 8,
+      difficulty:   1.5,
+      fogColor:     0x6a7080,
+      bgColor:      0x6a7080,
+      sunColor:     0xc8d0dc,
+      sunIntensity: 0.55,
+      exposure:     0.75,
+      tankFocus:    true,
+      hintWeapons:  ['NLAW','FGM148Javelin','RPG7','StugnaP'],
+      description:  'Feb 2022. Ambush the Russian armored convoy on the road to Kyiv. NLAW and Javelin teams hold the line.',
+    },
   ];
 
   let currentStage = 0;  // 0-based index into STAGES
@@ -2825,7 +2840,13 @@ const GameManager = (function () {
     }
 
     // Spawn enemy vehicles on later waves (Russian armored assault)
-    if (w >= 3) {
+    // tankFocus stages (e.g. Siege of Kyiv) get heavy armor from wave 1
+    var tankFocus = !!(stageDef && stageDef.tankFocus);
+    var armorMinWave = tankFocus ? 1 : 3;
+    var transportMinWave = tankFocus ? 2 : 5;
+    var extraTanks = tankFocus ? 1 + Math.min(3, Math.floor(w / 2)) : 0;
+
+    if (w >= armorMinWave) {
       var enemySpawnAngle = Math.random() * Math.PI * 2;
       var enemySpawnDist = 35 + Math.random() * 10;
       var evx = Math.cos(enemySpawnAngle) * enemySpawnDist;
@@ -2834,13 +2855,25 @@ const GameManager = (function () {
       VehicleSystem.spawnEnemy(evx, evy, evz, 'combat');
       HUD.notifyPickup('⚠ ENEMY ARMOR SPOTTED!', '#ff4444');
     }
-    if (w >= 5) {
+    if (w >= transportMinWave) {
       var evAngle2 = Math.random() * Math.PI * 2;
       var evDist2 = 30 + Math.random() * 10;
       var evx2 = Math.cos(evAngle2) * evDist2;
       var evz2 = Math.sin(evAngle2) * evDist2;
       var evy2 = VoxelWorld.getTerrainHeight(evx2, evz2);
       VehicleSystem.spawnEnemy(evx2, evy2, evz2, 'transport');
+    }
+    // tankFocus extra armored column — convoy-style spawn pattern
+    for (var et = 0; et < extraTanks; et++) {
+      var convoyAngle = (et / Math.max(1, extraTanks)) * Math.PI * 0.6 - Math.PI * 0.3 + (Math.random() - 0.5) * 0.4;
+      var convoyDist = 38 + et * 6 + Math.random() * 6;
+      var ctx = Math.cos(convoyAngle) * convoyDist;
+      var ctz = Math.sin(convoyAngle) * convoyDist;
+      var cty = VoxelWorld.getTerrainHeight(ctx, ctz);
+      VehicleSystem.spawnEnemy(ctx, cty, ctz, 'combat');
+    }
+    if (tankFocus && w === 1) {
+      HUD.notifyPickup('🚀 GRAB AN NLAW OR JAVELIN — STOP THE CONVOY!', '#ffcc44');
     }
 
     // Spawn enemy drones (from nests if alive, reduced if nests destroyed)
