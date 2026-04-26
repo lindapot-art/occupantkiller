@@ -297,11 +297,42 @@ const DroneSystem = (function () {
     drone.mesh = buildDroneMesh(type);
     drone.mesh.position.copy(drone.position);
     drone.mesh.userData.droneId = drone.id;
+    drone.mesh.userData.isDrone = true;
+    drone.mesh.userData.faction = drone.faction;
+    // Tag every child so raycaster hits register as drone hits regardless of which part is struck
+    drone.mesh.traverse(function (c) {
+      c.userData.droneId = drone.id;
+      c.userData.isDrone = true;
+      c.userData.faction = drone.faction;
+    });
 
     if (_scene) _scene.add(drone.mesh);
     drones.push(drone);
     _invalidateDroneCaches();
     return drone;
+  }
+
+  function findByMesh(mesh) {
+    if (!mesh) return null;
+    var node = mesh;
+    while (node) {
+      if (node.userData && node.userData.droneId) {
+        for (var i = 0; i < drones.length; i++) {
+          if (drones[i].id === node.userData.droneId && drones[i].alive) return drones[i];
+        }
+        return null;
+      }
+      node = node.parent;
+    }
+    return null;
+  }
+
+  function getAllMeshes() {
+    var arr = [];
+    for (var i = 0; i < drones.length; i++) {
+      if (drones[i].alive && drones[i].mesh) arr.push(drones[i].mesh);
+    }
+    return arr;
   }
 
   /* ── Possess / Release Drone ─────────────────────────────────────── */
@@ -471,10 +502,17 @@ const DroneSystem = (function () {
 
       if (drone === _possessedDrone) {
         updatePossessedDrone(drone, delta);
-      } else if (drone.aiControlled) {
-        updateAIDrone(drone, delta);
       } else if (drone.faction === 'russian') {
-        updateEnemyDrone(drone, delta);
+        // Enemy drones always use enemy AI (bomber/FPV/observer) regardless of aiControlled flag.
+        // Observer reinforcement timer + patrol fallback are handled in updateAIDrone.
+        if (drone.type === DRONE_TYPE.ENEMY_OBSERVER) {
+          updateAIDrone(drone, delta);
+        } else {
+          updateEnemyDrone(drone, delta);
+        }
+      } else {
+        // Friendly autonomous drones: hunt + attack enemies (FPV/BOMB/KAMIKAZE) or scout (RECON/SURVEILLANCE)
+        updateAIDrone(drone, delta);
       }
 
       // Apply velocity
@@ -563,6 +601,109 @@ const DroneSystem = (function () {
   }
 
   function updateAIDrone(drone, delta) {
+    // ── Friendly autonomous drones: hunt and attack enemies ──
+    if (drone.faction === 'ukrainian') {
+      // Find nearest enemy
+      var nearestEnemy = null;
+      var nearestDsq = Infinity;
+      if (typeof Enemies !== 'undefined' && Enemies.getAll) {
+        var elist = Enemies.getAll();
+        for (var ei = 0; ei < elist.length; ei++) {
+          var en = elist[ei];
+          if (!en || !en.alive || !en.mesh) continue;
+          var edx = en.mesh.position.x - drone.position.x;
+          var edz = en.mesh.position.z - drone.position.z;
+          var edy = en.mesh.position.y - drone.position.y;
+          var ed3 = edx * edx + edy * edy + edz * edz;
+          if (ed3 < nearestDsq) { nearestDsq = ed3; nearestEnemy = en; }
+        }
+      }
+      var rangeSq = drone.range * drone.range;
+
+      // FPV_ATTACK: kamikaze dive at enemy
+      if (drone.type === DRONE_TYPE.FPV_ATTACK && nearestEnemy && nearestDsq < rangeSq) {
+        var fdx = nearestEnemy.mesh.position.x - drone.position.x;
+        var fdy = (nearestEnemy.mesh.position.y + 1) - drone.position.y;
+        var fdz = nearestEnemy.mesh.position.z - drone.position.z;
+        var fd = Math.sqrt(fdx * fdx + fdy * fdy + fdz * fdz);
+        if (fd > 1.2) {
+          drone.velocity.x = (fdx / fd) * drone.speed;
+          drone.velocity.y = (fdy / fd) * drone.speed;
+          drone.velocity.z = (fdz / fd) * drone.speed;
+          drone.mesh.rotation.y = Math.atan2(drone.velocity.x, drone.velocity.z);
+        } else {
+          // Impact — damage in radius and self-destruct
+          if (typeof Enemies !== 'undefined' && Enemies.damageInRadius) {
+            Enemies.damageInRadius(drone.position, 3, drone.damage);
+          }
+          createDroneExplosion(drone.position.clone());
+          if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playExplosion) window.AudioSystem.playExplosion();
+          destroyDrone(drone);
+          return;
+        }
+        return;
+      }
+
+      // BOMB: hover to enemy, drop payload, then return
+      if (drone.type === DRONE_TYPE.BOMB && drone.hasPayload && nearestEnemy && nearestDsq < rangeSq) {
+        var bdx = nearestEnemy.mesh.position.x - drone.position.x;
+        var bdz = nearestEnemy.mesh.position.z - drone.position.z;
+        var bxz = Math.sqrt(bdx * bdx + bdz * bdz);
+        var bombAlt = nearestEnemy.mesh.position.y + 12;
+        drone.velocity.y = (bombAlt - drone.position.y) * 1.5;
+        if (bxz > 1.5) {
+          drone.velocity.x = (bdx / bxz) * drone.speed * 0.7;
+          drone.velocity.z = (bdz / bxz) * drone.speed * 0.7;
+        } else {
+          drone.velocity.x = 0;
+          drone.velocity.z = 0;
+          // Drop the payload
+          drone.hasPayload = false;
+          drone.mesh.children.forEach(function (c) { if (c.userData.isPayload) c.visible = false; });
+          var dropPos = drone.position.clone();
+          dropPos.y = nearestEnemy.mesh.position.y;
+          if (typeof Enemies !== 'undefined' && Enemies.damageInRadius) {
+            Enemies.damageInRadius(dropPos, 5, drone.damage);
+          }
+          createDroneExplosion(dropPos);
+          if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playExplosion) window.AudioSystem.playExplosion();
+        }
+        if (drone.velocity.length() > 0.1) drone.mesh.rotation.y = Math.atan2(drone.velocity.x, drone.velocity.z);
+        return;
+      }
+
+      // KAMIKAZE: pure dive bomber, no payload — same as FPV_ATTACK essentially
+      if (drone.type === DRONE_TYPE.KAMIKAZE && nearestEnemy && nearestDsq < rangeSq) {
+        var kdx = nearestEnemy.mesh.position.x - drone.position.x;
+        var kdy = nearestEnemy.mesh.position.y - drone.position.y;
+        var kdz = nearestEnemy.mesh.position.z - drone.position.z;
+        var kd = Math.sqrt(kdx * kdx + kdy * kdy + kdz * kdz);
+        if (kd > 1) {
+          drone.velocity.x = (kdx / kd) * drone.speed;
+          drone.velocity.y = (kdy / kd) * drone.speed;
+          drone.velocity.z = (kdz / kd) * drone.speed;
+          drone.mesh.rotation.y = Math.atan2(drone.velocity.x, drone.velocity.z);
+        } else {
+          if (typeof Enemies !== 'undefined' && Enemies.damageInRadius) {
+            Enemies.damageInRadius(drone.position, 4, drone.damage);
+          }
+          createDroneExplosion(drone.position.clone());
+          if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playExplosion) window.AudioSystem.playExplosion();
+          destroyDrone(drone);
+          return;
+        }
+        return;
+      }
+
+      // RECON / SURVEILLANCE without enemies in range: tag visible enemies on mission system if available
+      if ((drone.type === DRONE_TYPE.RECON || drone.type === DRONE_TYPE.SURVEILLANCE) && nearestEnemy) {
+        if (typeof MissionSystem !== 'undefined' && MissionSystem.onDroneScout) {
+          MissionSystem.onDroneScout(nearestEnemy.mesh.position);
+        }
+      }
+      // Fall through to patrol behavior below for drones with no current target
+    }
+
     if (drone.patrolPoints.length === 0) return;
 
     // Observer drones circle and call reinforcements
@@ -931,6 +1072,8 @@ const DroneSystem = (function () {
     setPatrol,
     damageDrone,
     destroyDrone,
+    findByMesh,
+    getAllMeshes,
     getAll,
     getActive,
     getById,

@@ -3598,11 +3598,39 @@ const GameManager = (function () {
           targets.push(veh.mesh);
         }
       }
+      // Add drone meshes as targets so player can shoot down enemy AND friendly drones (friendly fire allowed)
+      if (typeof DroneSystem !== 'undefined' && DroneSystem.getAllMeshes) {
+        var droneMeshes = DroneSystem.getAllMeshes();
+        for (var dmi = 0; dmi < droneMeshes.length; dmi++) {
+          targets.push(droneMeshes[dmi]);
+        }
+      }
       const weaponType = Weapons.getCurrentType();
       const weaponId = Weapons.getCurrentId();
       // Map weapon type to audio sound type
       const audioMap = { MELEE: 'melee', PISTOL: 'pistol', ASSAULT: 'rifle', LMG: 'rifle', SNIPER: 'sniper', HMG: 'hmg', AT: 'launcher', ATGM: 'launcher', NATO: 'rifle', AT_HEAVY: 'launcher', AT_LIGHT: 'launcher', AA: 'launcher', GRENADE: 'launcher', NATO_HEAVY: 'rifle', HMG_HEAVY: 'hmg', INCENDIARY: 'launcher', MACHINEGUN: 'hmg', SMG: 'smg', AMR: 'heavy_sniper', MINIGUN: 'hmg', SILENT: 'pistol', THERMOBARIC: 'launcher', SHOTGUN: 'shotgun', MINE: 'explosive', SMOKE: 'launcher', FLASHBANG: 'launcher', EXPLOSIVE: 'explosive' };
       Weapons.tryFire(_camera, targets, delta, function (hit) {
+        // Check if hit a drone first (mesh hierarchy tagged with userData.droneId)
+        var hitDrone = null;
+        if (typeof DroneSystem !== 'undefined' && DroneSystem.findByMesh) {
+          hitDrone = DroneSystem.findByMesh(hit.object);
+        }
+        if (hitDrone) {
+          var dmgD = Weapons.getDamage();
+          DroneSystem.damageDrone(hitDrone.id, dmgD);
+          if (typeof Tracers !== 'undefined' && Tracers.spawnImpactSpark) {
+            Tracers.spawnImpactSpark(hit.point || hitDrone.position);
+          }
+          // Award score for downing enemy drone
+          if (!hitDrone.alive && hitDrone.faction === 'russian') {
+            player.score += 50;
+            player.kills += 1;
+            if (typeof HUD !== 'undefined' && HUD.addCombatLog) {
+              HUD.addCombatLog('Enemy drone shot down (+50)', '#44ddff');
+            }
+          }
+          return;
+        }
         // Check if hit a vehicle mesh
         var hitVehicle = null;
         for (var hvi = 0; hvi < allVehicles.length; hvi++) {
