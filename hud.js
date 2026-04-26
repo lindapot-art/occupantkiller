@@ -387,7 +387,8 @@ const HUD = (() => {
     var sorted = [];
     for (var i = 0; i < enemies.length; i++) {
       var e = enemies[i];
-      if (!e || !e.mesh || e.health <= 0) continue;
+      // Enemies module uses .alive + .hp; .health was wrong field — caused dead enemies to show on HUD
+      if (!e || !e.mesh || e.alive === false || (typeof e.hp === 'number' && e.hp <= 0)) continue;
       var dx = e.mesh.position.x - px;
       var dz = e.mesh.position.z - pz;
       var dist = Math.sqrt(dx * dx + dz * dz);
