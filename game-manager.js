@@ -1769,6 +1769,11 @@ const GameManager = (function () {
       }
     });
 
+    // Mobile audio unlock — resume Web Audio context on first touch (iOS/Android requirement)
+    document.addEventListener('touchstart', function () {
+      if (window.AudioSystem && typeof window.AudioSystem.resume === 'function') window.AudioSystem.resume();
+    }, { passive: true });
+
     document.addEventListener('mousedown', function (e) {
       // Resume audio context on any user gesture
       if (window.AudioSystem && typeof window.AudioSystem.resume === 'function') window.AudioSystem.resume();
