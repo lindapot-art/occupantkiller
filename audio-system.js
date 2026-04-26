@@ -46,7 +46,7 @@ window.AudioSystem = (function () {
   // ── Sound Generators ────────────────────────────────────
 
   function playGunshot(type) {
-    // type: 'pistol', 'rifle', 'sniper', 'hmg', 'shotgun'
+    // type: 'pistol', 'rifle', 'sniper', 'hmg', 'shotgun', 'smg', 'launcher', 'explosive', 'melee'
     if (!enabled || !ctx) return;
     var now = ctx.currentTime;
     var osc = ctx.createOscillator();
@@ -59,6 +59,11 @@ window.AudioSystem = (function () {
       sniper:       { freq: 200, decay: 0.15, noiseVol: 0.8, filterFreq: 1500 },
       heavy_sniper: { freq: 120, decay: 0.22, noiseVol: 0.95, filterFreq: 1000 },
       hmg:          { freq: 300, decay: 0.08, noiseVol: 0.7, filterFreq: 1800 },
+      smg:          { freq: 600, decay: 0.05, noiseVol: 0.5, filterFreq: 2400 },
+      shotgun:      { freq: 250, decay: 0.18, noiseVol: 0.95, filterFreq: 1200 },
+      launcher:     { freq: 90,  decay: 0.30, noiseVol: 0.9,  filterFreq: 800 },
+      explosive:    { freq: 70,  decay: 0.35, noiseVol: 1.0,  filterFreq: 600 },
+      melee:        { freq: 220, decay: 0.04, noiseVol: 0.3,  filterFreq: 4000 },
     }[type] || { freq: 400, decay: 0.10, noiseVol: 0.6, filterFreq: 2000 };
 
     filter.type = 'lowpass';
@@ -270,6 +275,11 @@ window.AudioSystem = (function () {
       sniper:       { freq: 200, decay: 0.15, noiseVol: 0.8, filterFreq: 1500 },
       heavy_sniper: { freq: 120, decay: 0.22, noiseVol: 0.95, filterFreq: 1000 },
       hmg:          { freq: 300, decay: 0.08, noiseVol: 0.7, filterFreq: 1800 },
+      smg:          { freq: 600, decay: 0.05, noiseVol: 0.5, filterFreq: 2400 },
+      shotgun:      { freq: 250, decay: 0.18, noiseVol: 0.95, filterFreq: 1200 },
+      launcher:     { freq: 90,  decay: 0.30, noiseVol: 0.9,  filterFreq: 800 },
+      explosive:    { freq: 70,  decay: 0.35, noiseVol: 1.0,  filterFreq: 600 },
+      melee:        { freq: 220, decay: 0.04, noiseVol: 0.3,  filterFreq: 4000 },
     }[type] || { freq: 400, decay: 0.10, noiseVol: 0.6, filterFreq: 2000 };
     filter.type = 'lowpass';
     filter.frequency.value = params.filterFreq;

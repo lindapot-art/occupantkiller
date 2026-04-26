@@ -3365,6 +3365,50 @@ const GameManager = (function () {
       touch.lookY = 0;
     }
 
+    // ── Mobile aim assist: gentle magnetism toward nearest enemy in cone ──
+    // Helps thumb-aim feel responsive without auto-aim-bot behavior.
+    if (isMobile && typeof Enemies !== 'undefined' && Enemies.getAll) {
+      var _aaList = Enemies.getAll();
+      if (_aaList && _aaList.length > 0) {
+        var camYaw = CameraSystem.getYaw();
+        var camPitch = CameraSystem.getPitch();
+        var px = _camera.position.x, py = _camera.position.y, pz = _camera.position.z;
+        var bestE = null, bestAng = 0.18; // ~10° cone
+        var bestDx = 0, bestDy = 0, bestDist = 0;
+        for (var aai = 0; aai < _aaList.length; aai++) {
+          var en = _aaList[aai];
+          if (!en || !en.alive || !en.mesh) continue;
+          var ex = en.mesh.position.x - px;
+          var ey = (en.mesh.position.y + 1.0) - py;
+          var ez = en.mesh.position.z - pz;
+          var d2 = ex * ex + ez * ez;
+          if (d2 < 1 || d2 > 3600) continue; // 1m–60m
+          var dist = Math.sqrt(d2);
+          var enYaw = Math.atan2(-ex, -ez);
+          var dy = enYaw - camYaw;
+          while (dy > Math.PI) dy -= 2 * Math.PI;
+          while (dy < -Math.PI) dy += 2 * Math.PI;
+          var enPitch = Math.atan2(ey, dist);
+          var dp = enPitch - camPitch;
+          var ang = Math.sqrt(dy * dy + dp * dp);
+          if (ang < bestAng) {
+            bestAng = ang;
+            bestE = en;
+            bestDx = dy;
+            bestDy = dp;
+            bestDist = dist;
+          }
+        }
+        if (bestE) {
+          // Stronger pull when firing; falls off with distance
+          var pull = (touch.firing || mouseDown) ? 0.18 : 0.06;
+          pull *= Math.max(0.3, 1.0 - bestDist / 60);
+          CameraSystem.setYaw(camYaw + bestDx * pull);
+          CameraSystem.setPitch(camPitch + bestDy * pull);
+        }
+      }
+    }
+
     const yaw = CameraSystem.getYaw();
     const forward = _gmTmp1.set(-Math.sin(yaw), 0, -Math.cos(yaw));
     const right   = _gmTmp2.set(Math.cos(yaw), 0, -Math.sin(yaw));
@@ -3647,7 +3691,12 @@ const GameManager = (function () {
       }, mouseNewPress);
       // Play sound on every actual shot (auto-fire included), not just first click
       if (Weapons.didFire()) {
-        if (window.AudioSystem && window.AudioSystem.playGunshot) window.AudioSystem.playGunshot(audioMap[weaponType] || 'rifle');
+        if (window.AudioSystem) {
+          if (weaponType === 'FLASHBANG' && window.AudioSystem.playFlashbang) window.AudioSystem.playFlashbang();
+          else if (weaponType === 'SMOKE' && window.AudioSystem.playSmoke) window.AudioSystem.playSmoke();
+          else if (weaponType === 'MINE' && window.AudioSystem.playMine) window.AudioSystem.playMine();
+          else if (window.AudioSystem.playGunshot) window.AudioSystem.playGunshot(audioMap[weaponType] || 'rifle');
+        }
         MLSystem.onShot(weaponId);
         player.totalShots++;
         player.waveShots++;
