@@ -5476,6 +5476,7 @@ const GameManager = (function () {
       Weapons.forceReload();
       if (window.AudioSystem && window.AudioSystem.playReload) window.AudioSystem.playReload();
       MLSystem.onReload();
+      if (navigator.vibrate) { try { navigator.vibrate([10, 40, 10]); } catch (er) {} }
       btnReload.classList.add('active');
     }, { passive: false });
     btnReload.addEventListener('touchend', function () { btnReload.classList.remove('active'); });

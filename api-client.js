@@ -16,6 +16,9 @@ const ApiClient = (function () {
   let _anonId   = null;
   let _profile  = null;
   let _inflight = new Map();
+  let _backendDown = false; // circuit breaker — set after first connection failure
+  let _backendCheckedAt = 0;
+  const BACKEND_RETRY_MS = 60000; // retry every 60s after going down
 
   function _ensureAnonId() {
     if (_anonId) return _anonId;
@@ -45,9 +48,17 @@ const ApiClient = (function () {
     const key = method + ' ' + pathname + ':' + (body ? JSON.stringify(body) : '');
     if (_inflight.has(key)) return _inflight.get(key);
 
+    // Circuit breaker — short-circuit when backend known down (avoid log spam)
+    if (_backendDown && (Date.now() - _backendCheckedAt) < BACKEND_RETRY_MS) {
+      const e = new Error('backend offline');
+      e.offline = true;
+      return Promise.reject(e);
+    }
+
     const p = (async () => {
       try {
         const res = await fetch(url, opts);
+        _backendDown = false;
         let data = null;
         try { data = await res.json(); } catch (_) { data = { error: 'bad json' }; }
         if (!res.ok) {
@@ -56,6 +67,16 @@ const ApiClient = (function () {
           throw e;
         }
         return data;
+      } catch (err) {
+        // Network failure (CORS / refused / DNS) — trip breaker, suppress next retries
+        if (err && (err.name === 'TypeError' || err.message === 'Failed to fetch' || /NetworkError|connection|refused/i.test(String(err.message)))) {
+          _backendDown = true;
+          _backendCheckedAt = Date.now();
+          const offline = new Error('backend offline');
+          offline.offline = true;
+          throw offline;
+        }
+        throw err;
       } finally {
         _inflight.delete(key);
       }
