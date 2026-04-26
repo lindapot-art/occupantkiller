@@ -895,19 +895,26 @@ canvas {
 
 #mobile-actions {
   position: absolute;
-  bottom: 20px;
-  right: 20px;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  right: max(20px, env(safe-area-inset-right));
   display: grid;
   grid-template-columns: repeat(3, auto);
   gap: 8px;
   align-items: center;
   justify-items: center;
 }
-#mobile-actions #btn-fire { grid-column: span 3; margin-bottom: 4px; }
+#mobile-actions #btn-fire {
+  grid-column: span 3;
+  margin-bottom: 4px;
+  width: 88px; height: 88px;
+  font-size: 30px;
+  background: rgba(255, 80, 80, 0.28);
+  border-color: rgba(255, 120, 120, 0.55);
+}
 
 #mobile-utility {
   position: absolute;
-  right: 18px;
+  right: max(18px, env(safe-area-inset-right));
   bottom: 350px;
   display: grid;
   grid-template-columns: repeat(4, 52px);

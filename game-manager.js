@@ -1774,6 +1774,19 @@ const GameManager = (function () {
       if (window.AudioSystem && typeof window.AudioSystem.resume === 'function') window.AudioSystem.resume();
     }, { passive: true });
 
+    // Auto-pause when tab/app loses focus (mobile background, alt-tab, etc.)
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden && (gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE)) {
+        gameState = STATE.PAUSED;
+        var invOv = document.getElementById('inventory-overlay');
+        if (invOv) {
+          if (typeof showInventory === 'function') showInventory();
+          invOv.style.display = 'flex';
+        }
+        if (typeof updateMobileControlsVisibility === 'function') updateMobileControlsVisibility();
+      }
+    });
+
     document.addEventListener('mousedown', function (e) {
       // Resume audio context on any user gesture
       if (window.AudioSystem && typeof window.AudioSystem.resume === 'function') window.AudioSystem.resume();
