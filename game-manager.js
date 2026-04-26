@@ -577,6 +577,74 @@ const GameManager = (function () {
       hintWeapons:  ['NLAW','FGM148Javelin','RPG7','StugnaP'],
       description:  'Feb 2022. Ambush the Russian armored convoy on the road to Kyiv. NLAW and Javelin teams hold the line.',
     },
+    {
+      id:           14,
+      name:         'SNAKE ISLAND DEFENSE',
+      theme:        'coastal',
+      wavesPerStage: 6,
+      difficulty:   1.4,
+      fogColor:     0x4a6680,
+      bgColor:      0x4a6680,
+      sunColor:     0xddddff,
+      sunIntensity: 0.65,
+      exposure:     0.8,
+      description:  'Feb 24, 2022. Russian warship Moskva approaches Snake Island. Reply: "Russian warship, go fuck yourself."',
+    },
+    {
+      id:           15,
+      name:         'SAKY AIRBASE STRIKE',
+      theme:        'coastal',
+      wavesPerStage: 7,
+      difficulty:   1.7,
+      fogColor:     0x886644,
+      bgColor:      0xa8845a,
+      sunColor:     0xfff0d0,
+      sunIntensity: 0.95,
+      exposure:     0.95,
+      description:  'Aug 2022. Crimea. Light up the Saky airbase — every parked Su-24 is a war crime grounded.',
+    },
+    {
+      id:           16,
+      name:         'VUHLEDAR TANK GRAVEYARD',
+      theme:        'wasteland',
+      wavesPerStage: 8,
+      difficulty:   1.9,
+      fogColor:     0x4a4030,
+      bgColor:      0x5a5040,
+      sunColor:     0xddccaa,
+      sunIntensity: 0.5,
+      exposure:     0.7,
+      tankFocus:    true,
+      hintWeapons:  ['NLAW','FGM148Javelin','StugnaP','RPG7'],
+      description:  'Feb 2023. The 155th Naval Infantry Brigade walks into a minefield. Make Vuhledar the largest tank graveyard of the war.',
+    },
+    {
+      id:           17,
+      name:         'ANTONOV BRIDGE STRIKE',
+      theme:        'urban',
+      wavesPerStage: 7,
+      difficulty:   2.0,
+      fogColor:     0x556677,
+      bgColor:      0x6a7888,
+      sunColor:     0xffeecc,
+      sunIntensity: 0.85,
+      exposure:     0.85,
+      description:  'Jul-Aug 2022. HIMARS season. Cut the Antonov Bridge supply line and trap the Russian forces in Kherson.',
+    },
+    {
+      id:           18,
+      name:         'REFINERY STRIKE — FPV DRONE',
+      theme:        'industrial',
+      wavesPerStage: 1,
+      difficulty:   1.6,
+      fogColor:     0x2a2620,
+      bgColor:      0x3a342a,
+      sunColor:     0xffaa66,
+      sunIntensity: 0.6,
+      exposure:     0.75,
+      droneOnly:    true,
+      description:  'Pilot a one-way FPV drone deep into a Russian oil refinery. No respawns at the wheel — only at the launch pad.',
+    },
   ];
 
   let currentStage = 0;  // 0-based index into STAGES
@@ -967,6 +1035,7 @@ const GameManager = (function () {
     if (Building && typeof Building.init === 'function') Building.init(_scene);
     if (NPCSystem && typeof NPCSystem.init === 'function') NPCSystem.init(_scene);
     if (DroneSystem && typeof DroneSystem.init === 'function') DroneSystem.init(_scene, _camera);
+    if (typeof RefineryStrike !== 'undefined' && RefineryStrike.init) RefineryStrike.init(_scene);
     if (VehicleSystem && typeof VehicleSystem.init === 'function') VehicleSystem.init(_scene);
     if (Economy && typeof Economy.init === 'function') Economy.init();
     if (SkillSystem && typeof SkillSystem.init === 'function') SkillSystem.init();
@@ -2695,6 +2764,7 @@ const GameManager = (function () {
     Enemies.clear();
     Pickups.clear();
     DroneSystem.clear();
+    if (typeof RefineryStrike !== 'undefined' && RefineryStrike.clear) RefineryStrike.clear();
     if (typeof Building !== 'undefined' && Building.clear) Building.clear();
     if (typeof Tracers !== 'undefined' && Tracers.clear) Tracers.clear();
     if (typeof StageVFX !== 'undefined' && StageVFX.clear) StageVFX.clear();
@@ -2773,6 +2843,23 @@ const GameManager = (function () {
     // Show AI adaptation notification
     if (aiStrategy.adaptationLevel > 0 && HUD.notifyPickup) {
       HUD.notifyPickup(aiStrategy.adaptationMessage, '#ff00ff');
+    }
+
+    // ═══ DroneOnly stages (e.g. Refinery Strike) ═══
+    // Skip enemy spawning entirely; instead launch the FPV drone mission.
+    // Wave clears when all refinery targets destroyed.
+    if (stageDef.droneOnly && typeof RefineryStrike !== 'undefined' && RefineryStrike.startMission) {
+      window.AudioSystem.playWaveStart();
+      HUD.setWave(w, stageDef.wavesPerStage);
+      HUD.announceWave(w, 0, stageDef.wavesPerStage);
+      if (typeof Feedback !== 'undefined' && Feedback.radioChatter) Feedback.radioChatter('wave_start');
+      RefineryStrike.startMission({
+        onComplete: function () {
+          // Treat refinery destruction as wave complete -> stage clear
+          onWaveComplete();
+        }
+      });
+      return;
     }
 
     // Pass AI strategy to enemies for adaptive behavior
@@ -4529,6 +4616,7 @@ const GameManager = (function () {
       VehicleSystem.update(delta);
       Automation.update(delta);
       MissionSystem.update(delta);
+      if (typeof RefineryStrike !== 'undefined' && RefineryStrike.update) RefineryStrike.update(delta);
 
       // Update drone controls HUD
       updateDroneControlsHUD();
