@@ -679,8 +679,30 @@ const Enemies = (() => {
   });
 
   function createAssaultGroup(id, spawnCenter) {
-    const objectiveAngle = Math.random() * Math.PI * 2;
-    const objectiveDist = 8 + Math.random() * 12;
+    var objectiveAngle = Math.random() * Math.PI * 2;
+    var objectiveDist = 8 + Math.random() * 12;
+    var objX = Math.cos(objectiveAngle) * objectiveDist;
+    var objZ = Math.sin(objectiveAngle) * objectiveDist;
+    // Hunt mode: prefer NPC clusters as initial objective.
+    // ~70% of squads are dedicated NPC-hunters; 30% go for player area.
+    var huntsNPCs = Math.random() < 0.7;
+    if (huntsNPCs && typeof NPCSystem !== 'undefined' && NPCSystem.getAll) {
+      var allies = NPCSystem.getAll();
+      var pick = null;
+      var bestD = Infinity;
+      for (var ai = 0; ai < allies.length; ai++) {
+        if (!allies[ai].alive) continue;
+        var dxs = allies[ai].position.x - spawnCenter.x;
+        var dzs = allies[ai].position.z - spawnCenter.z;
+        var ds = dxs * dxs + dzs * dzs;
+        if (ds < bestD) { bestD = ds; pick = allies[ai]; }
+      }
+      if (pick) {
+        objX = pick.position.x + (Math.random() - 0.5) * 4;
+        objZ = pick.position.z + (Math.random() - 0.5) * 4;
+        objectiveAngle = Math.atan2(objZ - spawnCenter.z, objX - spawnCenter.x);
+      }
+    }
     // Pick formation type based on group id
     var formations = ['wedge', 'line', 'column', 'staggered'];
     return {
@@ -688,16 +710,13 @@ const Enemies = (() => {
       state: GROUP_STATE.FORMING,
       stateTimer: 3 + Math.random() * 5,
       rallyPoint: spawnCenter.clone(),
-      objective: new THREE.Vector3(
-        Math.cos(objectiveAngle) * objectiveDist,
-        0,
-        Math.sin(objectiveAngle) * objectiveDist
-      ),
+      objective: new THREE.Vector3(objX, 0, objZ),
       members: [],        // enemy indices
       wounded: [],         // wounded member indices
       morale: 80 + Math.random() * 20,
       hasOfficer: false,
       hasMedic: false,
+      huntsNPCs: huntsNPCs, // if true, this squad prioritises NPCs over player
       formationSpread: 2 + Math.random() * 2,
       formation: formations[id % formations.length],
       formationHeading: objectiveAngle, // direction the formation faces
@@ -1707,14 +1726,31 @@ const Enemies = (() => {
       // Alert icon visibility
       if (e.alertIcon) e.alertIcon.visible = e.playerSpotted;
 
-      // Choose target priority: nearest NPC within 20, or spotted player
-      if (nearestNPC && nearestNPCDist < 20) {
+      // Choose target priority. Each squad either hunts NPCs (70%) or hunts player (30%).
+      // NPC-hunters chase NPCs map-wide; only switch to player if player is *very* close (point-blank threat).
+      // Player-hunters chase the player; only switch to NPC if NPC is in melee range.
+      var grpHunts = false;
+      if (e.groupId >= 0 && e.groupId < assaultGroups.length && assaultGroups[e.groupId]) {
+        grpHunts = !!assaultGroups[e.groupId].huntsNPCs;
+      }
+      var npcHuntRange = grpHunts ? 80 : 12;
+      if (nearestNPC && nearestNPCDist < npcHuntRange) {
         moveTarget = nearestNPC.position;
         targetIsNPC = true;
         targetDist = nearestNPCDist;
         e.npcTarget = nearestNPC;
       }
-      if (e.playerSpotted && distToPlayer < nearestNPCDist * 0.8) {
+      // Player-priority cutoff: hunters only ditch NPC if player is point-blank (<5m).
+      // Non-hunters use the original 0.8 ratio.
+      var switchToPlayer = false;
+      if (e.playerSpotted) {
+        if (grpHunts) {
+          switchToPlayer = (distToPlayer < 5) || !nearestNPC;
+        } else {
+          switchToPlayer = !targetIsNPC || (distToPlayer < nearestNPCDist * 0.8);
+        }
+      }
+      if (switchToPlayer) {
         moveTarget = playerPos;
         targetIsNPC = false;
         targetDist = distToPlayer;
@@ -2113,16 +2149,40 @@ const Enemies = (() => {
         }
       }
 
-      // ── Combat: attack friendly NPCs ──
+      // ── Combat: attack friendly NPCs (melee + ranged) ──
       if (targetIsNPC && e.npcTarget && e.npcTarget.alive) {
         const npcDist = e.mesh.position.distanceTo(e.npcTarget.position);
         const attackRange = 2.0 * e.typeCfg.scale;
+        // Melee
         if (npcDist < attackRange) {
           e.attackTimer -= delta;
           if (e.attackTimer <= 0) {
             e.attackTimer = e.attackRate;
             if (typeof NPCSystem !== 'undefined' && NPCSystem.damage) {
               NPCSystem.damage(e.npcTarget.id, e.attackDmg);
+            }
+          }
+        }
+        // Ranged fire on NPC target
+        if (e.typeCfg.range > 0 && e.typeCfg.rangedDmg > 0 && npcDist < e.typeCfg.range && npcDist > 2.5) {
+          if (!e._rangedTimer) e._rangedTimer = 0;
+          e._rangedTimer -= delta;
+          if (e._rangedTimer <= 0) {
+            e._rangedTimer = e.typeCfg.rangedRate;
+            var hitC = Math.max(0, e.typeCfg.accuracy * (1 - npcDist / (e.typeCfg.range * 1.5)));
+            if (Math.random() < hitC && typeof NPCSystem !== 'undefined' && NPCSystem.damage) {
+              NPCSystem.damage(e.npcTarget.id, e.typeCfg.rangedDmg);
+            }
+            // Tracer + muzzle flash for visual feedback
+            if (typeof Tracers !== 'undefined' && Tracers.spawnTracer) {
+              var tO = _tmpVec3d.copy(e.mesh.position); tO.y += 1.2;
+              var tD = _tmpVec3e.set(e.npcTarget.position.x, e.npcTarget.position.y + 0.8, e.npcTarget.position.z).sub(tO).normalize();
+              Tracers.spawnTracer(tO, tD, 0xff4400, 80);
+              if (Tracers.spawnMuzzleFlash) Tracers.spawnMuzzleFlash(tO, tD);
+            }
+            if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playSpatialGunshot && playerPos) {
+              var camY = (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) ? CameraSystem.getYaw() : 0;
+              window.AudioSystem.playSpatialGunshot('rifle', e.mesh.position, playerPos, camY);
             }
           }
         }
@@ -2612,6 +2672,19 @@ const Enemies = (() => {
           break;
 
         case GROUP_STATE.ADVANCING:
+          // NPC-hunter squads continually refresh objective onto nearest live NPC while advancing
+          if (grp.huntsNPCs && typeof NPCSystem !== 'undefined' && NPCSystem.getAll) {
+            var advFriends = NPCSystem.getAll();
+            var advBest = null, advBestSq = Infinity;
+            for (var afi = 0; afi < advFriends.length; afi++) {
+              if (!advFriends[afi].alive) continue;
+              var adx = advFriends[afi].position.x - cx;
+              var adz = advFriends[afi].position.z - cz;
+              var adsq = adx * adx + adz * adz;
+              if (adsq < advBestSq) { advBestSq = adsq; advBest = advFriends[afi]; }
+            }
+            if (advBest) grp.objective.copy(advBest.position);
+          }
           // Move toward objective
           if (grp.stateTimer <= 0 || lossRatio > 0.3) {
             grp.state = lossRatio > 0.5 ? GROUP_STATE.RETREATING : GROUP_STATE.ASSAULTING;
@@ -2629,12 +2702,20 @@ const Enemies = (() => {
           break;
 
         case GROUP_STATE.ASSAULTING:
-          // Pick new objective near friendly NPCs
+          // Pick new objective: NEAREST live NPC to group center (not random — hunt the closest target)
           if (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) {
             const friendlies = NPCSystem.getAll();
             if (friendlies.length > 0) {
-              const target = friendlies[Math.floor(Math.random() * friendlies.length)];
-              grp.objective.copy(target.position);
+              var bestNpc = null;
+              var bestDsq = Infinity;
+              for (var fi = 0; fi < friendlies.length; fi++) {
+                if (!friendlies[fi].alive) continue;
+                var ddx = friendlies[fi].position.x - cx;
+                var ddz = friendlies[fi].position.z - cz;
+                var ddsq = ddx * ddx + ddz * ddz;
+                if (ddsq < bestDsq) { bestDsq = ddsq; bestNpc = friendlies[fi]; }
+              }
+              if (bestNpc) grp.objective.copy(bestNpc.position);
             }
           }
           if (grp.stateTimer <= 0) {
