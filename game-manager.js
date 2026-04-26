@@ -3160,6 +3160,14 @@ const GameManager = (function () {
       if (typeof Marketplace !== 'undefined') {
         Marketplace.onStageClear();
         HUD.updateOKC(Marketplace.getOKC());
+        // Off-chain NFT badge mint for veteran stages
+        if (Marketplace.mintStageBadge) {
+          var stageDefForBadge = STAGES[currentStage];
+          var minted = Marketplace.mintStageBadge(stageDefForBadge && stageDefForBadge.id);
+          if (minted && HUD.notifyPickup) {
+            HUD.notifyPickup('🏅 NFT BADGE MINTED — view in Marketplace', '#ffcc44');
+          }
+        }
       }
 
       if (currentStage >= STAGES.length - 1) {

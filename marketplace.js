@@ -154,6 +154,69 @@ const Marketplace = (function () {
 
   let ownedAssets = [];
 
+  /* ── NFT CLUB — off-chain ledger (smart contracts deferred) ────
+     The Occupant Killer NFT Club: tiered membership that mirrors
+     what will later become real Polygon ERC-1155 tokens minted from
+     the admin panel. For now, all state lives in this module and
+     persists via localStorage; the admin can flip it on-chain once
+     contracts are deployed. */
+  const NFT_CLUB_TIERS = [
+    {
+      id: 'club_recruit',
+      name: '🪖 Recruit',
+      polCost: 0,
+      okcCost: 0,
+      monthlyOkc: 0,
+      perks: ['Free entry tier', 'Profile badge', 'Eligible for future airdrops'],
+      earnMultiplier: 1.0,
+      maxSupply: 0,
+    },
+    {
+      id: 'club_knight',
+      name: '⚔ Bronze Knight',
+      polCost: 2.0,
+      okcCost: 2000,
+      monthlyOkc: 250,
+      perks: ['+25% OKC earn rate', '500 OKC monthly drop', 'Bronze profile frame', 'Exclusive Hostomel skin'],
+      earnMultiplier: 1.25,
+      maxSupply: 5000,
+    },
+    {
+      id: 'club_cossack',
+      name: '🐎 Silver Cossack',
+      polCost: 5.0,
+      okcCost: 5000,
+      monthlyOkc: 750,
+      perks: ['+50% OKC earn rate', '1500 OKC monthly drop', 'Silver profile frame', 'Exclusive Bakhmut skin', 'Voting rights on next stage'],
+      earnMultiplier: 1.5,
+      maxSupply: 1500,
+    },
+    {
+      id: 'club_ataman',
+      name: '👑 Gold Ataman',
+      polCost: 12.0,
+      okcCost: 12000,
+      monthlyOkc: 2000,
+      perks: ['+100% OKC earn rate', '4000 OKC monthly drop', 'Gold profile frame', 'All exclusive skins', 'Voting + roadmap input', 'Founder credit in-game'],
+      earnMultiplier: 2.0,
+      maxSupply: 250,
+    },
+  ];
+
+  /* Active club membership: { tierId, joinedAt, lastDropAt } */
+  let clubMembership = null;
+
+  /* Off-chain NFT ledger (soulbound badges). Each entry:
+     { id, name, kind, mintedAt, stageId?, txRef? } */
+  let ownedNfts = [];
+  const NFT_BADGES = {
+    veteran_kyiv:    { id: 'veteran_kyiv',    name: '🇺🇦 Veteran of Kyiv 2022',   kind: 'badge', stageId: 13 },
+    veteran_hostomel:{ id: 'veteran_hostomel',name: '🪂 Hero of Hostomel',         kind: 'badge', stageId: 0  },
+    veteran_bakhmut: { id: 'veteran_bakhmut', name: '🛡 Bakhmut Defender',         kind: 'badge', stageId: 2  },
+    veteran_kremlin: { id: 'veteran_kremlin', name: '🏛 Kremlin Liberator',        kind: 'badge', stageId: 11 },
+    founder_2026:    { id: 'founder_2026',    name: '⭐ Founder 2026',             kind: 'badge' },
+  };
+
   /* ── Transaction History ───────────────────────────────────────── */
   let txHistory = [];
   const MAX_HISTORY = 50;
@@ -312,10 +375,15 @@ const Marketplace = (function () {
 
   /* ── Premium Helpers ───────────────────────────────────────────── */
   function getEarnMultiplier() {
+    var mult = 1.0;
     if (activePremium && activePremium.expiresAt > Date.now()) {
-      return activePremium.tier.earnMultiplier;
+      mult *= activePremium.tier.earnMultiplier;
     }
-    return 1.0;
+    if (clubMembership) {
+      var ct = NFT_CLUB_TIERS.find(function (x) { return x.id === clubMembership.tierId; });
+      if (ct) mult *= ct.earnMultiplier;
+    }
+    return mult;
   }
 
   function getShopDiscount() {
@@ -420,6 +488,19 @@ const Marketplace = (function () {
     var earned = amount * AMMO_PRICE_OKC;
     okcBalance += earned;
     addTx('sell', 'Sold ' + amount + ' ammo', earned, 'OKC');
+    return earned;
+  }
+
+  async function sellAmmoForPOL(weaponIdx, amount) {
+    if (typeof Weapons === 'undefined') return 0;
+    var state = Weapons.getWeaponState(weaponIdx);
+    if (!state || state.reserve < amount) return 0;
+    if (typeof Blockchain === 'undefined' || !Blockchain.isConnected()) return 0;
+    var earned = parseFloat((amount * AMMO_PRICE_POL).toFixed(6));
+    if (earned <= 0) return 0;
+    /* Off-chain receipt; real settlement happens once contracts deploy. */
+    Weapons.removeAmmo(weaponIdx, amount);
+    addTx('sell', 'Sold ' + amount + ' ammo for POL (off-chain)', earned, 'POL');
     return earned;
   }
 
@@ -578,12 +659,95 @@ const Marketplace = (function () {
     return okc;
   }
 
+  /* ── NFT Club — off-chain operations ───────────────────────────── */
+  function getClubTiers()  { return NFT_CLUB_TIERS.slice(); }
+  function getClubMember() { return clubMembership ? Object.assign({}, clubMembership) : null; }
+  function getClubTier()   {
+    if (!clubMembership) return NFT_CLUB_TIERS[0];
+    var t = NFT_CLUB_TIERS.find(function (x) { return x.id === clubMembership.tierId; });
+    return t || NFT_CLUB_TIERS[0];
+  }
+
+  function joinClubWithOKC(tierIdx) {
+    var tier = NFT_CLUB_TIERS[tierIdx];
+    if (!tier || tier.okcCost <= 0) return false;
+    if (okcBalance < tier.okcCost) return false;
+    okcBalance -= tier.okcCost;
+    clubMembership = { tierId: tier.id, joinedAt: Date.now(), lastDropAt: Date.now() };
+    addTx('club', 'Joined ' + tier.name, -tier.okcCost, 'OKC');
+    _mintBadgeInternal('founder_2026');
+    return true;
+  }
+
+  async function joinClubWithPOL(tierIdx) {
+    var tier = NFT_CLUB_TIERS[tierIdx];
+    if (!tier || tier.polCost <= 0) return false;
+    if (typeof Blockchain === 'undefined' || !Blockchain.isConnected()) return false;
+    /* Off-chain reservation: when contracts deploy, this becomes
+       Blockchain.purchaseWithDonation(GAME_WALLET, tier.polCost). */
+    clubMembership = { tierId: tier.id, joinedAt: Date.now(), lastDropAt: Date.now() };
+    addTx('club', 'Joined ' + tier.name + ' (off-chain reservation)', -tier.polCost, 'POL');
+    _mintBadgeInternal('founder_2026');
+    return true;
+  }
+
+  function leaveClub() {
+    clubMembership = null;
+    addTx('club', 'Left NFT Club', 0, 'OKC');
+  }
+
+  /* Monthly drop — call once per real-world month while membership active. */
+  function claimClubMonthlyDrop() {
+    if (!clubMembership) return 0;
+    var tier = getClubTier();
+    var now = Date.now();
+    var ONE_MONTH = 30 * 24 * 60 * 60 * 1000;
+    if (now - (clubMembership.lastDropAt || 0) < ONE_MONTH) return 0;
+    if (tier.monthlyOkc <= 0) return 0;
+    okcBalance += tier.monthlyOkc;
+    clubMembership.lastDropAt = now;
+    addTx('club', tier.name + ' monthly drop', tier.monthlyOkc, 'OKC');
+    return tier.monthlyOkc;
+  }
+
+  /* ── NFT Badges — off-chain soulbound ledger ──────────────────── */
+  function _mintBadgeInternal(badgeId) {
+    var meta = NFT_BADGES[badgeId];
+    if (!meta) return false;
+    if (ownedNfts.some(function (n) { return n.id === badgeId; })) return false;
+    ownedNfts.push({
+      id: meta.id,
+      name: meta.name,
+      kind: meta.kind,
+      stageId: meta.stageId || null,
+      mintedAt: Date.now(),
+      txRef: null, /* will be filled when contracts deploy */
+    });
+    addTx('nft', 'Minted ' + meta.name + ' (off-chain)', 0, 'NFT');
+    return true;
+  }
+  function mintStageBadge(stageId) {
+    /* Match a badge to the cleared stage. */
+    var keys = Object.keys(NFT_BADGES);
+    for (var i = 0; i < keys.length; i++) {
+      var b = NFT_BADGES[keys[i]];
+      if (b.stageId === stageId) return _mintBadgeInternal(b.id);
+    }
+    return false;
+  }
+  function getOwnedNfts() { return ownedNfts.slice(); }
+  function getNftCatalog() {
+    return Object.keys(NFT_BADGES).map(function (k) { return NFT_BADGES[k]; });
+  }
+
   /* ── Reset ─────────────────────────────────────────────────────── */
   function reset() {
-    okcBalance    = 0;
-    activePremium = null;
-    ownedAssets   = [];
-    txHistory     = [];
+    okcBalance     = 0;
+    activePremium  = null;
+    ownedAssets    = [];
+    txHistory      = [];
+    clubMembership = null;
+    ownedNfts      = [];
   }
 
   /* ── Getters ───────────────────────────────────────────────────── */
@@ -607,7 +771,7 @@ const Marketplace = (function () {
 
     /* sell */
     sellWeaponForOKC, sellWeaponForPOL,
-    sellAmmoForOKC,
+    sellAmmoForOKC, sellAmmoForPOL,
 
     /* buy */
     buyItemWithOKC, buyItemWithPOL,
@@ -616,6 +780,11 @@ const Marketplace = (function () {
 
     /* premium */
     isPremium, getPremiumInfo, getEarnMultiplier, getShopDiscount,
+
+    /* nft club (off-chain) */
+    getClubTiers, getClubTier, getClubMember,
+    joinClubWithOKC, joinClubWithPOL, leaveClub, claimClubMonthlyDrop,
+    mintStageBadge, getOwnedNfts, getNftCatalog,
 
     /* convert */
     convertOKCToGold, convertGoldToOKC,
