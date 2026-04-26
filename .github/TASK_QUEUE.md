@@ -16,6 +16,12 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [MEDIUM] Traversal Runtime Log Noise Cleanup
+Status: DONE
+Requested: 2026-04-26
+Completed: 2026-04-26
+Details: Reduced always-on traversal export console noise in normal gameplay by gating informational logs behind debug flags (`window.__QA_MODE` or `window.__DEBUG_TRAVERSAL`) while preserving warning/error safeguards for missing API wiring. Verified with full proxy QA: health 200/200, test-master 38/0/0, test-qa-v2 21/0, gameplay fast profile `GAMEPLAY_EXIT:0` with `Errors: NONE`.
+
 ### [HIGH] Full Drone Remote Control + Eye/Chase Switching
 Status: DONE
 Requested: 2026-04-25

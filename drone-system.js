@@ -311,6 +311,7 @@ const DroneSystem = (function () {
     _possessedDrone = drone;
     drone.aiControlled = false;
     if (typeof CameraSystem !== 'undefined') {
+      if (CameraSystem.setDroneViewMode) CameraSystem.setDroneViewMode('eye');
       CameraSystem.setMode(CameraSystem.MODE.DRONE);
       CameraSystem.setDroneTarget(drone.mesh);
     }
@@ -322,6 +323,7 @@ const DroneSystem = (function () {
       _possessedDrone = null;
       if (typeof CameraSystem !== 'undefined') {
         if (CameraSystem.setDroneTarget) CameraSystem.setDroneTarget(null);
+        if (CameraSystem.setDroneViewMode) CameraSystem.setDroneViewMode('eye');
         CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
       }
     }

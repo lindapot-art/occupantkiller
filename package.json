@@ -26,6 +26,7 @@
     "@tensorflow/tfjs-node": "^4.22.0",
     "canvas": "^3.2.3",
     "jimp": "^1.6.1",
+    "pm2": "^5.4.3",
     "puppeteer": "^24.40.0"
   }
 }

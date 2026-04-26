@@ -1,5 +1,23 @@
 # Session Progress
 
+- Task: Traversal runtime log-noise cleanup
+- Status: Complete
+- Files changed:
+  - traversal.js
+  - .github/TASK_QUEUE.md
+  - .github/CHECKPOINT.md
+  - memories/session/progress.md
+- Fix shipped:
+  - Gated traversal export informational logs behind debug flags (`window.__QA_MODE || window.__DEBUG_TRAVERSAL`).
+  - Kept warning/error diagnostics for missing traversal API wiring so regressions remain visible.
+- Verified:
+  - `node --check traversal.js`: PASS
+  - `/healthz`: 200
+  - `/api/health`: 200
+  - `tools/test-master.js`: 38 passed, 0 failed, 0 warnings
+  - `tools/test-qa-v2.js http://localhost:3000`: 21 passed, 0 failed
+  - `tools/test-gameplay.js http://localhost:3000` (fast profile): `GAMEPLAY_EXIT:0`, `Errors: NONE`
+
 - Task: Close remaining active items after drone remote shipment
 - Status: Complete (local) / Blocked (external deploy reachability)
 - Recheck performed:

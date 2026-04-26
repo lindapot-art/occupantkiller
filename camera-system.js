@@ -40,6 +40,10 @@ const CameraSystem = (function () {
   /* ── Drone / Vehicle references ──────────────────────────────────── */
   let _droneObj   = null;
   let _vehicleObj = null;
+  const DRONE_VIEW = Object.freeze({ EYE: 'eye', CHASE: 'chase' });
+  let _droneViewMode = DRONE_VIEW.EYE;
+  const DRONE_CHASE_DIST = 5.2;
+  const DRONE_CHASE_HEIGHT = 1.6;
 
   /* ── Head bob (FPS) ──────────────────────────────────────────────── */
   let bobPhase   = 0;
@@ -290,11 +294,32 @@ const CameraSystem = (function () {
   /* ── Drone Camera ────────────────────────────────────────────────── */
   function setDroneTarget(obj) { _droneObj = obj; }
 
+  function setDroneViewMode(mode) {
+    if (mode === DRONE_VIEW.EYE || mode === DRONE_VIEW.CHASE) {
+      _droneViewMode = mode;
+    }
+  }
+
+  function getDroneViewMode() { return _droneViewMode; }
+
+  function toggleDroneViewMode() {
+    _droneViewMode = (_droneViewMode === DRONE_VIEW.EYE) ? DRONE_VIEW.CHASE : DRONE_VIEW.EYE;
+    return _droneViewMode;
+  }
+
   function updateDrone(delta) {
     if (!_droneObj) return;
-    _camera.position.copy(_droneObj.position);
-    const euler = _tmpEuler.set(pitch, yaw, 0, 'YXZ');
-    _camera.quaternion.setFromEuler(euler);
+    if (_droneViewMode === DRONE_VIEW.CHASE) {
+      _tmpVec3a.set(0, DRONE_CHASE_HEIGHT, DRONE_CHASE_DIST);
+      _tmpVec3a.applyQuaternion(_droneObj.quaternion);
+      _tmpVec3b.copy(_droneObj.position).add(_tmpVec3a);
+      _camera.position.lerp(_tmpVec3b, Math.min(1, 10 * delta));
+      _camera.lookAt(_droneObj.position);
+    } else {
+      _camera.position.copy(_droneObj.position);
+      const euler = _tmpEuler.set(pitch, yaw, 0, 'YXZ');
+      _camera.quaternion.setFromEuler(euler);
+    }
   }
 
   /* ── Vehicle Camera ──────────────────────────────────────────────── */
@@ -395,6 +420,9 @@ const CameraSystem = (function () {
     setRTSKey,
     getRTSTarget,
     setDroneTarget,
+    setDroneViewMode,
+    getDroneViewMode,
+    toggleDroneViewMode,
     setVehicleTarget,
     getYaw,
     getPitch,

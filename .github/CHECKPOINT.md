@@ -4,11 +4,13 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-25 — Session 37: Drone remote shipped, blocker revalidated
+- **Timestamp**: 2026-04-26 — Session 37: Traversal runtime-noise cleanup batch
 - **Agent**: KING
 - **Status**: COMPLETE — Local implementation + proxy QA complete; external Render verification still blocked
 
 ## Current Task
+- DONE: Traversal runtime log-noise cleanup in `traversal.js` (debug info logs gated behind `window.__QA_MODE || window.__DEBUG_TRAVERSAL`, warnings/errors preserved)
+- QA: `/healthz` 200, `/api/health` 200, `node --check traversal.js` PASS, `tools/test-master.js` 38/0/0, `tools/test-qa-v2.js` 21/0, `tools/test-gameplay.js` fast profile PASS with `GAMEPLAY_EXIT:0`
 - DONE: Revalidated Render blocker state (`https://occupantkiller.onrender.com`) — endpoint still times out on 2026-04-25 recheck
 - DONE: Drone remote usability hardening in `game-manager.js` (launch/link helper chain, reliable release flow, dedicated drone view toggle helper, KeyV guard while controlling drone/vehicle)
 - DONE: Mobile remote controls upgraded (`btn-use` exits drone remote when possessing; `btn-view` toggles drone eye/chase while possessing)
