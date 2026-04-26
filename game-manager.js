@@ -3429,8 +3429,17 @@ const GameManager = (function () {
 
     // Touch joystick movement (additive)
     if (isMobile && touch.moveActive) {
-      moveDir.addScaledVector(forward, -touch.moveY);
-      moveDir.addScaledVector(right, touch.moveX);
+      // Deadzone — ignore micro thumb jitter (5% radius), then remap remaining range to 0..1
+      var jx = touch.moveX, jy = touch.moveY;
+      var jmag = Math.sqrt(jx * jx + jy * jy);
+      var dz = 0.12;
+      if (jmag < dz) { jx = 0; jy = 0; }
+      else {
+        var rescale = (jmag - dz) / (1 - dz) / jmag;
+        jx *= rescale; jy *= rescale;
+      }
+      moveDir.addScaledVector(forward, -jy);
+      moveDir.addScaledVector(right, jx);
     }
 
     const isMoving = moveDir.lengthSq() > 0;
