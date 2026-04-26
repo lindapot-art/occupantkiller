@@ -280,6 +280,8 @@ window.AudioSystem = (function () {
       launcher:     { freq: 90,  decay: 0.30, noiseVol: 0.9,  filterFreq: 800 },
       explosive:    { freq: 70,  decay: 0.35, noiseVol: 1.0,  filterFreq: 600 },
       melee:        { freq: 220, decay: 0.04, noiseVol: 0.3,  filterFreq: 4000 },
+      silenced:     { freq: 480, decay: 0.04, noiseVol: 0.18, filterFreq: 2200 },
+      gatling:      { freq: 350, decay: 0.045, noiseVol: 0.55, filterFreq: 2100 },
     }[type] || { freq: 400, decay: 0.10, noiseVol: 0.6, filterFreq: 2000 };
     filter.type = 'lowpass';
     filter.frequency.value = params.filterFreq;
