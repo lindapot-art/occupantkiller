@@ -10,6 +10,8 @@ const Pickups = (() => {
   const HOVER_RANGE  = 0.1;
 
   const COLLECT_DIST_SQ = COLLECT_DIST * COLLECT_DIST;
+  const MAGNET_DIST = 4.0; // pickups glide toward player within this radius
+  const MAGNET_DIST_SQ = MAGNET_DIST * MAGNET_DIST;
 
   const TYPE_CONFIG = {
     HEALTH:  { color: 0x22ff55, emissive: 0x115522, size: 0.28 },
@@ -113,7 +115,15 @@ const Pickups = (() => {
       const dx = p.group.position.x - playerPos.x;
       const dz = p.group.position.z - playerPos.z;
       const dy = Math.abs(p.group.position.y - playerPos.y);
-      if (dx * dx + dz * dz < COLLECT_DIST_SQ && dy < 3) {
+      const distSq = dx * dx + dz * dz;
+      // Magnet glide: drift toward player within MAGNET_DIST (skip weapon drops to avoid auto-grab unintended weapons)
+      if (p.type !== 'WEAPON' && distSq < MAGNET_DIST_SQ && distSq > COLLECT_DIST_SQ && dy < 3) {
+        const pull = 6 * delta * (1 - Math.sqrt(distSq) / MAGNET_DIST);
+        p.group.position.x -= dx * pull;
+        p.group.position.z -= dz * pull;
+        p.baseY += (playerPos.y + 0.5 - p.baseY) * pull * 0.5;
+      }
+      if (distSq < COLLECT_DIST_SQ && dy < 3) {
         scene.remove(p.group);
         if (p.boxMesh && p.boxMesh.material) p.boxMesh.material.dispose();
         if (p.ringMesh && p.ringMesh.material) p.ringMesh.material.dispose();
