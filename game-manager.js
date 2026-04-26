@@ -988,10 +988,11 @@ const GameManager = (function () {
 
     sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
     sunLight.position.set(20, 30, 10);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.set(1024, 1024);
+    sunLight.castShadow = !isMobile; // mobile: skip shadows entirely for FPS
+    var shadowRes = isMobile ? 512 : 1024;
+    sunLight.shadow.mapSize.set(shadowRes, shadowRes);
     sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 100;
+    sunLight.shadow.camera.far = isMobile ? 60 : 100;
     sunLight.shadow.camera.left   = -50;
     sunLight.shadow.camera.right  =  50;
     sunLight.shadow.camera.top    =  50;
