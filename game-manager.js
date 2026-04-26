@@ -3697,6 +3697,11 @@ const GameManager = (function () {
           else if (weaponType === 'MINE' && window.AudioSystem.playMine) window.AudioSystem.playMine();
           else if (window.AudioSystem.playGunshot) window.AudioSystem.playGunshot(audioMap[weaponType] || 'rifle');
         }
+        // Mobile fire haptic — louder for heavy weapons
+        if (isMobile && navigator.vibrate) {
+          var heavyFire = ['HMG', 'HMG_HEAVY', 'MACHINEGUN', 'MINIGUN', 'AT', 'ATGM', 'AT_HEAVY', 'AT_LIGHT', 'AA', 'AMR'].indexOf(weaponType) >= 0;
+          try { navigator.vibrate(heavyFire ? 22 : 8); } catch (e) {}
+        }
         MLSystem.onShot(weaponId);
         player.totalShots++;
         player.waveShots++;
@@ -3805,6 +3810,10 @@ const GameManager = (function () {
       player.score += enemy.scoreValue;
       player.kills++;
       player.waveKills++;
+      // Mobile haptic — double-pulse for kill, longer for headshot
+      if (isMobile && navigator.vibrate) {
+        try { navigator.vibrate(isHeadshot ? [25, 35, 60] : [20, 30, 30]); } catch (e) {}
+      }
       HUD.setScore(player.score);
       HUD.setKills(player.kills);
       RankSystem.onKill(isHeadshot);
@@ -4156,6 +4165,10 @@ const GameManager = (function () {
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
+    // Mobile haptic feedback — sharper for heavier damage
+    if (isMobile && navigator.vibrate) {
+      try { navigator.vibrate(Math.min(80, 20 + dmg * 0.8)); } catch (e) {}
+    }
     // Blood drops — severity scales with damage as fraction of max HP
     if (HUD.showBloodDrops) HUD.showBloodDrops(Math.min(1, dmg / player.maxHp));
     // Low HP radio chatter
