@@ -2447,6 +2447,268 @@ window.VoxelWorld = (function () {
     setBlock(ox + 4, surfH + 2, oz, BLOCK.AIR);
   }
 
+  // ─── Kyiv Maidan Nezalezhnosti — historical recreation ─────────────
+  // Recreates the Independence Square / Khreshchatyk approach where
+  // Russian armored columns were stopped on the road into Kyiv (Feb–Mar 2022).
+  // Layout (looking down, +Z is south = player side, -Z is north = tank approach):
+  //   z=-45..-15  approach highway flanked by 9-story Soviet apartments
+  //   z=-15..+10  central plaza with Independence Monument + roundabout
+  //   z=+5..+15   gold-domed Orthodox church (east) + government building (west)
+  //   z=+18..+22  Ukrainian defensive line: hedgehogs, sandbags, parked busses
+  function generateKyivMaidanSquare(ox, oz) {
+    var bx = ox, bz = oz; // origin = plaza center
+    function gh(x, z) { return getTerrainHeight(x, z); }
+
+    // ── 1. North–South main avenue (Khreshchatyk-style boulevard, 10 wide)
+    for (var z = -45; z <= 25; z++) {
+      for (var x = -5; x <= 5; x++) {
+        var ay = gh(bx + x, bz + z);
+        setBlock(bx + x, ay, bz + z, BLOCK.ASPHALT);
+      }
+      // Center white road markings (dashed)
+      if ((z % 3) === 0) {
+        var my = gh(bx, bz + z);
+        setBlock(bx, my, bz + z, BLOCK.WHITE_TILE);
+      }
+      // Yellow shoulder lines (every block, edge of asphalt)
+      var sy = gh(bx - 5, bz + z);
+      setBlock(bx - 5, sy, bz + z, BLOCK.WHITE_TILE);
+      setBlock(bx + 5, sy, bz + z, BLOCK.WHITE_TILE);
+    }
+
+    // ── 2. East–West cross avenue at plaza (8 wide)
+    for (var x2 = -30; x2 <= 30; x2++) {
+      for (var z2 = -2; z2 <= 5; z2++) {
+        var ay2 = gh(bx + x2, bz + z2);
+        setBlock(bx + x2, ay2, bz + z2, BLOCK.ASPHALT);
+      }
+      if ((x2 % 3) === 0) setBlock(bx + x2, gh(bx + x2, bz + 1), bz + 1, BLOCK.WHITE_TILE);
+    }
+
+    // ── 3. Crosswalks at intersection (zebra stripes)
+    function crosswalk(cx, cz, dir) {
+      // dir 'h' = horizontal stripes across z, 'v' = vertical
+      for (var i = 0; i < 8; i++) {
+        if (dir === 'h') {
+          if (i % 2 === 0) {
+            for (var k = -4; k <= 4; k++) {
+              setBlock(cx + k, gh(cx + k, cz + i - 4), cz + i - 4, BLOCK.WHITE_TILE);
+            }
+          }
+        } else {
+          if (i % 2 === 0) {
+            for (var k2 = -4; k2 <= 4; k2++) {
+              setBlock(cx + i - 4, gh(cx + i - 4, cz + k2), cz + k2, BLOCK.WHITE_TILE);
+            }
+          }
+        }
+      }
+    }
+    crosswalk(bx, bz - 8, 'h');
+    crosswalk(bx, bz + 10, 'h');
+
+    // ── 4. Stoplights at the four corners of the intersection
+    function stoplight(sx, sz) {
+      var y = gh(bx + sx, bz + sz);
+      setBlock(bx + sx, y + 1, bz + sz, BLOCK.METAL);
+      setBlock(bx + sx, y + 2, bz + sz, BLOCK.METAL);
+      setBlock(bx + sx, y + 3, bz + sz, BLOCK.METAL);
+      setBlock(bx + sx, y + 4, bz + sz, BLOCK.METAL);
+      setBlock(bx + sx, y + 5, bz + sz, BLOCK.LIGHT); // light fixture
+    }
+    stoplight(-7, -4); stoplight(7, -4);
+    stoplight(-7, 7);  stoplight(7, 7);
+
+    // ── 5. Independence Square center: Monument (column with statue)
+    var cy = gh(bx, bz + 1);
+    // Circular roundabout base (10 radius)
+    for (var rx = -10; rx <= 10; rx++) {
+      for (var rz = -8; rz <= 8; rz++) {
+        var d = Math.sqrt(rx * rx + rz * rz);
+        if (d > 7 && d < 9) {
+          var py = gh(bx + rx, bz + rz);
+          setBlock(bx + rx, py, bz + rz, BLOCK.WHITE_TILE);
+        }
+      }
+    }
+    // Monument column (Berehynia-style — 12 high)
+    for (var my2 = 0; my2 < 12; my2++) {
+      setBlock(bx, cy + 1 + my2, bz + 1, BLOCK.CONCRETE);
+    }
+    // Gold orb on top (statue)
+    setBlock(bx, cy + 13, bz + 1, BLOCK.METAL);
+    setBlock(bx, cy + 14, bz + 1, BLOCK.LIGHT);
+    setBlock(bx - 1, cy + 13, bz + 1, BLOCK.METAL);
+    setBlock(bx + 1, cy + 13, bz + 1, BLOCK.METAL);
+    // Pedestal (4x4 concrete base)
+    for (var pbx = -1; pbx <= 1; pbx++) {
+      for (var pbz = 0; pbz <= 2; pbz++) {
+        setBlock(bx + pbx, cy + 1, bz + pbz, BLOCK.CONCRETE);
+      }
+    }
+
+    // ── 6. Soviet 9-story apartments lining the approach (west + east)
+    // West side
+    generateUkrainianApartment(bx - 24, bz - 38, 9);
+    generateUkrainianApartment(bx - 24, bz - 22, 9);
+    generateUkrainianApartment(bx - 24, bz - 6, 6);
+    // East side
+    generateUkrainianApartment(bx + 12, bz - 38, 9);
+    generateUkrainianApartment(bx + 12, bz - 22, 9);
+    generateUkrainianApartment(bx + 12, bz - 6, 6);
+
+    // ── 7. Hotel Ukraina-style tall building at north end of plaza
+    var hx = bx - 6, hz = bz - 18;
+    var hy = gh(hx, hz);
+    for (var hbx = 0; hbx < 12; hbx++) {
+      for (var hbz = 0; hbz < 8; hbz++) {
+        for (var hby = 0; hby < 18; hby++) {
+          var isShell = hbx === 0 || hbx === 11 || hbz === 0 || hbz === 7 || hby === 17;
+          if (isShell) {
+            setBlock(hx + hbx, hy + hby, hz + hbz, BLOCK.CONCRETE);
+          } else if (hby > 0 && hby < 17 && hby % 3 === 0 && (hbx === 0 || hbx === 11)) {
+            setBlock(hx + hbx, hy + hby, hz + hbz, BLOCK.GLASS);
+          }
+        }
+      }
+    }
+    // Hotel entrance
+    setBlock(hx + 5, hy, hz + 7, BLOCK.AIR);
+    setBlock(hx + 5, hy + 1, hz + 7, BLOCK.AIR);
+    setBlock(hx + 6, hy, hz + 7, BLOCK.AIR);
+    setBlock(hx + 6, hy + 1, hz + 7, BLOCK.AIR);
+
+    // ── 8. Gold-domed Orthodox church (east of plaza)
+    generateChurch(bx + 14, bz + 8);
+    // Replace church steeple metal cross with gold dome (LIGHT block = bright/gold)
+    var churchSurfH = gh(bx + 14, bz + 8);
+    for (var dy = 0; dy < 2; dy++) {
+      for (var ddx = -1; ddx <= 1; ddx++) {
+        for (var ddz = -1; ddz <= 1; ddz++) {
+          if (Math.abs(ddx) + Math.abs(ddz) <= 1) {
+            setBlock(bx + 14 + 3 + ddx, churchSurfH + 12 + dy, bz + 8 + 2 + ddz, BLOCK.LIGHT);
+          }
+        }
+      }
+    }
+
+    // ── 9. Government building (west of plaza)
+    var gx = bx - 18, gz = bz + 6;
+    var gy = gh(gx, gz);
+    for (var gbx = 0; gbx < 14; gbx++) {
+      for (var gbz = 0; gbz < 8; gbz++) {
+        for (var gby = 0; gby < 8; gby++) {
+          var isGShell = gbx === 0 || gbx === 13 || gbz === 0 || gbz === 7 || gby === 7;
+          if (isGShell) setBlock(gx + gbx, gy + gby, gz + gbz, BLOCK.STONE);
+          else if (gby >= 2 && gby <= 5 && gbx % 2 === 0 && (gbz === 0 || gbz === 7)) {
+            setBlock(gx + gbx, gy + gby, gz + gbz, BLOCK.GLASS);
+          }
+        }
+      }
+    }
+    // Pillared facade (classical Soviet style)
+    for (var pIdx = 0; pIdx < 5; pIdx++) {
+      var pcx = gx + 1 + pIdx * 3;
+      for (var pcy = 0; pcy < 6; pcy++) {
+        setBlock(pcx, gy + pcy, gz - 1, BLOCK.STONE);
+      }
+    }
+    // Ukrainian flag on top
+    setBlock(gx + 6, gy + 8, gz + 3, BLOCK.METAL);
+    setBlock(gx + 6, gy + 9, gz + 3, BLOCK.METAL);
+    setBlock(gx + 6, gy + 10, gz + 3, BLOCK.FLAG);
+
+    // ── 10. Civilian vehicles parked along avenue + on approach road
+    function placeVehicle(vx, vz, type) {
+      var vy = gh(bx + vx, bz + vz);
+      var b = (type === 'bus') ? BLOCK.BUS : (type === 'truck') ? BLOCK.TRUCK : BLOCK.CAR;
+      var len = (type === 'bus') ? 5 : (type === 'truck') ? 4 : 3;
+      for (var vi = 0; vi < len; vi++) {
+        setBlock(bx + vx + vi, vy + 1, bz + vz, b);
+        if (type === 'bus' || type === 'truck') {
+          setBlock(bx + vx + vi, vy + 2, bz + vz, b);
+        }
+      }
+    }
+    placeVehicle(-9, -36, 'bus');
+    placeVehicle(7, -32, 'truck');
+    placeVehicle(-9, -28, 'car');
+    placeVehicle(7, -24, 'car');
+    placeVehicle(-9, -20, 'truck');
+    placeVehicle(7, -16, 'bus');
+    placeVehicle(-9, 12, 'car');
+    placeVehicle(7, 14, 'bus');
+
+    // ── 11. Streetlights every 8 along the avenue
+    for (var slz = -40; slz <= 20; slz += 8) {
+      var sly1 = gh(bx - 6, bz + slz);
+      var sly2 = gh(bx + 6, bz + slz);
+      for (var sly = 1; sly <= 4; sly++) {
+        setBlock(bx - 6, sly1 + sly, bz + slz, BLOCK.STREETLIGHT);
+        setBlock(bx + 6, sly2 + sly, bz + slz, BLOCK.STREETLIGHT);
+      }
+      setBlock(bx - 6, sly1 + 5, bz + slz, BLOCK.LIGHT);
+      setBlock(bx + 6, sly2 + 5, bz + slz, BLOCK.LIGHT);
+    }
+
+    // ── 12. Ukrainian defensive line (south = player side)
+    // Anti-tank hedgehogs (Czech hedgehogs) blocking the avenue
+    var hedgePositions = [[-4, 18], [-2, 19], [0, 18], [2, 19], [4, 18], [-3, 20], [3, 20]];
+    for (var hp = 0; hp < hedgePositions.length; hp++) {
+      var hgx = bx + hedgePositions[hp][0];
+      var hgz = bz + hedgePositions[hp][1];
+      var hgy = gh(hgx, hgz);
+      setBlock(hgx, hgy + 1, hgz, BLOCK.METAL);
+      setBlock(hgx, hgy + 2, hgz, BLOCK.METAL);
+    }
+    // Sandbag emplacements at flanks
+    function sandbagWall(sgx, sgz, len, horiz) {
+      for (var sgi = 0; sgi < len; sgi++) {
+        var sgX = bx + sgx + (horiz ? sgi : 0);
+        var sgZ = bz + sgz + (horiz ? 0 : sgi);
+        var sgy = gh(sgX, sgZ);
+        setBlock(sgX, sgy + 1, sgZ, BLOCK.SANDBAG);
+        setBlock(sgX, sgy + 2, sgZ, BLOCK.SANDBAG);
+      }
+    }
+    sandbagWall(-12, 21, 6, true);
+    sandbagWall(7, 21, 6, true);
+    sandbagWall(-12, 17, 5, false);
+    sandbagWall(11, 17, 5, false);
+
+    // ── 13. Bus stops, billboards, bench seating along avenue
+    generateBillboard(bx - 14, bz - 10);
+    generateBillboard(bx + 8, bz - 14);
+    // Bus stop shelters (BUS_STOP block)
+    function busShelter(bsx, bsz) {
+      var bsy = gh(bx + bsx, bz + bsz);
+      setBlock(bx + bsx, bsy + 1, bz + bsz, BLOCK.BUS_STOP);
+      setBlock(bx + bsx + 1, bsy + 1, bz + bsz, BLOCK.BUS_STOP);
+      setBlock(bx + bsx, bsy + 2, bz + bsz, BLOCK.GLASS);
+      setBlock(bx + bsx + 1, bsy + 2, bz + bsz, BLOCK.GLASS);
+    }
+    busShelter(-9, -10);
+    busShelter(7, -8);
+
+    // ── 14. Park trees + benches around plaza
+    for (var pti = 0; pti < 10; pti++) {
+      var ang = (pti / 10) * Math.PI * 2;
+      var ptx = bx + Math.round(Math.cos(ang) * 11);
+      var ptz = bz + Math.round(Math.sin(ang) * 9) + 1;
+      var pty = gh(ptx, ptz);
+      // Skip trees that would land on the road
+      if (Math.abs(ptx - bx) < 6 && ptz < bz - 2) continue;
+      setBlock(ptx, pty + 1, ptz, BLOCK.PARK_TREE);
+      setBlock(ptx, pty + 2, ptz, BLOCK.PARK_TREE);
+      setBlock(ptx, pty + 3, ptz, BLOCK.LEAVES || BLOCK.BUSH);
+    }
+
+    // ── 15. Add this square to road waypoint list so vehicles can drive in
+    for (var wpz = -40; wpz <= 20; wpz += 6) {
+      _roadWaypoints.push(new THREE.Vector3(bx, gh(bx, bz + wpz) + 0.5, bz + wpz));
+    }
+  }
+
   // IDEA 21: Evacuation bus/civilian vehicles
   function generateEvacVehicles(count) {
     for (let v = 0; v < count; v++) {
@@ -3648,6 +3910,13 @@ window.VoxelWorld = (function () {
       generateUkrainianApartment(20, -30, 6);
       generateDroneNest(35, -40);
       generateDroneNest(-35, -55);
+    } else if (level.id === 'KYIV') {
+      // Real-map recreation: Maidan Nezalezhnosti / Khreshchatyk approach
+      // where Russian armored columns were stopped on the road into Kyiv
+      generateKyivMaidanSquare(0, 0);
+      // Drone nests along enemy approach corridor
+      generateDroneNest(36, -40);
+      generateDroneNest(-36, -40);
     }
     rebuildAll();
     _levelSpawnPoint = resolveLevelSpawnPoint(level);
