@@ -116,7 +116,9 @@ const Enemies = (() => {
     charge:    'УРААА!',
     hurt:      'Он ранен!',
     reinforce: 'Подкрепление!',
+    spotted:   'Вижу его!',
   };
+  var _lastAlertTime = 0;
   function spawnBarkText(pos, barkType) {
     if (!scene) return;
     var text = _BARK_TEXTS[barkType] || barkType;
@@ -1936,6 +1938,23 @@ const Enemies = (() => {
         e.spotLevel = Math.max(0, e.spotLevel - delta * 0.5);
       }
       e.playerSpotted = e.spotLevel >= SPOT_TIME;
+
+      // First-spot bark: play one-shot alert when transitioning unaware → spotted
+      if (e.playerSpotted && !e._wasSpotted) {
+        e._wasSpotted = true;
+        if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playEnemyAlert && distToPlayer < 35) {
+          // Throttle: only one alert per 1.2s globally to avoid sonic spam in groups
+          var _alertNow = performance.now();
+          if (!_lastAlertTime || _alertNow - _lastAlertTime > 1200) {
+            window.AudioSystem.playEnemyAlert();
+            _lastAlertTime = _alertNow;
+          }
+        }
+        // Visual exclamation bark
+        if (typeof spawnBarkText === 'function') spawnBarkText(e.mesh.position, 'spotted');
+      } else if (!e.playerSpotted) {
+        e._wasSpotted = false;
+      }
 
       // If player shot this enemy, immediately spot them
       if (e.flashTimer > 0.07) {
