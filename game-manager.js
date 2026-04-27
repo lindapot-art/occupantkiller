@@ -4403,6 +4403,22 @@ const GameManager = (function () {
     player.lastDamageTime = 0; // reset health regen timer
     player.totalDamageTaken += dmg;
     player.waveDamageTaken += dmg;
+    // Tag the attacker enemy: brief red outline so player can identify the shooter
+    try {
+      if (attackerPos && Enemies.getAll) {
+        var _atkList = Enemies.getAll();
+        var _bestE = null, _bestD = Infinity;
+        for (var _ai = 0; _ai < _atkList.length; _ai++) {
+          var _ae = _atkList[_ai];
+          if (!_ae || !_ae.alive || !_ae.mesh) continue;
+          var _adx = _ae.mesh.position.x - attackerPos.x;
+          var _adz = _ae.mesh.position.z - attackerPos.z;
+          var _ad = _adx * _adx + _adz * _adz;
+          if (_ad < _bestD) { _bestD = _ad; _bestE = _ae; }
+        }
+        if (_bestE && _bestD < 9 && Enemies.tagAttacker) Enemies.tagAttacker(_bestE);
+      }
+    } catch (eAtk) {}
     MLSystem.onDamageTaken(dmg);
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);

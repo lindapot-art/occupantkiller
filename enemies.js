@@ -2811,6 +2811,8 @@ const Enemies = (() => {
 
       // Update floating HP bar
       updateHpBar(e, playerPos);
+      // Attacker tag pulse fade
+      if (e._attackerTag) _updateAttackerTag(e, delta);
     }
 
     // Last-survivor highlight: pulse a bright marker over the final enemy of the wave
@@ -3056,6 +3058,42 @@ const Enemies = (() => {
 
   // ── Set player stealth state ──────────────────────────────
   function setPlayerStealth(val) { _playerStealth = !!val; }
+
+  // ── Tag attacker: brief red outline ring over their head when they hit player ──
+  var _attackerTagGeo = new THREE.RingGeometry(0.55, 0.78, 14);
+  function tagAttacker(enemy) {
+    if (!enemy || !enemy.alive || !enemy.mesh) return;
+    if (enemy._attackerTag && enemy._attackerTag.parent) {
+      // Just refresh timer
+      enemy._attackerTagLife = 1.2;
+      return;
+    }
+    var mat = new THREE.MeshBasicMaterial({
+      color: 0xff2222, transparent: true, opacity: 0.85,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    var ring = new THREE.Mesh(_attackerTagGeo, mat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = (enemy.typeCfg ? enemy.typeCfg.scale * 1.9 : 1.9) + 0.85;
+    enemy.mesh.add(ring);
+    enemy._attackerTag = ring;
+    enemy._attackerTagMat = mat;
+    enemy._attackerTagLife = 1.2;
+  }
+  function _updateAttackerTag(e, delta) {
+    if (!e._attackerTag) return;
+    e._attackerTagLife -= delta;
+    if (e._attackerTagLife <= 0) {
+      if (e._attackerTag.parent) e._attackerTag.parent.remove(e._attackerTag);
+      if (e._attackerTagMat) e._attackerTagMat.dispose();
+      e._attackerTag = null;
+      e._attackerTagMat = null;
+      return;
+    }
+    var pulse = 0.5 + Math.sin(e._attackerTagLife * 14) * 0.5;
+    if (e._attackerTagMat) e._attackerTagMat.opacity = 0.4 + pulse * 0.55;
+    e._attackerTag.scale.setScalar(0.95 + pulse * 0.25);
+  }
 
   // ── Apply damage, return remaining HP ─────────────────────
   function damage(enemy, amount, isHeadshot, weaponType) {
@@ -3388,6 +3426,7 @@ const Enemies = (() => {
     getAll,
     getAssaultGroups,
     setPlayerStealth,
+    tagAttacker,
     getSurrenderCount,
     spawnSingle: function (typeName, pos) { spawnOne(typeName, -1, pos); },
     spawnReinforcement: function (x, z, count) {
