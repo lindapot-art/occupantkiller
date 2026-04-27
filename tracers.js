@@ -168,6 +168,28 @@ const Tracers = (() => {
     }
     // Shockwave ring (render-loop driven, not setInterval)
     spawnShockwave(pos, radius * 2.5, 0xffaa44);
+    // Persistent scorch mark on the ground beneath explosion
+    try {
+      var groundY = pos.y;
+      if (typeof window !== 'undefined' && window.VoxelWorld && window.VoxelWorld.getTerrainHeight) {
+        groundY = window.VoxelWorld.getTerrainHeight(pos.x, pos.z) + 0.04;
+      }
+      var scorchMat = new THREE.MeshBasicMaterial({
+        color: 0x111111, transparent: true, opacity: 0.75,
+        depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
+      });
+      var scorch = new THREE.Mesh(_scorchGeo, scorchMat);
+      scorch.rotation.x = -Math.PI / 2;
+      scorch.position.set(pos.x, groundY, pos.z);
+      var sScale = (radius || 3) * 0.7;
+      scorch.scale.set(sScale, sScale, 1);
+      _scene.add(scorch);
+      _scorchMarks.push({ mesh: scorch, mat: scorchMat, life: 25, maxLife: 25 });
+      if (_scorchMarks.length > MAX_SCORCH) {
+        var oldS = _scorchMarks.shift();
+        _scene.remove(oldS.mesh); oldS.mat.dispose();
+      }
+    } catch (eSc) {}
   }
 
   /* ── Blood Splatter ─────────────────────────────────────────── */
@@ -431,6 +453,9 @@ const Tracers = (() => {
   // ── Bullet hole decals ───────────────────────────────────
   const _bulletHoles = [];
   const _holeGeo = new THREE.PlaneGeometry(0.18, 0.18);
+  const _scorchMarks = [];
+  const _scorchGeo = new THREE.PlaneGeometry(1, 1);
+  var MAX_SCORCH = 40;
   const _holeMat = new THREE.MeshBasicMaterial({
     color: 0x111111, transparent: true, opacity: 0.7,
     depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1
@@ -476,6 +501,18 @@ const Tracers = (() => {
         _scene.remove(h.mesh);
         h.mesh.material.dispose();
         _bulletHoles.splice(i, 1);
+      }
+    }
+  }
+  function updateScorchMarks(delta) {
+    for (var i = _scorchMarks.length - 1; i >= 0; i--) {
+      var s = _scorchMarks[i];
+      s.life -= delta;
+      if (s.life < 5) s.mat.opacity = (s.life / 5) * 0.75;
+      if (s.life <= 0) {
+        if (_scene) _scene.remove(s.mesh);
+        s.mat.dispose();
+        _scorchMarks.splice(i, 1);
       }
     }
   }
@@ -620,6 +657,7 @@ const Tracers = (() => {
       updateShockwaves(delta);
       updateFire(delta);
       updateRain(delta, playerPos);
+      updateScorchMarks(delta);
     },
     clear: function() {
       clear();
@@ -635,6 +673,8 @@ const Tracers = (() => {
       sparks.length = 0;
       _bulletHoles.forEach(h => { if (_scene) _scene.remove(h.mesh); h.mesh.material.dispose(); });
       _bulletHoles.length = 0;
+      _scorchMarks.forEach(s => { if (_scene) _scene.remove(s.mesh); s.mat.dispose(); });
+      _scorchMarks.length = 0;
     }
   };
 })();
