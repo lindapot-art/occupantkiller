@@ -299,6 +299,25 @@ const HUD = (() => {
     vignetteTimer = setTimeout(() => el.vignette.classList.remove('hit'), 300);
   }
 
+  // ── Dynamic crosshair spread (0..1) — pushes 4 lines outward proportionally
+  var _chLineCache = null;
+  function setCrosshairSpread(amount) {
+    if (!_chLineCache) {
+      _chLineCache = {
+        top:    document.querySelector('#crosshair .cl-top'),
+        bottom: document.querySelector('#crosshair .cl-bottom'),
+        left:   document.querySelector('#crosshair .cl-left'),
+        right:  document.querySelector('#crosshair .cl-right'),
+      };
+    }
+    var s = Math.max(0, Math.min(1, amount || 0));
+    var px = Math.round(s * 8); // up to 8px outward
+    if (_chLineCache.top)    _chLineCache.top.style.transform    = 'translateY(' + (-px) + 'px)';
+    if (_chLineCache.bottom) _chLineCache.bottom.style.transform = 'translateY(' + ( px) + 'px)';
+    if (_chLineCache.left)   _chLineCache.left.style.transform   = 'translateX(' + (-px) + 'px)';
+    if (_chLineCache.right)  _chLineCache.right.style.transform  = 'translateX(' + ( px) + 'px)';
+  }
+
   // Green heal flash vignette (briefly tint screen on health pickup)
   var _healFlashEl = null;
   var _healFlashTimer = null;
@@ -1446,7 +1465,7 @@ const HUD = (() => {
     setScore, setWave, setKills, setEnemies, setStage,
     setHealth, setAmmo, setWeapon, showReload,
     flashHit, flashDamage, flashHeal, showBloodDrops,
-    showHeadshot, notifyPickup,
+    showHeadshot, notifyPickup, setCrosshairSpread,
     announceWave, announceStage,
     addKill, showHitDirection, updateMinimap,
     updateCompass, showStreak, showBleed, showProne, showJam,

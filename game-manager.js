@@ -4857,6 +4857,21 @@ const GameManager = (function () {
       if (Weapons.setHoldBreath) Weapons.setHoldBreath(Weapons.isZoomed() && keys['ShiftLeft'] && player.velocity.length() < 0.5);
       Weapons.update(delta);
 
+      // ── Dynamic crosshair spread: widens with movement, sprint, jump, recent fire ──
+      try {
+        var _chSpread = 0;
+        var _spd = player.velocity ? player.velocity.length() : 0;
+        _chSpread += Math.min(0.4, _spd * 0.06);          // movement
+        if (player.sprinting) _chSpread += 0.35;
+        if (!player.grounded) _chSpread += 0.35;          // airborne
+        if (player.isCrouching) _chSpread *= 0.55;
+        // Recent fire kick — read recoil accum if available
+        var _recoilNow = (typeof Weapons !== 'undefined' && Weapons.getRecoilAccum) ? Weapons.getRecoilAccum() : 0;
+        _chSpread += Math.min(0.5, _recoilNow * 8);
+        if (Weapons.isZoomed && Weapons.isZoomed()) _chSpread *= 0.25;
+        if (HUD.setCrosshairSpread) HUD.setCrosshairSpread(_chSpread);
+      } catch (eCh) {}
+
       // ── FOV kick: sprint widens (+5), ADS narrows (weapons handles its own) ──
       if (!Weapons.isZoomed()) {
         _targetFOV = _baseFOV + (player.sprinting ? 5 : 0);

@@ -3354,6 +3354,7 @@ const Weapons = (() => {
     isZoomed,
     setPlayerSpeed: function(s) { _playerSpeed = s; },
     setHoldBreath,
+    getRecoilAccum: function() { return _recoilPitchAccum; },
     startInspect,
     isInSmoke: isInSmoke,
     getWeaponCount: function () { return WEAPONS.length; },
