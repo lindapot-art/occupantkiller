@@ -3024,6 +3024,12 @@ const Enemies = (() => {
     // Spawn blood voxel particles (shared geometry + materials)
     if (scene && enemy.mesh) {
       var bloodCount = Math.min(8, Math.ceil(amount / 10));
+      // Explosive / heavy weapons => bigger gib burst
+      var _wt = weaponType || '';
+      var isExplosive = (_wt === 'AT' || _wt === 'ATGM' || _wt === 'THERMOBARIC' ||
+                         _wt === 'EXPLOSIVE' || _wt === 'INCENDIARY' || _wt === 'GRENADE');
+      if (isExplosive) bloodCount = Math.min(20, bloodCount + 12);
+      else if (isHeadshot) bloodCount = Math.min(14, bloodCount + 4);
       for (var b = 0; b < bloodCount; b++) {
         var bloodSize = 0.08 + Math.random() * 0.12;
         var bloodMesh = new THREE.Mesh(_bloodGeo, Math.random() < 0.5 ? _bloodMatLight : _bloodMatDark);
@@ -3035,9 +3041,9 @@ const Enemies = (() => {
           mesh: bloodMesh,
           _origScale: bloodSize,
           velocity: new THREE.Vector3(
-            (Math.random() - 0.5) * 4,
-            1.5 + Math.random() * 3,
-            (Math.random() - 0.5) * 4
+            (Math.random() - 0.5) * (isExplosive ? 12 : 4),
+            (isExplosive ? 3 : 1.5) + Math.random() * (isExplosive ? 6 : 3),
+            (Math.random() - 0.5) * (isExplosive ? 12 : 4)
           ),
           life: 1.5 + Math.random() * 1.0,
           gravity: 12,
@@ -3057,7 +3063,10 @@ const Enemies = (() => {
           });
           var decal = new THREE.Mesh(_decalGeo, decalMat);
           decal.rotation.x = -Math.PI / 2;
-          var radius = 0.6 + Math.random() * 0.8;
+          var _wtD = weaponType || '';
+          var _isExplD = (_wtD === 'AT' || _wtD === 'ATGM' || _wtD === 'THERMOBARIC' ||
+                          _wtD === 'EXPLOSIVE' || _wtD === 'INCENDIARY' || _wtD === 'GRENADE');
+          var radius = _isExplD ? (1.4 + Math.random() * 1.0) : (0.6 + Math.random() * 0.8);
           decal.scale.set(radius, radius, 1);
           decal.position.set(
             enemy.mesh.position.x,
