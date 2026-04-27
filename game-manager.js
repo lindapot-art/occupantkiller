@@ -4932,6 +4932,22 @@ const GameManager = (function () {
 
       // Compass update
       if (HUD.updateCompass) HUD.updateCompass(CameraSystem.getYaw());
+      // Sprint intensity → HUD vignette + footstep dust puffs
+      try {
+        var _spdNow = player.velocity ? player.velocity.length() : 0;
+        var _sprintAmt = (player.sprinting && player.grounded && _spdNow > 6) ? Math.min(1, (_spdNow - 6) / 6) : 0;
+        if (HUD.setSprintIntensity) HUD.setSprintIntensity(_sprintAmt);
+        // Periodic dust puff under feet while sprinting
+        if (_sprintAmt > 0.4 && typeof Tracers !== 'undefined' && Tracers.spawnSmoke) {
+          if (player._dustStepTimer === undefined) player._dustStepTimer = 0;
+          player._dustStepTimer -= delta;
+          if (player._dustStepTimer <= 0) {
+            var _dustPos = new THREE.Vector3(player.position.x, player.position.y - 1.4, player.position.z);
+            Tracers.spawnSmoke(_dustPos);
+            player._dustStepTimer = 0.22 + Math.random() * 0.08;
+          }
+        }
+      } catch (eSP) {}
       // Distant artillery rumble for war atmosphere (every 18-40s during gameplay)
       try {
         if (typeof AudioSystem !== 'undefined' && AudioSystem.playDistantBoom) {
