@@ -331,8 +331,13 @@ const Tracers = (() => {
     casings.push({
       mesh: mesh, vel: vel,
       spin: new THREE.Vector3(Math.random()*15, Math.random()*15, Math.random()*15),
-      life: 1.0,
+      life: 6.0, settled: false,
     });
+    // Cap casing count for perf
+    if (casings.length > 80) {
+      var oldC = casings.shift();
+      if (oldC && oldC.mesh && _scene) _scene.remove(oldC.mesh);
+    }
   }
 
   // Metal impact sparks
@@ -373,11 +378,33 @@ const Tracers = (() => {
   function updateCasings(delta) {
     for (let i = casings.length - 1; i >= 0; i--) {
       const c = casings[i];
-      c.vel.y -= 12 * delta; // gravity
-      c.mesh.position.addScaledVector(c.vel, delta);
-      c.mesh.rotation.x += c.spin.x * delta;
-      c.mesh.rotation.y += c.spin.y * delta;
-      c.mesh.rotation.z += c.spin.z * delta;
+      if (!c.settled) {
+        c.vel.y -= 12 * delta; // gravity
+        c.mesh.position.addScaledVector(c.vel, delta);
+        c.mesh.rotation.x += c.spin.x * delta;
+        c.mesh.rotation.y += c.spin.y * delta;
+        c.mesh.rotation.z += c.spin.z * delta;
+        // Settle when ground reached and velocity low
+        var groundY = 0;
+        if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
+          groundY = VoxelWorld.getTerrainHeight(c.mesh.position.x, c.mesh.position.z) + 0.02;
+        }
+        if (c.mesh.position.y <= groundY) {
+          c.mesh.position.y = groundY;
+          // Bounce once with damping
+          if (Math.abs(c.vel.y) > 1.5) {
+            c.vel.y = -c.vel.y * 0.35;
+            c.vel.x *= 0.6;
+            c.vel.z *= 0.6;
+            c.spin.multiplyScalar(0.5);
+          } else {
+            c.settled = true;
+            c.vel.set(0, 0, 0);
+            // Lay flat on ground
+            c.mesh.rotation.x = Math.PI / 2;
+          }
+        }
+      }
       c.life -= delta;
       if (c.life <= 0) {
         _scene.remove(c.mesh);
