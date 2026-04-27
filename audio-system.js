@@ -324,6 +324,27 @@ window.AudioSystem = (function () {
     osc.stop(now + 0.06);
   }
 
+  // Pitch-shifted hit marker: higher pitch when target is nearly dead (audio low-HP cue)
+  function playHitPitched(hpFrac) {
+    if (!enabled || !ctx) return;
+    resume();
+    const now = ctx.currentTime;
+    const f = Math.max(0, Math.min(1, hpFrac == null ? 1 : hpFrac));
+    // Low HP → shift up an octave
+    var basePitch = 1200 + (1 - f) * 1100;
+    var endPitch = 300 + (1 - f) * 300;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.setValueAtTime(basePitch, now);
+    osc.frequency.exponentialRampToValueAtTime(endPitch, now + 0.05);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 0.06);
+  }
+
   function playReload() {
     if (!enabled || !ctx) return;
     resume();
@@ -1671,6 +1692,7 @@ window.AudioSystem = (function () {
     playSpatialGunshot: playSpatialGunshot,
     playExplosion: playExplosion,
     playHit: playHit,
+    playHitPitched: playHitPitched,
     playReload: playReload,
     playPickup: playPickup,
     playDeath: playDeath,

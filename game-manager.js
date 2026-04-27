@@ -3919,7 +3919,13 @@ const GameManager = (function () {
     const enemy = Enemies.findByMesh(hit.object);
     if (!enemy || !enemy.alive) return;
 
-    AudioSystem.playHit();
+    // Pitch-shift hit marker by remaining HP — high pitch when target near death
+    if (AudioSystem.playHitPitched) {
+      var _hpFrac = (enemy.maxHp > 0) ? (enemy.hp / enemy.maxHp) : 1;
+      AudioSystem.playHitPitched(_hpFrac);
+    } else {
+      AudioSystem.playHit();
+    }
     // Blood splatter on hit — directional exit-wound spray
     if (typeof Tracers !== 'undefined' && Tracers.spawnBlood) {
       var _bloodPt = hit.point || enemy.mesh.position;
