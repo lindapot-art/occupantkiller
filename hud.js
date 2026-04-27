@@ -311,9 +311,19 @@ const HUD = (() => {
       el.ammo.style.color = '#ff4444';
       el.ammo.style.animation = 'lowAmmoFlash 0.4s infinite';
       if (window.AudioSystem && AudioSystem.playLowAmmo) AudioSystem.playLowAmmo();
+    } else if (clipSize && typeof clip === 'number' && clip > 0 && clip <= clipSize * 0.5) {
+      // Half-clip warning: yellow tint, no flash
+      el.ammo.style.color = '#ffcc44';
+      el.ammo.style.animation = '';
     } else {
       el.ammo.style.color = '';
       el.ammo.style.animation = '';
+    }
+    // Reserve text dimming when running low overall
+    if (typeof reserve === 'number' && reserve <= 0) {
+      el.ammoRes.style.color = '#ff6666';
+    } else {
+      el.ammoRes.style.color = '';
     }
   }
 

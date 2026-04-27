@@ -3215,6 +3215,18 @@ const GameManager = (function () {
 
     // Slow-mo on wave clear (dramatic final-kill moment)
     if (typeof Feedback !== 'undefined' && Feedback.triggerSlowMo) Feedback.triggerSlowMo(0.4, 0.2);
+    // Confetti / spark burst above player as celebration
+    try {
+      if (typeof Tracers !== 'undefined' && Tracers.spawnPickupBurst && _scene && player) {
+        var _wcPos = player.position.clone(); _wcPos.y += 1.5;
+        Tracers.spawnPickupBurst(_wcPos, 0xffd700);
+        var _wcPos2 = player.position.clone(); _wcPos2.y += 2.2; _wcPos2.x += 0.6;
+        Tracers.spawnPickupBurst(_wcPos2, 0x44ff88);
+        var _wcPos3 = player.position.clone(); _wcPos3.y += 2.2; _wcPos3.x -= 0.6;
+        Tracers.spawnPickupBurst(_wcPos3, 0x44aaff);
+      }
+      _killFovKick = Math.max(_killFovKick, 5);
+    } catch (eWC) {}
     // Kill cam: brief camera override toward last killed enemy
     if (_lastKillPos && CameraSystem.playLastKillCam) {
       CameraSystem.playLastKillCam(_lastKillPos, _camera.position);
