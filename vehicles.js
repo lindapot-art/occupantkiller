@@ -518,6 +518,11 @@ const VehicleSystem = (function () {
     vehicle.mesh.position.copy(vehicle.position);
     vehicle.mesh.userData.vehicleId = vehicle.id;
 
+    // Attach faction flag (Ukrainian friendly / Russian enemy)
+    if (typeof Flags !== 'undefined' && Flags.attachToVehicle) {
+      try { Flags.attachToVehicle(vehicle); } catch (e) {}
+    }
+
     if (_scene) _scene.add(vehicle.mesh);
     vehicles.push(vehicle);
     return vehicle;
@@ -574,6 +579,15 @@ const VehicleSystem = (function () {
       v.npcGunner = null;
     }
     v.faction = 'friendly';
+    // Swap to Ukrainian flag
+    if (v.mesh && v.mesh.userData.flagPennant) {
+      v.mesh.remove(v.mesh.userData.flagPennant);
+      v.mesh.userData.flagAttached = false;
+      v.mesh.userData.flagPennant = null;
+    }
+    if (typeof Flags !== 'undefined' && Flags.attachToVehicle) {
+      try { Flags.attachToVehicle(v); } catch (e) {}
+    }
     v.occupied = true;
     _occupiedVehicle = v;
     attachPlayerBody(v);
@@ -607,6 +621,15 @@ const VehicleSystem = (function () {
       v.npcGunner = null;
     }
     v.faction = 'friendly';
+    // Swap to Ukrainian flag
+    if (v.mesh && v.mesh.userData.flagPennant) {
+      v.mesh.remove(v.mesh.userData.flagPennant);
+      v.mesh.userData.flagAttached = false;
+      v.mesh.userData.flagPennant = null;
+    }
+    if (typeof Flags !== 'undefined' && Flags.attachToVehicle) {
+      try { Flags.attachToVehicle(v); } catch (e) {}
+    }
     v.occupied = true;
     _occupiedVehicle = v;
     attachPlayerBody(v);
@@ -671,7 +694,18 @@ const VehicleSystem = (function () {
   /** Spawn an enemy vehicle (for tactical enemy vehicle spawns) */
   function spawnEnemy(x, y, z, type) {
     var v = spawn(x, y, z, type);
-    if (v) v.faction = 'enemy';
+    if (v) {
+      v.faction = 'enemy';
+      // Replace friendly flag with Russian flag
+      if (v.mesh && v.mesh.userData.flagPennant) {
+        v.mesh.remove(v.mesh.userData.flagPennant);
+        v.mesh.userData.flagAttached = false;
+        v.mesh.userData.flagPennant = null;
+      }
+      if (typeof Flags !== 'undefined' && Flags.attachToVehicle) {
+        try { Flags.attachToVehicle(v); } catch (e) {}
+      }
+    }
     return v;
   }
 

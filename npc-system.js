@@ -771,6 +771,10 @@ function buildCivilianMesh(npc) {
     group.userData.npcId   = npc.id;
     group.userData.faction = 'ukrainian';
     group.castShadow = true;
+    // Attach Ukrainian flag patch on back + shoulder
+    if (typeof Flags !== 'undefined' && Flags.attachToSoldier) {
+      try { Flags.attachToSoldier(group, 'ukrainian'); } catch (e) {}
+    }
     return group;
   }
 

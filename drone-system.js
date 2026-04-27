@@ -306,6 +306,11 @@ const DroneSystem = (function () {
       c.userData.faction = drone.faction;
     });
 
+    // Attach faction patch (Ukrainian for friendly drones, Russian for enemy)
+    if (typeof Flags !== 'undefined' && Flags.attachToDrone) {
+      try { Flags.attachToDrone(drone); } catch (e) {}
+    }
+
     if (_scene) _scene.add(drone.mesh);
     drones.push(drone);
     _invalidateDroneCaches();

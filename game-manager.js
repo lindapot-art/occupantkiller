@@ -1143,6 +1143,20 @@ const GameManager = (function () {
     if (WeatherSystem && typeof WeatherSystem.init === 'function') WeatherSystem.init(_scene, _camera);
     if (MLSystem && typeof MLSystem.init === 'function') MLSystem.init();
     if (typeof StageVFX !== 'undefined' && StageVFX && typeof StageVFX.init === 'function') StageVFX.init(_scene);
+    if (typeof Flags !== 'undefined' && Flags && typeof Flags.init === 'function') {
+      Flags.init(_scene);
+      // Plant a Ukrainian flagpole near the player spawn (and a captured Russian one further out for atmosphere)
+      try {
+        var spawnX = (_player && _player.position) ? _player.position.x : 0;
+        var spawnZ = (_player && _player.position) ? _player.position.z : 0;
+        var groundY = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
+          ? VoxelWorld.getTerrainHeight(spawnX + 6, spawnZ + 6) + 1 : 1;
+        Flags.spawnFlagpole(spawnX + 6, groundY, spawnZ + 6, 'ukrainian', 4.5);
+        var ry = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
+          ? VoxelWorld.getTerrainHeight(spawnX + 28, spawnZ - 28) + 1 : 1;
+        Flags.spawnFlagpole(spawnX + 28, ry, spawnZ - 28, 'russian', 4.0);
+      } catch (e) {}
+    }
 
     // ── New feature systems init ──────────────────────────
     if (typeof CombatExtras !== 'undefined' && CombatExtras && typeof CombatExtras.reset === 'function') CombatExtras.reset();
@@ -2689,6 +2703,7 @@ const GameManager = (function () {
     if (typeof Building !== 'undefined' && Building.clear) Building.clear();
     if (typeof Tracers !== 'undefined') Tracers.clear();
     if (typeof StageVFX !== 'undefined' && StageVFX.clear) StageVFX.clear();
+    if (typeof Flags !== 'undefined' && Flags.clear) Flags.clear();
     if (typeof WeatherSystem !== 'undefined' && WeatherSystem.clear) WeatherSystem.clear();
     if (typeof WeatherSystem !== 'undefined' && WeatherSystem.init) WeatherSystem.init(_scene, _camera);
 
@@ -5306,6 +5321,7 @@ const GameManager = (function () {
       // Update tracers
       if (typeof Tracers !== 'undefined') Tracers.update(delta, player.position);
       if (typeof StageVFX !== 'undefined') StageVFX.update(delta);
+      if (typeof Flags !== 'undefined' && Flags.update) Flags.update(delta);
 
       // ═══ NEW FEATURE SYSTEM UPDATES (59 features) ═══
 

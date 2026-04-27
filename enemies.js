@@ -1304,6 +1304,11 @@ const Enemies = (() => {
     });
     group.userData.faction  = 'occupant';
 
+    // Attach Russian Federation flag patch on back + shoulder
+    if (typeof Flags !== 'undefined' && Flags.attachToSoldier) {
+      try { Flags.attachToSoldier(group, 'russian'); } catch (e) {}
+    }
+
     return group;
   }
 
