@@ -33,6 +33,54 @@ const GameManager = (function () {
   var _hudSlowTimer = 0; // throttle slow HUD updates (dailies, bounties, prestige)
   var _musicIntTimer = 0; // throttle music intensity calc
   var _buildMatHud = null; // cached DOM ref for build materials HUD
+
+  // Footstep dust puffs (visible when sprinting)
+  var _footstepPuffs = [];
+  var _footstepPuffGeo = null;
+  function _spawnFootstepPuff() {
+    if (!_scene) return;
+    if (!_footstepPuffGeo) _footstepPuffGeo = new THREE.PlaneGeometry(0.5, 0.5);
+    var groundY = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
+      ? VoxelWorld.getTerrainHeight(player.position.x, player.position.z)
+      : (player.position.y - player.height);
+    var mat = new THREE.MeshBasicMaterial({
+      color: 0xb0a080, transparent: true, opacity: 0.45,
+      depthWrite: false,
+    });
+    var puff = new THREE.Mesh(_footstepPuffGeo, mat);
+    puff.rotation.x = -Math.PI / 2;
+    puff.position.set(
+      player.position.x + (Math.random() - 0.5) * 0.2,
+      groundY + 0.04,
+      player.position.z + (Math.random() - 0.5) * 0.2
+    );
+    var s = 0.4 + Math.random() * 0.2;
+    puff.scale.set(s, s, 1);
+    _scene.add(puff);
+    _footstepPuffs.push({ mesh: puff, material: mat, life: 0.5, maxLife: 0.5 });
+    // Cap puff count for perf
+    if (_footstepPuffs.length > 24) {
+      var oldP = _footstepPuffs.shift();
+      if (oldP.mesh && _scene) _scene.remove(oldP.mesh);
+      if (oldP.material && oldP.material.dispose) oldP.material.dispose();
+    }
+  }
+  function _updateFootstepPuffs(delta) {
+    for (var pi = _footstepPuffs.length - 1; pi >= 0; pi--) {
+      var p = _footstepPuffs[pi];
+      p.life -= delta;
+      if (p.material) p.material.opacity = Math.max(0, (p.life / p.maxLife) * 0.45);
+      // Expand outward as it rises slightly
+      p.mesh.scale.x += delta * 0.6;
+      p.mesh.scale.y += delta * 0.6;
+      p.mesh.position.y += delta * 0.15;
+      if (p.life <= 0) {
+        if (_scene) _scene.remove(p.mesh);
+        if (p.material && p.material.dispose) p.material.dispose();
+        _footstepPuffs.splice(pi, 1);
+      }
+    }
+  }
   var _buildMatList = null;
   // Cached per-frame HUD indicator DOM refs
   var _domLean = null, _domInspect = null, _domBayonet = null;
@@ -3684,9 +3732,12 @@ const GameManager = (function () {
           ) || 0;
         }
         if (window.AudioSystem && window.AudioSystem.playFootstep) window.AudioSystem.playFootstep(_fsType);
+        // Footstep dust puff (only when sprinting — visible movement polish)
+        if (player.sprinting && _scene) _spawnFootstepPuff();
         player._footstepTimer = player.sprinting ? 0.28 : 0.42;
       }
     }
+    _updateFootstepPuffs(delta);
   }
 
   /* ── Combat ──────────────────────────────────────────────────────── */
