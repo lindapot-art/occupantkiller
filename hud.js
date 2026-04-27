@@ -610,6 +610,15 @@ const HUD = (() => {
     ctx.closePath();
     ctx.fill();
 
+    // FOV cone indicator — translucent fan in front of player
+    ctx.fillStyle = 'rgba(0,255,80,0.12)';
+    ctx.beginPath();
+    ctx.moveTo(MM_HALF, MM_HALF);
+    var _coneR = MM_HALF * 0.95;
+    ctx.arc(MM_HALF, MM_HALF, _coneR, -Math.PI / 2 - 0.55, -Math.PI / 2 + 0.55);
+    ctx.closePath();
+    ctx.fill();
+
     // Compass labels (rotate with player)
     ctx.fillStyle = 'rgba(0,255,0,0.6)';
     ctx.font = '10px monospace';
