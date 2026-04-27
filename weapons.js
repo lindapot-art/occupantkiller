@@ -3078,6 +3078,8 @@ const Weapons = (() => {
       // Per-type reload animation
       if (mesh) {
         const progress = 1 - st.reloadTimer / wep.reloadTime;
+        // Push reload progress to HUD bar
+        if (typeof HUD !== 'undefined' && HUD.showReload) HUD.showReload(true, progress);
         var rType = wep.type;
         var rRotX = 0, rRotZ = 0, rPosY = 0;
         if (rType === 'PISTOL' || rType === 'SMG' || rType === 'SILENT') {

@@ -263,9 +263,29 @@ const HUD = (() => {
     });
   }
 
-  function showReload(on) {
+  function showReload(on, progress) {
     if (on) el.reload.classList.add('visible');
     else    el.reload.classList.remove('visible');
+    // Lazy-create a progress bar under the reload indicator
+    var rb = document.getElementById('reload-progress-bar');
+    if (on) {
+      if (!rb) {
+        rb = document.createElement('div');
+        rb.id = 'reload-progress-bar';
+        rb.style.cssText = 'position:fixed;left:50%;top:58%;transform:translateX(-50%);width:120px;height:4px;background:rgba(0,0,0,0.55);border:1px solid #ffaa00;border-radius:2px;z-index:160;pointer-events:none;overflow:hidden;';
+        var fill = document.createElement('div');
+        fill.id = 'reload-progress-fill';
+        fill.style.cssText = 'height:100%;width:0%;background:linear-gradient(90deg,#ffaa00,#ffdd44);box-shadow:0 0 6px #ffaa00;transition:width 0.05s linear;';
+        rb.appendChild(fill);
+        document.body.appendChild(rb);
+      }
+      var pct = Math.max(0, Math.min(1, progress || 0)) * 100;
+      var fillEl = document.getElementById('reload-progress-fill');
+      if (fillEl) fillEl.style.width = pct.toFixed(1) + '%';
+      rb.style.display = 'block';
+    } else if (rb) {
+      rb.style.display = 'none';
+    }
   }
 
   let _chFlashTimer = null;
