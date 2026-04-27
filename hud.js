@@ -395,8 +395,10 @@ const HUD = (() => {
       if (dist > 80) continue; // range limit
       // Direction arrow: angle relative to player facing
       var angle = Math.atan2(dx, -dz) - pyaw;
-      var mh = (typeof e.maxHealth === 'number' && e.maxHealth > 0) ? e.maxHealth : 100;
-      var hh = (typeof e.health === 'number' && isFinite(e.health)) ? e.health : mh;
+      var mh = (typeof e.maxHp === 'number' && e.maxHp > 0) ? e.maxHp
+             : (typeof e.maxHealth === 'number' && e.maxHealth > 0) ? e.maxHealth : 100;
+      var hh = (typeof e.hp === 'number' && isFinite(e.hp)) ? e.hp
+             : (typeof e.health === 'number' && isFinite(e.health)) ? e.health : mh;
       sorted.push({ dist: dist, angle: angle, type: e.type || 'INF', health: hh, maxHp: mh });
     }
     sorted.sort(function(a, b) { return a.dist - b.dist; });
