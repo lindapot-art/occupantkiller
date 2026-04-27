@@ -1,0 +1,25 @@
+{
+  "url": "http://localhost:3000",
+  "outDir": "D:\\occupantkiller\\occupantkiller\\tools\\screenshots\\full-win-2026-04-27T01-56-50-265Z",
+  "screenshots": 130,
+  "final": {
+    "state": "playing",
+    "stage": 0,
+    "wave": 3,
+    "score": 1000,
+    "kills": 0,
+    "hp": 999999
+  },
+  "reachedWin": false,
+  "errors": [
+    "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+    "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+    "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+  ],
+  "stateLog": [
+    "2026-04-27T01:56:57.305Z state=playing stage=0 wave=1 alive=28",
+    "2026-04-27T02:00:25.870Z state=waveClear stage=0 wave=1 alive=0",
+    "2026-04-27T02:00:29.578Z state=playing stage=0 wave=2 alive=49",
+    "2026-04-27T02:06:40.179Z state=playing stage=0 wave=3 alive=51"
+  ]
+}

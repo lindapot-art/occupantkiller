@@ -6,7 +6,9 @@
  *  TRAVERSAL.JS — 5 new movement features
  *  Features: mantling, dolphin dive, rope rappel, zipline, swimming
  * ============================================================ */
-console.log('[Traversal.js] Script loaded');
+if (typeof window !== 'undefined' && (window.__QA_MODE || window.__DEBUG_TRAVERSAL)) {
+  console.log('[Traversal.js] Script loaded');
+}
 const Traversal = (function () {
   'use strict';
 
@@ -539,27 +541,32 @@ if (typeof Traversal === 'undefined') {
 // Ensure Traversal is exported globally for browser/legacy code
 if (typeof window !== 'undefined' && Traversal) {
   window.Traversal = Traversal;
+  var _traversalDebug = !!(window.__QA_MODE || window.__DEBUG_TRAVERSAL);
   if (typeof Traversal.updateVehicleTraffic === 'function') {
     window.updateVehicleTraffic = Traversal.updateVehicleTraffic;
   }
-  // Debug: log Traversal keys and forcibly assign reset if missing
-  console.log('[Traversal export] window.Traversal keys:', Object.keys(window.Traversal));
+  // Debug-only diagnostics; keep runtime console output clean in normal play.
+  if (_traversalDebug) {
+    console.log('[Traversal export] window.Traversal keys:', Object.keys(window.Traversal));
+  }
   if (typeof window.Traversal.reset !== 'function' && typeof Traversal.reset === 'function') {
     window.Traversal.reset = Traversal.reset;
-    console.log('[Traversal export] Assigned window.Traversal.reset manually');
+    if (_traversalDebug) {
+      console.log('[Traversal export] Assigned window.Traversal.reset manually');
+    }
   }
   if (typeof window.Traversal.update !== 'function' && typeof Traversal.update === 'function') {
     window.Traversal.update = Traversal.update;
     console.warn('[Traversal export] Assigned window.Traversal.update manually');
   }
-  if (typeof window.Traversal.reset === 'function') {
-    console.log('[Traversal export] Traversal.reset is present');
-  } else {
+  if (typeof window.Traversal.reset !== 'function') {
     console.warn('[Traversal export] Traversal.reset is STILL missing!');
+  } else if (_traversalDebug) {
+    console.log('[Traversal export] Traversal.reset is present');
   }
-  if (typeof window.Traversal.update === 'function') {
-    console.log('[Traversal export] Traversal.update is present');
-  } else {
+  if (typeof window.Traversal.update !== 'function') {
     console.error('[Traversal export] Traversal.update is STILL missing!');
+  } else if (_traversalDebug) {
+    console.log('[Traversal export] Traversal.update is present');
   }
 }
