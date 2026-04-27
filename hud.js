@@ -362,6 +362,22 @@ const HUD = (() => {
     });
   }
 
+  // Range readout under crosshair when ADS-aimed at enemy
+  var _rangeEl = null;
+  function setRangeReadout(metres) {
+    if (metres == null || metres < 0) {
+      if (_rangeEl) _rangeEl.style.opacity = '0';
+      return;
+    }
+    if (!_rangeEl) {
+      _rangeEl = document.createElement('div');
+      _rangeEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,18px);color:#ff8866;font-size:11px;font-family:monospace;font-weight:bold;text-shadow:0 0 4px #000;pointer-events:none;z-index:165;opacity:0;transition:opacity 0.15s;';
+      document.body.appendChild(_rangeEl);
+    }
+    _rangeEl.textContent = Math.round(metres) + 'm';
+    _rangeEl.style.opacity = '1';
+  }
+
   // Green heal flash vignette (briefly tint screen on health pickup)
   var _healFlashEl = null;
   var _healFlashTimer = null;
@@ -1528,7 +1544,7 @@ const HUD = (() => {
     setScore, setWave, setKills, setEnemies, setStage,
     setHealth, setAmmo, setWeapon, showReload,
     flashHit, flashDamage, flashHeal, showBloodDrops,
-    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget,
+    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout,
     announceWave, announceStage,
     addKill, showHitDirection, updateMinimap,
     updateCompass, showStreak, showBleed, showProne, showJam,

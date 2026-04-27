@@ -4932,6 +4932,7 @@ const GameManager = (function () {
           var _camFwd = _camera.getWorldDirection(new THREE.Vector3());
           var _camPos = _camera.position;
           var _onTarget = false;
+          var _onTargetDist = 0;
           var _list = Enemies.getAll();
           // Tighter cone when zoomed (precise) vs wider when hipfiring (forgiving)
           var _aimCos = (Weapons.isZoomed && Weapons.isZoomed()) ? 0.997 : 0.992;
@@ -4944,9 +4945,14 @@ const GameManager = (function () {
             var _dist = Math.sqrt(_dx*_dx + _dy*_dy + _dz*_dz);
             if (_dist < 1 || _dist > 120) continue;
             var _dot = (_dx*_camFwd.x + _dy*_camFwd.y + _dz*_camFwd.z) / _dist;
-            if (_dot > _aimCos) { _onTarget = true; break; }
+            if (_dot > _aimCos) { _onTarget = true; _onTargetDist = _dist; break; }
           }
           HUD.setCrosshairTarget(_onTarget);
+          // Range readout: only show when zoomed AND on target (sniper info)
+          if (HUD.setRangeReadout) {
+            if (_onTarget && Weapons.isZoomed && Weapons.isZoomed()) HUD.setRangeReadout(_onTargetDist);
+            else HUD.setRangeReadout(null);
+          }
         }
       } catch (eCt) {}
 
