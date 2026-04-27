@@ -4922,6 +4922,17 @@ const GameManager = (function () {
 
       // Compass update
       if (HUD.updateCompass) HUD.updateCompass(CameraSystem.getYaw());
+      // Distant artillery rumble for war atmosphere (every 18-40s during gameplay)
+      try {
+        if (typeof AudioSystem !== 'undefined' && AudioSystem.playDistantBoom) {
+          if (player._distantBoomTimer === undefined) player._distantBoomTimer = 8 + Math.random() * 12;
+          player._distantBoomTimer -= delta;
+          if (player._distantBoomTimer <= 0) {
+            AudioSystem.playDistantBoom();
+            player._distantBoomTimer = 18 + Math.random() * 22;
+          }
+        }
+      } catch (eDB) {}
       // Compass threat ticks: nearest 4 enemies as red marks at top of compass bar
       try {
         if (HUD.setCompassThreats && Enemies.getAll) {

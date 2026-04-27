@@ -158,6 +158,37 @@ window.AudioSystem = (function () {
     noiseGain.connect(masterGain);
   }
 
+  // Distant mortar/artillery boom - low rumble for ambient war atmosphere
+  function playDistantBoom() {
+    if (!enabled || !ctx) return;
+    resume();
+    var now = ctx.currentTime;
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(50, now);
+    osc.frequency.exponentialRampToValueAtTime(22, now + 1.4);
+    gain.gain.setValueAtTime(0.0, now);
+    gain.gain.linearRampToValueAtTime(0.09, now + 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 1.4);
+    // Low-pass filtered noise rumble
+    var noise = createNoise(1.2);
+    var lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 180;
+    var ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.0, now);
+    ng.gain.linearRampToValueAtTime(0.06, now + 0.18);
+    ng.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    noise.connect(lp);
+    lp.connect(ng);
+    ng.connect(masterGain);
+  }
+
   function playFlashbang() {
     if (!enabled || !ctx) return;
     resume();
@@ -1691,6 +1722,7 @@ window.AudioSystem = (function () {
     playGunshot: playGunshot,
     playSpatialGunshot: playSpatialGunshot,
     playExplosion: playExplosion,
+    playDistantBoom: playDistantBoom,
     playHit: playHit,
     playHitPitched: playHitPitched,
     playReload: playReload,
