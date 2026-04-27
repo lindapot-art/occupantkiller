@@ -868,6 +868,7 @@ const Enemies = (() => {
     _enemyGrenades.push({ mesh: mesh, vx: vx, vy: vy, vz: vz, life: t + 0.5, dmg: 35, radius: 4, _trailT: 0, _beaconMat: beaconMat });
   }
   function updateEnemyGrenades(delta, playerPos) {
+    var _nearestG = Infinity;
     for (var i = _enemyGrenades.length - 1; i >= 0; i--) {
       var g = _enemyGrenades[i];
       g.mesh.position.x += g.vx * delta;
@@ -883,6 +884,11 @@ const Enemies = (() => {
       if (g._trailT >= 0.05 && typeof Tracers !== 'undefined' && Tracers.spawnSmoke) {
         g._trailT = 0;
         try { Tracers.spawnSmoke(g.mesh.position); } catch (eT) {}
+      }
+      // Track nearest grenade for warning
+      if (playerPos) {
+        var _gd = g.mesh.position.distanceTo(playerPos);
+        if (_gd < _nearestG) _nearestG = _gd;
       }
       // Explode on ground or timeout
       var terrainY = (typeof window.VoxelWorld !== 'undefined') ? window.VoxelWorld.getTerrainHeight(g.mesh.position.x, g.mesh.position.z) : 0;
@@ -903,6 +909,12 @@ const Enemies = (() => {
         _enemyGrenades.splice(i, 1);
       }
     }
+    // Push grenade-warning state to HUD
+    try {
+      if (typeof HUD !== 'undefined' && HUD.setGrenadeWarning) {
+        HUD.setGrenadeWarning(_nearestG < 8 ? _nearestG : -1);
+      }
+    } catch (eGW) {}
   }
 
   // ── Stage-specific enemy composition tables ────────────────

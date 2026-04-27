@@ -262,6 +262,33 @@ const HUD = (() => {
     _adrEl.style.opacity = String(0.35 + t * 0.55);
   }
 
+  // ── Incoming grenade warning ─────────────────────────────────
+  // dist: distance to nearest enemy grenade in metres, or -1 to clear
+  var _grenWarnEl = null;
+  function setGrenadeWarning(dist) {
+    if (dist == null || dist < 0) {
+      if (_grenWarnEl) _grenWarnEl.style.opacity = '0';
+      return;
+    }
+    if (!_grenWarnEl) {
+      _grenWarnEl = document.createElement('div');
+      _grenWarnEl.style.cssText = 'position:fixed;top:30%;left:50%;transform:translate(-50%,0);color:#ffaa00;font-size:24px;font-family:monospace;font-weight:bold;text-shadow:0 0 8px #ff4400,0 0 14px #000;pointer-events:none;z-index:170;opacity:0;transition:opacity 0.15s;letter-spacing:2px;';
+      _grenWarnEl.textContent = '⚠ GRENADE ⚠';
+      document.body.appendChild(_grenWarnEl);
+      if (!document.getElementById('gren-warn-kf')) {
+        var st = document.createElement('style');
+        st.id = 'gren-warn-kf';
+        st.textContent = '@keyframes grenWarnPulse{0%,100%{transform:translate(-50%,0) scale(1)}50%{transform:translate(-50%,0) scale(1.18)}}';
+        document.head.appendChild(st);
+      }
+      _grenWarnEl.style.animation = 'grenWarnPulse 0.45s ease-in-out infinite';
+    }
+    // Closer = brighter & faster pulse
+    var t2 = 1 - Math.min(1, dist / 8);
+    _grenWarnEl.style.opacity = String(0.55 + t2 * 0.45);
+    _grenWarnEl.style.color = t2 > 0.6 ? '#ff3030' : '#ffaa00';
+  }
+
   // Sprint motion vignette: subtle dark edges intensify on sprint start
   var _sprintEl = null;
   function setSprintIntensity(amount) {
@@ -1597,7 +1624,7 @@ const HUD = (() => {
     setScore, setWave, setKills, setEnemies, setStage,
     setHealth, setAmmo, setWeapon, showReload,
     flashHit, flashDamage, flashHeal, showBloodDrops,
-    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout, setSprintIntensity,
+    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout, setSprintIntensity, setGrenadeWarning,
     announceWave, announceStage,
     addKill, showHitDirection, updateMinimap,
     updateCompass, showStreak, showBleed, showProne, showJam,
