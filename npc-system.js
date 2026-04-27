@@ -924,7 +924,7 @@ function buildCivilianMesh(npc) {
     let nearest = null;
     let nearDist = Infinity;
     for (const e of allEnemies) {
-      if (!e.mesh) continue;
+      if (!e.mesh || !e.alive) continue;
       const dist = npc.position.distanceTo(e.mesh.position);
       if (dist < nearDist) {
         nearDist = dist;
