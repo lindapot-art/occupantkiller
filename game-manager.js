@@ -81,6 +81,39 @@ const GameManager = (function () {
       }
     }
   }
+  // ── Threat-behind warning glow ───────────────────────────────────
+  var _threatEl = null;
+  var _threatOpacity = 0;
+  function _updateThreatBehind() {
+    if (!_threatEl) _threatEl = document.getElementById('threat-behind');
+    if (!_threatEl) return;
+    var threatNear = false;
+    if (typeof Enemies !== 'undefined' && Enemies.getAll && _camera) {
+      var fwd = _camera.getWorldDirection(new THREE.Vector3());
+      var pp = player.position;
+      var list = Enemies.getAll();
+      for (var ii = 0; ii < list.length; ii++) {
+        var ee = list[ii];
+        if (!ee || !ee.alive || !ee.mesh) continue;
+        var dx = ee.mesh.position.x - pp.x;
+        var dz = ee.mesh.position.z - pp.z;
+        var d2 = dx*dx + dz*dz;
+        if (d2 > 49) continue; // >7m away
+        // dot of forward vs to-enemy direction; <0 means behind
+        var len = Math.sqrt(d2) || 1;
+        var dot = (fwd.x * dx + fwd.z * dz) / len;
+        if (dot < -0.25) { threatNear = true; break; }
+      }
+    }
+    var target = threatNear ? 1 : 0;
+    _threatOpacity += (target - _threatOpacity) * Math.min(1, 6 * 0.016);
+    if (_threatOpacity < 0.02 && target === 0) {
+      if (_threatEl.style.display !== 'none') _threatEl.style.display = 'none';
+      return;
+    }
+    if (_threatEl.style.display === 'none') _threatEl.style.display = 'block';
+    _threatEl.style.opacity = _threatOpacity.toFixed(2);
+  }
   var _buildMatList = null;
   // Cached per-frame HUD indicator DOM refs
   var _domLean = null, _domInspect = null, _domBayonet = null;
@@ -3739,6 +3772,7 @@ const GameManager = (function () {
       }
     }
     _updateFootstepPuffs(delta);
+    _updateThreatBehind();
   }
 
   /* ── Combat ──────────────────────────────────────────────────────── */
