@@ -2813,6 +2813,19 @@ const Enemies = (() => {
       updateHpBar(e, playerPos);
       // Attacker tag pulse fade
       if (e._attackerTag) _updateAttackerTag(e, delta);
+      // Bleeding from low HP: periodic small blood drip on the ground
+      if (e.hp > 0 && e.hp < e.maxHp * 0.35) {
+        e._bleedTimer = (e._bleedTimer || 0) - delta;
+        if (e._bleedTimer <= 0) {
+          e._bleedTimer = 0.6 + Math.random() * 0.6;
+          try {
+            if (typeof Tracers !== 'undefined' && Tracers.spawnBlood) {
+              var _bp = e.mesh.position.clone(); _bp.y += 0.05;
+              Tracers.spawnBlood(_bp);
+            }
+          } catch (eBl) {}
+        }
+      }
     }
 
     // Last-survivor highlight: pulse a bright marker over the final enemy of the wave
