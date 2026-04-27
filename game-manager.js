@@ -938,7 +938,7 @@ const GameManager = (function () {
         let bgColor = stageCfg && stageCfg.bgColor !== undefined ? stageCfg.bgColor : 0xFFD700;
         let fogColor = stageCfg && stageCfg.fogColor !== undefined ? stageCfg.fogColor : 0xFFD700;
         _scene.background = new THREE.Color(bgColor);
-        _scene.fog = new THREE.Fog(fogColor, 14, 80);
+        _scene.fog = new THREE.Fog(fogColor, 14, isMobile ? 55 : 80);
 
         // If running in compatibility mode, show a warning overlay
         if (_rendererProfile === 'compatibility') {
@@ -976,10 +976,10 @@ const GameManager = (function () {
     // Create scene — Ukrainian theme (golden sky)
     _scene = new THREE.Scene();
     _scene.background = new THREE.Color(0xFFD700);
-    _scene.fog = new THREE.Fog(0xFFD700, 14, 80);
+    _scene.fog = new THREE.Fog(0xFFD700, 14, isMobile ? 55 : 80);
 
     // Create camera
-    _camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
+    _camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, isMobile ? 140 : 200);
 
     // Lighting — Ukrainian theme
     ambLight = new THREE.AmbientLight(0x888866, 0.8);
