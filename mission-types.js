@@ -86,6 +86,20 @@ const MissionTypes = (function () {
       blastDamage: 300, blastRadius: 10,
       timeLimit: 150,
       rewardOKC: 250, rewardXP: 350
+    },
+    // Feature 46: Assault Russian Dugouts (Ukrainian-led grenade assault)
+    ASSAULT_DUGOUTS: {
+      id: 'ASSAULT_DUGOUTS', name: 'Clear Russian Dugouts', icon: '💥', tier: 3,
+      desc: 'Lead Ukrainian squad to clear Russian Federation dugouts, holes, and trenches with grenades.',
+      objectives: [
+        { type: 'reach_first_dugout', label: 'Reach first Russian position' },
+        { type: 'clear_dugouts', label: 'Clear all dugouts (0/4)' },
+        { type: 'hold_position', label: 'Hold for 30s after clear' }
+      ],
+      dugoutCount: 4, ukrSquadSize: 5, holdTime: 30,
+      rusGarrisonPerHole: 4, grenadeBonus: 8,
+      timeLimit: 360, // 6 minutes
+      rewardOKC: 350, rewardXP: 500
     }
   };
 
@@ -126,6 +140,13 @@ const MissionTypes = (function () {
         break;
       case 'DEFUSE':
         missionProgress = { located: 0, defused: 0, defusing: false, defuseProgress: 0, detonationTimer: type.detonationTimer };
+        break;
+      case 'ASSAULT_DUGOUTS':
+        missionProgress = {
+          dugoutsCleared: 0, reachedFirst: false, holdTimer: 0,
+          dugoutPositions: [], rusKilledTotal: 0,
+          ukrSquad: [], grenadesUsed: 0
+        };
         break;
     }
     return true;
@@ -212,6 +233,20 @@ const MissionTypes = (function () {
           return { ...result, state: 'COMPLETE' };
         }
         break;
+
+      case 'ASSAULT_DUGOUTS':
+        result.dugoutsCleared = missionProgress.dugoutsCleared;
+        result.dugoutCount = cfg.dugoutCount;
+        result.reachedFirst = missionProgress.reachedFirst;
+        if (missionProgress.dugoutsCleared >= cfg.dugoutCount) {
+          missionProgress.holdTimer += dt;
+          result.holdProgress = missionProgress.holdTimer / cfg.holdTime;
+          if (missionProgress.holdTimer >= cfg.holdTime) {
+            m.state = 'COMPLETE';
+            return { ...result, state: 'COMPLETE' };
+          }
+        }
+        break;
     }
     return result;
   }
@@ -275,6 +310,19 @@ const MissionTypes = (function () {
             return { defused: missionProgress.defused };
           }
           return { defusing: true, progress: missionProgress.defuseProgress };
+        }
+        break;
+      case 'CLEAR_DUGOUT':
+        if (m.type === 'ASSAULT_DUGOUTS') {
+          missionProgress.dugoutsCleared++;
+          missionProgress.reachedFirst = true;
+          return { cleared: missionProgress.dugoutsCleared, total: m.config.dugoutCount };
+        }
+        break;
+      case 'GRENADE_USED':
+        if (m.type === 'ASSAULT_DUGOUTS') {
+          missionProgress.grenadesUsed++;
+          return { grenadesUsed: missionProgress.grenadesUsed };
         }
         break;
     }

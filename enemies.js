@@ -1308,6 +1308,18 @@ const Enemies = (() => {
     if (typeof Flags !== 'undefined' && Flags.attachToSoldier) {
       try { Flags.attachToSoldier(group, 'russian'); } catch (e) {}
     }
+    // Grenade pouch on belt — small dark cube cluster (visual gear)
+    try {
+      var ePouchG = new THREE.Group();
+      var ePouchMat = new THREE.MeshLambertMaterial({ color: 0x1f2412 });
+      for (var epg = 0; epg < 3; epg++) {
+        var enade = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.10, 0.06), ePouchMat);
+        enade.position.set(-0.06 + epg * 0.06, 0.50, 0.18);
+        ePouchG.add(enade);
+      }
+      group.add(ePouchG);
+      group.userData.gearGrenadePouch = ePouchG;
+    } catch (e) {}
 
     return group;
   }

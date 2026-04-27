@@ -206,8 +206,11 @@ const Weapons = (() => {
 
   // ── Per-weapon mutable state ───────────────────────────────
   function makeState(cfg) {
+    var initReserve = cfg.maxReserve;
+    // Ensure player always starts with at least 5 grenades available
+    if (cfg.type === 'GRENADE' && initReserve < 5) initReserve = 5;
     return {
-      clip: cfg.clipSize, reserve: cfg.maxReserve,
+      clip: cfg.clipSize, reserve: initReserve,
       reloading: false, reloadTimer: 0, fireCooldown: 0,
       jammed: false, shotsSinceClean: 0,
     };
@@ -2689,13 +2692,18 @@ const Weapons = (() => {
     if (wep.type === 'AT' || wep.type === 'ATGM' || wep.type === 'AT_HEAVY' ||
         wep.type === 'AT_LIGHT' || wep.type === 'AA' || wep.type === 'GRENADE' ||
         wep.type === 'INCENDIARY' || wep.type === 'THERMOBARIC' || wep.type === 'EXPLOSIVE') {
+      var _isGod = (typeof GameManager !== 'undefined' && GameManager.isGodMode && GameManager.isGodMode());
+      if (_isGod && wep.type === 'GRENADE') {
+        // Unlimited grenades in god mode — top up clip + reserve so ammo never depletes
+        st.clip = wep.clipSize; st.reserve = wep.maxReserve;
+      }
       if (st.clip <= 0) { startReload(); _firedThisFrame = false; return; }
-      st.clip--;
+      if (!_isGod) st.clip--;
       HUD.setAmmo(st.clip, st.reserve);
       showMuzzle();
       spawnProjectile(camera, wep);
       recoilOffset = 0.04;
-      if (st.clip === 0 && st.reserve > 0) startReload();
+      if (!_isGod && st.clip === 0 && st.reserve > 0) startReload();
       return;
     }
 

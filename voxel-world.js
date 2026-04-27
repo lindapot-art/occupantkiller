@@ -270,6 +270,49 @@ window.VoxelWorld = (function () {
     setBlock(wx, wy + 2, wz, BLOCK.METAL);
   }
 
+  // Russian dugout / trench position. Carves a pit, lines it with sandbags,
+  // adds a couple wood plank covers, and spits out a center anchor for spawning a garrison.
+  function placeDugout(wx, wy, wz, length) {
+    var L = Math.max(3, length || 5);
+    var W = 3;
+    var depth = 2;
+    // Carve trench
+    for (var dx = 0; dx < L; dx++) {
+      for (var dz = 0; dz < W; dz++) {
+        for (var dy = 0; dy < depth; dy++) {
+          setBlock(wx + dx, wy - dy, wz + dz, BLOCK.AIR);
+        }
+        // floor = dirt
+        setBlock(wx + dx, wy - depth, wz + dz, BLOCK.DIRT);
+      }
+    }
+    // Sandbag walls along long edges (top of trench)
+    for (var i = 0; i < L; i++) {
+      setBlock(wx + i, wy + 1, wz - 1, BLOCK.SANDBAG);
+      setBlock(wx + i, wy + 1, wz + W, BLOCK.SANDBAG);
+      if (i % 2 === 0) {
+        setBlock(wx + i, wy + 2, wz - 1, BLOCK.SANDBAG);
+        setBlock(wx + i, wy + 2, wz + W, BLOCK.SANDBAG);
+      }
+    }
+    // Wood plank covers (partial)
+    if (BLOCK.WOOD !== undefined) {
+      setBlock(wx + 1, wy + 1, wz, BLOCK.WOOD);
+      setBlock(wx + 1, wy + 1, wz + 1, BLOCK.WOOD);
+      setBlock(wx + L - 2, wy + 1, wz + 1, BLOCK.WOOD);
+      setBlock(wx + L - 2, wy + 1, wz + 2, BLOCK.WOOD);
+    }
+    // Mark dirt mound at end of trench (entry)
+    setBlock(wx, wy, wz - 1, BLOCK.DIRT);
+    setBlock(wx + L - 1, wy, wz + W, BLOCK.DIRT);
+    return {
+      x: wx + Math.floor(L / 2),
+      y: wy - depth + 1,
+      z: wz + Math.floor(W / 2),
+      length: L, width: W, depth: depth
+    };
+  }
+
   function placeFountain(wx, wy, wz) {
     setBlock(wx, wy, wz, BLOCK.WATER);
     setBlock(wx, wy + 1, wz, BLOCK.GLASS);
@@ -4004,6 +4047,7 @@ window.VoxelWorld = (function () {
     updateVehicles,
     getActiveVehicles,
     clearVehicles,
+    placeDugout: typeof placeDugout === 'function' ? placeDugout : function () { return null; },
     isSolid: typeof isSolid === 'function' ? isSolid : function () { return false; },
     // Cover degradation
     damageBlock: damageBlock,

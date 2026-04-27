@@ -775,6 +775,35 @@ function buildCivilianMesh(npc) {
     if (typeof Flags !== 'undefined' && Flags.attachToSoldier) {
       try { Flags.attachToSoldier(group, 'ukrainian'); } catch (e) {}
     }
+    // Grenade pouch on belt — small dark cube cluster (visual gear)
+    try {
+      var pouchG = new THREE.Group();
+      var pouchMat = new THREE.MeshLambertMaterial({ color: 0x2a3018 });
+      for (var pg = 0; pg < 3; pg++) {
+        var nade = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.10, 0.06), pouchMat);
+        nade.position.set(-0.06 + pg * 0.06, 0.50, 0.18);
+        pouchG.add(nade);
+      }
+      group.add(pouchG);
+      group.userData.gearGrenadePouch = pouchG;
+    } catch (e) {}
+    // ~40% of NPCs carry a sitting mat: rolled cylinder while walking, flat plane when sitting
+    if (Math.random() < 0.4) {
+      try {
+        var matMat = new THREE.MeshLambertMaterial({ color: 0x6a4a26 });
+        var rolled = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.42, 8), matMat);
+        rolled.rotation.z = Math.PI / 2;
+        rolled.position.set(0, 0.42, -0.20);
+        group.add(rolled);
+        var flatMat = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 1.10), matMat);
+        flatMat.rotation.x = -Math.PI / 2;
+        flatMat.position.set(0, 0.02, 0);
+        flatMat.visible = false;
+        group.add(flatMat);
+        group.userData.sittingMatRolled = rolled;
+        group.userData.sittingMatFlat = flatMat;
+      } catch (e) {}
+    }
     return group;
   }
 
@@ -880,6 +909,15 @@ function buildCivilianMesh(npc) {
         updateBehavior(npc, delta, timeInfo);
         updateMovement(npc, delta);
         updateAnimation(npc, delta);
+        // Sitting mat: toggle rolled vs flat plane based on idle time
+        var ud = npc.mesh && npc.mesh.userData;
+        if (ud && ud.sittingMatRolled && ud.sittingMatFlat) {
+          var moving = !!(npc.velocity && (Math.abs(npc.velocity.x) + Math.abs(npc.velocity.z) > 0.05));
+          npc._idleTime = (moving ? 0 : (npc._idleTime || 0) + delta);
+          var sitting = npc._idleTime > 4.0;
+          ud.sittingMatRolled.visible = !sitting;
+          ud.sittingMatFlat.visible = sitting;
+        }
       }
     }
   }

@@ -6411,6 +6411,17 @@ const GameManager = (function () {
       Enemies.setPlayerStealth(true);
       var stInd = document.getElementById('stealth-indicator');
       if (stInd) stInd.style.display = 'block';
+      // Grant unlimited build materials so god-mode player can build dugouts/structures freely
+      try {
+        if (player.buildMaterials) {
+          player.buildMaterials.wood = 9999;
+          player.buildMaterials.stone = 9999;
+          player.buildMaterials.metal = 9999;
+          player.buildMaterials.dirt = 9999;
+          player.buildMaterials.sand = 9999;
+          player.buildMaterials.brick = 9999;
+        }
+      } catch (e) {}
       HUD.notifyPickup('⚡ GOD MODE — FULL KIT EQUIPPED', '#ffff00');
     } else {
       // Reset health
