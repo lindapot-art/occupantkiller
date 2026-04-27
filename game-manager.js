@@ -4044,6 +4044,20 @@ const GameManager = (function () {
           }
         }
       } catch (eLS) {}
+      // Personal-best longest-shot tracker — announce + persist when broken
+      try {
+        var _kdNow = (enemy && enemy.mesh) ? enemy.mesh.position.distanceTo(player.position) : 0;
+        if (_kdNow > 5) {
+          if (player._longestShot === undefined) {
+            player._longestShot = parseFloat(localStorage.getItem('ok_longest_shot') || '0') || 0;
+          }
+          if (_kdNow > player._longestShot + 1) {
+            player._longestShot = _kdNow;
+            try { localStorage.setItem('ok_longest_shot', String(_kdNow)); } catch (eLS2) {}
+            if (HUD.showStreakBanner) HUD.showStreakBanner('🏆 NEW LONGEST SHOT: ' + Math.round(_kdNow) + 'm', Math.round(_kdNow));
+          }
+        }
+      } catch (eLS3) {}
       player.xp += xpGain;
       var xpNeeded = player.level * 200;
       if (player.xp >= xpNeeded) {
