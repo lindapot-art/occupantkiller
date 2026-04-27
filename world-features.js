@@ -154,6 +154,7 @@ const WorldFeatures = (function () {
   }
 
   function updateTrees(dt) {
+    var _windT = (typeof performance !== 'undefined') ? performance.now() * 0.001 : 0;
     for (let i = trees.length - 1; i >= 0; i--) {
       const t = trees[i];
       if (t.falling) {
@@ -168,6 +169,11 @@ const WorldFeatures = (function () {
             trees.splice(i, 1);
           }
         }
+      } else if (t.mesh) {
+        // Gentle wind sway — per-tree phase keeps motion incoherent
+        if (t._swayPhase === undefined) t._swayPhase = Math.random() * Math.PI * 2;
+        t.mesh.rotation.z = Math.sin(_windT * 1.1 + t._swayPhase) * 0.025;
+        t.mesh.rotation.x = Math.sin(_windT * 0.7 + t._swayPhase * 0.5) * 0.02;
       }
     }
   }
