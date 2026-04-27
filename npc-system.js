@@ -331,6 +331,37 @@ function buildCivilianMesh(npc) {
     );
     mag.position.set(0, -0.06, -0.04);
     g.add(mag);
+    // Pistol grip
+    const grip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.035, 0.06, 0.03),
+      new THREE.MeshLambertMaterial({ color: 0x141414 })
+    );
+    grip.position.set(0, -0.05, 0.03);
+    g.add(grip);
+    // Stock for rifles/MGs (barrel >= 0.25)
+    if (weaponDef.barrelLen >= 0.25) {
+      const stock = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.05, 0.16),
+        new THREE.MeshLambertMaterial({ color: 0x3a2a18 })
+      );
+      stock.position.set(0, 0, 0.12);
+      g.add(stock);
+    }
+    // Picatinny optic for ELITE/VETERAN
+    if (weaponDef.soundType === 'rifle' || weaponDef.soundType === 'hmg') {
+      const optic = new THREE.Mesh(
+        new THREE.BoxGeometry(0.03, 0.04, 0.08),
+        new THREE.MeshLambertMaterial({ color: 0x111111 })
+      );
+      optic.position.set(0, 0.05, -0.04);
+      g.add(optic);
+      const lens = new THREE.Mesh(
+        new THREE.BoxGeometry(0.022, 0.022, 0.005),
+        new THREE.MeshBasicMaterial({ color: 0x66aaff })
+      );
+      lens.position.set(0, 0.05, -0.084);
+      g.add(lens);
+    }
     return g;
   }
 
