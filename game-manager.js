@@ -2953,6 +2953,7 @@ const GameManager = (function () {
     }
     currentWave = w;
     player.waveStartTime = performance.now();
+    player._secondWindTriggered = false;
     const stageDef = STAGES[currentStage];
     const mlDiff = MLSystem.getDifficultyMult();
 
@@ -4303,6 +4304,14 @@ const GameManager = (function () {
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
+    // ── Second Wind: trigger once per wave when HP first drops to <=20% ──
+    if (player.hp > 0 && player.hp <= player.maxHp * 0.20 && !player._secondWindTriggered) {
+      player._secondWindTriggered = true;
+      if (typeof Feedback !== 'undefined' && Feedback.triggerSlowMo) Feedback.triggerSlowMo(0.45, 1.2);
+      if (HUD.showStreakBanner) HUD.showStreakBanner('⚡ SECOND WIND', 0);
+      if (CameraSystem.shake) CameraSystem.shake(0.06, 0.4);
+      if (typeof AudioSystem !== 'undefined' && AudioSystem.playReadyChime) AudioSystem.playReadyChime();
+    }
     // Mobile haptic feedback — sharper for heavier damage
     if (isMobile && navigator.vibrate) {
       try { navigator.vibrate(Math.min(80, 20 + dmg * 0.8)); } catch (e) {}
