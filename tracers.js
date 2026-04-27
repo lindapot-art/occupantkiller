@@ -168,6 +168,11 @@ const Tracers = (() => {
     }
     // Shockwave ring (render-loop driven, not setInterval)
     spawnShockwave(pos, radius * 2.5, 0xffaa44);
+    // Lingering smoke pillar — rises from explosion site for ~1.5s
+    try {
+      var smokeBase = pos.clone ? pos.clone() : new THREE.Vector3(pos.x, pos.y, pos.z);
+      _smokePillars.push({ base: smokeBase, radius: radius, age: 0, dur: 1.5 });
+    } catch (eSp) {}
     // Persistent scorch mark on the ground beneath explosion
     try {
       var groundY = pos.y;
@@ -471,6 +476,7 @@ const Tracers = (() => {
   const _scorchMarks = [];
   const _scorchGeo = new THREE.PlaneGeometry(1, 1);
   var MAX_SCORCH = 40;
+  const _smokePillars = [];
   const _holeMat = new THREE.MeshBasicMaterial({
     color: 0x111111, transparent: true, opacity: 0.7,
     depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1
@@ -529,6 +535,23 @@ const Tracers = (() => {
         s.mat.dispose();
         _scorchMarks.splice(i, 1);
       }
+    }
+  }
+  function updateSmokePillars(delta) {
+    for (var i = _smokePillars.length - 1; i >= 0; i--) {
+      var sp = _smokePillars[i];
+      sp.age += delta;
+      // Spawn smoke puffs every ~80ms, rising and drifting
+      sp._next = (sp._next || 0) - delta;
+      if (sp._next <= 0 && sp.age < sp.dur) {
+        sp._next = 0.08;
+        var puffPos = sp.base.clone();
+        puffPos.x += (Math.random() - 0.5) * sp.radius * 0.4;
+        puffPos.z += (Math.random() - 0.5) * sp.radius * 0.4;
+        puffPos.y += sp.age * 2.5; // rises
+        if (typeof spawnSmoke === 'function') spawnSmoke(puffPos);
+      }
+      if (sp.age >= sp.dur) _smokePillars.splice(i, 1);
     }
   }
 
@@ -673,6 +696,7 @@ const Tracers = (() => {
       updateFire(delta);
       updateRain(delta, playerPos);
       updateScorchMarks(delta);
+      updateSmokePillars(delta);
     },
     clear: function() {
       clear();
