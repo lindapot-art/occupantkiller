@@ -417,6 +417,26 @@ const Tracers = (() => {
     }
   }
 
+  // Pickup burst — coloured ascending particles to celebrate item collection
+  function spawnPickupBurst(pos, color) {
+    if (!_scene) return;
+    var col = color || 0xffffff;
+    for (let i = 0; i < 14; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: col, transparent: true, opacity: 1,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const m = new THREE.Mesh(_boxGeoSpark, mat);
+      m.position.copy(pos);
+      _scene.add(m);
+      sparks.push({
+        mesh: m,
+        vel: new THREE.Vector3((Math.random()-0.5)*5, Math.random()*5+3, (Math.random()-0.5)*5),
+        life: 0.5 + Math.random() * 0.3,
+      });
+    }
+  }
+
   function updateSparks(delta) {
     for (let i = sparks.length - 1; i >= 0; i--) {
       const s = sparks[i];
@@ -684,7 +704,7 @@ const Tracers = (() => {
 
   return {
     init, spawnTracer, spawnSmoke, spawnMuzzleFlash, spawnExplosion, spawnBlood,
-    spawnBlockImpact, spawnCasing, spawnSparks, spawnBulletHole,
+    spawnBlockImpact, spawnCasing, spawnSparks, spawnPickupBurst, spawnBulletHole,
     spawnShockwave, spawnFire,
     startRain, stopRain,
     update: function(delta, playerPos) {

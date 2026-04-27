@@ -4931,6 +4931,20 @@ const GameManager = (function () {
       Pickups.update(delta, player.position, function (type, data) {
         AudioSystem.playPickup();
         MLSystem.onPickup();
+        // Coloured particle burst at player position to celebrate pickup
+        if (typeof Tracers !== 'undefined' && Tracers.spawnPickupBurst) {
+          var _bcol = type === 'HEALTH' || type === 'MEDKIT' ? 0x22ff55
+                    : type === 'AMMO'   ? 0xffcc00
+                    : type === 'ARMOR'  ? 0x4488ff
+                    : type === 'STIM'   ? 0xcc44ff
+                    : type === 'INTEL'  ? 0x00ffff
+                    : type === 'SHIELD' ? 0xffd700
+                    : type === 'WEAPON' ? 0xff8800
+                    : 0xffffff;
+          var _bpos = player.position.clone();
+          _bpos.y += 0.6;
+          Tracers.spawnPickupBurst(_bpos, _bcol);
+        }
         if (type === 'HEALTH') {
           player.hp = Math.min(player.maxHp, player.hp + 25);
           HUD.setHealth(player.hp, player.maxHp);
