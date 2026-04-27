@@ -1320,6 +1320,29 @@ const Enemies = (() => {
       group.add(ePouchG);
       group.userData.gearGrenadePouch = ePouchG;
     } catch (e) {}
+    // Mag pouches on chest
+    try {
+      var eMagMat = new THREE.MeshLambertMaterial({ color: 0x282a18 });
+      var eMagL = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.12, 0.05), eMagMat);
+      eMagL.position.set(-0.10, 0.78, 0.16);
+      var eMagR = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.12, 0.05), eMagMat);
+      eMagR.position.set(0.10, 0.78, 0.16);
+      group.add(eMagL); group.add(eMagR);
+    } catch (e) {}
+    // Entrenching tool on ~30% of enemies (digs trenches)
+    if (Math.random() < 0.30) {
+      try {
+        var eShovelG = new THREE.Group();
+        var eHandle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.28, 0.03),
+          new THREE.MeshLambertMaterial({ color: 0x4a2a10 }));
+        var eBlade = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.02),
+          new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
+        eBlade.position.y = -0.18;
+        eShovelG.add(eHandle); eShovelG.add(eBlade);
+        eShovelG.position.set(0, 0.55, -0.18);
+        group.add(eShovelG);
+      } catch (e) {}
+    }
 
     return group;
   }

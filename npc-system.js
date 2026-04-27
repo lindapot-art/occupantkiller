@@ -804,6 +804,39 @@ function buildCivilianMesh(npc) {
         group.userData.sittingMatFlat = flatMat;
       } catch (e) {}
     }
+    // Mag pouches on chest (every soldier) — 2 stacked rectangles
+    try {
+      var magMat = new THREE.MeshLambertMaterial({ color: 0x3a4022 });
+      var magL = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.12, 0.05), magMat);
+      magL.position.set(-0.10, 0.78, 0.16);
+      var magR = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.12, 0.05), magMat);
+      magR.position.set(0.10, 0.78, 0.16);
+      group.add(magL); group.add(magR);
+    } catch (e) {}
+    // Entrenching tool (small shovel) on lower back — ~25% of NPCs
+    if (Math.random() < 0.25) {
+      try {
+        var shovelG = new THREE.Group();
+        var handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.28, 0.03),
+          new THREE.MeshLambertMaterial({ color: 0x5a3a1a }));
+        var blade = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.02),
+          new THREE.MeshLambertMaterial({ color: 0x202020 }));
+        blade.position.y = -0.18;
+        shovelG.add(handle); shovelG.add(blade);
+        shovelG.position.set(0, 0.55, -0.18);
+        group.add(shovelG);
+      } catch (e) {}
+    }
+    // Antenna (radioman) — ~15% of NPCs get tall whip antenna from backpack
+    if (Math.random() < 0.15) {
+      try {
+        var antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.008, 0.65, 6),
+          new THREE.MeshLambertMaterial({ color: 0x111111 }));
+        antenna.position.set(-0.08, 1.05, -0.18);
+        antenna.rotation.z = -0.18;
+        group.add(antenna);
+      } catch (e) {}
+    }
     return group;
   }
 
