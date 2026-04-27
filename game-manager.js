@@ -765,6 +765,7 @@ const GameManager = (function () {
   const _baseFOV = 75;
   var _currentFOV = 75;
   var _targetFOV = 75;
+  var _killFovKick = 0; // additive FOV bump on kill, decays
 
   /* ── Physics Constants ───────────────────────────────────────────── */
   const MOVE_SPEED   = 6.0;
@@ -4033,6 +4034,8 @@ const GameManager = (function () {
       HUD.setKills(player.kills);
       RankSystem.onKill(isHeadshot);
       HUD.addKill(Weapons.getCurrentName(), enemy.typeCfg ? enemy.typeCfg.name : 'ENEMY', isHeadshot);
+      // FOV kick: brief zoom-out punch on kill (bigger on headshot)
+      _killFovKick = Math.max(_killFovKick, isHeadshot ? 4.5 : 2.5);
 
       // ── B23: XP system ──
       var xpGain = (enemy.typeCfg ? enemy.typeCfg.xpReward : 20) || 20;
@@ -4958,7 +4961,7 @@ const GameManager = (function () {
 
       // ── FOV kick: sprint widens (+5), ADS narrows (weapons handles its own) ──
       if (!Weapons.isZoomed()) {
-        _targetFOV = _baseFOV + (player.sprinting ? 5 : 0);
+        _targetFOV = _baseFOV + (player.sprinting ? 5 : 0) + _killFovKick;
         _currentFOV += (_targetFOV - _currentFOV) * Math.min(1, delta * 10);
         _camera.fov = _currentFOV;
         _camera.updateProjectionMatrix();
@@ -4966,6 +4969,8 @@ const GameManager = (function () {
         // While zoomed, let weapons.js handle FOV, but track for smooth unzoom
         _currentFOV = _camera.fov;
       }
+      // Decay kill FOV kick (~0.4s ease-back)
+      if (_killFovKick > 0) _killFovKick = Math.max(0, _killFovKick - delta * 8);
 
       Enemies.update(delta, player.position, onPlayerHit, function (waveDone) {
         if (waveDone) onWaveComplete();
