@@ -720,6 +720,14 @@ const GameManager = (function () {
     moveTouchId: null,
     lookTouchId: null,
     moveStartX: 0, moveStartY: 0,
+    // ── Gyro aim (mobile DeviceOrientation) ──
+    gyroEnabled: false,
+    gyroReady: false,
+    gyroPrevAlpha: null,
+    gyroPrevBeta: null,
+    gyroDX: 0,
+    gyroDY: 0,
+    gyroSensitivity: 4.0,
   };
 
   let _rendererProfile = 'desktop';
@@ -3403,6 +3411,12 @@ const GameManager = (function () {
       touch.lookX = 0;
       touch.lookY = 0;
     }
+    // Apply gyro look rotation (additive to touch)
+    if (isMobile && touch.gyroEnabled && (touch.gyroDX !== 0 || touch.gyroDY !== 0)) {
+      CameraSystem.handleMouseMove(touch.gyroDX, touch.gyroDY);
+      touch.gyroDX = 0;
+      touch.gyroDY = 0;
+    }
 
     // ── Mobile aim assist: gentle magnetism toward nearest enemy in cone ──
     // Helps thumb-aim feel responsive without auto-aim-bot behavior.
@@ -5419,6 +5433,69 @@ const GameManager = (function () {
     }
   }
 
+  /* ── Gyro Aim (mobile DeviceOrientation) ──────────────────────── */
+  function _onDeviceOrientation(e) {
+    if (!touch.gyroEnabled) return;
+    // alpha = compass yaw (0-360, may be null on some devices)
+    // beta  = front/back tilt (-180..180); gamma = left/right tilt (-90..90)
+    var a = e.alpha, b = e.beta;
+    if (a == null || b == null) return;
+    if (touch.gyroPrevAlpha === null) {
+      touch.gyroPrevAlpha = a;
+      touch.gyroPrevBeta  = b;
+      return;
+    }
+    var dA = a - touch.gyroPrevAlpha;
+    if (dA > 180) dA -= 360; else if (dA < -180) dA += 360;
+    var dB = b - touch.gyroPrevBeta;
+    touch.gyroPrevAlpha = a;
+    touch.gyroPrevBeta  = b;
+    // Reject huge spikes (recalibration jumps)
+    if (Math.abs(dA) > 30 || Math.abs(dB) > 30) return;
+    // Landscape: yaw comes from -alpha, pitch from beta
+    // handleMouseMove(dx, dy) treats dx as horizontal pixel delta. Scale to feel ~similar to touch.
+    var sens = touch.gyroSensitivity;
+    touch.gyroDX += -dA * sens;
+    touch.gyroDY += dB * sens * 0.6;
+  }
+
+  function toggleGyroAim() {
+    if (!isMobile) return;
+    var enable = !touch.gyroEnabled;
+    var btn = document.getElementById('btn-gyro');
+    function _activate() {
+      touch.gyroEnabled = true;
+      touch.gyroPrevAlpha = null;
+      touch.gyroPrevBeta  = null;
+      touch.gyroDX = 0;
+      touch.gyroDY = 0;
+      if (!touch.gyroReady) {
+        window.addEventListener('deviceorientation', _onDeviceOrientation, true);
+        touch.gyroReady = true;
+      }
+      if (btn) btn.classList.add('active');
+      try { localStorage.setItem('ok_gyro', '1'); } catch (_e) {}
+    }
+    function _deactivate() {
+      touch.gyroEnabled = false;
+      touch.gyroDX = 0;
+      touch.gyroDY = 0;
+      if (btn) btn.classList.remove('active');
+      try { localStorage.setItem('ok_gyro', '0'); } catch (_e) {}
+    }
+    if (!enable) { _deactivate(); return; }
+    // iOS 13+ requires explicit permission
+    var DOE = window.DeviceOrientationEvent;
+    if (DOE && typeof DOE.requestPermission === 'function') {
+      DOE.requestPermission().then(function (state) {
+        if (state === 'granted') _activate();
+        else if (btn) btn.classList.remove('active');
+      }).catch(function () {});
+    } else {
+      _activate();
+    }
+  }
+
   /* ── Mobile Controls Setup ─────────────────────────────────────── */
   function setupMobileControls() {
     if (_mobileControlsReady) return;
@@ -5600,6 +5677,7 @@ const GameManager = (function () {
       }
     });
     bindTapButton('btn-night', function () { tapVirtualKey('KeyL'); });
+    bindTapButton('btn-gyro', function () { toggleGyroAim(); });
     bindTapButton('btn-inventory-mobile', function () { toggleInventory(); });
     bindTapButton('btn-crouch', function () { tapVirtualKey('KeyZ', 140); });
     bindTapButton('btn-melee', function () {
@@ -5641,6 +5719,18 @@ const GameManager = (function () {
       e.preventDefault();
       tapVirtualKey('Escape');
     }, { passive: false });
+
+    // Restore gyro preference (if previously enabled and no permission gate needed)
+    try {
+      if (localStorage.getItem('ok_gyro') === '1') {
+        var DOE = window.DeviceOrientationEvent;
+        if (!(DOE && typeof DOE.requestPermission === 'function')) {
+          // Non-iOS: enable silently
+          toggleGyroAim();
+        }
+        // iOS: require user re-tap (permission must be in user gesture)
+      }
+    } catch (_e) {}
   }
 
   /* ── Orientation + Fullscreen (mobile) ──────────────────────────── */
