@@ -1174,6 +1174,15 @@ const HUD = (() => {
     }
     var pct = nextLevelXP > 0 ? Math.min(100, (currentXP / nextLevelXP) * 100) : 100;
     _xpBarFill.style.width = pct + '%';
+    // Glow pulse intensifies as you near level-up
+    if (pct >= 85) {
+      var glowAmt = Math.floor(6 + (pct - 85) * 0.8);
+      _xpBarFill.style.boxShadow = '0 0 ' + glowAmt + 'px #66ccff, 0 0 ' + (glowAmt * 1.5) + 'px #88ddff';
+      _xpBarEl.style.borderColor = pct >= 95 ? '#ffdd44' : '#88ccff';
+    } else {
+      _xpBarFill.style.boxShadow = 'none';
+      _xpBarEl.style.borderColor = '#4488ff';
+    }
     _xpBarText.textContent = 'LVL ' + level + ' — ' + currentXP + '/' + nextLevelXP + ' XP';
   }
 
