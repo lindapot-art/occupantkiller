@@ -1053,15 +1053,39 @@ const Enemies = (() => {
     );
     head.position.y = 1.4 * s;
 
-    // ── Helmet with white «Z» insignia ────────────────────
+    // ── Helmet — composite 6B47 Ratnik (shell + brim + nape) ──
     const helmetZTex = getCachedTex('helmet_' + typeCfg.helmetColor, function() {
       return makeHelmetZTexture(typeCfg.helmetColor);
     });
-    const helmet = new THREE.Mesh(
-      new THREE.BoxGeometry(0.40 * s, 0.18 * s, 0.40 * s),
-      new THREE.MeshLambertMaterial({ map: helmetZTex })
+    const helmetMat = new THREE.MeshLambertMaterial({ map: helmetZTex });
+    const helmetShell = new THREE.Mesh(
+      new THREE.BoxGeometry(0.40 * s, 0.16 * s, 0.40 * s),
+      helmetMat
     );
-    helmet.position.y = 1.55 * s;
+    helmetShell.position.y = 1.55 * s;
+    const helmetCrown = new THREE.Mesh(
+      new THREE.BoxGeometry(0.34 * s, 0.06 * s, 0.34 * s),
+      new THREE.MeshLambertMaterial({ color: typeCfg.helmetColor })
+    );
+    helmetCrown.position.y = 1.65 * s;
+    const helmetBrim = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42 * s, 0.04 * s, 0.10 * s),
+      new THREE.MeshLambertMaterial({ color: typeCfg.helmetColor })
+    );
+    helmetBrim.position.set(0, 1.49 * s, 0.20 * s);
+    const helmetNape = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42 * s, 0.10 * s, 0.06 * s),
+      new THREE.MeshLambertMaterial({ color: typeCfg.helmetColor })
+    );
+    helmetNape.position.set(0, 1.50 * s, -0.21 * s);
+    // NVG counterweight pouch on back of helmet
+    const helmetCw = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18 * s, 0.08 * s, 0.05 * s),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    helmetCw.position.set(0, 1.55 * s, -0.22 * s);
+    const helmet = helmetShell; // backward-compat reference
+    group.add(helmetShell, helmetCrown, helmetBrim, helmetNape, helmetCw);
 
     // ── Legs (camo textured, darker variant) ──────────────
     const legCamo = getCachedTex('camo_dark', function() {
@@ -1139,12 +1163,21 @@ const Enemies = (() => {
     // ── Boots (dark brown — historically accurate) ────────
     for (const legMesh of [legL, legR]) {
       const boot = new THREE.Mesh(
-        new THREE.BoxGeometry(0.22 * s, 0.18 * s, 0.22 * s),
+        new THREE.BoxGeometry(0.24 * s, 0.22 * s, 0.26 * s),
         new THREE.MeshLambertMaterial({ color: 0x2A1A0A })
       );
       boot.position.copy(legMesh.position);
       boot.position.y = 0.04 * s;
+      boot.position.z = 0.02 * s; // toe forward
       group.add(boot);
+      // Boot upper (laced shaft)
+      const bootUpper = new THREE.Mesh(
+        new THREE.BoxGeometry(0.20 * s, 0.14 * s, 0.20 * s),
+        new THREE.MeshLambertMaterial({ color: 0x1a0e06 })
+      );
+      bootUpper.position.copy(legMesh.position);
+      bootUpper.position.y = 0.18 * s;
+      group.add(bootUpper);
 
       // Knee pad
       const kneePad = new THREE.Mesh(
@@ -1155,6 +1188,57 @@ const Enemies = (() => {
       kneePad.position.y = 0.18 * s;
       kneePad.position.z = 0.12 * s;
       group.add(kneePad);
+    }
+
+    // ── Tactical gloves (black) on hands ──────────────────
+    const gloveMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+    const gloveL = new THREE.Mesh(new THREE.BoxGeometry(0.20 * s, 0.10 * s, 0.20 * s), gloveMat);
+    gloveL.position.set(-0.35 * s, 0.54 * s, 0);
+    const gloveR = new THREE.Mesh(new THREE.BoxGeometry(0.20 * s, 0.10 * s, 0.20 * s), gloveMat);
+    gloveR.position.set(0.35 * s, 0.54 * s, 0);
+    group.add(gloveL, gloveR);
+
+    // ── Admin pouch (right chest) ─────────────────────────
+    const adminPouch = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14 * s, 0.10 * s, 0.04 * s),
+      new THREE.MeshLambertMaterial({ color: 0x2a2a1a })
+    );
+    adminPouch.position.set(0.10 * s, 1.05 * s, 0.18 * s);
+    group.add(adminPouch);
+
+    // ── Dump pouch (left hip — for spent magazines) ───────
+    const dumpPouch = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14 * s, 0.16 * s, 0.10 * s),
+      new THREE.MeshLambertMaterial({ color: 0x2a2a1a })
+    );
+    dumpPouch.position.set(-0.30 * s, 0.62 * s, 0.04 * s);
+    group.add(dumpPouch);
+
+    // ── Russian tricolor shoulder flag (white-blue-red, right shoulder) ──
+    const flagW = 0.16 * s, flagH = 0.04 * s;
+    const flagWhite = new THREE.Mesh(new THREE.BoxGeometry(flagW, flagH, 0.005),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    flagWhite.position.set(0.36 * s, 1.04 * s, 0.10 * s);
+    flagWhite.rotation.y = -Math.PI / 2;
+    const flagBlue = new THREE.Mesh(new THREE.BoxGeometry(flagW, flagH, 0.005),
+      new THREE.MeshBasicMaterial({ color: 0x0033A0 }));
+    flagBlue.position.set(0.36 * s, 1.00 * s, 0.10 * s);
+    flagBlue.rotation.y = -Math.PI / 2;
+    const flagRed = new THREE.Mesh(new THREE.BoxGeometry(flagW, flagH, 0.005),
+      new THREE.MeshBasicMaterial({ color: 0xDA291C }));
+    flagRed.position.set(0.36 * s, 0.96 * s, 0.10 * s);
+    flagRed.rotation.y = -Math.PI / 2;
+    group.add(flagWhite, flagBlue, flagRed);
+
+    // ── Balaclava (face covering) for elite/special units ──
+    if (typeCfg.name === 'OFFICER' || typeCfg.name === 'SABOTEUR' ||
+        typeCfg.name === 'SNIPER_ELITE' || typeCfg.name === 'WAGNER') {
+      const bala = new THREE.Mesh(
+        new THREE.BoxGeometry(0.36 * s, 0.18 * s, 0.36 * s),
+        new THREE.MeshLambertMaterial({ color: 0x111111 })
+      );
+      bala.position.y = 1.36 * s;
+      group.add(bala);
     }
 
     // Eye glow

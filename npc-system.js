@@ -537,14 +537,36 @@ function buildCivilianMesh(npc) {
     head.position.y = 1.28;
     group.add(head);
 
-    // ── Helmet with blue-yellow cross tape ────────────────
+    // ── Helmet — composite PASGT/MICH (shell + crown + brim + nape) ──
     const helmetTex = makeUkrainianHelmetTexture(helmetColor);
+    const helmetMat = new THREE.MeshLambertMaterial({ map: helmetTex });
     const helmet = new THREE.Mesh(
       new THREE.BoxGeometry(0.40, 0.16, 0.40),
-      new THREE.MeshLambertMaterial({ map: helmetTex })
+      helmetMat
     );
     helmet.position.y = 1.44;
-    group.add(helmet);
+    const helmetCrown = new THREE.Mesh(
+      new THREE.BoxGeometry(0.34, 0.06, 0.34),
+      new THREE.MeshLambertMaterial({ color: helmetColor })
+    );
+    helmetCrown.position.y = 1.54;
+    const helmetBrim = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.04, 0.10),
+      new THREE.MeshLambertMaterial({ color: helmetColor })
+    );
+    helmetBrim.position.set(0, 1.38, 0.20);
+    const helmetNape = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.10, 0.06),
+      new THREE.MeshLambertMaterial({ color: helmetColor })
+    );
+    helmetNape.position.set(0, 1.39, -0.21);
+    // Yellow ID combat tape strip across helmet front (current war marking)
+    const yellowTape = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.02, 0.05),
+      new THREE.MeshBasicMaterial({ color: 0xFFD700 })
+    );
+    yellowTape.position.set(0, 1.40, 0.21);
+    group.add(helmet, helmetCrown, helmetBrim, helmetNape, yellowTape);
 
     // ── Legs (dark camo) ──────────────────────────────────
     const legCamo = makeMM14CamoTexture('dark');
@@ -633,6 +655,66 @@ function buildCivilianMesh(npc) {
     );
     belt.position.y = 0.42;
     group.add(belt);
+
+    // ── Tactical gloves (black) on hands ──────────────────
+    const ukrGloveMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+    const ukrGloveL = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.08, 0.13), ukrGloveMat);
+    ukrGloveL.position.set(-0.32, 0.52, 0);
+    const ukrGloveR = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.08, 0.13), ukrGloveMat);
+    ukrGloveR.position.set(0.32, 0.52, 0);
+    group.add(ukrGloveL, ukrGloveR);
+
+    // ── Admin pouch (right chest) ─────────────────────────
+    const ukrAdmin = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.10, 0.04),
+      new THREE.MeshLambertMaterial({ color: 0x6a5230 })
+    );
+    ukrAdmin.position.set(0.10, 0.95, 0.18);
+    group.add(ukrAdmin);
+
+    // ── Mag pouches (3, on chest plate) ───────────────────
+    for (let i = -1; i <= 1; i++) {
+      const mp = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.10, 0.04),
+        new THREE.MeshLambertMaterial({ color: 0x6a5230 })
+      );
+      mp.position.set(i * 0.09, 0.78, 0.18);
+      group.add(mp);
+    }
+
+    // ── Dump pouch (left hip) ─────────────────────────────
+    const ukrDump = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.14, 0.10),
+      new THREE.MeshLambertMaterial({ color: 0x6a5230 })
+    );
+    ukrDump.position.set(-0.27, 0.58, 0.04);
+    group.add(ukrDump);
+
+    // ── Boots (taller laced — replace earlier short boots) ─
+    // (Earlier short boots already added; layer a tall shaft on top.)
+    for (let side = -1; side <= 1; side += 2) {
+      const bootShaft = new THREE.Mesh(
+        new THREE.BoxGeometry(0.13, 0.14, 0.13),
+        new THREE.MeshLambertMaterial({ color: 0x6a4f30 })
+      );
+      bootShaft.position.set(side * 0.12, 0.13, 0);
+      group.add(bootShaft);
+    }
+
+    // ── Ukrainian flag shoulder patch (right shoulder, blue over yellow) ──
+    const ukrFlagBlue = new THREE.Mesh(
+      new THREE.BoxGeometry(0.13, 0.03, 0.005),
+      new THREE.MeshBasicMaterial({ color: 0x0057B8 })
+    );
+    ukrFlagBlue.position.set(0.33, 1.00, 0.07);
+    ukrFlagBlue.rotation.y = -Math.PI / 2;
+    const ukrFlagYellow = new THREE.Mesh(
+      new THREE.BoxGeometry(0.13, 0.03, 0.005),
+      new THREE.MeshBasicMaterial({ color: 0xFFD700 })
+    );
+    ukrFlagYellow.position.set(0.33, 0.97, 0.07);
+    ukrFlagYellow.rotation.y = -Math.PI / 2;
+    group.add(ukrFlagBlue, ukrFlagYellow);
 
     // ── Eyes (green glow for friendlies) ──────────────────
     const eyeGeo = new THREE.SphereGeometry(0.035, 6, 6);
