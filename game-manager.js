@@ -4007,6 +4007,18 @@ const GameManager = (function () {
       player.score += enemy.scoreValue;
       player.kills++;
       player.waveKills++;
+      // Kill milestone banners — celebrate round numbers of total kills
+      try {
+        var _kMile = player.kills;
+        var _mileLabel = null;
+        if (_kMile === 50) _mileLabel = '⚔ 50 KILLS — WARRIOR';
+        else if (_kMile === 100) _mileLabel = '🔥 100 KILLS — VETERAN';
+        else if (_kMile === 250) _mileLabel = '💀 250 KILLS — REAPER';
+        else if (_kMile === 500) _mileLabel = '☠ 500 KILLS — DESTROYER';
+        else if (_kMile === 1000) _mileLabel = '👑 1000 KILLS — LEGEND';
+        else if (_kMile > 1000 && _kMile % 1000 === 0) _mileLabel = '👑 ' + _kMile + ' KILLS — UNSTOPPABLE';
+        if (_mileLabel && HUD.showStreakBanner) HUD.showStreakBanner(_mileLabel, _kMile);
+      } catch (eMile) {}
       // Mobile haptic — double-pulse for kill, longer for headshot
       if (isMobile && navigator.vibrate) {
         try { navigator.vibrate(isHeadshot ? [25, 35, 60] : [20, 30, 30]); } catch (e) {}
