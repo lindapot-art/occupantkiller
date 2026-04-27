@@ -1132,9 +1132,22 @@ const GameManager = (function () {
       }, 10000);
     });
 
-    // Set player spawn on terrain
-    const spawnH = window.VoxelWorld.getTerrainHeight(0, 0);
-    player.position.set(0, spawnH + player.height, 0);
+    // Set player spawn on terrain — search outward if (0,0) lands in water
+    var sx = 0, sz = 0, spawnH = window.VoxelWorld.getTerrainHeight(0, 0);
+    var BLOCK_WATER = 8;
+    function _isWaterCol(x, z, h) {
+      var b = window.VoxelWorld.getBlock ? window.VoxelWorld.getBlock(Math.floor(x), Math.floor(h), Math.floor(z)) : 0;
+      return b === BLOCK_WATER;
+    }
+    if (_isWaterCol(sx, sz, spawnH)) {
+      var _spiral = [[0,3],[3,0],[0,-3],[-3,0],[5,5],[-5,5],[5,-5],[-5,-5],[0,8],[8,0],[0,-8],[-8,0]];
+      for (var _si = 0; _si < _spiral.length; _si++) {
+        var tx = _spiral[_si][0], tz = _spiral[_si][1];
+        var th = window.VoxelWorld.getTerrainHeight(tx, tz);
+        if (!_isWaterCol(tx, tz, th)) { sx = tx; sz = tz; spawnH = th; break; }
+      }
+    }
+    player.position.set(sx, spawnH + player.height, sz);
 
     // Spawn organized assault groups (4 squads of 4-5 armed NPCs)
     NPCSystem.spawnAssaultGroups();
