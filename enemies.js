@@ -1302,20 +1302,77 @@ const Enemies = (() => {
     const wInfo = ENEMY_WEAPON_VISUALS[typeCfg.name];
     if (!wInfo) return;
     const s = typeCfg.scale;
-    // Weapon barrel attached to right arm area
+    if (wInfo.len <= 0) return; // melee/explosive vest — no weapon mesh
+
+    // ── Weapon barrel ──
     const barrel = new THREE.Mesh(
       new THREE.BoxGeometry(0.04 * s, 0.04 * s, wInfo.len * s),
       new THREE.MeshLambertMaterial({ color: wInfo.color })
     );
     barrel.position.set(0.35 * s, 0.70 * s, 0.18 * s);
     mesh.add(barrel);
-    // Weapon body (receiver)
+    // ── Weapon receiver/body ──
     const body = new THREE.Mesh(
-      new THREE.BoxGeometry(0.05 * s, 0.05 * s, 0.10 * s),
+      new THREE.BoxGeometry(0.06 * s, 0.06 * s, 0.12 * s),
       new THREE.MeshLambertMaterial({ color: wInfo.color })
     );
     body.position.set(0.35 * s, 0.72 * s, 0.06 * s);
     mesh.add(body);
+    // ── Magazine (curved AK profile or straight stick) ──
+    const isLong = wInfo.len >= 0.20;
+    const mag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05 * s, 0.10 * s, 0.04 * s),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    mag.position.set(0.35 * s, 0.62 * s, 0.06 * s);
+    mesh.add(mag);
+    // ── Stock for rifles/MGs ──
+    if (isLong) {
+      const stock = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05 * s, 0.05 * s, 0.16 * s),
+        new THREE.MeshLambertMaterial({ color: 0x3a2a18 })
+      );
+      stock.position.set(0.35 * s, 0.72 * s, -0.06 * s);
+      mesh.add(stock);
+    }
+    // ── Pistol grip ──
+    const grip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04 * s, 0.07 * s, 0.04 * s),
+      new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+    );
+    grip.position.set(0.35 * s, 0.65 * s, 0.02 * s);
+    mesh.add(grip);
+    // ── Optic (Kobra/PSO) for officers, snipers, elites ──
+    const hasOptic = (typeCfg.name === 'OFFICER' || typeCfg.name === 'SNIPER' ||
+                      typeCfg.name === 'SNIPER_ELITE' || typeCfg.name === 'SABOTEUR');
+    if (hasOptic) {
+      const optic = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04 * s, 0.06 * s, 0.10 * s),
+        new THREE.MeshLambertMaterial({ color: 0x111111 })
+      );
+      optic.position.set(0.35 * s, 0.79 * s, 0.06 * s);
+      mesh.add(optic);
+      // Lens glow
+      const lens = new THREE.Mesh(
+        new THREE.BoxGeometry(0.03 * s, 0.03 * s, 0.005 * s),
+        new THREE.MeshBasicMaterial({ color: 0x66aaff })
+      );
+      lens.position.set(0.35 * s, 0.79 * s, 0.115 * s);
+      mesh.add(lens);
+    }
+    // ── Bipod for snipers / MGs ──
+    if (typeCfg.name === 'SNIPER_ELITE' || typeCfg.name === 'BOSS' || typeCfg.name === 'ARMORED') {
+      const bipodL = new THREE.Mesh(
+        new THREE.BoxGeometry(0.005 * s, 0.10 * s, 0.005 * s),
+        new THREE.MeshLambertMaterial({ color: 0x222222 })
+      );
+      bipodL.position.set(0.33 * s, 0.62 * s, 0.20 * s);
+      bipodL.rotation.z = 0.25;
+      const bipodR = bipodL.clone();
+      bipodR.position.x = 0.37 * s;
+      bipodR.rotation.z = -0.25;
+      mesh.add(bipodL, bipodR);
+    }
   }
 
   // ── Floating HP bar (lives in scene, follows enemy) ───────
