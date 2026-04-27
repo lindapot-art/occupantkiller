@@ -41,6 +41,11 @@ const Pickups = (() => {
     if (!_ringGeo) _ringGeo = new THREE.TorusGeometry(0.25, 0.025, 8, 20);
     return _ringGeo;
   }
+  var _beamGeo = null;
+  function _getBeamGeo() {
+    if (!_beamGeo) _beamGeo = new THREE.CylinderGeometry(0.06, 0.10, 8, 6, 1, true);
+    return _beamGeo;
+  }
 
   function init(sc) { scene = sc; }
 
@@ -67,7 +72,17 @@ const Pickups = (() => {
     );
     ringMesh.rotation.x = Math.PI / 2;
 
-    group.add(boxMesh, ringMesh);
+    // Vertical light beam — visible from a distance
+    const beamMesh = new THREE.Mesh(
+      _getBeamGeo(),
+      new THREE.MeshBasicMaterial({
+        color: cfg.color, transparent: true, opacity: 0.18,
+        depthWrite: false, blending: THREE.AdditiveBlending,
+      })
+    );
+    beamMesh.position.y = 4; // tall pillar above pickup
+
+    group.add(boxMesh, ringMesh, beamMesh);
     const spawnY = worldPos.y + 0.3;
     group.position.set(worldPos.x, spawnY, worldPos.z);
     scene.add(group);
@@ -76,6 +91,7 @@ const Pickups = (() => {
       group,
       boxMesh,
       ringMesh,
+      beamMesh,
       type,
       data: data || null,
       baseY: spawnY,
@@ -97,6 +113,7 @@ const Pickups = (() => {
           scene.remove(p.group);
           if (p.boxMesh && p.boxMesh.material) p.boxMesh.material.dispose();
           if (p.ringMesh && p.ringMesh.material) p.ringMesh.material.dispose();
+          if (p.beamMesh && p.beamMesh.material) p.beamMesh.material.dispose();
           pickups.splice(i, 1);
           continue;
         }
@@ -127,6 +144,7 @@ const Pickups = (() => {
         scene.remove(p.group);
         if (p.boxMesh && p.boxMesh.material) p.boxMesh.material.dispose();
         if (p.ringMesh && p.ringMesh.material) p.ringMesh.material.dispose();
+        if (p.beamMesh && p.beamMesh.material) p.beamMesh.material.dispose();
         pickups.splice(i, 1);
         onCollect(p.type, p.data);
       }
@@ -139,6 +157,7 @@ const Pickups = (() => {
       if (scene) scene.remove(p.group);
       if (p.boxMesh && p.boxMesh.material) p.boxMesh.material.dispose();
       if (p.ringMesh && p.ringMesh.material) p.ringMesh.material.dispose();
+      if (p.beamMesh && p.beamMesh.material) p.beamMesh.material.dispose();
     }
     pickups = [];
     time    = 0;
@@ -146,6 +165,7 @@ const Pickups = (() => {
     for (var k in _boxGeos) { _boxGeos[k].dispose(); }
     _boxGeos = {};
     if (_ringGeo) { _ringGeo.dispose(); _ringGeo = null; }
+    if (_beamGeo) { _beamGeo.dispose(); _beamGeo = null; }
   }
 
   return { init, spawn, update, clear, getAll: function () { return pickups; } };
