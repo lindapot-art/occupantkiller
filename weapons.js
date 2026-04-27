@@ -57,7 +57,7 @@ const Weapons = (() => {
     {
       id: 'STUGNA', name: 'Stugna-P', damage: 800,
       fireRate: 3.0, clipSize: 1, maxReserve: 2, reloadTime: 5.0,
-      spread: 0, auto: false, type: 'ATGM', hasScope: true, blastRadius: 5, recoilY: 0.050, recoilX: 0.015,
+      spread: 0, auto: false, type: 'ATGM', hasScope: true, homing: true, blastRadius: 5, recoilY: 0.050, recoilX: 0.015,
     },
     {
       id: 'M4A1', name: 'M4A1', damage: 30,
@@ -67,7 +67,7 @@ const Weapons = (() => {
     {
       id: 'JAVELIN', name: 'FGM-148 Javelin', damage: 1200,
       fireRate: 4.0, clipSize: 1, maxReserve: 2, reloadTime: 6.0,
-      spread: 0, auto: false, type: 'AT_HEAVY', hasScope: true, blastRadius: 6, recoilY: 0.060, recoilX: 0.020,
+      spread: 0, auto: false, type: 'AT_HEAVY', hasScope: true, homing: true, blastRadius: 6, recoilY: 0.060, recoilX: 0.020,
     },
     {
       id: 'RPG7', name: 'RPG-7', damage: 350,
@@ -77,7 +77,7 @@ const Weapons = (() => {
     {
       id: 'IGLA', name: 'Igla MANPADS', damage: 600,
       fireRate: 3.5, clipSize: 1, maxReserve: 2, reloadTime: 5.0,
-      spread: 0, auto: false, type: 'AA', blastRadius: 4, recoilY: 0.050, recoilX: 0.015,
+      spread: 0, auto: false, type: 'AA', hasScope: true, homing: true, blastRadius: 4, recoilY: 0.050, recoilX: 0.015,
     },
     {
       id: 'GP25', name: 'GP-25 Grenade Launcher', damage: 150,
@@ -190,7 +190,7 @@ const Weapons = (() => {
     {
       id: 'STINGER', name: 'FIM-92 Stinger', damage: 700,
       fireRate: 3.5, clipSize: 1, maxReserve: 2, reloadTime: 5.5,
-      spread: 0, auto: false, type: 'AA', blastRadius: 5, recoilY: 0.050, recoilX: 0.015,
+      spread: 0, auto: false, type: 'AA', hasScope: true, homing: true, blastRadius: 5, recoilY: 0.050, recoilX: 0.015,
     },
     {
       id: 'THROWKNIFE', name: 'Throwing Knife', damage: 90,
@@ -2153,6 +2153,48 @@ const Weapons = (() => {
     mesh.lookAt(_wTmp2);
     _scene.add(mesh);
     const speed = (isGrenade || isMolotov || isSmoke || isFlash) ? 18 : PROJ_SPEED;
+
+    // ── Heat-seeking / fire-and-forget guidance ──
+    // AA (Igla/Stinger) → lock onto enemy aircraft (drones)
+    // ATGM/AT_HEAVY (Stugna/Javelin) → lock onto nearest enemy in cone
+    var homingTarget = null;
+    if (wep.homing) {
+      var origin = pos.clone();
+      var fwd = dir.clone();
+      var bestScore = -Infinity;
+      var maxRange = 220;
+      var minDot = 0.85; // ~32° cone half-angle
+      function _scoreCand(tpos) {
+        var dx = tpos.x - origin.x, dy = tpos.y - origin.y, dz = tpos.z - origin.z;
+        var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist > maxRange || dist < 1) return null;
+        var dot = (dx * fwd.x + dy * fwd.y + dz * fwd.z) / dist;
+        if (dot < minDot) return null;
+        return dot - dist * 0.001;
+      }
+      if (wep.type === 'AA' && typeof DroneSystem !== 'undefined' && DroneSystem.getEnemyDrones) {
+        var dlist = DroneSystem.getEnemyDrones() || [];
+        for (var di = 0; di < dlist.length; di++) {
+          var dr = dlist[di];
+          if (!dr || !dr.position || dr.destroyed || dr.alive === false) continue;
+          var s = _scoreCand(dr.position);
+          if (s !== null && s > bestScore) { bestScore = s; homingTarget = { kind: 'drone', ref: dr }; }
+        }
+      } else if (typeof Enemies !== 'undefined' && Enemies.getAll) {
+        var elist = Enemies.getAll();
+        for (var ei = 0; ei < elist.length; ei++) {
+          var e2 = elist[ei];
+          if (!e2 || !e2.alive || !e2.mesh) continue;
+          var s2 = _scoreCand(e2.mesh.position);
+          if (s2 !== null && s2 > bestScore) { bestScore = s2; homingTarget = { kind: 'enemy', ref: e2 }; }
+        }
+      }
+      if (homingTarget && typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playPickup) {
+        // brief lock-on chirp
+        try { window.AudioSystem.playPickup(); } catch (_e) {}
+      }
+    }
+
     projectiles.push({
       mesh, dir: dir.clone(), speed: speed,
       damage: wep.damage, radius: wep.blastRadius || 4,
@@ -2162,12 +2204,29 @@ const Weapons = (() => {
       isSmoke: isSmoke,
       isFlash: isFlash,
       weaponType: wep.type,
+      homing: !!wep.homing,
+      target: homingTarget,
+      turnRate: (wep.type === 'AA') ? 3.0 : 1.6,
     });
   }
 
   function updateProjectiles(delta) {
     for (let i = projectiles.length - 1; i >= 0; i--) {
       const p = projectiles[i];
+      // ── Homing guidance: steer dir toward locked target ──
+      if (p.homing && p.target && p.target.ref) {
+        var tref = p.target.ref;
+        var tpos = (p.target.kind === 'drone') ? tref.position : (tref.mesh && tref.mesh.position);
+        var tAlive = (p.target.kind === 'drone') ? !tref.destroyed : !!tref.alive;
+        if (tpos && tAlive) {
+          _wTmp2.copy(tpos).sub(p.mesh.position).normalize();
+          var maxTurn = Math.min(1, (p.turnRate || 2.0) * delta);
+          p.dir.lerp(_wTmp2, maxTurn).normalize();
+          p.mesh.lookAt(_wTmp1.copy(p.mesh.position).add(p.dir));
+        } else {
+          p.target = null;
+        }
+      }
       p.mesh.position.addScaledVector(p.dir, p.speed * delta);
       // Apply gravity for arc projectiles (grenades, molotovs)
       if (p.gravity) {
