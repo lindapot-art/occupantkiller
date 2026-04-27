@@ -141,9 +141,9 @@ canvas {
   transform: translateX(-50%);
   display: flex;
   gap: 18px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: bold;
-  text-shadow: 0 0 8px #f00;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.7);
   white-space: nowrap;
   z-index: 11;
 }
@@ -167,7 +167,7 @@ canvas {
 
 /* Health */
 #health-section { display: flex; flex-direction: column; gap: 4px; }
-#health-label { font-size: 12px; color: #aaa; letter-spacing: 2px; }
+#health-label { font-size: 12px; color: #ccc; letter-spacing: 2px; text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
 #health-bar-container {
   width: 200px;
   height: 14px;
@@ -181,18 +181,18 @@ canvas {
   border-radius: 2px;
   transition: width 0.2s ease;
 }
-#health-value { font-size: 13px; color: #ff6666; }
+#health-value { font-size: 13px; color: #ff8888; text-shadow: 0 1px 2px rgba(0,0,0,0.9); font-weight: bold; }
 
 /* Ammo */
 #ammo-section { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-#ammo-label { font-size: 12px; color: #aaa; letter-spacing: 2px; }
+#ammo-label { font-size: 12px; color: #ccc; letter-spacing: 2px; text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
 #ammo-display {
   font-size: 28px;
   font-weight: bold;
   color: #ffcc00;
-  text-shadow: 0 0 10px #ffcc00;
+  text-shadow: 0 0 10px #ffcc00, 0 1px 3px rgba(0,0,0,0.9);
 }
-#ammo-reserve { font-size: 13px; color: #aaa; }
+#ammo-reserve { font-size: 13px; color: #ddd; text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
 
 /* Reload indicator */
 #reload-indicator {
@@ -1165,6 +1165,7 @@ html.is-mobile #minimap-canvas {
   html.is-mobile #missions-panel,
   html.is-mobile #npc-morale-display,
   html.is-mobile #hud-npcs,
+  html.is-mobile #info-panel-left,
   html.is-mobile #mission-hud,
   html.is-mobile #objective-tracker { display: none !important; }
   html.is-mobile #top-bar { font-size: 10px; gap: 10px; top: 20px; }
