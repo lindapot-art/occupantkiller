@@ -2791,7 +2791,13 @@ const Enemies = (() => {
       const pct    = e.hp / e.maxHp;
       e.hpBar.fg.scale.x     = pct;
       e.hpBar.fg.position.x  = -0.35 * (1 - pct);
-      const hpColor = pct > 0.6 ? 0x44ff44 : pct > 0.3 ? 0xffaa00 : 0xff2222;
+      let hpColor = pct > 0.6 ? 0x44ff44 : pct > 0.3 ? 0xffaa00 : 0xff2222;
+      // Pulse red when nearly dead — telegraphs the kill shot
+      if (pct < 0.18) {
+        var _pNow = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+        var _pulse = (Math.sin(_pNow * 0.018) * 0.5 + 0.5);
+        hpColor = _pulse > 0.5 ? 0xff5555 : 0xff0000;
+      }
       e.hpBar.fg.material.color.setHex(hpColor);
 
       const barY = e.mesh.position.y + 1.75 * e.typeCfg.scale + 0.35;
