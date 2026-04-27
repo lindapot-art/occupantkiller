@@ -3735,6 +3735,11 @@ const GameManager = (function () {
           if (Weapons.applyLandingBob) Weapons.applyLandingBob(landIntensity);
           if (window.AudioSystem && window.AudioSystem.playLandingThud) window.AudioSystem.playLandingThud(landIntensity);
           if (landIntensity > 0.6) player._landSlowTimer = 0.3;
+          // Landing dust burst — number of puffs scales with fall intensity
+          if (_scene && landIntensity > 0.2) {
+            var _puffN = 2 + Math.floor(landIntensity * 4);
+            for (var _li = 0; _li < _puffN; _li++) _spawnFootstepPuff();
+          }
         }
       }
       player.velocity.y = 0;
