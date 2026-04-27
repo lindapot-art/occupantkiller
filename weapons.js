@@ -1906,11 +1906,85 @@ const Weapons = (() => {
       if (typeof WeaponDetails !== 'undefined' && WeaponDetails.enhanceMesh) {
         WeaponDetails.enhanceMesh(m, WEAPONS[i], i);
       }
+      // Weld visual gaps so parts don't look detached / floating in air
+      try { _unifyWeaponMesh(m); } catch (e) {}
       gunMeshes.push(m);
       m.visible = (i === currentIdx);
       camera.add(m);
     }
   }
+
+  // Post-process a built weapon mesh: detect children that are visually orphaned
+  // from the dominant cluster (large gap in space) and add thin dark connector
+  // strips so the weapon reads as a single contiguous object.
+  function _unifyWeaponMesh(g) {
+    if (!g || !g.children || g.children.length < 2) return;
+    // Snapshot direct children only (some builders nest scopes/sub-groups)
+    const kids = [];
+    for (let i = 0; i < g.children.length; i++) {
+      const c = g.children[i];
+      if (!c || c.userData && c.userData._unifyConnector) continue;
+      kids.push(c);
+    }
+    if (kids.length < 2) return;
+    // Compute per-child world-equivalent (here local) bounding boxes
+    const bboxes = [];
+    for (let i = 0; i < kids.length; i++) {
+      const c = kids[i];
+      try {
+        const b = new THREE.Box3().setFromObject(c);
+        if (!b.isEmpty()) bboxes.push({ obj: c, box: b, center: b.getCenter(new THREE.Vector3()) });
+      } catch (e) {}
+    }
+    if (bboxes.length < 2) return;
+    // Overall bbox
+    const overall = new THREE.Box3();
+    for (let i = 0; i < bboxes.length; i++) overall.union(bboxes[i].box);
+    const size = overall.getSize(new THREE.Vector3());
+    const longLen = Math.max(size.x, size.y, size.z);
+    if (longLen <= 0) return;
+    // Gap threshold: parts farther than 5% of longest side from any other
+    // along the firing axis (Z is forward in this engine; X is gun-right).
+    const gapTol = longLen * 0.05;
+    const connMat = new THREE.MeshLambertMaterial({ color: 0x1d1d20 });
+    const added = [];
+    // For each child, find nearest neighbour. If gap > tol, drop a thin
+    // connector box that bridges the two centroids.
+    for (let i = 0; i < bboxes.length; i++) {
+      const a = bboxes[i];
+      let nearest = null, nearestDist = Infinity;
+      for (let j = 0; j < bboxes.length; j++) {
+        if (i === j) continue;
+        const b = bboxes[j];
+        // Distance between bbox surfaces along Z (the long gun axis)
+        const dz = Math.max(0,
+          Math.max(a.box.min.z, b.box.min.z) - Math.min(a.box.max.z, b.box.max.z));
+        const dx = Math.max(0,
+          Math.max(a.box.min.x, b.box.min.x) - Math.min(a.box.max.x, b.box.max.x));
+        const dy = Math.max(0,
+          Math.max(a.box.min.y, b.box.min.y) - Math.min(a.box.max.y, b.box.max.y));
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist < nearestDist) { nearestDist = dist; nearest = b; }
+      }
+      if (!nearest || nearestDist <= gapTol) continue;
+      // Build a thin connector from a.center to nearest.center
+      const start = a.center, end = nearest.center;
+      const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+      const span = new THREE.Vector3().subVectors(end, start);
+      const len = span.length();
+      if (len <= 0) continue;
+      const thick = Math.max(0.006, longLen * 0.012);
+      const geo = new THREE.BoxGeometry(thick, thick, len);
+      const conn = new THREE.Mesh(geo, connMat);
+      conn.position.copy(mid);
+      // Orient connector along the span
+      conn.lookAt(end);
+      conn.userData._unifyConnector = true;
+      added.push(conn);
+    }
+    for (let i = 0; i < added.length; i++) g.add(added[i]);
+  }
+
 
   // ── Muzzle flash ──────────────────────────────────────────
   let muzzleFlash = null;

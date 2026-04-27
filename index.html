@@ -231,6 +231,9 @@
     <!-- Inventory Button (always visible) -->
     <button id="inventory-btn" style="position:fixed;top:4px;right:72px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:2px 10px;border-radius:4px;font-size:11px;font-family:monospace;z-index:210;cursor:pointer" title="Open Inventory (I key)">📦 INV</button>
 
+    <!-- In-game God Mode toggle (always visible) -->
+    <button id="hud-god-mode-btn" style="position:fixed;top:4px;right:148px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,0,0.5);color:#ff0;padding:2px 10px;border-radius:4px;font-size:11px;font-family:monospace;z-index:210;cursor:pointer;text-shadow:0 0 6px #ff0" title="Toggle God Mode (all weapons + invincible)">⚡ GOD</button>
+
     <!-- Build Materials HUD (shown when holding shovel) -->
     <div id="build-materials-hud" style="display:none;position:fixed;bottom:85px;right:12px;background:rgba(0,0,0,0.6);border:1px solid rgba(139,105,20,0.4);padding:6px 10px;border-radius:4px;font-size:10px;font-family:monospace;z-index:200;pointer-events:none;color:#ccc">
       <div style="color:#8B6914;font-weight:bold;margin-bottom:3px">⛏ MATERIALS</div>
@@ -1135,12 +1138,26 @@ document.addEventListener('DOMContentLoaded', function () {
       pauseBtn.style.color = active ? '#0f0' : '#ff0';
       pauseBtn.textContent = active ? '⚡ GOD MODE: ON' : '⚡ GOD MODE';
     }
+    // In-game HUD button
+    var hudBtn = document.getElementById('hud-god-mode-btn');
+    if (hudBtn) {
+      hudBtn.style.borderColor = active ? '#0f0' : 'rgba(255,255,0,0.5)';
+      hudBtn.style.color = active ? '#0f0' : '#ff0';
+      hudBtn.style.textShadow = active ? '0 0 6px #0f0' : '0 0 6px #ff0';
+      hudBtn.textContent = active ? '⚡ GOD: ON' : '⚡ GOD';
+    }
   }
   document.getElementById('god-mode-btn').addEventListener('click', function () {
     GameManager.toggleGodMode();
     updateGodModeButtons();
   });
   document.getElementById('pause-god-mode-btn').addEventListener('click', function () {
+    GameManager.toggleGodMode();
+    updateGodModeButtons();
+  });
+  var _hudGod = document.getElementById('hud-god-mode-btn');
+  if (_hudGod) _hudGod.addEventListener('click', function (e) {
+    e.stopPropagation();
     GameManager.toggleGodMode();
     updateGodModeButtons();
   });

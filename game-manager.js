@@ -5983,12 +5983,34 @@ const GameManager = (function () {
       player.maxHp = GOD_MODE_HP;
       player.hp = GOD_MODE_HP;
       HUD.setHealth(player.hp, player.maxHp);
+      // Full armor
+      player.armor = 100;
+      if (HUD.updateArmor) HUD.updateArmor(1);
+      // Full equipment kit (grenades, throwables, special items)
+      try {
+        if (typeof Pickups !== 'undefined' && Pickups.grantFullKit) Pickups.grantFullKit();
+      } catch (e) {}
+      // Equip top-tier perks (fills MAX_PERKS slots)
+      try {
+        if (typeof Perks !== 'undefined' && Perks.PERK_LIST && Perks.equipPerk) {
+          var perkIds = Object.keys(Perks.PERK_LIST);
+          var slots = (Perks.MAX_PERKS || 3);
+          for (var p = 0; p < Math.min(slots, perkIds.length); p++) {
+            try { Perks.equipPerk(perkIds[p]); } catch (e2) {}
+          }
+        }
+      } catch (e) {}
+      // Boost economy so player can buy anything
+      try {
+        if (typeof Economy !== 'undefined' && Economy.setCurrency) Economy.setCurrency(999999);
+        else if (player.coins !== undefined) player.coins = 999999;
+      } catch (e) {}
       // Enable stealth (enemies can't see player)
       player.stealth = true;
       Enemies.setPlayerStealth(true);
       var stInd = document.getElementById('stealth-indicator');
       if (stInd) stInd.style.display = 'block';
-      HUD.notifyPickup('⚡ GOD MODE ACTIVATED', '#ffff00');
+      HUD.notifyPickup('⚡ GOD MODE — FULL KIT EQUIPPED', '#ffff00');
     } else {
       // Reset health
       player.maxHp = 100;
