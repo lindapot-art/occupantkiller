@@ -4011,7 +4011,14 @@ const GameManager = (function () {
       }
       MLSystem.onKill(Weapons.getCurrentId());
       MLSystem.trackKillTiming(); // AI Smart Learning: track kill timing patterns
-      player.score += enemy.scoreValue;
+      // Streak score multiplier: 3+ kills in chain = +10% per streak (capped at +150%)
+      var _streakMult = 1 + Math.min(1.5, Math.max(0, player.killStreak - 1) * 0.1);
+      var _scoreGain = Math.round((enemy.scoreValue || 0) * _streakMult);
+      player.score += _scoreGain;
+      // Show floating multiplier text when meaningful (>= x1.2)
+      if (_streakMult >= 1.2 && typeof Feedback !== 'undefined' && Feedback.showStreakMult) {
+        try { Feedback.showStreakMult(_streakMult); } catch (eSM) {}
+      }
       player.kills++;
       player.waveKills++;
       // Kill milestone banners — celebrate round numbers of total kills

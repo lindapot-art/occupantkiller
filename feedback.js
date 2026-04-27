@@ -407,6 +407,26 @@ const Feedback = (function () {
     setTimeout(() => el.remove(), 1100);
   }
 
+  /* ── Feature: Streak Score Multiplier Pop-up ────── */
+  function showStreakMult(mult, screenX, screenY) {
+    if (!_dmgContainer) initDamageNumbers();
+    if (mult <= 1.05) return; // skip trivial
+    const el = document.createElement('div');
+    el.textContent = '×' + mult.toFixed(1);
+    var hot = mult >= 2.0;
+    var color = hot ? '#ff8800' : '#ffcc44';
+    var size = hot ? '22px' : '18px';
+    var glow = hot ? '0 0 8px #ff5500,0 0 14px #ff0000' : '0 0 5px #aa6600';
+    el.style.cssText = 'position:absolute;left:' + (screenX || window.innerWidth / 2) + 'px;top:' + (screenY || window.innerHeight * 0.42) + 'px;color:' + color + ';font-size:' + size + ';font-weight:bold;text-shadow:' + glow + ';pointer-events:none;transition:all 0.9s ease-out;font-family:monospace;';
+    _dmgContainer.appendChild(el);
+    requestAnimationFrame(() => {
+      el.style.top = ((screenY || window.innerHeight * 0.42) - 38) + 'px';
+      el.style.opacity = '0';
+      el.style.transform = 'scale(1.4)';
+    });
+    setTimeout(() => el.remove(), 1000);
+  }
+
   /* ── Feature: Critical Hit Slow-Mo Flash ───── */
   let _slowMoTimer = 0;
   let _slowMoRate = 1.0;
@@ -641,6 +661,7 @@ const Feedback = (function () {
     showKillConfirm,
     // XP popup
     showXPGain,
+    showStreakMult,
     // Slow-mo
     triggerSlowMo, getSlowMoRate,
     // Hitstop
