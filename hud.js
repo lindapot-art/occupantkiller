@@ -547,6 +547,23 @@ const HUD = (() => {
     hitDirEl.appendChild(arc);
     setTimeout(function () { if (arc.parentNode) arc.parentNode.removeChild(arc); }, 800);
   }
+  // Damage-scaled variant: bigger / redder / longer-lived for heavy hits
+  function showHitDirectionScaled(angle, dmg) {
+    if (!hitDirEl) return;
+    const arc = document.createElement('div');
+    arc.className = 'hit-arc';
+    const deg = (angle * 180 / Math.PI);
+    var s = 1 + Math.min(0.6, (dmg || 0) * 0.012);
+    var op = 0.65 + Math.min(0.35, (dmg || 0) * 0.012);
+    arc.style.transform = 'translate(-50%, 0) rotate(' + deg + 'deg) scale(' + s.toFixed(2) + ')';
+    arc.style.opacity = op.toFixed(2);
+    if (dmg >= 25) {
+      arc.style.filter = 'brightness(1.4) drop-shadow(0 0 8px #ff0000)';
+    }
+    hitDirEl.appendChild(arc);
+    var life = 800 + Math.min(700, (dmg || 0) * 14);
+    setTimeout(function () { if (arc.parentNode) arc.parentNode.removeChild(arc); }, life);
+  }
 
   // ── Targeting Assistant (on-weapon digital readout) ─────────
   var _taEl = null;
@@ -1626,7 +1643,7 @@ const HUD = (() => {
     flashHit, flashDamage, flashHeal, showBloodDrops,
     showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout, setSprintIntensity, setGrenadeWarning,
     announceWave, announceStage,
-    addKill, showHitDirection, updateMinimap,
+    addKill, showHitDirection, showHitDirectionScaled, updateMinimap,
     updateCompass, showStreak, showBleed, showProne, showJam,
     setMinimapJammed, setCompassJammed,
     showVehicleHUD, hideVehicleHUD, updateVehicleHUD, showHijackProgress,

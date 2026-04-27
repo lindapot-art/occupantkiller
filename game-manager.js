@@ -4505,7 +4505,8 @@ const GameManager = (function () {
       var dz = attackerPos.z - player.position.z;
       var worldAngle = Math.atan2(dx, dz);
       var relAngle = CameraSystem.getYaw() - worldAngle + Math.PI;
-      HUD.showHitDirection(relAngle);
+      if (HUD.showHitDirectionScaled) HUD.showHitDirectionScaled(relAngle, dmg);
+      else HUD.showHitDirection(relAngle);
     }
 
     if (player.hp <= 0) {
