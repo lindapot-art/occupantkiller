@@ -109,7 +109,7 @@ const WorldFeatures = (function () {
       f.mesh.material.opacity = 0.4 + Math.sin(Date.now() * 0.01) * 0.3;
       f.mesh.scale.y = 1 + Math.sin(Date.now() * 0.008 + i) * 0.2;
       if (f.timer <= 0) {
-        _scene.remove(f.mesh); _scene.remove(f.light);
+        _scene.remove(f.mesh); _disposeMesh(f.mesh); _scene.remove(f.light);
         fires.splice(i, 1);
         continue;
       }
@@ -164,7 +164,7 @@ const WorldFeatures = (function () {
           // tree has fallen, mark as debris
           t.mesh.position.y -= dt;
           if (t.mesh.position.y < t.y - 2) {
-            _scene.remove(t.mesh);
+            _scene.remove(t.mesh); _disposeMesh(t.mesh);
             trees.splice(i, 1);
           }
         }
@@ -246,7 +246,7 @@ const WorldFeatures = (function () {
           const dust = new _THREE.Mesh(dustGeo, dustMat);
           dust.position.copy(a.mesh.position);
           _scene.add(dust);
-          setTimeout(() => { _scene.remove(dust); }, 700);
+          setTimeout(() => { if (_scene) _scene.remove(dust); _disposeMesh(dust); }, 700);
         }
       }
     }
@@ -259,7 +259,7 @@ const WorldFeatures = (function () {
       if (!a.landed) continue;
       const dx = playerPos.x - a.mesh.position.x, dz = playerPos.z - a.mesh.position.z;
       if (dx * dx + dz * dz < a.collectRange * a.collectRange) {
-        _scene.remove(a.mesh);
+        _scene.remove(a.mesh); _disposeMesh(a.mesh);
         const result = a.contents;
         airdrops.splice(i, 1);
         return result;
@@ -290,7 +290,7 @@ const WorldFeatures = (function () {
         const dx = playerPos.x - m.x, dz = playerPos.z - m.z;
         if (dx * dx + dz * dz < CFG.MINE_TRIGGER_RADIUS * CFG.MINE_TRIGGER_RADIUS) {
           explosions.push({ x: m.x, y: m.y, z: m.z, damage: CFG.MINE_DAMAGE, radius: CFG.MINE_BLAST_RADIUS, target: 'player' });
-          _scene.remove(m.mesh);
+          _scene.remove(m.mesh); _disposeMesh(m.mesh);
           landmines.splice(i, 1);
           continue;
         }
@@ -301,7 +301,7 @@ const WorldFeatures = (function () {
           const dx = ep.x - m.x, dz = ep.z - m.z;
           if (dx * dx + dz * dz < CFG.MINE_TRIGGER_RADIUS * CFG.MINE_TRIGGER_RADIUS) {
             explosions.push({ x: m.x, y: m.y, z: m.z, damage: CFG.MINE_DAMAGE, radius: CFG.MINE_BLAST_RADIUS, target: 'enemy' });
-            _scene.remove(m.mesh);
+            _scene.remove(m.mesh); _disposeMesh(m.mesh);
             landmines.splice(i, 1);
             break;
           }
