@@ -4841,6 +4841,7 @@ const GameManager = (function () {
           player.hp = Math.min(player.maxHp, player.hp + 25);
           HUD.setHealth(player.hp, player.maxHp);
           HUD.notifyPickup('+25 HP', '#22ff55');
+          if (HUD.flashHeal) HUD.flashHeal();
         } else if (type === 'AMMO') {
           Weapons.addAmmo(30);
           HUD.notifyPickup('+30 AMMO', '#ffcc00');
@@ -4856,6 +4857,7 @@ const GameManager = (function () {
           player.hp = player.maxHp;
           HUD.setHealth(player.hp, player.maxHp);
           HUD.notifyPickup('FULL HEAL!', '#ff4444');
+          if (HUD.flashHeal) HUD.flashHeal();
         } else if (type === 'STIM') {
           // Temporary speed boost (handled via flag)
           player._stimTimer = 8.0;

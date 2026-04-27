@@ -278,6 +278,20 @@ const HUD = (() => {
     vignetteTimer = setTimeout(() => el.vignette.classList.remove('hit'), 300);
   }
 
+  // Green heal flash vignette (briefly tint screen on health pickup)
+  var _healFlashEl = null;
+  var _healFlashTimer = null;
+  function flashHeal() {
+    if (!_healFlashEl) {
+      _healFlashEl = document.createElement('div');
+      _healFlashEl.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:191;box-shadow:inset 0 0 70px 25px rgba(34,255,85,0.45);opacity:0;transition:opacity 0.18s linear';
+      document.body.appendChild(_healFlashEl);
+    }
+    _healFlashEl.style.opacity = '1';
+    clearTimeout(_healFlashTimer);
+    _healFlashTimer = setTimeout(() => { if (_healFlashEl) _healFlashEl.style.opacity = '0'; }, 280);
+  }
+
   // ── Persistent blood drops on damage ──────────────────────
   function showBloodDrops(severity) {
     // severity 0-1: 0 = light scratch, 1 = heavy hit
@@ -1369,7 +1383,7 @@ const HUD = (() => {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
     setHealth, setAmmo, setWeapon, showReload,
-    flashHit, flashDamage, showBloodDrops,
+    flashHit, flashDamage, flashHeal, showBloodDrops,
     showHeadshot, notifyPickup,
     announceWave, announceStage,
     addKill, showHitDirection, updateMinimap,
