@@ -4387,6 +4387,12 @@ const GameManager = (function () {
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
+    // Damage-proportional camera shake — big hits punch the view
+    if (typeof CameraSystem !== 'undefined' && CameraSystem.shake && dmg >= 5) {
+      var _shakeAmt = Math.min(0.18, 0.02 + dmg * 0.0025);
+      var _shakeDur = Math.min(0.45, 0.12 + dmg * 0.005);
+      CameraSystem.shake(_shakeAmt, _shakeDur);
+    }
     // ── Second Wind: trigger once per wave when HP first drops to <=20% ──
     if (player.hp > 0 && player.hp <= player.maxHp * 0.20 && !player._secondWindTriggered) {
       player._secondWindTriggered = true;
