@@ -2166,6 +2166,13 @@ const Enemies = (() => {
         if (parts[6]) parts[6].rotation.x =  e.legAngle * 0.5;
         // Torso bob
         if (parts[0]) parts[0].rotation.z = Math.sin(e.legAngle) * 0.04;
+        // Wounded limp — extra side-to-side wobble at low HP
+        if (e.hp < e.maxHp * 0.3 && e.mesh) {
+          e.mesh.rotation.z = Math.sin(e.legAngle * 0.6) * 0.10;
+        } else if (e.mesh && Math.abs(e.mesh.rotation.z) < 0.01 === false && !e._stunTimer && !e._flinchRotZ) {
+          // gradually settle when no longer wounded
+          e.mesh.rotation.z *= 0.9;
+        }
       }
 
       // ── B25: Retreat when wounded (30-50% HP) — run away from player ──
