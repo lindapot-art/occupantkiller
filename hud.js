@@ -206,6 +206,21 @@ const HUD = (() => {
   function setWave(v, total) {
     el.wave.textContent = total ? 'WAVE: ' + v + '/' + total : 'WAVE: ' + v;
   }
+  // Wave progress bar (thin red→green bar under wave HUD)
+  var _waveProgEl = null;
+  var _waveProgFill = null;
+  function setWaveProgress(pct) {
+    if (!_waveProgEl) {
+      _waveProgEl = document.createElement('div');
+      _waveProgEl.style.cssText = 'position:fixed;top:6px;left:50%;transform:translateX(-50%);width:240px;height:5px;background:rgba(0,0,0,0.55);border:1px solid #555;border-radius:3px;z-index:120;overflow:hidden;pointer-events:none;';
+      _waveProgFill = document.createElement('div');
+      _waveProgFill.style.cssText = 'height:100%;width:0%;background:linear-gradient(90deg,#ff4444,#ffaa00,#44ff88);transition:width 0.3s ease-out;';
+      _waveProgEl.appendChild(_waveProgFill);
+      document.body.appendChild(_waveProgEl);
+    }
+    var p = Math.max(0, Math.min(1, pct || 0));
+    _waveProgFill.style.width = (p * 100).toFixed(1) + '%';
+  }
   function setKills(v)   {
     el.kills.textContent    = 'KILLS: '   + v;
     el.kills.style.transition = 'none';
@@ -1721,6 +1736,7 @@ const HUD = (() => {
   return {
     show, hide,
     setScore, setWave, setKills, setEnemies, setStage,
+    setWaveProgress,
     setHealth, setAmmo, setWeapon, showReload,
     flashHit, flashDamage, flashHeal, showBloodDrops,
     showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout, setSprintIntensity, setGrenadeWarning,

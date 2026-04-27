@@ -3022,6 +3022,8 @@ const GameManager = (function () {
     window.AudioSystem.playWaveStart();
     HUD.setWave(w, stageDef.wavesPerStage);
     HUD.announceWave(w, Enemies.getAliveCount(), stageDef.wavesPerStage);
+    // Track initial wave enemy count for progress bar
+    player._waveStartCount = Enemies.getAliveCount();
     if (typeof Feedback !== 'undefined' && Feedback.radioChatter) Feedback.radioChatter('wave_start');
 
     // ═══ Stage Boss on final wave ═══
@@ -5261,6 +5263,12 @@ const GameManager = (function () {
       HUD.setWeapon(Weapons.getCurrentName(), Weapons.getCurrentIdx());
       HUD.showReload(Weapons.isReloading());
       HUD.setEnemies(Enemies.getAliveCount());
+      // Wave progress bar: pct of wave cleared based on initial enemy count
+      if (HUD.setWaveProgress && player._waveStartCount > 0) {
+        var _alv = Enemies.getAliveCount();
+        var _pct = 1 - (_alv / player._waveStartCount);
+        HUD.setWaveProgress(Math.max(0, Math.min(1, _pct)));
+      }
 
       // Update extended HUD
       updateExtendedHUD();
