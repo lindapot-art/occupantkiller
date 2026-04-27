@@ -51,6 +51,11 @@ const CameraSystem = (function () {
   const BOB_AMP  = 0.038;
   const BOB_FREQ = 10;
   let _fpsSmoothedY = null;
+  // Idle breath sway — subtle wobble while standing still
+  let _idleSwayPhase = 0;
+  const IDLE_SWAY_AMP_X = 0.0035;
+  const IDLE_SWAY_AMP_Y = 0.0022;
+  const IDLE_SWAY_FREQ  = 1.6;
 
   /* ── Screen Shake ───────────────────────────────────────────────── */
   let shakeIntensity = 0;
@@ -225,6 +230,12 @@ const CameraSystem = (function () {
     }
     const bobOffset = Math.sin(bobPhase) * BOB_AMP * (bobActive ? 1 : 0);
 
+    // Idle breath sway: subtle x/y wobble when standing still
+    _idleSwayPhase += delta * IDLE_SWAY_FREQ;
+    var idleAmt = bobActive ? 0 : 1;
+    var idleSwayX = Math.sin(_idleSwayPhase) * IDLE_SWAY_AMP_X * idleAmt;
+    var idleSwayY = Math.sin(_idleSwayPhase * 0.7) * IDLE_SWAY_AMP_Y * idleAmt;
+
     var targetY = playerPos.y + bobOffset + shakeOffsetY;
     if (_fpsSmoothedY === null) _fpsSmoothedY = targetY;
     var yLerpRate = isGrounded ? 16 : 9;
@@ -237,8 +248,8 @@ const CameraSystem = (function () {
     );
 
     const euler = _tmpEuler.set(
-      pitch + shakeOffsetY * 0.5 + _flinchPitch,
-      yaw + shakeOffsetX * 0.5 + _flinchYaw,
+      pitch + shakeOffsetY * 0.5 + _flinchPitch + idleSwayY,
+      yaw + shakeOffsetX * 0.5 + _flinchYaw + idleSwayX,
       0, 'YXZ'
     );
     // Strafe camera roll
