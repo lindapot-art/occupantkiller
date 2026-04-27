@@ -251,6 +251,25 @@ window.VoxelWorld = (function () {
     setBlock(wx, wy + 1, wz, BLOCK.LAMPPOST);
   }
 
+  function placeMailbox(wx, wy, wz) {
+    // Short post + box on top
+    setBlock(wx, wy, wz, BLOCK.LAMPPOST);
+    setBlock(wx, wy + 1, wz, BLOCK.METAL);
+  }
+
+  function placeStreetSign(wx, wy, wz) {
+    // Pole + sign-block on top
+    setBlock(wx, wy, wz, BLOCK.LAMPPOST);
+    setBlock(wx, wy + 1, wz, BLOCK.GLASS);
+  }
+
+  function placeBusStop(wx, wy, wz) {
+    // Simple shelter: 3 wall blocks + roof
+    setBlock(wx, wy, wz, BLOCK.GLASS);
+    setBlock(wx, wy + 1, wz, BLOCK.GLASS);
+    setBlock(wx, wy + 2, wz, BLOCK.METAL);
+  }
+
   function placeFountain(wx, wy, wz) {
     setBlock(wx, wy, wz, BLOCK.WATER);
     setBlock(wx, wy + 1, wz, BLOCK.GLASS);
