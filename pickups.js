@@ -145,6 +145,10 @@ const Pickups = (() => {
         p.baseY += (playerPos.y + 0.5 - p.baseY) * pull * 0.5;
       }
       if (distSq < COLLECT_DIST_SQ && dy < 3) {
+        // Collection spark burst — gratifying visual confirmation
+        if (typeof Tracers !== 'undefined' && Tracers.spawnSparks) {
+          try { Tracers.spawnSparks(p.group.position); } catch (eS) {}
+        }
         scene.remove(p.group);
         if (p.boxMesh && p.boxMesh.material) p.boxMesh.material.dispose();
         if (p.ringMesh && p.ringMesh.material) p.ringMesh.material.dispose();
