@@ -597,7 +597,7 @@ const HUD = (() => {
   function setMinimapJammed(jammed) { _minimapJammed = !!jammed; }
   function setCompassJammed(jammed) { _compassJammed = !!jammed; }
 
-  function updateMinimap(px, pz, pyaw, enemies, npcs, vehicles, drones) {
+  function updateMinimap(px, pz, pyaw, enemies, npcs, vehicles, drones, pickups) {
     if (!minimapCtx) return;
     const ctx = minimapCtx;
     ctx.clearRect(0, 0, MM_SIZE, MM_SIZE);
@@ -738,6 +738,20 @@ const HUD = (() => {
           ctx.rotate(Math.PI / 4);
           ctx.fillRect(-2.5, -2.5, 5, 5);
           ctx.restore();
+        }
+      }
+    }
+
+    // Pickups — small color-coded squares (health=green, ammo=yellow, armor=blue, other=cyan)
+    if (pickups) {
+      var _puColors = { HEALTH: '#22ff66', MEDKIT: '#22ff66', AMMO: '#ffcc00', ARMOR: '#4488ff', STIM: '#cc44ff', INTEL: '#00ffff', SHIELD: '#ffd700', WEAPON: '#ff8800' };
+      for (var pu = 0; pu < pickups.length; pu++) {
+        var puk = pickups[pu];
+        if (!puk || !puk.mesh) continue;
+        var pup = toMM(puk.mesh.position.x, puk.mesh.position.z);
+        if (Math.abs(pup.x - MM_HALF) < MM_HALF && Math.abs(pup.y - MM_HALF) < MM_HALF) {
+          ctx.fillStyle = _puColors[puk.type] || '#88ffff';
+          ctx.fillRect(pup.x - 1.5, pup.y - 1.5, 3, 3);
         }
       }
     }
