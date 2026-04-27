@@ -40,9 +40,25 @@ const Feedback = (function () {
     const el = document.createElement('div');
     el.className = 'dmg-number';
     el.textContent = Math.round(amount);
-    el.style.cssText = `position:absolute;left:${screenX}px;top:${screenY}px;font-weight:bold;font-size:${isHeadshot ? 24 : isCrit ? 20 : 16}px;color:${isHeadshot ? '#ff4444' : isCrit ? '#ffaa00' : '#ffffff'};text-shadow:1px 1px 2px #000;pointer-events:none;transition:all ${CFG.DMG_NUMBER_DURATION}s ease-out;`;
+    // Tiered color/size based on damage magnitude (more visceral feedback for big hits)
+    var bigHit = amount >= 100;
+    var hugeHit = amount >= 250;
+    var color = isHeadshot ? '#ff4444'
+              : hugeHit    ? '#ff2200'
+              : bigHit     ? '#ff8800'
+              : isCrit     ? '#ffaa00'
+              : amount >= 40 ? '#ffdd44'
+              : '#ffffff';
+    var size = isHeadshot ? 24
+             : hugeHit    ? 30
+             : bigHit     ? 26
+             : isCrit     ? 20
+             : 16;
+    var glow = (hugeHit || isHeadshot) ? `,0 0 8px ${color}` : '';
+    el.style.cssText = `position:absolute;left:${screenX}px;top:${screenY}px;font-weight:bold;font-size:${size}px;color:${color};text-shadow:1px 1px 2px #000${glow};pointer-events:none;transition:all ${CFG.DMG_NUMBER_DURATION}s ease-out;`;
     if (isHeadshot) el.textContent += ' HS!';
-    if (isCrit) el.textContent += ' CRIT!';
+    else if (hugeHit) el.textContent += '!!';
+    else if (isCrit) el.textContent += ' CRIT!';
     _dmgContainer.appendChild(el);
     // animate
     requestAnimationFrame(() => {
