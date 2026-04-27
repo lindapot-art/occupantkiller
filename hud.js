@@ -234,6 +234,32 @@ const HUD = (() => {
     if (pct <= 30) el.healthBar.style.animation = 'lowHpPulse 0.6s infinite';
     else el.healthBar.style.animation = '';
     el.healthVal.textContent = Math.ceil(current) + ' / ' + max;
+    // Adrenaline vignette: persistent red/dark border when critical
+    _updateAdrenalineVignette(pct);
+  }
+
+  // Persistent low-HP red vignette overlay (layered above damage flash)
+  var _adrEl = null;
+  function _updateAdrenalineVignette(pct) {
+    if (pct > 25) {
+      if (_adrEl) _adrEl.style.opacity = '0';
+      return;
+    }
+    if (!_adrEl) {
+      _adrEl = document.createElement('div');
+      _adrEl.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:140;background:radial-gradient(ellipse at center,transparent 38%,rgba(180,0,0,0.18) 70%,rgba(255,0,0,0.55) 100%);opacity:0;transition:opacity 0.4s;animation:adrPulse 1.4s ease-in-out infinite;';
+      document.body.appendChild(_adrEl);
+      // Inject keyframes once
+      if (!document.getElementById('adr-kf')) {
+        var st = document.createElement('style');
+        st.id = 'adr-kf';
+        st.textContent = '@keyframes adrPulse{0%,100%{filter:brightness(0.9)}50%{filter:brightness(1.35)}}';
+        document.head.appendChild(st);
+      }
+    }
+    // Intensity scales: 25% HP = 0.4 opacity, 0% HP = 1.0
+    var t = Math.max(0, Math.min(1, (25 - pct) / 25));
+    _adrEl.style.opacity = String(0.35 + t * 0.55);
   }
 
   function setAmmo(clip, reserve, clipSize) {
