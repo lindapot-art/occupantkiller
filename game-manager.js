@@ -1157,6 +1157,7 @@ const GameManager = (function () {
         Flags.spawnFlagpole(spawnX + 28, ry, spawnZ - 28, 'russian', 4.0);
       } catch (e) {}
     }
+    if (typeof Environment !== 'undefined' && Environment.init) Environment.init(_scene, _camera);
 
     // ── New feature systems init ──────────────────────────
     if (typeof CombatExtras !== 'undefined' && CombatExtras && typeof CombatExtras.reset === 'function') CombatExtras.reset();
@@ -2704,6 +2705,7 @@ const GameManager = (function () {
     if (typeof Tracers !== 'undefined') Tracers.clear();
     if (typeof StageVFX !== 'undefined' && StageVFX.clear) StageVFX.clear();
     if (typeof Flags !== 'undefined' && Flags.clear) Flags.clear();
+    if (typeof Environment !== 'undefined' && Environment.clear) Environment.clear();
     if (typeof WeatherSystem !== 'undefined' && WeatherSystem.clear) WeatherSystem.clear();
     if (typeof WeatherSystem !== 'undefined' && WeatherSystem.init) WeatherSystem.init(_scene, _camera);
 
@@ -2814,7 +2816,7 @@ const GameManager = (function () {
 
     // Update scene colors
     _scene.background = new THREE.Color(stageDef.bgColor);
-    _scene.fog = new THREE.Fog(stageDef.fogColor, 30, 140);
+    _scene.fog = new THREE.Fog(stageDef.fogColor, 18, 105);
 
     // Update sky dome colors for this stage
     if (_skyDome) {
@@ -2937,6 +2939,7 @@ const GameManager = (function () {
     if (typeof Building !== 'undefined' && Building.clear) Building.clear();
     if (typeof Tracers !== 'undefined' && Tracers.clear) Tracers.clear();
     if (typeof StageVFX !== 'undefined' && StageVFX.clear) StageVFX.clear();
+    if (typeof Environment !== 'undefined' && Environment.clear) Environment.clear();
     if (typeof WorldFeatures !== 'undefined' && WorldFeatures.clear) WorldFeatures.clear();
     if (typeof CombatExtras !== 'undefined' && CombatExtras.reset) CombatExtras.reset();
     if (typeof Traversal !== 'undefined' && Traversal.reset) Traversal.reset();
@@ -5325,6 +5328,7 @@ const GameManager = (function () {
       if (typeof Tracers !== 'undefined') Tracers.update(delta, player.position);
       if (typeof StageVFX !== 'undefined') StageVFX.update(delta);
       if (typeof Flags !== 'undefined' && Flags.update) Flags.update(delta);
+      if (typeof Environment !== 'undefined' && Environment.update) Environment.update(delta);
 
       // ═══ NEW FEATURE SYSTEM UPDATES (59 features) ═══
 
