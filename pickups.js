@@ -127,6 +127,10 @@ const Pickups = (() => {
       p.group.position.y = p.baseY + Math.sin(time * HOVER_SPEED + p.phase) * HOVER_RANGE;
       p.boxMesh.rotation.y  += ROTATE_SPEED * delta;
       p.ringMesh.rotation.z += ROTATE_SPEED * 0.6 * delta;
+      // Pulse the beam — a subtle breath that helps it stand out at distance
+      if (p.beamMesh && p.beamMesh.material) {
+        p.beamMesh.material.opacity = 0.14 + (Math.sin(time * 2.4 + p.phase) * 0.5 + 0.5) * 0.16;
+      }
 
       // Proximity collection (XZ + Y check to prevent through-floor collection)
       const dx = p.group.position.x - playerPos.x;
