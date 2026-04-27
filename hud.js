@@ -541,6 +541,8 @@ const HUD = (() => {
       DRONE_OP: '#00ffcc'
     };
     if (enemies) {
+      var _mmNow = performance.now() * 0.006;
+      var _mmPulse = 0.5 + Math.sin(_mmNow) * 0.5;
       for (var i = 0; i < enemies.length; i++) {
         var e = enemies[i];
         if (!e.alive) continue;
@@ -549,9 +551,30 @@ const HUD = (() => {
         var mp = toMM(ep.x, ep.z);
         if (Math.abs(mp.x - MM_HALF) < MM_HALF && Math.abs(mp.y - MM_HALF) < MM_HALF) {
           var tn = e.typeCfg ? e.typeCfg.name : '';
-          ctx.fillStyle = _mmEnemyColors[tn] || '#ff3333';
+          var col = _mmEnemyColors[tn] || '#ff3333';
           var r = (tn === 'BOSS') ? 4 : 2.5;
+          // Threat halo: enemy actively targeting player gets a pulsing red ring
+          if (e.playerSpotted) {
+            ctx.strokeStyle = 'rgba(255,40,40,' + (0.35 + _mmPulse * 0.45) + ')';
+            ctx.lineWidth = 1.4;
+            ctx.beginPath(); ctx.arc(mp.x, mp.y, r + 2 + _mmPulse * 1.5, 0, Math.PI * 2); ctx.stroke();
+          }
+          ctx.fillStyle = col;
           ctx.beginPath(); ctx.arc(mp.x, mp.y, r, 0, Math.PI * 2); ctx.fill();
+          // Facing tick
+          if (e.mesh && e.mesh.quaternion) {
+            try {
+              var fwdX = -Math.sin(e.mesh.rotation.y);
+              var fwdZ = -Math.cos(e.mesh.rotation.y);
+              // Apply same map-rotation as toMM
+              var fcos = Math.cos(-pyaw), fsin = Math.sin(-pyaw);
+              var rx = fwdX * fcos - fwdZ * fsin;
+              var ry = fwdX * fsin + fwdZ * fcos;
+              ctx.strokeStyle = col;
+              ctx.lineWidth = 1;
+              ctx.beginPath(); ctx.moveTo(mp.x, mp.y); ctx.lineTo(mp.x + rx * (r + 3), mp.y + ry * (r + 3)); ctx.stroke();
+            } catch (eFt) {}
+          }
         }
       }
     }
