@@ -4122,6 +4122,12 @@ const GameManager = (function () {
         var mkNames = ['', '', 'DOUBLE KILL', 'TRIPLE KILL', 'MULTI KILL', 'MEGA KILL', 'ULTRA KILL'];
         var mkName = mkNames[Math.min(player.multikillCount, 6)];
         if (HUD.showStreakBanner) HUD.showStreakBanner(mkName, player.multikillCount);
+        // Adrenaline rush on quad+: brief slow-mo + FOV punch
+        if (player.multikillCount >= 4) {
+          if (Feedback.triggerSlowMo) Feedback.triggerSlowMo(0.5, 0.55);
+          _killFovKick = Math.max(_killFovKick, 7);
+          if (CameraSystem.shake) CameraSystem.shake(0.10, 0.4);
+        }
       }
 
       // ── B23: Kill confirm effect ──
@@ -4566,6 +4572,10 @@ const GameManager = (function () {
       }
       gameState = STATE.DEAD;
       if (_waveStartTimer) { clearTimeout(_waveStartTimer); _waveStartTimer = null; }
+      // Streak-end banner: show what was ended
+      if (player.killStreak >= 5 && HUD.showStreakBanner) {
+        HUD.showStreakBanner('STREAK ENDED — ' + player.killStreak + ' KILLS', 0);
+      }
       // Force exit vehicle / release drone on death
       if (VehicleSystem.isInVehicle()) VehicleSystem.exit();
       hideTankHUD();
