@@ -377,6 +377,42 @@ window.AudioSystem = (function () {
     osc.stop(now + 0.35);
   }
 
+  // Enemy death grunt — guttural, panned by relative position
+  function playEnemyDeath(distance, panX) {
+    if (!enabled || !ctx) return;
+    resume();
+    var dist = Math.max(2, Math.min(60, distance || 10));
+    var falloff = 1 - (dist / 60);
+    var now = ctx.currentTime;
+    // Vocal grunt: noise + low osc
+    var osc = ctx.createOscillator();
+    var oscG = ctx.createGain();
+    osc.type = 'sawtooth';
+    var startPitch = 110 + Math.random() * 40;
+    osc.frequency.setValueAtTime(startPitch, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.4);
+    oscG.gain.setValueAtTime(0.18 * falloff, now);
+    oscG.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    // Panner
+    var pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    if (pan) {
+      pan.pan.value = Math.max(-1, Math.min(1, panX || 0));
+      osc.connect(oscG); oscG.connect(pan); pan.connect(masterGain);
+    } else {
+      osc.connect(oscG); oscG.connect(masterGain);
+    }
+    osc.start(now);
+    osc.stop(now + 0.55);
+    // Body fall thud
+    var thudN = createNoise(0.15);
+    var thudF = ctx.createBiquadFilter();
+    thudF.type = 'lowpass'; thudF.frequency.value = 200;
+    var thudG = ctx.createGain();
+    thudG.gain.setValueAtTime(0.15 * falloff, now + 0.35);
+    thudG.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    thudN.connect(thudF); thudF.connect(thudG); thudG.connect(masterGain);
+  }
+
   function playFootstep(surfaceType) {
     if (!enabled || !ctx) return;
     resume();
@@ -1638,6 +1674,7 @@ window.AudioSystem = (function () {
     playReload: playReload,
     playPickup: playPickup,
     playDeath: playDeath,
+    playEnemyDeath: playEnemyDeath,
     playFootstep: playFootstep,
     playEnemyFootstep: playEnemyFootstep,
     startEngine: startEngine,

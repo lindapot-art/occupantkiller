@@ -3054,6 +3054,15 @@ const Enemies = (() => {
     if (enemy.hp <= 0) {
       enemy.alive      = false;
       enemy.deathTimer = 2.0;
+      // Spatial death grunt
+      if (typeof window !== 'undefined' && window.AudioSystem && window.AudioSystem.playEnemyDeath && _playerPos && enemy.mesh) {
+        var _ddx = enemy.mesh.position.x - _playerPos.x;
+        var _ddz = enemy.mesh.position.z - _playerPos.z;
+        var _dDist = Math.sqrt(_ddx * _ddx + _ddz * _ddz);
+        var _camY = (typeof CameraSystem !== 'undefined' && CameraSystem.getYaw) ? CameraSystem.getYaw() : 0;
+        var _relA = Math.atan2(_ddx, _ddz) - _camY;
+        window.AudioSystem.playEnemyDeath(_dDist, Math.sin(_relA));
+      }
       // Spawn persistent blood pool decal on the ground at corpse position
       if (scene && enemy.mesh) {
         try {
