@@ -1485,7 +1485,7 @@ const Enemies = (() => {
     if (typeCfg.role === 'boss') {
       try {
         if (typeof HUD !== 'undefined' && HUD.showBossIntro) HUD.showBossIntro(typeCfg.name || typeName);
-        if (typeof CameraSystem !== 'undefined' && CameraSystem.addShake) CameraSystem.addShake(0.4);
+        if (typeof CameraSystem !== 'undefined' && CameraSystem.shake) CameraSystem.shake(0.4, 0.6);
         if (typeof Feedback !== 'undefined' && Feedback.triggerSlowMo) Feedback.triggerSlowMo(0.55, 0.25);
       } catch (eBI) {}
     }
