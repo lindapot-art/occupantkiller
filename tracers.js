@@ -435,7 +435,7 @@ const Tracers = (() => {
     color: 0x111111, transparent: true, opacity: 0.7,
     depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1
   });
-  var MAX_HOLES = 60;
+  var MAX_HOLES = 120;
   // Surface type → impact color for bullet holes
   const _surfaceColors = {
     5:  0xC0C0C0,  // METAL → bright silver
@@ -459,7 +459,7 @@ const Tracers = (() => {
     mesh.position.addScaledVector(normal, 0.02);
     mesh.lookAt(pos.x + normal.x, pos.y + normal.y, pos.z + normal.z);
     _scene.add(mesh);
-    _bulletHoles.push({ mesh: mesh, life: 8.0 });
+    _bulletHoles.push({ mesh: mesh, life: 20.0 });
     // Cap max decals
     if (_bulletHoles.length > MAX_HOLES) {
       var old = _bulletHoles.shift();
@@ -471,7 +471,7 @@ const Tracers = (() => {
     for (var i = _bulletHoles.length - 1; i >= 0; i--) {
       var h = _bulletHoles[i];
       h.life -= delta;
-      if (h.life < 2) h.mesh.material.opacity = h.life / 2 * 0.7;
+      if (h.life < 4) h.mesh.material.opacity = h.life / 4 * 0.7;
       if (h.life <= 0) {
         _scene.remove(h.mesh);
         h.mesh.material.dispose();
