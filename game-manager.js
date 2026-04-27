@@ -4127,6 +4127,20 @@ const GameManager = (function () {
       // ── B23: Kill confirm effect ──
       if (Feedback.showKillConfirm) Feedback.showKillConfirm();
       if (isHeadshot && AudioSystem.playHeadshotDing) AudioSystem.playHeadshotDing();
+      // Headshot brain-spurt: extra blood spray upward + slight extra slow-mo
+      if (isHeadshot && enemy && enemy.mesh && typeof Tracers !== 'undefined') {
+        try {
+          var _hsPos = enemy.mesh.position.clone();
+          _hsPos.y += (enemy.typeCfg ? enemy.typeCfg.scale * 1.7 : 1.7);
+          // Multiple blood sprays in different directions for fountain effect
+          var _hsUp = new THREE.Vector3(0, 1, 0);
+          if (Tracers.spawnBlood) {
+            Tracers.spawnBlood(_hsPos, _hsUp);
+            Tracers.spawnBlood(_hsPos, new THREE.Vector3(0.4, 0.9, 0.1).normalize());
+            Tracers.spawnBlood(_hsPos, new THREE.Vector3(-0.4, 0.9, -0.1).normalize());
+          }
+        } catch (eHS) {}
+      }
 
       // ── Kill audio feedback ──
       if (typeof AudioSystem !== 'undefined') {
