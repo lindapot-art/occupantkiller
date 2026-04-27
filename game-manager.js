@@ -4922,6 +4922,33 @@ const GameManager = (function () {
 
       // Compass update
       if (HUD.updateCompass) HUD.updateCompass(CameraSystem.getYaw());
+      // Compass threat ticks: nearest 4 enemies as red marks at top of compass bar
+      try {
+        if (HUD.setCompassThreats && Enemies.getAll) {
+          var _ctList = Enemies.getAll();
+          var _ctThreats = [];
+          for (var _ci = 0; _ci < _ctList.length; _ci++) {
+            var _ce = _ctList[_ci];
+            if (!_ce || !_ce.alive || !_ce.mesh) continue;
+            var _cdx = _ce.mesh.position.x - player.position.x;
+            var _cdz = _ce.mesh.position.z - player.position.z;
+            var _cd2 = _cdx * _cdx + _cdz * _cdz;
+            if (_cd2 > 90 * 90) continue; // 90m radius
+            // Convert world dir → compass bearing (0=N=+Z?). Use atan2(dx, -dz) so 0=N when dz<0.
+            var _bear = Math.atan2(_cdx, -_cdz) * 180 / Math.PI;
+            if (_bear < 0) _bear += 360;
+            _ctThreats.push({
+              bearing: _bear, d2: _cd2,
+              spotted: !!_ce.playerSpotted,
+              boss: (_ce.typeCfg && _ce.typeCfg.name === 'BOSS')
+            });
+          }
+          // Keep nearest 5 (or all bosses + nearest)
+          _ctThreats.sort(function (a, b) { return a.d2 - b.d2; });
+          if (_ctThreats.length > 5) _ctThreats.length = 5;
+          HUD.setCompassThreats(_ctThreats);
+        }
+      } catch (eCT) {}
 
       // Weapon jam indicator
       if (HUD.showJam && Weapons.isJammed) HUD.showJam(Weapons.isJammed());

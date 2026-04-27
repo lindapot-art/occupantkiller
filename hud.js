@@ -880,10 +880,29 @@ const HUD = (() => {
           '">' + dirs[i].label + '</span>';
       }
     }
+    // Threat ticks: enemies in compass arc rendered as small red marks at top of bar
+    if (_compassThreats && _compassThreats.length) {
+      for (var ti = 0; ti < _compassThreats.length; ti++) {
+        var th = _compassThreats[ti];
+        // th.bearing is degrees (0=N, 90=E)
+        var tdiff = th.bearing - degs;
+        if (tdiff > 180) tdiff -= 360;
+        if (tdiff < -180) tdiff += 360;
+        if (Math.abs(tdiff) < 60) {
+          var tpos = 50 + tdiff * 1.5;
+          var tcol = th.spotted ? '#ff2020' : '#ffaa00';
+          var tsz = th.boss ? 14 : 10;
+          html += '<span style="position:absolute;left:' + tpos + '%;top:0;transform:translateX(-50%);color:' + tcol + ';font-size:' + tsz + 'px;text-shadow:0 0 4px ' + tcol + '">▼</span>';
+        }
+      }
+    }
     // Degree readout at center
     html += '<span style="position:absolute;left:50%;transform:translateX(-50%);bottom:0;font-size:9px;color:#666">' + Math.round(degs) + '°</span>';
     compassEl.innerHTML = html;
   }
+  // External callers push threat data each frame
+  var _compassThreats = null;
+  function setCompassThreats(arr) { _compassThreats = arr; }
 
   // ── Kill Streak Display ────────────────────────────────────
   const streakEl = document.getElementById('streak-display');
@@ -1654,7 +1673,7 @@ const HUD = (() => {
     showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout, setSprintIntensity, setGrenadeWarning,
     announceWave, announceStage,
     addKill, showHitDirection, showHitDirectionScaled, updateMinimap,
-    updateCompass, showStreak, showBleed, showProne, showJam,
+    updateCompass, setCompassThreats, showStreak, showBleed, showProne, showJam,
     setMinimapJammed, setCompassJammed,
     showVehicleHUD, hideVehicleHUD, updateVehicleHUD, showHijackProgress,
     updateStamina, showNightVision, updateWeatherDisplay,
