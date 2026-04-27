@@ -365,6 +365,31 @@ const HUD = (() => {
       // Hide locked slots to prevent overflow
       s.style.display = isLocked ? 'none' : '';
     });
+    // Brief switch banner (skip first call at game start)
+    if (_lastWeaponName != null && name !== _lastWeaponName) _showWeaponSwitchBanner(name);
+    _lastWeaponName = name;
+  }
+  var _lastWeaponName = null;
+  var _wepSwitchEl = null;
+  var _wepSwitchHideTimer = null;
+  function _showWeaponSwitchBanner(name) {
+    if (!_wepSwitchEl) {
+      _wepSwitchEl = document.createElement('div');
+      _wepSwitchEl.style.cssText = 'position:fixed;left:50%;top:62%;transform:translateX(-50%) translateY(0);color:#ffcc44;font:bold 18px monospace;text-shadow:0 0 8px #000,0 0 12px #ff8800;letter-spacing:2px;z-index:158;pointer-events:none;opacity:0;transition:opacity 0.18s, transform 0.5s;';
+      document.body.appendChild(_wepSwitchEl);
+    }
+    _wepSwitchEl.textContent = name;
+    _wepSwitchEl.style.transition = 'none';
+    _wepSwitchEl.style.transform = 'translateX(-50%) translateY(8px)';
+    _wepSwitchEl.style.opacity = '0';
+    void _wepSwitchEl.offsetHeight; // reflow
+    _wepSwitchEl.style.transition = 'opacity 0.18s, transform 0.45s';
+    _wepSwitchEl.style.opacity = '1';
+    _wepSwitchEl.style.transform = 'translateX(-50%) translateY(0)';
+    if (_wepSwitchHideTimer) clearTimeout(_wepSwitchHideTimer);
+    _wepSwitchHideTimer = setTimeout(function () {
+      if (_wepSwitchEl) _wepSwitchEl.style.opacity = '0';
+    }, 700);
   }
 
   function showReload(on, progress) {
