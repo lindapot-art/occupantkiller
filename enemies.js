@@ -2385,6 +2385,7 @@ const Enemies = (() => {
               tOrigin.y += 1.2;
               var tDir = _tmpVec3e.set(playerPos.x, playerPos.y + 0.8, playerPos.z).sub(tOrigin).normalize();
               Tracers.spawnTracer(tOrigin, tDir, 0xff4400, 80);
+              if (Tracers.spawnBullet) Tracers.spawnBullet(tOrigin, tDir, 0xff5522, 160);
               // Enemy muzzle flash so player can SEE where shots come from
               if (Tracers.spawnMuzzleFlash) {
                 Tracers.spawnMuzzleFlash(tOrigin, tDir);
@@ -2445,6 +2446,7 @@ const Enemies = (() => {
               var tO = _tmpVec3d.copy(e.mesh.position); tO.y += 1.2;
               var tD = _tmpVec3e.set(e.npcTarget.position.x, e.npcTarget.position.y + 0.8, e.npcTarget.position.z).sub(tO).normalize();
               Tracers.spawnTracer(tO, tD, 0xff4400, 80);
+              if (Tracers.spawnBullet) Tracers.spawnBullet(tO, tD, 0xff5522, 160);
               if (Tracers.spawnMuzzleFlash) Tracers.spawnMuzzleFlash(tO, tD);
             }
             if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playSpatialGunshot && playerPos) {

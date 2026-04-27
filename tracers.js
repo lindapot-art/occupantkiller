@@ -702,10 +702,124 @@ const Tracers = (() => {
     }
   }
 
+  /* ── Bullet Projectiles (fast visible particles) ──────────── */
+  const bullets = [];
+  const _bulletPool = [];
+  const MAX_BULLETS = 120;
+  // Stretched sphere reused for every bullet (streak look via scale.z)
+  const _bulletGeo = new THREE.SphereGeometry(1, 5, 4);
+
+  function spawnBullet(origin, direction, color, speed) {
+    if (!_scene || !origin || !direction) return;
+    color = (color === undefined || color === null) ? 0xffee66 : color;
+    speed = speed || 180;
+    var entry;
+    if (_bulletPool.length > 0) {
+      entry = _bulletPool.pop();
+      entry.core.material.color.setHex(color);
+      entry.core.material.opacity = 1.0;
+      entry.glow.material.color.setHex(color);
+      entry.glow.material.opacity = 0.55;
+      entry.core.visible = true;
+      entry.glow.visible = true;
+      _scene.add(entry.core);
+      _scene.add(entry.glow);
+    } else {
+      var coreMat = new THREE.MeshBasicMaterial({
+        color: color, transparent: true, opacity: 1.0,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      var glowMat = new THREE.MeshBasicMaterial({
+        color: color, transparent: true, opacity: 0.55,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      var core = new THREE.Mesh(_bulletGeo, coreMat);
+      var glow = new THREE.Mesh(_bulletGeo, glowMat);
+      _scene.add(core);
+      _scene.add(glow);
+      entry = { core: core, glow: glow };
+    }
+    // Start a touch in front of origin so it doesn't clip the muzzle
+    var sx = origin.x + direction.x * 0.35;
+    var sy = origin.y + direction.y * 0.35;
+    var sz = origin.z + direction.z * 0.35;
+    entry.core.position.set(sx, sy, sz);
+    entry.glow.position.set(sx, sy, sz);
+    // Orient streak along travel direction
+    _tTmp.set(sx + direction.x, sy + direction.y, sz + direction.z);
+    entry.core.lookAt(_tTmp);
+    entry.glow.lookAt(_tTmp);
+    // Stretched along local Z = forward
+    entry.core.scale.set(0.045, 0.045, 0.55);
+    entry.glow.scale.set(0.13, 0.13, 0.85);
+    entry.dx = direction.x;
+    entry.dy = direction.y;
+    entry.dz = direction.z;
+    entry.speed = speed;
+    entry.life = 0.45;
+    entry.maxLife = 0.45;
+    bullets.push(entry);
+    if (bullets.length > MAX_BULLETS) {
+      var old = bullets.shift();
+      _scene.remove(old.core); _scene.remove(old.glow);
+      old.core.visible = false; old.glow.visible = false;
+      if (_bulletPool.length < 60) _bulletPool.push(old);
+      else {
+        old.core.material.dispose(); old.glow.material.dispose();
+      }
+    }
+  }
+
+  function updateBullets(delta) {
+    for (var i = bullets.length - 1; i >= 0; i--) {
+      var b = bullets[i];
+      b.life -= delta;
+      var step = b.speed * delta;
+      b.core.position.x += b.dx * step;
+      b.core.position.y += b.dy * step;
+      b.core.position.z += b.dz * step;
+      b.glow.position.copy(b.core.position);
+      // Slight fade near end of life
+      var lifeRatio = b.life / b.maxLife;
+      if (lifeRatio < 0.4) {
+        b.core.material.opacity = Math.max(0, lifeRatio / 0.4);
+        b.glow.material.opacity = Math.max(0, lifeRatio / 0.4 * 0.55);
+      }
+      if (b.life <= 0) {
+        _scene.remove(b.core);
+        _scene.remove(b.glow);
+        b.core.visible = false; b.glow.visible = false;
+        if (_bulletPool.length < 60) {
+          _bulletPool.push(b);
+        } else {
+          b.core.material.dispose();
+          b.glow.material.dispose();
+        }
+        bullets.splice(i, 1);
+      }
+    }
+  }
+
+  function clearBullets() {
+    for (var i = 0; i < bullets.length; i++) {
+      var b = bullets[i];
+      if (_scene) { _scene.remove(b.core); _scene.remove(b.glow); }
+      b.core.material.dispose();
+      b.glow.material.dispose();
+    }
+    bullets.length = 0;
+    for (var j = 0; j < _bulletPool.length; j++) {
+      var p = _bulletPool[j];
+      p.core.material.dispose();
+      p.glow.material.dispose();
+    }
+    _bulletPool.length = 0;
+  }
+
   return {
     init, spawnTracer, spawnSmoke, spawnMuzzleFlash, spawnExplosion, spawnBlood,
     spawnBlockImpact, spawnCasing, spawnSparks, spawnPickupBurst, spawnBulletHole,
-    spawnShockwave, spawnFire,
+    spawnShockwave, spawnFire, spawnBullet,
     startRain, stopRain,
     update: function(delta, playerPos) {
       update(delta);
@@ -717,6 +831,7 @@ const Tracers = (() => {
       updateRain(delta, playerPos);
       updateScorchMarks(delta);
       updateSmokePillars(delta);
+      updateBullets(delta);
     },
     clear: function() {
       clear();
@@ -734,6 +849,7 @@ const Tracers = (() => {
       _bulletHoles.length = 0;
       _scorchMarks.forEach(s => { if (_scene) _scene.remove(s.mesh); s.mat.dispose(); });
       _scorchMarks.length = 0;
+      clearBullets();
     }
   };
 })();

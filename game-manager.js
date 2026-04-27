@@ -3930,6 +3930,9 @@ const GameManager = (function () {
             _gmNewPos.copy(_gmTmp2).addScaledVector(_gmTmp3, 0.5);
             var tracerColor = isHeavy ? 0xff4400 : (isSniperShot ? 0x66ff88 : 0xffcc44);
             Tracers.spawnTracer(_gmNewPos, _gmTmp3, tracerColor, isSniperShot ? 220 : 120);
+            if (Tracers.spawnBullet) {
+              Tracers.spawnBullet(_gmNewPos, _gmTmp3, tracerColor, isSniperShot ? 320 : 200);
+            }
           }
           // Muzzle flash on every shot
           if (Tracers.spawnMuzzleFlash) {
