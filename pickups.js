@@ -127,6 +127,19 @@ const Pickups = (() => {
       p.group.position.y = p.baseY + Math.sin(time * HOVER_SPEED + p.phase) * HOVER_RANGE;
       p.boxMesh.rotation.y  += ROTATE_SPEED * delta;
       p.ringMesh.rotation.z += ROTATE_SPEED * 0.6 * delta;
+      // Proximity scale-up: pickups grow + glow brighter as you approach
+      try {
+        var pdx = p.group.position.x - playerPos.x;
+        var pdz = p.group.position.z - playerPos.z;
+        var pDistSq = pdx * pdx + pdz * pdz;
+        var proxAmt = pDistSq < 64 ? Math.max(0, 1 - Math.sqrt(pDistSq) / 8) : 0; // within 8m
+        var proxScale = 1 + proxAmt * 0.35;
+        p.boxMesh.scale.setScalar(proxScale);
+        p.ringMesh.scale.setScalar(proxScale);
+        if (p.boxMesh.material && p.boxMesh.material.emissiveIntensity !== undefined) {
+          p.boxMesh.material.emissiveIntensity = 0.5 + proxAmt * 0.7;
+        }
+      } catch (eP) {}
       // Pulse the beam — a subtle breath that helps it stand out at distance
       if (p.beamMesh && p.beamMesh.material) {
         p.beamMesh.material.opacity = 0.14 + (Math.sin(time * 2.4 + p.phase) * 0.5 + 0.5) * 0.16;
