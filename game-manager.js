@@ -3895,9 +3895,11 @@ const GameManager = (function () {
           _camera.getWorldDirection(_gmTmp3);
           var isHeavy = ['HMG', 'HMG_HEAVY', 'MACHINEGUN', 'MINIGUN'].indexOf(weaponType) >= 0;
           var isExplosive = ['AT', 'ATGM', 'AT_HEAVY', 'AT_LIGHT', 'AA', 'GRENADE', 'INCENDIARY', 'THERMOBARIC'].indexOf(weaponType) >= 0;
+          var isSniperShot = ['SNIPER', 'AMR'].indexOf(weaponType) >= 0;
           if (!isExplosive) {
             _gmNewPos.copy(_gmTmp2).addScaledVector(_gmTmp3, 0.5);
-            Tracers.spawnTracer(_gmNewPos, _gmTmp3, isHeavy ? 0xff4400 : 0xffcc44, 120);
+            var tracerColor = isHeavy ? 0xff4400 : (isSniperShot ? 0x66ff88 : 0xffcc44);
+            Tracers.spawnTracer(_gmNewPos, _gmTmp3, tracerColor, isSniperShot ? 220 : 120);
           }
           // Muzzle flash on every shot
           if (Tracers.spawnMuzzleFlash) {
