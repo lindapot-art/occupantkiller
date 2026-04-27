@@ -14,6 +14,8 @@ const Enemies = (() => {
   // Persistent blood-pool decals on the ground (fade out over time)
   const bloodDecals = [];
   const _decalGeo = new THREE.CircleGeometry(0.6, 12);
+  // Spawn dust puffs (one-shot per spawn; fade quickly)
+  const _spawnDusts = [];
   // Shared blood particle resources (pool geometry + 2 materials)
   var _bloodGeo = new THREE.BoxGeometry(1, 1, 1);
   var _bloodMatDark = new THREE.MeshLambertMaterial({ color: 0x880000 });
@@ -1436,6 +1438,20 @@ const Enemies = (() => {
     mesh.position.set(sx, sy, sz);
     mesh.scale.setScalar(0.01); // start tiny for spawn animation
     if (scene) scene.add(mesh);
+    // Spawn dust burst at feet — visual cue for new spawn
+    if (scene) {
+      var _spawnDust = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.6, 1.6),
+        new THREE.MeshBasicMaterial({
+          color: 0x9a8060, transparent: true, opacity: 0.55,
+          depthWrite: false,
+        })
+      );
+      _spawnDust.rotation.x = -Math.PI / 2;
+      _spawnDust.position.set(sx, sy + 0.05, sz);
+      scene.add(_spawnDust);
+      _spawnDusts.push({ mesh: _spawnDust, material: _spawnDust.material, life: 0.6, maxLife: 0.6 });
+    }
 
     // Build alert icon as child of mesh (auto-positioned above head)
     var _alertIcon = buildAlertIcon();
@@ -1658,6 +1674,21 @@ const Enemies = (() => {
         if (scene) scene.remove(dec.mesh);
         if (dec.material && dec.material.dispose) dec.material.dispose();
         bloodDecals.splice(bd, 1);
+      }
+    }
+
+    // Update spawn dust puffs (expand + fade)
+    for (var sd = _spawnDusts.length - 1; sd >= 0; sd--) {
+      var sdust = _spawnDusts[sd];
+      sdust.life -= delta;
+      if (sdust.material) sdust.material.opacity = Math.max(0, (sdust.life / sdust.maxLife) * 0.55);
+      sdust.mesh.scale.x += delta * 1.5;
+      sdust.mesh.scale.y += delta * 1.5;
+      if (sdust.life <= 0) {
+        if (scene) scene.remove(sdust.mesh);
+        if (sdust.mesh.geometry) sdust.mesh.geometry.dispose();
+        if (sdust.material && sdust.material.dispose) sdust.material.dispose();
+        _spawnDusts.splice(sd, 1);
       }
     }
 
@@ -3190,6 +3221,14 @@ const Enemies = (() => {
       if (dec.material && dec.material.dispose) dec.material.dispose();
     });
     bloodDecals.length = 0;
+
+    // Clean up spawn dust puffs
+    _spawnDusts.forEach(sd => {
+      if (scene) scene.remove(sd.mesh);
+      if (sd.mesh.geometry) sd.mesh.geometry.dispose();
+      if (sd.material && sd.material.dispose) sd.material.dispose();
+    });
+    _spawnDusts.length = 0;
 
     // Clean up enemy grenades
     for (var gi = _enemyGrenades.length - 1; gi >= 0; gi--) {
