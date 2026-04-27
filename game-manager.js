@@ -4441,9 +4441,19 @@ const GameManager = (function () {
       }
     } catch (eAtk) {}
     MLSystem.onDamageTaken(dmg);
+    var _hpBefore = player.hp;
     player.hp = Math.max(0, player.hp - dmg);
     HUD.setHealth(player.hp, player.maxHp);
     HUD.flashDamage();
+    // Close-call slow-mo: hit drops HP from > 30% into critical (< 18%) in one shot
+    var _critFrac = 0.18, _safeFrac = 0.30;
+    if (player.maxHp > 0 && _hpBefore > player.maxHp * _safeFrac && player.hp > 0 && player.hp < player.maxHp * _critFrac) {
+      try {
+        if (typeof Feedback !== 'undefined' && Feedback.triggerSlowMo) Feedback.triggerSlowMo(0.45, 0.4);
+        if (typeof CameraSystem !== 'undefined' && CameraSystem.shake) CameraSystem.shake(0.12, 0.35);
+        if (typeof AudioSystem !== 'undefined' && AudioSystem.playLowHealth) AudioSystem.playLowHealth();
+      } catch (eCC) {}
+    }
     // Damage-proportional camera shake — big hits punch the view
     if (typeof CameraSystem !== 'undefined' && CameraSystem.shake && dmg >= 5) {
       var _shakeAmt = Math.min(0.18, 0.02 + dmg * 0.0025);
