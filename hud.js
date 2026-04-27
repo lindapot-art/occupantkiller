@@ -262,6 +262,19 @@ const HUD = (() => {
     _adrEl.style.opacity = String(0.35 + t * 0.55);
   }
 
+  // Sprint motion vignette: subtle dark edges intensify on sprint start
+  var _sprintEl = null;
+  function setSprintIntensity(amount) {
+    var v = Math.max(0, Math.min(1, amount || 0));
+    if (!_sprintEl) {
+      if (v <= 0) return;
+      _sprintEl = document.createElement('div');
+      _sprintEl.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:135;background:radial-gradient(ellipse at center,transparent 48%,rgba(0,0,0,0.55) 100%);opacity:0;transition:opacity 0.22s;';
+      document.body.appendChild(_sprintEl);
+    }
+    _sprintEl.style.opacity = String(v * 0.6);
+  }
+
   function setAmmo(clip, reserve, clipSize) {
     if (!el.ammo || !el.ammoRes) return;
     el.ammo.textContent    = clip;
@@ -1570,7 +1583,7 @@ const HUD = (() => {
     setScore, setWave, setKills, setEnemies, setStage,
     setHealth, setAmmo, setWeapon, showReload,
     flashHit, flashDamage, flashHeal, showBloodDrops,
-    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout,
+    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout, setSprintIntensity,
     announceWave, announceStage,
     addKill, showHitDirection, updateMinimap,
     updateCompass, showStreak, showBleed, showProne, showJam,

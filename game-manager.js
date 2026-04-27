@@ -4083,7 +4083,22 @@ const GameManager = (function () {
         }
       }
       if (HUD.updateXPBar) HUD.updateXPBar(player.xp, xpNeeded, player.level);
-      if (Feedback.showXPGain) Feedback.showXPGain(xpGain);
+      // Project XP popup at the enemy's screen position so it visually anchors to the kill
+      try {
+        if (Feedback.showXPGain) {
+          var _xpScrX = null, _xpScrY = null;
+          if (enemy && enemy.mesh && _camera) {
+            var _eProj = enemy.mesh.position.clone();
+            _eProj.y += 1.6;
+            _eProj.project(_camera);
+            if (_eProj.z < 1) {
+              _xpScrX = (_eProj.x * 0.5 + 0.5) * window.innerWidth;
+              _xpScrY = (-_eProj.y * 0.5 + 0.5) * window.innerHeight;
+            }
+          }
+          Feedback.showXPGain(xpGain, _xpScrX, _xpScrY);
+        }
+      } catch (eXp) {}
 
       // ── B23: Multikill tracking ──
       player.multikillTimer = 2.0;
@@ -4971,6 +4986,10 @@ const GameManager = (function () {
       }
       // Decay kill FOV kick (~0.4s ease-back)
       if (_killFovKick > 0) _killFovKick = Math.max(0, _killFovKick - delta * 8);
+      // Sprint vignette: dark edges when sprinting (unless zoomed)
+      if (HUD.setSprintIntensity) {
+        HUD.setSprintIntensity(player.sprinting && !Weapons.isZoomed() ? 1 : 0);
+      }
 
       Enemies.update(delta, player.position, onPlayerHit, function (waveDone) {
         if (waveDone) onWaveComplete();
