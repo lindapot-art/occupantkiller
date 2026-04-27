@@ -262,6 +262,19 @@ const HUD = (() => {
     _adrEl.style.opacity = String(0.35 + t * 0.55);
   }
 
+  // Sprint motion vignette: subtle dark edges intensify on sprint start
+  var _sprintEl = null;
+  function setSprintIntensity(amount) {
+    var v = Math.max(0, Math.min(1, amount || 0));
+    if (!_sprintEl) {
+      if (v <= 0) return;
+      _sprintEl = document.createElement('div');
+      _sprintEl.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:135;background:radial-gradient(ellipse at center,transparent 48%,rgba(0,0,0,0.55) 100%);opacity:0;transition:opacity 0.22s;';
+      document.body.appendChild(_sprintEl);
+    }
+    _sprintEl.style.opacity = String(v * 0.6);
+  }
+
   function setAmmo(clip, reserve, clipSize) {
     if (!el.ammo || !el.ammoRes) return;
     el.ammo.textContent    = clip;
@@ -584,7 +597,7 @@ const HUD = (() => {
   function setMinimapJammed(jammed) { _minimapJammed = !!jammed; }
   function setCompassJammed(jammed) { _compassJammed = !!jammed; }
 
-  function updateMinimap(px, pz, pyaw, enemies, npcs, vehicles, drones) {
+  function updateMinimap(px, pz, pyaw, enemies, npcs, vehicles, drones, pickups) {
     if (!minimapCtx) return;
     const ctx = minimapCtx;
     ctx.clearRect(0, 0, MM_SIZE, MM_SIZE);
@@ -725,6 +738,20 @@ const HUD = (() => {
           ctx.rotate(Math.PI / 4);
           ctx.fillRect(-2.5, -2.5, 5, 5);
           ctx.restore();
+        }
+      }
+    }
+
+    // Pickups — small color-coded squares (health=green, ammo=yellow, armor=blue, other=cyan)
+    if (pickups) {
+      var _puColors = { HEALTH: '#22ff66', MEDKIT: '#22ff66', AMMO: '#ffcc00', ARMOR: '#4488ff', STIM: '#cc44ff', INTEL: '#00ffff', SHIELD: '#ffd700', WEAPON: '#ff8800' };
+      for (var pu = 0; pu < pickups.length; pu++) {
+        var puk = pickups[pu];
+        if (!puk || !puk.mesh) continue;
+        var pup = toMM(puk.mesh.position.x, puk.mesh.position.z);
+        if (Math.abs(pup.x - MM_HALF) < MM_HALF && Math.abs(pup.y - MM_HALF) < MM_HALF) {
+          ctx.fillStyle = _puColors[puk.type] || '#88ffff';
+          ctx.fillRect(pup.x - 1.5, pup.y - 1.5, 3, 3);
         }
       }
     }
@@ -1570,7 +1597,7 @@ const HUD = (() => {
     setScore, setWave, setKills, setEnemies, setStage,
     setHealth, setAmmo, setWeapon, showReload,
     flashHit, flashDamage, flashHeal, showBloodDrops,
-    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout,
+    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout, setSprintIntensity,
     announceWave, announceStage,
     addKill, showHitDirection, updateMinimap,
     updateCompass, showStreak, showBleed, showProne, showJam,
