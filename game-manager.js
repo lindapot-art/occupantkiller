@@ -4074,6 +4074,17 @@ const GameManager = (function () {
         player.level++;
         if (HUD.showStreakBanner) HUD.showStreakBanner('LEVEL UP! LVL ' + player.level, player.level);
         if (typeof AudioSystem !== 'undefined' && AudioSystem.playLevelUp) AudioSystem.playLevelUp();
+        // Level-up VFX: golden burst of pickup-style sparks at player + brief FOV punch
+        try {
+          if (typeof Tracers !== 'undefined' && Tracers.spawnPickupBurst) {
+            var _luPos = player.position.clone(); _luPos.y += 1.2;
+            Tracers.spawnPickupBurst(_luPos, 0xffd700);
+          }
+          _killFovKick = Math.max(_killFovKick, 6); // bigger zoom-out punch
+          if (typeof Feedback !== 'undefined' && Feedback.triggerSlowMo) {
+            Feedback.triggerSlowMo(0.35, 0.5);
+          }
+        } catch (eLU) {}
         // Unlock a weapon every 3 levels
         if (player.level % 3 === 0) {
           var newWepIdx = Weapons.unlockNext();
@@ -4083,22 +4094,7 @@ const GameManager = (function () {
         }
       }
       if (HUD.updateXPBar) HUD.updateXPBar(player.xp, xpNeeded, player.level);
-      // Project XP popup at the enemy's screen position so it visually anchors to the kill
-      try {
-        if (Feedback.showXPGain) {
-          var _xpScrX = null, _xpScrY = null;
-          if (enemy && enemy.mesh && _camera) {
-            var _eProj = enemy.mesh.position.clone();
-            _eProj.y += 1.6;
-            _eProj.project(_camera);
-            if (_eProj.z < 1) {
-              _xpScrX = (_eProj.x * 0.5 + 0.5) * window.innerWidth;
-              _xpScrY = (-_eProj.y * 0.5 + 0.5) * window.innerHeight;
-            }
-          }
-          Feedback.showXPGain(xpGain, _xpScrX, _xpScrY);
-        }
-      } catch (eXp) {}
+      if (Feedback.showXPGain) Feedback.showXPGain(xpGain);
 
       // ── B23: Multikill tracking ──
       player.multikillTimer = 2.0;
@@ -4986,10 +4982,6 @@ const GameManager = (function () {
       }
       // Decay kill FOV kick (~0.4s ease-back)
       if (_killFovKick > 0) _killFovKick = Math.max(0, _killFovKick - delta * 8);
-      // Sprint vignette: dark edges when sprinting (unless zoomed)
-      if (HUD.setSprintIntensity) {
-        HUD.setSprintIntensity(player.sprinting && !Weapons.isZoomed() ? 1 : 0);
-      }
 
       Enemies.update(delta, player.position, onPlayerHit, function (waveDone) {
         if (waveDone) onWaveComplete();
@@ -5171,8 +5163,7 @@ const GameManager = (function () {
         var mmNPCs = (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) ? NPCSystem.getAll() : [];
         var mmVehicles = (typeof VehicleSystem !== 'undefined' && VehicleSystem.getAll) ? VehicleSystem.getAll() : [];
         var mmDrones = (typeof DroneSystem !== 'undefined' && DroneSystem.getAll) ? DroneSystem.getAll() : [];
-        var mmPickups = (typeof Pickups !== 'undefined' && Pickups.getAll) ? Pickups.getAll() : [];
-        HUD.updateMinimap(player.position.x, player.position.z, CameraSystem.getYaw(), mmEnemies, mmNPCs, mmVehicles, mmDrones, mmPickups);
+        HUD.updateMinimap(player.position.x, player.position.z, CameraSystem.getYaw(), mmEnemies, mmNPCs, mmVehicles, mmDrones);
       }
 
       // Targeting assistant (on-weapon enemy readout)
