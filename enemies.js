@@ -860,8 +860,12 @@ const Enemies = (() => {
     var vx = dx / t;
     var vz = dz / t;
     var vy = 6 + dist * 0.15; // arc upward
+    // Pulsing red beacon so player can spot incoming grenades
+    var beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2200, transparent: true, opacity: 0.9 });
+    var beacon = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 4), beaconMat);
+    mesh.add(beacon);
     scene.add(mesh);
-    _enemyGrenades.push({ mesh: mesh, vx: vx, vy: vy, vz: vz, life: t + 0.5, dmg: 35, radius: 4 });
+    _enemyGrenades.push({ mesh: mesh, vx: vx, vy: vy, vz: vz, life: t + 0.5, dmg: 35, radius: 4, _trailT: 0, _beaconMat: beaconMat });
   }
   function updateEnemyGrenades(delta, playerPos) {
     for (var i = _enemyGrenades.length - 1; i >= 0; i--) {
@@ -871,6 +875,15 @@ const Enemies = (() => {
       g.mesh.position.z += g.vz * delta;
       g.vy -= 15 * delta; // gravity
       g.life -= delta;
+      // Pulse beacon + smoke trail
+      if (g._beaconMat) {
+        g._beaconMat.opacity = 0.55 + Math.sin(performance.now() * 0.025) * 0.4;
+      }
+      g._trailT += delta;
+      if (g._trailT >= 0.05 && typeof Tracers !== 'undefined' && Tracers.spawnSmoke) {
+        g._trailT = 0;
+        try { Tracers.spawnSmoke(g.mesh.position); } catch (eT) {}
+      }
       // Explode on ground or timeout
       var terrainY = (typeof window.VoxelWorld !== 'undefined') ? window.VoxelWorld.getTerrainHeight(g.mesh.position.x, g.mesh.position.z) : 0;
       if (g.mesh.position.y <= terrainY + 0.2 || g.life <= 0) {
@@ -886,6 +899,7 @@ const Enemies = (() => {
           }
         }
         scene.remove(g.mesh);
+        if (g._beaconMat) g._beaconMat.dispose();
         _enemyGrenades.splice(i, 1);
       }
     }
