@@ -1535,6 +1535,19 @@ const HUD = (() => {
       el.style.opacity = '0';
       el.style.transform = 'translate(-50%,-50%) scale(0.85)';
     }, 2200);
+    // Red full-screen flash for dramatic boss entry
+    var flash = document.getElementById('boss-flash');
+    if (!flash) {
+      flash = document.createElement('div');
+      flash.id = 'boss-flash';
+      flash.style.cssText = 'position:fixed;inset:0;background:radial-gradient(ellipse at center,rgba(255,40,40,0.55) 0%,rgba(120,0,0,0.35) 60%,transparent 100%);pointer-events:none;z-index:235;opacity:0;transition:opacity 0.35s ease-out;';
+      document.body.appendChild(flash);
+    }
+    flash.style.transition = 'none';
+    flash.style.opacity = '0.9';
+    void flash.offsetWidth;
+    flash.style.transition = 'opacity 0.65s ease-out';
+    flash.style.opacity = '0';
   }
 
   // ── B22: Damage Log (scrolling combat text) ──────────────────────
