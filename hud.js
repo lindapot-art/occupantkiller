@@ -338,6 +338,30 @@ const HUD = (() => {
     if (_chLineCache.right)  _chLineCache.right.style.transform  = 'translateX(' + ( px) + 'px)';
   }
 
+  // ── Crosshair target tint: red glow when aimed at an enemy ──
+  var _chTargetActive = false;
+  function setCrosshairTarget(onTarget) {
+    var want = !!onTarget;
+    if (want === _chTargetActive) return;
+    _chTargetActive = want;
+    if (!_chLineCache) {
+      _chLineCache = {
+        top:    document.querySelector('#crosshair .cl-top'),
+        bottom: document.querySelector('#crosshair .cl-bottom'),
+        left:   document.querySelector('#crosshair .cl-left'),
+        right:  document.querySelector('#crosshair .cl-right'),
+      };
+    }
+    var col = want ? '#ff3030' : '';
+    var glow = want ? '0 0 6px #ff0000,0 0 10px #ff5050' : '';
+    ['top', 'bottom', 'left', 'right'].forEach(function (k) {
+      var el = _chLineCache[k];
+      if (!el) return;
+      el.style.backgroundColor = col;
+      el.style.boxShadow = glow;
+    });
+  }
+
   // Green heal flash vignette (briefly tint screen on health pickup)
   var _healFlashEl = null;
   var _healFlashTimer = null;
@@ -1504,7 +1528,7 @@ const HUD = (() => {
     setScore, setWave, setKills, setEnemies, setStage,
     setHealth, setAmmo, setWeapon, showReload,
     flashHit, flashDamage, flashHeal, showBloodDrops,
-    showHeadshot, notifyPickup, setCrosshairSpread,
+    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget,
     announceWave, announceStage,
     addKill, showHitDirection, updateMinimap,
     updateCompass, showStreak, showBleed, showProne, showJam,

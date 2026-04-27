@@ -4884,6 +4884,30 @@ const GameManager = (function () {
         if (HUD.setCrosshairSpread) HUD.setCrosshairSpread(_chSpread);
       } catch (eCh) {}
 
+      // ── Crosshair target tint: red when aimed at enemy (cheap dot-product check) ──
+      try {
+        if (HUD.setCrosshairTarget && _camera && Enemies.getAll) {
+          var _camFwd = _camera.getWorldDirection(new THREE.Vector3());
+          var _camPos = _camera.position;
+          var _onTarget = false;
+          var _list = Enemies.getAll();
+          // Tighter cone when zoomed (precise) vs wider when hipfiring (forgiving)
+          var _aimCos = (Weapons.isZoomed && Weapons.isZoomed()) ? 0.997 : 0.992;
+          for (var _ti = 0; _ti < _list.length; _ti++) {
+            var _en = _list[_ti];
+            if (!_en || !_en.alive || !_en.mesh) continue;
+            var _dx = _en.mesh.position.x - _camPos.x;
+            var _dy = (_en.mesh.position.y + 1.0) - _camPos.y;
+            var _dz = _en.mesh.position.z - _camPos.z;
+            var _dist = Math.sqrt(_dx*_dx + _dy*_dy + _dz*_dz);
+            if (_dist < 1 || _dist > 120) continue;
+            var _dot = (_dx*_camFwd.x + _dy*_camFwd.y + _dz*_camFwd.z) / _dist;
+            if (_dot > _aimCos) { _onTarget = true; break; }
+          }
+          HUD.setCrosshairTarget(_onTarget);
+        }
+      } catch (eCt) {}
+
       // ── FOV kick: sprint widens (+5), ADS narrows (weapons handles its own) ──
       if (!Weapons.isZoomed()) {
         _targetFOV = _baseFOV + (player.sprinting ? 5 : 0);
