@@ -193,9 +193,11 @@ const Tracers = (() => {
   }
 
   /* ── Blood Splatter ─────────────────────────────────────────── */
-  function spawnBlood(pos) {
+  // Directional exit-wound spray. dir is optional bullet travel direction (Vector3).
+  function spawnBlood(pos, dir) {
     if (!_scene) return;
     var count = 8 + Math.floor(Math.random() * 5);
+    var hasDir = !!(dir && typeof dir.x === 'number');
     for (let i = 0; i < count; i++) {
       var size = 0.06 + Math.random() * 0.06;
       const mat = new THREE.MeshBasicMaterial({
@@ -207,11 +209,24 @@ const Tracers = (() => {
       mesh.position.copy(pos);
       _scene.add(mesh);
       var _bSize = size;
-      const vel = new THREE.Vector3(
-        (Math.random() - 0.5) * 4,
-        Math.random() * 3 + 1,
-        (Math.random() - 0.5) * 4
-      );
+      var vel;
+      if (hasDir) {
+        // Bias the spurt along bullet direction (exit wound) with some scatter
+        var biasX = dir.x * (3 + Math.random() * 3);
+        var biasY = (dir.y || 0) * (2 + Math.random() * 2) + Math.random() * 2 + 0.5;
+        var biasZ = dir.z * (3 + Math.random() * 3);
+        vel = new THREE.Vector3(
+          biasX + (Math.random() - 0.5) * 2.5,
+          biasY,
+          biasZ + (Math.random() - 0.5) * 2.5
+        );
+      } else {
+        vel = new THREE.Vector3(
+          (Math.random() - 0.5) * 4,
+          Math.random() * 3 + 1,
+          (Math.random() - 0.5) * 4
+        );
+      }
       explosionParts.push({
         mesh: mesh, vel: vel,
         life: 0.6 + Math.random() * 0.6,

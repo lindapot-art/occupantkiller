@@ -3920,9 +3920,16 @@ const GameManager = (function () {
     if (!enemy || !enemy.alive) return;
 
     AudioSystem.playHit();
-    // Blood splatter on hit
+    // Blood splatter on hit — directional exit-wound spray
     if (typeof Tracers !== 'undefined' && Tracers.spawnBlood) {
-      Tracers.spawnBlood(hit.point || enemy.mesh.position);
+      var _bloodPt = hit.point || enemy.mesh.position;
+      var _bloodDir = null;
+      try {
+        if (hit.point && _camera) {
+          _bloodDir = hit.point.clone().sub(_camera.position).normalize();
+        }
+      } catch (eBd) { _bloodDir = null; }
+      Tracers.spawnBlood(_bloodPt, _bloodDir);
     }
     MLSystem.onHit(Weapons.getCurrentId());
     // AI Smart Learning: track weapon engagement range
