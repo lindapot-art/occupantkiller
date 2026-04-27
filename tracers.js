@@ -147,9 +147,24 @@ const Tracers = (() => {
     light.position.copy(pos);
     _scene.add(light);
     flashes.push({ mesh: null, light: light, life: 0.2 });
-    // Shake camera
+    // Shake camera — falls off with distance from player so distant booms feel distant
     if (typeof CameraSystem !== 'undefined' && CameraSystem.shake) {
-      CameraSystem.shake(radius * 0.06, 0.4);
+      var _shakeAmt = radius * 0.06;
+      try {
+        if (typeof GameManager !== 'undefined' && GameManager.getPlayer) {
+          var _pp = GameManager.getPlayer();
+          if (_pp && _pp.position) {
+            var _ddx = pos.x - _pp.position.x;
+            var _ddy = (pos.y || 0) - _pp.position.y;
+            var _ddz = pos.z - _pp.position.z;
+            var _dD = Math.sqrt(_ddx*_ddx + _ddy*_ddy + _ddz*_ddz);
+            // Falloff: full strength <8m, zero past 60m
+            var _fall = Math.max(0, 1 - Math.max(0, _dD - 8) / 52);
+            _shakeAmt *= _fall;
+          }
+        }
+      } catch (eS) {}
+      if (_shakeAmt > 0.001) CameraSystem.shake(_shakeAmt, 0.4);
     }
     // Shockwave ring (render-loop driven, not setInterval)
     spawnShockwave(pos, radius * 2.5, 0xffaa44);

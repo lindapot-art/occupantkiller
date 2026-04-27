@@ -2335,6 +2335,12 @@ const Weapons = (() => {
         }
       }
       p.mesh.position.addScaledVector(p.dir, p.speed * delta);
+      // Smoke trail behind projectiles (visibility aid for grenades/rockets)
+      p._trailTimer = (p._trailTimer || 0) - delta;
+      if (p._trailTimer <= 0 && typeof Tracers !== 'undefined' && Tracers.spawnSmoke) {
+        Tracers.spawnSmoke(p.mesh.position);
+        p._trailTimer = (p.weaponType === 'AT' || p.weaponType === 'ATGM' || p.weaponType === 'AA') ? 0.025 : 0.06;
+      }
       // Apply gravity for arc projectiles (grenades, molotovs)
       if (p.gravity) {
         p.dir.y -= p.gravity * delta / p.speed;
