@@ -1040,13 +1040,19 @@ window.VoxelWorld = (function () {
   }
 
   function rebuildAll() {
+    // PRELOAD: build every chunk synchronously up-front. The budgeted
+    // updateDirtyChunks() path is for runtime block edits only — using it
+    // here causes visible pop-in on spawn (only 4 chunks/frame appear).
     for (const chunk of chunks.values()) {
       chunk.dirty = true;
     }
-    updateDirtyChunks();
+    if (typeof chunks !== 'object' || !chunks.values) return;
+    for (const chunk of chunks.values()) {
+      if (chunk.dirty) buildChunkMesh(chunk, _scene);
+    }
   }
 
-  let _rebuildBudget = 4; // max chunks to rebuild per frame
+  let _rebuildBudget = 4; // max chunks to rebuild per frame (runtime edits only)
   function updateDirtyChunks() {
     let count = 0;
     if (typeof chunks !== 'object' || !chunks.values) {
@@ -3880,6 +3886,18 @@ window.VoxelWorld = (function () {
 
     regenerate();
     _droneNestPositions.length = 0; // Reset nests for this level
+
+    // Main road network — every stage gets visible asphalt arteries so
+    // the world doesn't look like an empty sandbox. User reported "no
+    // roads"; previously roads only existed at outpost rims.
+    generateRoadNetwork([
+      [-120,   0,  120,   0, 4],   // east-west main road
+      [   0,-120,    0, 120, 4],   // north-south main road
+      [ -60, -60,   60, -60, 3],   // southern parallel
+      [ -60,  60,   60,  60, 3],   // northern parallel
+      [ -80,   0,  -80, -80, 3],   // west connector
+      [  80,   0,   80,  80, 3],   // east connector
+    ]);
     if (level.id === 'HOSTOMEL') {
       generateHostomelAirport(0, 0);
       generateUkrainianApartment(-35, -30, 6);

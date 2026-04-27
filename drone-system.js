@@ -704,7 +704,23 @@ const DroneSystem = (function () {
       // Fall through to patrol behavior below for drones with no current target
     }
 
-    if (drone.patrolPoints.length === 0) return;
+    // Auto-generate patrol if drone has no path. Without this, friendly
+    // autonomous drones spawned via launchAndPossessDrone() (and any drone
+    // released from possession) freeze in place — user reported "drones don't
+    // move". Build a 4-point square circuit around the drone's current spot.
+    if (drone.patrolPoints.length === 0) {
+      var _ax = drone.position.x;
+      var _az = drone.position.z;
+      var _ay = drone.position.y;
+      var _pr = 18; // patrol radius
+      drone.patrolPoints = [
+        new THREE.Vector3(_ax + _pr, _ay, _az + _pr),
+        new THREE.Vector3(_ax - _pr, _ay, _az + _pr),
+        new THREE.Vector3(_ax - _pr, _ay, _az - _pr),
+        new THREE.Vector3(_ax + _pr, _ay, _az - _pr),
+      ];
+      drone.patrolIdx = 0;
+    }
 
     // Observer drones circle and call reinforcements
     if (drone.type === DRONE_TYPE.ENEMY_OBSERVER) {

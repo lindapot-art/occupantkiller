@@ -747,12 +747,14 @@ const VehicleSystem = (function () {
       if (!v.flying) {
         v.velocity.y -= 25 * delta; // stronger gravity
         const terrainH = VoxelWorld.getTerrainHeight(v.position.x, v.position.z);
-        if (v.position.y <= terrainH) {
+        // Hard clamp to terrain. Ground vehicles have NO suspension physics —
+        // they always sit on the ground. Previously we only snapped UP from
+        // below; now we also snap DOWN from above so explosions, prop bumps,
+        // or stale spawn altitudes cannot leave them "flying around".
+        if (v.position.y !== terrainH) {
           v.position.y = terrainH;
-          if (v.velocity.y < 0) v.velocity.y = 0;
         }
-        // Hard ground-lock: zero upward velocity for ground vehicles (prevents BMP flying)
-        if (v.velocity.y > 0) v.velocity.y = 0;
+        v.velocity.y = 0;
         // Hard speed cap for AI vehicles to prevent erratic movement
         if (v !== _occupiedVehicle) {
           var hSpd = Math.sqrt(v.velocity.x * v.velocity.x + v.velocity.z * v.velocity.z);
