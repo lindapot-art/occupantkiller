@@ -2141,6 +2141,11 @@ const Enemies = (() => {
         if (prevLeg * e.legAngle < 0 && typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playEnemyFootstep) {
           var eDist = e.mesh.position.distanceTo(playerPos);
           window.AudioSystem.playEnemyFootstep(eDist);
+          // Occasional footstep dust puff for visual life (1-in-3 to keep perf)
+          if (Math.random() < 0.33 && typeof Tracers !== 'undefined' && Tracers.spawnSmoke) {
+            var fp = e.mesh.position;
+            try { Tracers.spawnSmoke(new THREE.Vector3(fp.x + (Math.random()-0.5)*0.2, fp.y + 0.05, fp.z + (Math.random()-0.5)*0.2)); } catch (eF) {}
+          }
         }
       } else if (e.playerSpotted && engageDist > 1 && targetDist <= engageDist) {
         // At engage distance: strafe sideways while facing player
