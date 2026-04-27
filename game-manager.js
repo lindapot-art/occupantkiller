@@ -5520,6 +5520,10 @@ const GameManager = (function () {
       touch.jumping = false;
       btnJump.classList.remove('active');
     });
+    btnJump.addEventListener('touchcancel', function () {
+      touch.jumping = false;
+      btnJump.classList.remove('active');
+    });
 
     // Sprint button (toggle)
     const btnSprint = document.getElementById('btn-sprint');
