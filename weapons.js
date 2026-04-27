@@ -1990,6 +1990,10 @@ const Weapons = (() => {
   let muzzleFlash = null;
   let muzzleTimer = 0;
   let _muzzleLight = null;
+  // Lingering muzzle smoke puff (plane that fades + drifts up)
+  let _muzzleSmoke = null;
+  let _muzzleSmokeTimer = 0;
+  const _MUZZLE_SMOKE_LIFE = 0.45;
 
   function createMuzzleFlash(scene, camera) {
     _scene = scene;
@@ -2016,6 +2020,18 @@ const Weapons = (() => {
     _muzzleLight.position.set(0, -0.05, -0.7);
     camera.add(_muzzleLight);
 
+    // Lingering smoke puff plane (additive grey, faces camera)
+    var smokeGeo = new THREE.PlaneGeometry(0.18, 0.18);
+    var smokeMat = new THREE.MeshBasicMaterial({
+      color: 0xaaaaaa, transparent: true, opacity: 0,
+      depthTest: false, depthWrite: false,
+      blending: THREE.NormalBlending,
+    });
+    _muzzleSmoke = new THREE.Mesh(smokeGeo, smokeMat);
+    _muzzleSmoke.position.set(0.17, -0.10, -0.60);
+    _muzzleSmoke.visible = false;
+    camera.add(_muzzleSmoke);
+
     scene.add(camera);
   }
 
@@ -2026,6 +2042,19 @@ const Weapons = (() => {
     muzzleTimer = 0.06;
     // Flash point light burst
     if (_muzzleLight) _muzzleLight.intensity = 2.5;
+    // Trigger lingering smoke puff
+    if (_muzzleSmoke) {
+      _muzzleSmoke.visible = true;
+      _muzzleSmoke.material.opacity = 0.55;
+      _muzzleSmoke.position.set(
+        0.17 + (Math.random() - 0.5) * 0.02,
+        -0.10,
+        -0.60 + (Math.random() - 0.5) * 0.02
+      );
+      _muzzleSmoke.rotation.z = Math.random() * Math.PI * 2;
+      _muzzleSmoke.scale.setScalar(0.6 + Math.random() * 0.2);
+      _muzzleSmokeTimer = _MUZZLE_SMOKE_LIFE;
+    }
     // Shell casing eject for hitscan/shotgun weapons
     if (_camera && typeof Tracers !== 'undefined' && Tracers.spawnCasing) {
       Tracers.spawnCasing(_camera);
@@ -2853,6 +2882,17 @@ const Weapons = (() => {
       muzzleTimer -= delta;
       if (muzzleFlash) muzzleFlash.material.opacity = Math.max(0, muzzleTimer / 0.06);
       if (_muzzleLight) _muzzleLight.intensity = Math.max(0, (muzzleTimer / 0.06) * 2.5);
+    }
+    // Lingering muzzle smoke puff: drift up & fade
+    if (_muzzleSmokeTimer > 0 && _muzzleSmoke) {
+      _muzzleSmokeTimer -= delta;
+      var sFrac = Math.max(0, _muzzleSmokeTimer / _MUZZLE_SMOKE_LIFE);
+      _muzzleSmoke.material.opacity = sFrac * 0.55;
+      _muzzleSmoke.position.y += delta * 0.18;
+      _muzzleSmoke.position.z -= delta * 0.06;
+      _muzzleSmoke.scale.x += delta * 0.6;
+      _muzzleSmoke.scale.y += delta * 0.6;
+      if (_muzzleSmokeTimer <= 0) _muzzleSmoke.visible = false;
     }
 
     // Projectiles

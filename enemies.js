@@ -11,6 +11,9 @@ const Enemies = (() => {
 
   const MAX_CLIMBABLE_HEIGHT = 2; // Max terrain height difference enemies can climb
   const bloodParticles = [];
+  // Persistent blood-pool decals on the ground (fade out over time)
+  const bloodDecals = [];
+  const _decalGeo = new THREE.CircleGeometry(0.6, 12);
   // Shared blood particle resources (pool geometry + 2 materials)
   var _bloodGeo = new THREE.BoxGeometry(1, 1, 1);
   var _bloodMatDark = new THREE.MeshLambertMaterial({ color: 0x880000 });
@@ -1587,6 +1590,20 @@ const Enemies = (() => {
       }
     }
 
+    // Update persistent blood decals (fade out, then dispose)
+    for (var bd = bloodDecals.length - 1; bd >= 0; bd--) {
+      var dec = bloodDecals[bd];
+      dec.life -= delta;
+      if (dec.life <= 5 && dec.material) {
+        dec.material.opacity = Math.max(0, (dec.life / 5) * 0.85);
+      }
+      if (dec.life <= 0) {
+        if (scene) scene.remove(dec.mesh);
+        if (dec.material && dec.material.dispose) dec.material.dispose();
+        bloodDecals.splice(bd, 1);
+      }
+    }
+
     // Update floating damage numbers
     updateDmgNumbers(delta);
 
@@ -2974,6 +2991,26 @@ const Enemies = (() => {
     if (enemy.hp <= 0) {
       enemy.alive      = false;
       enemy.deathTimer = 2.0;
+      // Spawn persistent blood pool decal on the ground at corpse position
+      if (scene && enemy.mesh) {
+        try {
+          var decalMat = new THREE.MeshBasicMaterial({
+            color: 0x550000, transparent: true, opacity: 0.85,
+            depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
+          });
+          var decal = new THREE.Mesh(_decalGeo, decalMat);
+          decal.rotation.x = -Math.PI / 2;
+          var radius = 0.6 + Math.random() * 0.8;
+          decal.scale.set(radius, radius, 1);
+          decal.position.set(
+            enemy.mesh.position.x,
+            enemy.mesh.position.y + 0.02 - 0.5, // slightly above ground/foot level
+            enemy.mesh.position.z
+          );
+          scene.add(decal);
+          bloodDecals.push({ mesh: decal, material: decalMat, life: 30, maxLife: 30 });
+        } catch (eD) {}
+      }
       // Death topple: random tilt direction
       var tiltX = (Math.random() > 0.5 ? 1 : -1) * (1.0 + Math.random() * 0.5);
       enemy._deathTiltX = tiltX;
@@ -3071,6 +3108,13 @@ const Enemies = (() => {
       if (scene) scene.remove(bp.mesh);
     });
     bloodParticles.length = 0;
+
+    // Clean up persistent blood decals
+    bloodDecals.forEach(dec => {
+      if (scene) scene.remove(dec.mesh);
+      if (dec.material && dec.material.dispose) dec.material.dispose();
+    });
+    bloodDecals.length = 0;
 
     // Clean up enemy grenades
     for (var gi = _enemyGrenades.length - 1; gi >= 0; gi--) {
