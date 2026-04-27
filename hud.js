@@ -191,11 +191,32 @@ const HUD = (() => {
   function show() { el.hud.style.display = 'block'; }
   function hide() { el.hud.style.display = 'none'; }
 
-  function setScore(v)   { el.score.textContent   = 'SCORE: '   + v; }
+  function setScore(v)   {
+    el.score.textContent   = 'SCORE: '   + v;
+    // Brief pulse-pop when score updates
+    el.score.style.transition = 'none';
+    el.score.style.transform = 'scale(1.18)';
+    el.score.style.color = '#ffe060';
+    setTimeout(function() {
+      el.score.style.transition = 'transform 0.22s ease-out, color 0.22s ease-out';
+      el.score.style.transform = 'scale(1)';
+      el.score.style.color = '';
+    }, 16);
+  }
   function setWave(v, total) {
     el.wave.textContent = total ? 'WAVE: ' + v + '/' + total : 'WAVE: ' + v;
   }
-  function setKills(v)   { el.kills.textContent    = 'KILLS: '   + v; }
+  function setKills(v)   {
+    el.kills.textContent    = 'KILLS: '   + v;
+    el.kills.style.transition = 'none';
+    el.kills.style.transform = 'scale(1.15)';
+    el.kills.style.color = '#ff6644';
+    setTimeout(function() {
+      el.kills.style.transition = 'transform 0.22s ease-out, color 0.22s ease-out';
+      el.kills.style.transform = 'scale(1)';
+      el.kills.style.color = '';
+    }, 16);
+  }
   function setEnemies(v) { el.enemies.textContent  = 'ENEMIES: ' + v; }
   function setStage(num, name) {
     if (el.stage) el.stage.textContent = 'STAGE ' + num + ': ' + name;
