@@ -2804,6 +2804,32 @@ const Enemies = (() => {
       updateHpBar(e, playerPos);
     }
 
+    // Last-survivor highlight: pulse a bright marker over the final enemy of the wave
+    if (alive === 1 && spawnQueue.length === 0) {
+      for (var lsI = enemies.length - 1; lsI >= 0; lsI--) {
+        var lsE = enemies[lsI];
+        if (!lsE || !lsE.alive || !lsE.mesh) continue;
+        if (!lsE._lastMarker) {
+          try {
+            var lmGeo = new THREE.RingGeometry(0.6, 0.85, 16);
+            var lmMat = new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
+            var lmRing = new THREE.Mesh(lmGeo, lmMat);
+            lmRing.rotation.x = -Math.PI / 2;
+            lmRing.position.y = (lsE.typeCfg && lsE.typeCfg.scale ? 1.9 * lsE.typeCfg.scale : 1.9) + 0.7;
+            lsE.mesh.add(lmRing);
+            lsE._lastMarker = lmRing;
+            lsE._lastMarkerMat = lmMat;
+          } catch (eLm) {}
+        }
+        if (lsE._lastMarkerMat) {
+          var lmPulse = 0.5 + Math.sin(performance.now() * 0.012) * 0.5;
+          lsE._lastMarkerMat.opacity = 0.4 + lmPulse * 0.55;
+          if (lsE._lastMarker) lsE._lastMarker.scale.setScalar(0.85 + lmPulse * 0.4);
+        }
+        break;
+      }
+    }
+
     // Wave complete? (alive counter tracks living enemies; null entries are cleaned corpses)
     if (spawnQueue.length === 0 && alive === 0 && !allDead) {
       allDead = true;
