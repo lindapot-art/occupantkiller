@@ -2169,6 +2169,13 @@ const Enemies = (() => {
         // Wounded limp — extra side-to-side wobble at low HP
         if (e.hp < e.maxHp * 0.3 && e.mesh) {
           e.mesh.rotation.z = Math.sin(e.legAngle * 0.6) * 0.10;
+          // Drip wound smoke periodically so wounded enemies are visually obvious
+          e._woundSmokeT = (e._woundSmokeT || 0) + delta;
+          if (e._woundSmokeT >= 0.45 && typeof Tracers !== 'undefined' && Tracers.spawnSmoke) {
+            e._woundSmokeT = 0;
+            var wsp = e.mesh.position;
+            Tracers.spawnSmoke(new THREE.Vector3(wsp.x + (Math.random()-0.5)*0.2, wsp.y + 1.0 + Math.random()*0.3, wsp.z + (Math.random()-0.5)*0.2));
+          }
         } else if (e.mesh && Math.abs(e.mesh.rotation.z) < 0.01 === false && !e._stunTimer && !e._flinchRotZ) {
           // gradually settle when no longer wounded
           e.mesh.rotation.z *= 0.9;
