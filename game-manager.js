@@ -4019,6 +4019,19 @@ const GameManager = (function () {
       // ── B23: XP system ──
       var xpGain = (enemy.typeCfg ? enemy.typeCfg.xpReward : 20) || 20;
       if (isHeadshot) xpGain = Math.floor(xpGain * 1.5);
+      // Long-shot bonus: kills beyond 40m award bonus XP and a banner
+      try {
+        var _killDist = (enemy && enemy.mesh) ? enemy.mesh.position.distanceTo(player.position) : 0;
+        if (_killDist >= 40) {
+          var _longBonus = _killDist >= 80 ? 50 : (_killDist >= 60 ? 35 : 20);
+          xpGain += _longBonus;
+          player.score += _longBonus;
+          if (HUD.showStreakBanner) {
+            var _ldLabel = _killDist >= 80 ? '🎯 IMPOSSIBLE SHOT' : (_killDist >= 60 ? '🎯 LONG SHOT' : '🎯 RANGED KILL');
+            HUD.showStreakBanner(_ldLabel + ' +' + _longBonus, Math.round(_killDist));
+          }
+        }
+      } catch (eLS) {}
       player.xp += xpGain;
       var xpNeeded = player.level * 200;
       if (player.xp >= xpNeeded) {
