@@ -234,8 +234,36 @@ const HUD = (() => {
     if (pct <= 30) el.healthBar.style.animation = 'lowHpPulse 0.6s infinite';
     else el.healthBar.style.animation = '';
     el.healthVal.textContent = Math.ceil(current) + ' / ' + max;
+    // Regen tick: floating "+N" green popup when health increases
+    if (_lastHpTracked != null && current > _lastHpTracked + 0.4) {
+      var diff = Math.round(current - _lastHpTracked);
+      if (diff >= 1) _showRegenTick(diff);
+    }
+    _lastHpTracked = current;
     // Adrenaline vignette: persistent red/dark border when critical
     _updateAdrenalineVignette(pct);
+  }
+  var _lastHpTracked = null;
+  var _regenTickEl = null;
+  var _regenTickHideTimer = 0;
+  function _showRegenTick(amt) {
+    if (!_regenTickEl) {
+      _regenTickEl = document.createElement('div');
+      _regenTickEl.style.cssText = 'position:fixed;left:120px;bottom:60px;color:#44ff88;font:bold 14px monospace;text-shadow:0 0 6px #00ff44,0 0 10px #44ff88;z-index:155;pointer-events:none;opacity:0;transition:opacity 0.18s, transform 0.6s;';
+      document.body.appendChild(_regenTickEl);
+    }
+    _regenTickEl.textContent = '+' + amt;
+    _regenTickEl.style.transform = 'translateY(0)';
+    _regenTickEl.style.opacity = '1';
+    // Animate up + fade
+    requestAnimationFrame(function () {
+      _regenTickEl.style.transform = 'translateY(-22px)';
+      _regenTickEl.style.opacity = '0.0';
+    });
+    if (_regenTickHideTimer) clearTimeout(_regenTickHideTimer);
+    _regenTickHideTimer = setTimeout(function () {
+      if (_regenTickEl) { _regenTickEl.style.transform = 'translateY(0)'; _regenTickEl.style.transition = 'none'; void _regenTickEl.offsetHeight; _regenTickEl.style.transition = 'opacity 0.18s, transform 0.6s'; }
+    }, 650);
   }
 
   // Persistent low-HP red vignette overlay (layered above damage flash)
