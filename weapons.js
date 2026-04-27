@@ -2143,6 +2143,10 @@ const Weapons = (() => {
     // Viewmodel fire kick: barrel snaps up + backward
     _fireKickRot += (w.recoilY || 0.01) * 12;
     _fireKickZ -= intensity * 0.02;
+    // Camera screen shake — adds visceral kick scaled to recoil intensity
+    if (typeof CameraSystem !== 'undefined' && CameraSystem.shake) {
+      CameraSystem.shake(0.004 + intensity * 0.012, 0.12 + intensity * 0.08);
+    }
   }
 
   // ── Weapon switching ──────────────────────────────────────
