@@ -968,10 +968,10 @@ canvas {
 
 #btn-pause {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 44px; height: 44px;
-  font-size: 20px;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  width: 48px; height: 48px;
+  font-size: 22px;
   pointer-events: auto;
 }
 
@@ -1139,17 +1139,17 @@ html.is-mobile #minimap-canvas {
     grid-template-columns: repeat(3, auto);
     gap: 6px;
   }
-  html.is-mobile .mobile-btn { width: 52px; height: 52px; font-size: 20px; }
-  html.is-mobile .mobile-btn.sm { width: 40px; height: 40px; font-size: 16px; }
-  html.is-mobile .fire-btn { width: 64px; height: 64px; font-size: 24px; }
+  html.is-mobile .mobile-btn { width: 56px; height: 56px; font-size: 22px; }
+  html.is-mobile .mobile-btn.sm { width: 44px; height: 44px; font-size: 16px; }
+  html.is-mobile .fire-btn { width: 84px; height: 84px; font-size: 30px; }
   html.is-mobile #mobile-utility {
     bottom: auto;
     top: calc(var(--mobile-safe-top) + 84px);
     right: max(14px, env(safe-area-inset-right));
-    grid-template-columns: repeat(4, 40px);
-    gap: 5px;
+    grid-template-columns: repeat(4, 44px);
+    gap: 6px;
   }
-  html.is-mobile .utility-btn { width: 40px; height: 40px; font-size: 16px; }
+  html.is-mobile .utility-btn { width: 44px; height: 44px; font-size: 17px; }
   /* Hide non-essential HUD in mobile landscape to avoid clutter */
   html.is-mobile #controls-legend,
   html.is-mobile #controls-legend-toggle,

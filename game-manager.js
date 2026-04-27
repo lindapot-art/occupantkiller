@@ -1204,6 +1204,13 @@ const GameManager = (function () {
     document.addEventListener('keydown', function (e) {
       keys[e.code] = true;
 
+      // Cheat: Ctrl+Shift+G toggles God Mode (works in any state for QA convenience)
+      if (e.code === 'KeyG' && e.ctrlKey && e.shiftKey) {
+        e.preventDefault();
+        toggleGodMode();
+        return;
+      }
+
       if (gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE) {
         // Speed controls (only in build mode, since 4-7 are weapons in play mode)
         if (gameState === STATE.BUILD_MODE) {
