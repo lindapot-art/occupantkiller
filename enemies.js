@@ -1481,6 +1481,15 @@ const Enemies = (() => {
     if (typeCfg.role === 'medic') squadRole = SQUAD_ROLE.MEDIC;
     else if (typeCfg.role === 'officer') squadRole = SQUAD_ROLE.OFFICER;
 
+    // Boss intro: dramatic banner + screen shake when a boss-role enemy spawns
+    if (typeCfg.role === 'boss') {
+      try {
+        if (typeof HUD !== 'undefined' && HUD.showBossIntro) HUD.showBossIntro(typeCfg.name || typeName);
+        if (typeof CameraSystem !== 'undefined' && CameraSystem.addShake) CameraSystem.addShake(0.4);
+        if (typeof Feedback !== 'undefined' && Feedback.triggerSlowMo) Feedback.triggerSlowMo(0.55, 0.25);
+      } catch (eBI) {}
+    }
+
     const idx = enemies.length;
     enemies.push({
       id:          idx,

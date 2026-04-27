@@ -1284,6 +1284,25 @@ const HUD = (() => {
     }, 2500);
   }
 
+  // ── Boss Intro Banner ────────────────────────────────────────────
+  function showBossIntro(name) {
+    var el = document.getElementById('boss-intro');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'boss-intro';
+      el.style.cssText = 'position:fixed;top:35%;left:50%;transform:translate(-50%,-50%) scale(0.6);color:#ff2222;font-size:42px;font-weight:900;letter-spacing:3px;text-shadow:0 0 18px #ff0000,0 0 36px #aa0000;pointer-events:none;z-index:240;opacity:0;transition:opacity 0.35s,transform 0.5s cubic-bezier(.34,1.56,.64,1);font-family:"Impact","Arial Black",sans-serif;';
+      document.body.appendChild(el);
+    }
+    el.textContent = '⚠ ' + (name || 'BOSS') + ' ⚠';
+    void el.offsetWidth;
+    el.style.opacity = '1';
+    el.style.transform = 'translate(-50%,-50%) scale(1.15)';
+    setTimeout(function () {
+      el.style.opacity = '0';
+      el.style.transform = 'translate(-50%,-50%) scale(0.85)';
+    }, 2200);
+  }
+
   // ── B22: Damage Log (scrolling combat text) ──────────────────────
   let _dmgLogEl = null;
 
@@ -1506,7 +1525,7 @@ const HUD = (() => {
     // ── B22: New HUD ──
     showBossBar, hideBossBar,
     updateXPBar, showObjective, hideObjective,
-    showStreakBanner, addDamageLog,
+    showStreakBanner, showBossIntro, addDamageLog,
     showGrenadeWarning, updateStageProgress,
     showDamageFlash,
     // ── B26: QoL ──
