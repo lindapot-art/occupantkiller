@@ -473,12 +473,12 @@
     </div>
   </div>
 
-  <!-- Pause screen -->
+  <!-- Pause screen (legacy fallback — redirects to unified inventory overlay) -->
   <div id="overlay-pause" class="overlay" style="display:none">
     <h1>PAUSED</h1>
-    <p>Game paused. Click to resume.</p>
-    <button class="btn" id="pause-resume-btn">▶ RESUME</button>
-    <button class="btn" id="pause-quit-btn" style="margin-top:8px;border-color:#888;color:#888">✕ QUIT TO MENU</button>
+    <p>Game paused. Press <kbd>R</kbd> to resume or <kbd>Q</kbd> to quit.</p>
+    <button class="btn" id="pause-resume-btn">▶ [R]ESUME</button>
+    <button class="btn" id="pause-quit-btn" style="margin-top:8px;border-color:#888;color:#888">✕ [Q]UIT TO MENU</button>
   </div>
 
   <!-- Drone Selection Overlay (shown before wave 1) -->
@@ -654,13 +654,13 @@
         <div id="inv-pol-display" style="color:#8247e5;font-size:13px;display:none">💎 0.00 POL</div>
       </div>
 
-      <!-- Tab Navigation -->
+      <!-- Tab Navigation (desktop hotkeys: 1=Inventory 2=Shop 3=Sell 4=Premium 5=Assets) -->
       <div id="inv-tabs" style="display:flex;gap:4px;margin:8px 0">
-        <button class="btn inv-tab active" data-tab="inventory" style="font-size:11px;padding:4px 10px;border-color:#fff;color:#fff;flex:1">📦 Inventory</button>
-        <button class="btn inv-tab" data-tab="shop" style="font-size:11px;padding:4px 10px;border-color:#ffd700;color:#ffd700;flex:1">🛒 Shop</button>
-        <button class="btn inv-tab" data-tab="sell" style="font-size:11px;padding:4px 10px;border-color:#ff8844;color:#ff8844;flex:1">💰 Sell</button>
-        <button class="btn inv-tab" data-tab="premium" style="font-size:11px;padding:4px 10px;border-color:#8247e5;color:#8247e5;flex:1">⭐ Premium</button>
-        <button class="btn inv-tab" data-tab="assets" style="font-size:11px;padding:4px 10px;border-color:#00ffcc;color:#00ffcc;flex:1">🎨 Assets</button>
+        <button class="btn inv-tab active" data-tab="inventory" data-hotkey="Digit1" style="font-size:11px;padding:4px 10px;border-color:#fff;color:#fff;flex:1">📦 [1] Inventory</button>
+        <button class="btn inv-tab" data-tab="shop" data-hotkey="Digit2" style="font-size:11px;padding:4px 10px;border-color:#ffd700;color:#ffd700;flex:1">🛒 [2] Shop</button>
+        <button class="btn inv-tab" data-tab="sell" data-hotkey="Digit3" style="font-size:11px;padding:4px 10px;border-color:#ff8844;color:#ff8844;flex:1">💰 [3] Sell</button>
+        <button class="btn inv-tab" data-tab="premium" data-hotkey="Digit4" style="font-size:11px;padding:4px 10px;border-color:#8247e5;color:#8247e5;flex:1">⭐ [4] Premium</button>
+        <button class="btn inv-tab" data-tab="assets" data-hotkey="Digit5" style="font-size:11px;padding:4px 10px;border-color:#00ffcc;color:#00ffcc;flex:1">🎨 [5] Assets</button>
       </div>
 
       <!-- ── TAB: Inventory ──────────────────────────────── -->
@@ -730,12 +730,12 @@
         <div style="font-size:10px;color:#aaa;margin-top:2px">Wallet: 0x165C…e14</div>
       </div>
 
-      <!-- Pause Controls -->
-      <button class="btn" id="stealth-toggle-btn" style="border-color:#0f6;color:#0f6;margin-top:8px">👻 TOGGLE STEALTH</button>
-      <button class="btn" id="pause-god-mode-btn" style="font-size:12px;padding:4px 12px;border-color:#ff0;color:#ff0;display:inline-block;margin:4px 0;text-shadow:0 0 8px #ff0">⚡ GOD MODE</button>
-      <p style="color:#888;font-size:12px">Press ESC or tap ⏸ to resume</p>
-      <button class="btn" id="resume-btn" style="border-color:#fff;color:#fff">▶ RESUME</button>
-      <button class="btn" id="quit-btn" style="margin-top:12px;border-color:#888;color:#888">✕ QUIT TO MENU</button>
+      <!-- Pause Controls (desktop hotkeys: R=Resume, Q=Quit, S=Stealth, G=GodMode) -->
+      <button class="btn" id="stealth-toggle-btn" style="border-color:#0f6;color:#0f6;margin-top:8px">👻 [S] TOGGLE STEALTH</button>
+      <button class="btn" id="pause-god-mode-btn" style="font-size:12px;padding:4px 12px;border-color:#ff0;color:#ff0;display:inline-block;margin:4px 0;text-shadow:0 0 8px #ff0">⚡ [G] GOD MODE</button>
+      <p style="color:#888;font-size:12px">Desktop: <kbd>R</kbd> resume · <kbd>Q</kbd> quit · <kbd>1-5</kbd> tabs · <kbd>ESC</kbd>/<kbd>TAB</kbd> close</p>
+      <button class="btn" id="resume-btn" style="border-color:#fff;color:#fff">▶ [R]ESUME</button>
+      <button class="btn" id="quit-btn" style="margin-top:12px;border-color:#888;color:#888">✕ [Q]UIT TO MENU</button>
     </div>
   </div>
 
@@ -1029,6 +1029,87 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('stealth-toggle-btn').addEventListener('click', function () {
     GameManager.toggleStealth();
   });
+
+  // ── Desktop keyboard shortcuts for the unified menu ─────
+  // Active only while the inventory/pause overlay is visible. Mobile users
+  // get touch buttons instead. Avoids the "no way to navigate without mouse"
+  // complaint while pointer is captured by another process.
+  (function () {
+    function isInventoryOpen() {
+      var inv = document.getElementById('inventory-overlay');
+      return inv && inv.style.display !== 'none' && getComputedStyle(inv).display !== 'none';
+    }
+    function isPauseOpen() {
+      var p = document.getElementById('overlay-pause');
+      return p && p.style.display !== 'none' && getComputedStyle(p).display !== 'none';
+    }
+    function clickTab(tabName) {
+      var btn = document.querySelector('.inv-tab[data-tab="' + tabName + '"]');
+      if (btn) btn.click();
+    }
+    document.addEventListener('keydown', function (e) {
+      if (!isInventoryOpen() && !isPauseOpen()) return;
+      // Don't hijack typing in inputs/textareas
+      var t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      // Skip when modifier keys are held
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      switch (e.code) {
+        case 'KeyR':
+          e.preventDefault();
+          resumeFromPauseUI();
+          break;
+        case 'KeyQ':
+          e.preventDefault();
+          quitToMenuUI();
+          break;
+        case 'KeyS':
+          if (isInventoryOpen()) {
+            e.preventDefault();
+            var sb = document.getElementById('stealth-toggle-btn');
+            if (sb) sb.click();
+          }
+          break;
+        case 'KeyG':
+          if (isInventoryOpen()) {
+            e.preventDefault();
+            var gb = document.getElementById('pause-god-mode-btn');
+            if (gb) gb.click();
+          }
+          break;
+        case 'Digit1': if (isInventoryOpen()) { e.preventDefault(); clickTab('inventory'); } break;
+        case 'Digit2': if (isInventoryOpen()) { e.preventDefault(); clickTab('shop'); } break;
+        case 'Digit3': if (isInventoryOpen()) { e.preventDefault(); clickTab('sell'); } break;
+        case 'Digit4': if (isInventoryOpen()) { e.preventDefault(); clickTab('premium'); } break;
+        case 'Digit5': if (isInventoryOpen()) { e.preventDefault(); clickTab('assets'); } break;
+      }
+    }, true); // capture phase: beat the in-game keydown listeners
+  })();
+
+  // Auto-redirect any legacy showOverlay('pause') call into the unified menu.
+  // Keeps a single source of truth for "the menu" so the user never sees
+  // two different pause UIs.
+  (function () {
+    var pauseOv = document.getElementById('overlay-pause');
+    if (!pauseOv) return;
+    var observer = new MutationObserver(function () {
+      if (pauseOv.style.display !== 'none' && pauseOv.style.display !== '') {
+        // Hide it and route to inventory-overlay instead
+        pauseOv.style.display = 'none';
+        var inv = document.getElementById('inventory-overlay');
+        if (inv && GameManager && typeof GameManager.showInventory === 'function') {
+          try { GameManager.showInventory(); } catch (_) {}
+          inv.style.display = 'flex';
+          if (typeof document.exitPointerLock === 'function' && document.pointerLockElement) {
+            try { document.exitPointerLock(); } catch (_) {}
+          }
+          document.body.style.cursor = 'auto';
+        }
+      }
+    });
+    observer.observe(pauseOv, { attributes: true, attributeFilter: ['style'] });
+  })();
 
   // ── Inventory Button (in-game HUD) ────────────────────────
   document.getElementById('inventory-btn').addEventListener('click', function () {

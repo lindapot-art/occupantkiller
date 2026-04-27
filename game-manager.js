@@ -1755,6 +1755,7 @@ const GameManager = (function () {
             showInventory();
             invOv.style.display = 'flex';
           }
+          _releaseMouseForUI();
         } else if (gameState === STATE.PAUSED) {
           gameState = STATE.PLAYING;
           var invOv = document.getElementById('inventory-overlay');
@@ -1811,6 +1812,7 @@ const GameManager = (function () {
           if (typeof showInventory === 'function') showInventory();
           invOv.style.display = 'flex';
         }
+        _releaseMouseForUI();
         if (typeof updateMobileControlsVisibility === 'function') updateMobileControlsVisibility();
       }
     });
@@ -1888,8 +1890,18 @@ const GameManager = (function () {
     document.addEventListener('pointerlockchange', function () {
       if (!document.pointerLockElement && gameState === STATE.PLAYING) {
         if (!isMobile) {
+          // Unified menu: route to inventory-overlay (pause + inventory + shop in one).
+          // Avoids the "4 different menus" complaint.
           gameState = STATE.PAUSED;
-          showOverlay('pause');
+          var invOv = document.getElementById('inventory-overlay');
+          if (invOv) {
+            if (typeof showInventory === 'function') showInventory();
+            invOv.style.display = 'flex';
+          } else {
+            showOverlay('pause');
+          }
+          _releaseMouseForUI();
+          if (typeof updateMobileControlsVisibility === 'function') updateMobileControlsVisibility();
         }
       }
     });
@@ -2061,10 +2073,23 @@ const GameManager = (function () {
   }
 
   /* ── Overlay helpers ─────────────────────────────────────────────── */
+  function _releaseMouseForUI() {
+    // CRITICAL: Without this, pointer is locked to canvas and the user
+    // CANNOT click menu items. Browser tells them "press ESC" — but ESC
+    // closes the menu we just opened. Always release before showing UI.
+    try {
+      if (typeof document.exitPointerLock === 'function' && document.pointerLockElement) {
+        document.exitPointerLock();
+      }
+    } catch (_) { /* non-fatal */ }
+    try { document.body.style.cursor = 'auto'; } catch (_) {}
+  }
+
   function showOverlay(name) {
     document.querySelectorAll('.overlay').forEach(function (el) { el.style.display = 'none'; });
     var el = document.getElementById('overlay-' + name);
     if (el) el.style.display = 'flex';
+    _releaseMouseForUI();
   }
 
   function hideOverlays() {
@@ -5798,6 +5823,7 @@ const GameManager = (function () {
       gameState = STATE.PAUSED;
       showInventory();
       invOverlay.style.display = 'flex';
+      _releaseMouseForUI();
       updateMobileControlsVisibility();
     } else if (gameState === STATE.PAUSED) {
       gameState = STATE.PLAYING;
@@ -6429,6 +6455,7 @@ const GameManager = (function () {
     hideOverlays,
     requestPointerLock,
     toggleInventory,
+    showInventory,
     resumeFromPause,
     quitToMenu,
     isMobile,
