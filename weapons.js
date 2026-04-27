@@ -2872,6 +2872,49 @@ const Weapons = (() => {
     st.reloadTimer = wep.reloadTime;
     reloadAnimAngle = 0;
     HUD.showReload(true);
+    // Mag-drop visual: spawn a small black mag that falls + fades
+    try {
+      if (_scene && _camera && wep.type !== 'MELEE' && wep.clipSize >= 5) {
+        var _magGeo = new THREE.BoxGeometry(0.08, 0.18, 0.05);
+        var _magMat = new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.9 });
+        var _mag = new THREE.Mesh(_magGeo, _magMat);
+        // Spawn near gun position (slightly below + right of camera)
+        var _camDir = new THREE.Vector3();
+        _camera.getWorldDirection(_camDir);
+        var _camRight = new THREE.Vector3().crossVectors(_camDir, new THREE.Vector3(0, 1, 0)).normalize();
+        _mag.position.copy(_camera.position)
+          .addScaledVector(_camDir, 0.6)
+          .addScaledVector(_camRight, 0.18)
+          .y -= 0.25;
+        _mag.userData.vy = -0.2;
+        _mag.userData.vx = (Math.random() - 0.5) * 0.3;
+        _mag.userData.vz = (Math.random() - 0.5) * 0.3;
+        _mag.userData.life = 1.4;
+        _mag.userData.rotSpd = (Math.random() - 0.5) * 6;
+        _scene.add(_mag);
+        _droppedMags.push(_mag);
+      }
+    } catch (eMD) {}
+  }
+  var _droppedMags = [];
+  function _updateDroppedMags(delta) {
+    for (var i = _droppedMags.length - 1; i >= 0; i--) {
+      var m = _droppedMags[i];
+      m.userData.vy -= 9.8 * delta;
+      m.position.x += m.userData.vx * delta;
+      m.position.y += m.userData.vy * delta;
+      m.position.z += m.userData.vz * delta;
+      m.rotation.x += m.userData.rotSpd * delta;
+      m.rotation.z += m.userData.rotSpd * 0.7 * delta;
+      m.userData.life -= delta;
+      if (m.userData.life < 0.5) m.material.opacity = Math.max(0, m.userData.life / 0.5) * 0.9;
+      if (m.userData.life <= 0) {
+        if (_scene) _scene.remove(m);
+        m.geometry.dispose();
+        m.material.dispose();
+        _droppedMags.splice(i, 1);
+      }
+    }
   }
 
   function cancelReload() {
@@ -2887,6 +2930,7 @@ const Weapons = (() => {
 
   // ── Per-frame update ──────────────────────────────────────
   function update(delta) {
+    _updateDroppedMags(delta);
     // Muzzle flash fade
     if (muzzleTimer > 0) {
       muzzleTimer -= delta;
