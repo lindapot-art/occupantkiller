@@ -3955,11 +3955,21 @@ const GameManager = (function () {
 
     // Floating damage number on hit (not just kill)
     if (typeof Feedback !== 'undefined') {
-      Feedback.spawnDamageNumber(
-        window.innerWidth / 2 + (Math.random() - 0.5) * 40,
-        window.innerHeight / 2 - 20 + (Math.random() - 0.5) * 30,
-        dmg, isHeadshot, false
-      );
+      // Project enemy world position to screen so the number rises from the actual hit point
+      var _dnX = window.innerWidth / 2 + (Math.random() - 0.5) * 40;
+      var _dnY = window.innerHeight / 2 - 20 + (Math.random() - 0.5) * 30;
+      try {
+        if (enemy && enemy.mesh && _camera) {
+          var _wpos = enemy.mesh.position.clone();
+          _wpos.y += 1.4 + Math.random() * 0.4; // rise from upper torso
+          var _proj = _wpos.project(_camera);
+          if (_proj.z < 1) {
+            _dnX = (_proj.x * 0.5 + 0.5) * window.innerWidth;
+            _dnY = (-_proj.y * 0.5 + 0.5) * window.innerHeight;
+          }
+        }
+      } catch (eDN) {}
+      Feedback.spawnDamageNumber(_dnX, _dnY, dmg, isHeadshot, false);
     }
 
     SkillSystem.onShoot(true, isHeadshot);
