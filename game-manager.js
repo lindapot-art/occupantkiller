@@ -1070,10 +1070,7 @@ const GameManager = (function () {
       return;
     }
 
-    // Create scene — Ukrainian theme (golden sky)
-    _scene = new THREE.Scene();
-    _scene.background = new THREE.Color(0xFFD700);
-    _scene.fog = new THREE.Fog(0xFFD700, 14, isMobile ? 55 : 80);
+    // (Scene was already created with stage-specific bg/fog above; no re-init needed)
 
     // Create camera
     _camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, isMobile ? 140 : 200);
@@ -2623,6 +2620,10 @@ const GameManager = (function () {
       if (typeof window !== 'undefined') {
         console.log('[QA] startGame called, __QA_MODE:', window.__QA_MODE);
       }
+    if (!_scene || !_camera) {
+      console.warn('[startGame] Aborting: scene/camera not initialized (renderer init failed earlier).');
+      return;
+    }
     if (window.AudioSystem && typeof window.AudioSystem.resume === 'function') {
       window.AudioSystem.resume();
     }
@@ -2839,6 +2840,10 @@ const GameManager = (function () {
   /* ── Stage Management ───────────────────────────────────────────── */
   function applyStage(stageIndex) {
     const stageDef = STAGES[stageIndex];
+    if (!_scene) {
+      console.warn('[applyStage] No scene (renderer init failed); skipping visual update for stage', stageIndex);
+      return;
+    }
 
     // Generate level terrain and features
     window.VoxelWorld.generateLevel(stageIndex);
