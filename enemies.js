@@ -1499,8 +1499,10 @@ const Enemies = (() => {
       sx = px + Math.cos(angle) * r;
       sz = pz + Math.sin(angle) * r;
     }
-    const sy = (typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.getTerrainHeight)
-      ? window.VoxelWorld.getTerrainHeight(sx, sz) : 0;
+    const sy = (typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.getTopSolidY)
+      ? window.VoxelWorld.getTopSolidY(sx, sz)
+      : ((typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.getTerrainHeight)
+        ? window.VoxelWorld.getTerrainHeight(sx, sz) + 1 : 0);
     const mesh  = buildMesh(typeCfg);
     // Attach rank-based weapon visual to enemy mesh
     attachWeaponVisual(mesh, typeCfg);
@@ -1939,7 +1941,7 @@ const Enemies = (() => {
 
       // Always follow terrain height
       if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
-        e.mesh.position.y = window.VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z);
+        e.mesh.position.y = (window.VoxelWorld.getTopSolidY ? window.VoxelWorld.getTopSolidY(e.mesh.position.x, e.mesh.position.z) : window.VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z) + 1);
       }
 
       // ── Detection system: enemies must spot the player ──
@@ -2368,7 +2370,7 @@ const Enemies = (() => {
           e.mesh.position.addScaledVector(awayDir, e.speed * 1.5 * delta);
           // Snap to terrain height
           if (typeof VoxelWorld !== 'undefined') {
-            e.mesh.position.y = window.VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z);
+            e.mesh.position.y = (window.VoxelWorld.getTopSolidY ? window.VoxelWorld.getTopSolidY(e.mesh.position.x, e.mesh.position.z) : window.VoxelWorld.getTerrainHeight(e.mesh.position.x, e.mesh.position.z) + 1);
           }
           e.mesh.lookAt(e.mesh.position.x + awayDir.x, e.mesh.position.y, e.mesh.position.z + awayDir.z);
         }

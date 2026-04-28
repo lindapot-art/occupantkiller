@@ -3970,13 +3970,16 @@ const GameManager = (function () {
           }
           return;
         }
-        // Check if hit a vehicle mesh
+        // Check if hit a vehicle mesh — walk up parent tree because vehicles have nested children
         var hitVehicle = null;
-        for (var hvi = 0; hvi < allVehicles.length; hvi++) {
-          if (allVehicles[hvi].mesh === hit.object || (hit.object.parent && allVehicles[hvi].mesh === hit.object.parent)) {
-            hitVehicle = allVehicles[hvi];
-            break;
+        var _vWalk = hit.object;
+        var _vGuard = 0;
+        while (_vWalk && _vGuard < 8 && !hitVehicle) {
+          for (var hvi = 0; hvi < allVehicles.length; hvi++) {
+            if (allVehicles[hvi].mesh === _vWalk) { hitVehicle = allVehicles[hvi]; break; }
           }
+          _vWalk = _vWalk.parent;
+          _vGuard++;
         }
         if (hitVehicle) {
           onVehicleHit(hitVehicle, Weapons.getDamage());
@@ -7112,6 +7115,7 @@ const GameManager = (function () {
     addArmor: addArmor,
     addStimBuff: addStimBuff,
     addSuppression: addSuppression,
+    requestFullscreenAndLockLandscape: requestFullscreenAndLockLandscape,
     // Test helpers for headless Puppeteer (bypasses pointer lock requirement)
     _testFireStart:  function () { mouseDown = true; mouseNewPress = true; },
     _testFireStop:   function () { mouseDown = false; mouseNewPress = false; },

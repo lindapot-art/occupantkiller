@@ -85,7 +85,8 @@ const Tracers = (() => {
 
   function spawnMuzzleFlash(pos, dir) {
     if (!_scene) return;
-    var flashSize = 0.5 + Math.random() * 0.2;
+    // 20% of previous size — was 0.5..0.7, now 0.10..0.14 to stop blocking the player view
+    var flashSize = 0.10 + Math.random() * 0.04;
     var flashColor = Math.random() < 0.5 ? 0xffdd44 : 0xffaa22;
     var flashMat = new THREE.MeshBasicMaterial({
       color: flashColor, transparent: true, opacity: 0.9,
@@ -93,21 +94,18 @@ const Tracers = (() => {
     });
     var flash = new THREE.Mesh(_planeGeoFlash, flashMat);
     flash.scale.setScalar(flashSize);
-    flash.position.copy(pos).addScaledVector(dir, 0.5);
+    // Move flash slightly further from origin so the small puff still reads at distance
+    flash.position.copy(pos).addScaledVector(dir, 0.35);
     _tTmp.copy(pos).add(dir);
     flash.lookAt(_tTmp);
     flash.rotation.z = Math.random() * Math.PI;
     _scene.add(flash);
-    // Second perpendicular plane (cross-billboard)
-    var flash2 = flash.clone();
-    flash2.rotation.z += Math.PI * 0.5;
-    _scene.add(flash2);
-    // Point light for illumination
-    var light = new THREE.PointLight(0xffaa22, 3, 8);
+    // Single billboard now (cross-billboard removed; doubled the visual mass with no readability gain)
+    // Dim point light for illumination — was intensity 3, range 8
+    var light = new THREE.PointLight(0xffaa22, 1.2, 4);
     light.position.copy(flash.position);
     _scene.add(light);
-    flashes.push({ mesh: flash, light: light, life: 0.08 });
-    flashes.push({ mesh: flash2, light: null, life: 0.08 });
+    flashes.push({ mesh: flash, light: light, life: 0.06 });
   }
 
   /* ── Explosion Particles ────────────────────────────────────── */

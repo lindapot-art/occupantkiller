@@ -1044,6 +1044,7 @@ document.addEventListener('DOMContentLoaded', function () {
         advSection.style.display = 'block';
       });
       document.getElementById('quick-start-btn').addEventListener('click', function () {
+        if (GameManager.requestFullscreenAndLockLandscape) GameManager.requestFullscreenAndLockLandscape();
         GameManager.startGame();
       });
     } else if (quickSection) {
@@ -1052,10 +1053,12 @@ document.addEventListener('DOMContentLoaded', function () {
   })();
 
   document.getElementById('start-btn').addEventListener('click', function () {
+    if (GameManager.requestFullscreenAndLockLandscape) GameManager.requestFullscreenAndLockLandscape();
     GameManager.startGame();
   });
 
   document.getElementById('restart-btn').addEventListener('click', function () {
+    if (GameManager.requestFullscreenAndLockLandscape) GameManager.requestFullscreenAndLockLandscape();
     GameManager.startGame();
   });
 

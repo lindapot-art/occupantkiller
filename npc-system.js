@@ -960,7 +960,7 @@ function buildCivilianMesh(npc) {
       const leaderDist = 4 + Math.random() * 4;
       const lx = Math.cos(leaderAngle) * leaderDist;
       const lz = Math.sin(leaderAngle) * leaderDist;
-      const lh = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(lx, lz) : 0;
+      const lh = (typeof VoxelWorld !== 'undefined') ? (VoxelWorld.getTopSolidY ? VoxelWorld.getTopSolidY(lx, lz) : VoxelWorld.getTerrainHeight(lx, lz) + 1) : 0;
 
       // Leader (specialist)
       const leader = spawn(lx, lh, lz, NPC_RANK.SPECIALIST);
@@ -972,7 +972,7 @@ function buildCivilianMesh(npc) {
       // Medic (infantry rank, medic job)
       const mx = lx + (Math.random() - 0.5) * 3;
       const mz = lz + (Math.random() - 0.5) * 3;
-      const mh = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(mx, mz) : 0;
+      const mh = (typeof VoxelWorld !== 'undefined') ? (VoxelWorld.getTopSolidY ? VoxelWorld.getTopSolidY(mx, mz) : VoxelWorld.getTerrainHeight(mx, mz) + 1) : 0;
       const medic = spawn(mx, mh, mz, NPC_RANK.INFANTRY);
       medic.job = JOB.MEDIC;
       medic.groupId = g;
@@ -985,7 +985,7 @@ function buildCivilianMesh(npc) {
       for (let i = 0; i < infantryCount; i++) {
         const ix = lx + (Math.random() - 0.5) * 4;
         const iz = lz + (Math.random() - 0.5) * 4;
-        const ih = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(ix, iz) : 0;
+        const ih = (typeof VoxelWorld !== 'undefined') ? (VoxelWorld.getTopSolidY ? VoxelWorld.getTopSolidY(ix, iz) : VoxelWorld.getTerrainHeight(ix, iz) + 1) : 0;
         const rank = Math.random() < 0.4 ? NPC_RANK.VETERAN : NPC_RANK.INFANTRY;
         const inf = spawn(ix, ih, iz, rank);
         inf.job = JOB.ASSAULT;
@@ -1636,8 +1636,10 @@ function buildCivilianMesh(npc) {
     const move = dir.multiplyScalar(npc.speed * moraleFx.speedMult * delta);
     npc.position.add(move);
 
-    // Terrain follow
-    const terrainY = (typeof VoxelWorld !== 'undefined') ? VoxelWorld.getTerrainHeight(npc.position.x, npc.position.z) : 0;
+    // Terrain follow — use top of solid voxel so feet don't sink inside the surface block
+    const terrainY = (typeof VoxelWorld !== 'undefined')
+      ? (VoxelWorld.getTopSolidY ? VoxelWorld.getTopSolidY(npc.position.x, npc.position.z) : VoxelWorld.getTerrainHeight(npc.position.x, npc.position.z) + 1)
+      : 0;
     npc.position.y = terrainY;
 
     npc.mesh.position.copy(npc.position);

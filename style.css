@@ -1157,10 +1157,29 @@ html.is-mobile #minimap-canvas {
     bottom: auto;
     top: calc(var(--mobile-safe-top) + 84px);
     right: max(14px, env(safe-area-inset-right));
-    grid-template-columns: repeat(4, 44px);
-    gap: 6px;
+    grid-template-columns: repeat(2, 40px);
+    gap: 4px;
   }
-  html.is-mobile .utility-btn { width: 44px; height: 44px; font-size: 17px; }
+  html.is-mobile .utility-btn { width: 40px; height: 40px; font-size: 16px; }
+  /* Hide rarely-used buttons on mobile landscape — accessible via inventory/pause overlay */
+  html.is-mobile #btn-build,
+  html.is-mobile #btn-night,
+  html.is-mobile #btn-gyro,
+  html.is-mobile #btn-view,
+  html.is-mobile #btn-melee,
+  html.is-mobile #btn-crouch { display: none !important; }
+  /* Make look-zone smaller and translucent so it doesn't dominate landscape */
+  html.is-mobile #mobile-look-zone {
+    width: min(22vh, 130px) !important;
+    height: min(22vh, 130px) !important;
+    bottom: 130px !important;
+    opacity: 0.45;
+  }
+  html.is-mobile #joystick-zone {
+    width: 110px !important; height: 110px !important;
+  }
+  html.is-mobile #joystick-base { width: 110px !important; height: 110px !important; }
+  html.is-mobile #joystick-thumb { width: 46px !important; height: 46px !important; left: 32px !important; top: 32px !important; }
   /* Hide non-essential HUD in mobile landscape to avoid clutter */
   html.is-mobile #controls-legend,
   html.is-mobile #controls-legend-toggle,
