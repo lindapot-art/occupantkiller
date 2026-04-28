@@ -826,8 +826,12 @@
 <!-- Three.js r137 (local copy, patched for CVE XSS < 0.137.0) -->
 <script src="three.min.js"></script>
 
-<!-- ethers v6 (CDN — used by blockchain.js for contract calls) -->
-<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<!-- ethers v6 (CDN — used by blockchain.js for contract calls).
+     async + onerror so a slow/blocked CDN can't stall game boot.
+     blockchain.js only references window.ethers inside async functions,
+     so missing ethers only breaks web3 features, not gameplay. -->
+<script async src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"
+        onerror="console.warn('[BOOT] ethers CDN failed; web3 features disabled');"></script>
 
 <!-- Core modules (order matters: dependencies first) -->
 <script src="voxel-world.js"></script>
@@ -956,17 +960,35 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         console.error('[BOOT]', e);
       }
-    } else if (a < 1500) {
+    } else if (a < 6000) {
+      // 6000 * 20ms = 120s. Slow mobile networks need much more than 30s
+      // to download & parse ~16,500 LOC + ethers CDN. Keep waiting silently.
       setTimeout(function () { bootWhenReady(a + 1); }, 20);
     } else {
       var overlay = document.getElementById('error-overlay');
       if (overlay) {
         overlay.style.display = 'block';
-        overlay.innerText = 'BOOT ERROR:\nGameManager did not initialize in time.\n' +
-          (missing.length ? 'Missing modules: ' + missing.join(', ') : '') +
-          '\nTry reloading the page.';
+        overlay.style.cursor = 'pointer';
+        overlay.innerHTML =
+          '<div style="font-family:monospace;font-size:14px;line-height:1.5">' +
+            '<div style="color:#ff6464;font-weight:bold">BOOT TIMEOUT</div>' +
+            '<div>Some scripts failed to load.</div>' +
+            (missing.length
+              ? '<div style="margin:8px 0;color:#ffaa44">Missing: ' + missing.join(', ') + '</div>'
+              : '') +
+            '<div>Likely causes: slow network, ad-blocker, stale cache.</div>' +
+            '<div style="margin-top:12px">Try:</div>' +
+            '<ul style="margin:4px 0 12px 20px;padding:0">' +
+              '<li>Hard-reload (Ctrl+Shift+R / Cmd+Shift+R)</li>' +
+              '<li>Disable ad-blocker for this site</li>' +
+              '<li>Switch to a faster connection</li>' +
+            '</ul>' +
+            '<button id="boot-retry-btn" style="background:#222;color:#0f0;border:1px solid #0f0;padding:8px 18px;font-family:monospace;cursor:pointer">RETRY</button>' +
+          '</div>';
+        var rb = document.getElementById('boot-retry-btn');
+        if (rb) rb.onclick = function () { location.reload(); };
       }
-      console.error('[BOOT] GameManager not ready after waiting; missing:', missing);
+      console.error('[BOOT] GameManager not ready after 120s; missing:', missing);
     }
   }
   setBootProgress(5, 'parsing scripts', '');
