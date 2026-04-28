@@ -16,6 +16,56 @@ Details: [what you want done]
 
 ## Active Tasks
 
+### [P0] Unify Start Screens + Add Preloader (2026-04-27 batch)
+Status: IN-PROGRESS
+Requested: 2026-04-27
+Details: User reports multiple start screens. Required: one start screen with vertical scroll containing GOD button, drone missions, and other missions inline. Plus a real preloader with progress bar that gates GameManager.init so the online (Render) build does not crash on cold start. See `.github/AUDIT-2026-04-27.md`.
+
+### [P0] Investigate "Action Under Terrain"
+Status: PENDING
+Requested: 2026-04-27
+Details: Gameplay QA screenshots (e.g. `gameplay-260-game3-final.png`) show camera below terrain looking up at hovering blocks. `enforcePlayerGroundSnap()` exists but isn't catching the case. Possible causes: QA-bot teleport timing, post-explosion crater fall, stage-transition spawn before chunks ready. Repro + instrument before patching.
+
+### [P1] Full-Time Overseer Agent
+Status: PENDING
+Requested: 2026-04-27
+Details: Create a permanent overseer agent (`overseer.agent.md`) that watches every batch: verifies new user requests are added to TASK_QUEUE before any code edits, double-checks QA stamps against raw terminal output, and produces a session ledger of every request and its disposition. User mandate: "i dont trust you anymore."
+
+### [P1] 333-Screenshot QA Per Level (Real Play)
+Status: PENDING
+Requested: 2026-04-27
+Details: Replace the current 23-shot harness with a 333-shot run PER level (not total), one shot every 4 seconds, with the QA bot actually playing: completing missions, killing drones, picking up items, using inventory. Required for all 4 stages. Currently `tools/test-stage-tour-333.js` exists — verify it does real play, not just camera tour. See `.github/AUDIT-2026-04-27.md`.
+
+### [P1] God-Mode Dugout Building From Inventory
+Status: PENDING
+Requested: 2026-04-27
+Details: In god mode, the player has all inventory materials. Add ability to build a dugout (foxhole / sheltered firing position) by placing inventory blocks. Should integrate with existing `building.js` auto-build system but allow manual placement.
+
+### [P1] New Mission: "Clear RF Dugouts/Holes/Trenches"
+Status: PENDING
+Requested: 2026-04-27
+Details: Custom mission where Ukrainian NPCs assault Russian Federation positions (dugouts, foxholes, trenches) and clear them with grenades throughout. Procedural RF dugout layouts with sandbag entrances, wood beams, ammo crates. UA squad uses cover-and-move tactics, throws grenades, breaches positions.
+
+### [P1] Grenade Gear Default 5 / Unlimited God
+Status: PENDING
+Requested: 2026-04-27
+Details: Default loadout: 5 grenades on player. God mode: unlimited grenades. Visible grenade gear on player and NPC models — grenades on chest rigs, grenade bags hanging on hip/back. Allow grenade throw at any time (not just when equipped via slot).
+
+### [P1] NPC Sitting-Mat Detail
+Status: PENDING
+Requested: 2026-04-27
+Details: Equip some Ukrainian soldier NPCs with foam sitting mats hanging from their belt/butt while walking. When they sit (idle, rest, or scripted sit animation), the mat deploys under them as a sitting surface. Adds visible immersion detail.
+
+### [P1] Detail Polish Pass
+Status: PENDING
+Requested: 2026-04-27
+Details: User wants more "small details" like the sitting mat. Suggestions: NPC water canteens, helmet covers with grass tufts, rolled sleeping rolls on packs, drying laundry in bases, tea kettles, smoke breaks, kit shake on movement. Each detail is a small mesh + animation hook.
+
+### [P0] Project Tracking & Crash Recovery Improvements
+Status: IN-PROGRESS
+Requested: 2026-04-27
+Details: User reports requests are getting lost across crashes. Improvements: (a) every NEW user request gets logged to TASK_QUEUE.md as the FIRST action of the response, before any tool call; (b) CHECKPOINT.md updated after every significant edit, not only at session end; (c) audit doc generated when user reports missed work; (d) overseer agent verifies request → queue conversion.
+
 ### [MEDIUM] Traversal Runtime Log Noise Cleanup
 Status: DONE
 Requested: 2026-04-26

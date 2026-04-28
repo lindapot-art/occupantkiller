@@ -846,6 +846,23 @@ window.VoxelWorld = (function () {
     return getHeight(wx, wz);
   }
 
+  // Returns the Y coordinate of the topmost solid block at (wx, wz).
+  // Unlike getTerrainHeight (which returns the procedural noise height and
+  // ignores carved craters / placed structures), this scans actual voxel
+  // state from the world ceiling downward. Use this for player spawn
+  // placement and ground-snap correctness so the camera can never end up
+  // beneath solid geometry.
+  function getTopSolidY(wx, wz) {
+    var ix = Math.floor(wx);
+    var iz = Math.floor(wz);
+    // Start a few blocks above the noise height to cover placed structures.
+    var startY = Math.min(CHUNK_HEIGHT - 1, getHeight(ix, iz) + 24);
+    for (var y = startY; y >= 0; y--) {
+      if (isSolid(ix, y, iz)) return y + 1; // top surface = first AIR above solid
+    }
+    return getHeight(ix, iz) + 1;
+  }
+
 
   function generateChunkTerrain(chunk) {
     const ox = chunk.cx * CHUNK_SIZE;
@@ -4033,6 +4050,7 @@ window.VoxelWorld = (function () {
     getBlock: typeof getBlock === 'function' ? getBlock : function () { return BLOCK.AIR; },
     setBlock: typeof setBlock === 'function' ? setBlock : function () { return false; },
     getTerrainHeight: typeof getTerrainHeight === 'function' ? getTerrainHeight : function () { return 0; },
+    getTopSolidY: typeof getTopSolidY === 'function' ? getTopSolidY : function (x, z) { return (typeof getTerrainHeight === 'function' ? getTerrainHeight(x, z) : 0) + 1; },
     raycastBlock: typeof raycastBlock === 'function' ? raycastBlock : function () { return null; },
     updateDirtyChunks: typeof updateDirtyChunks === 'function' ? updateDirtyChunks : function () {},
     rebuildAll: typeof rebuildAll === 'function' ? rebuildAll : function () {},

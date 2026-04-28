@@ -1,5 +1,22 @@
 # Session Progress
 
+- Task: Session 38 — User audit response (unify start screens + boot preloader)
+- Status: Complete (P0 batch); P1 backlog queued in TASK_QUEUE
+- Files changed:
+  - .github/AUDIT-2026-04-27.md (new)
+  - .github/TASK_QUEUE.md (added 9 PENDING entries for unaddressed work)
+  - .github/CHECKPOINT.md (updated)
+  - index.html (boot preloader + inline drone choice + new boot logic)
+  - style.css (scrollable #overlay-start)
+  - game-manager.js (showDroneSelection honors window.__chosenDroneType)
+- Verified:
+  - node --check game-manager.js: PASS
+  - /healthz 200, / 200, preloader + drone-row HTML served
+  - test-master 38/0/0, test-qa-v2 21/0, test-gameplay Errors NONE
+  - Live preloader screenshot at 15% with module wait list captured
+- Deferred to TASK_QUEUE: under-terrain investigation, overseer agent, 333-shot QA, god-mode dugout, RF assault mission, grenade gear, sitting-mat, detail polish
+- User trust note: user explicitly said "i dont trust you anymore" — every future session must over-deliver honesty (real raw QA output, no inflated claims)
+
 - Task: Traversal runtime log-noise cleanup
 - Status: Complete
 - Files changed:

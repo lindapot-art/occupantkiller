@@ -253,7 +253,10 @@ function isLowVisibilityGameplayFrame(sample) {
     const scenicLook = { x: 0, z: 10 };
     player.position.x = scenicPos.x;
     player.position.z = scenicPos.z;
-    player.position.y = VoxelWorld.getTerrainHeight(scenicPos.x, scenicPos.z) + 1.7;
+    var topY = (typeof VoxelWorld.getTopSolidY === 'function')
+      ? VoxelWorld.getTopSolidY(scenicPos.x, scenicPos.z)
+      : VoxelWorld.getTerrainHeight(scenicPos.x, scenicPos.z) + 1;
+    player.position.y = topY + 1.7;
     window.__qaAnchor = { x: scenicPos.x, z: scenicPos.z };
     const dx = scenicLook.x - scenicPos.x;
     const dz = scenicLook.z - scenicPos.z;
@@ -338,7 +341,10 @@ function isLowVisibilityGameplayFrame(sample) {
         const player = GameManager.getPlayer();
         player.position.x = sp.x;
         player.position.z = sp.z;
-        player.position.y = VoxelWorld.getTerrainHeight(sp.x, sp.z) + 1.7;
+        var topY2 = (typeof VoxelWorld.getTopSolidY === 'function')
+          ? VoxelWorld.getTopSolidY(sp.x, sp.z)
+          : VoxelWorld.getTerrainHeight(sp.x, sp.z) + 1;
+        player.position.y = topY2 + 1.7;
         window.__qaAnchor = { x: sp.x, z: sp.z };
         CameraSystem.setYaw(Math.random() * Math.PI * 2);
         CameraSystem.setPitch(-0.1);

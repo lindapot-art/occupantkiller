@@ -149,6 +149,8 @@ const GameManager = (function () {
     intelTimer: 0,            // intel reveal timer
     armor:      0,            // armor points (0-100), reduces damage
     lastDamageTime: 0,        // time since last damage (for health regen)
+    // ── Throwables ──
+    grenades:   5,            // hand grenades on player; default 5, unlimited in god mode
     // ── Loot & Building ──
     lootParticles: [],        // active loot particles in world
     buildMaterials: { wood: 0, stone: 0, metal: 0, dirt: 0, sand: 0, brick: 0 },
@@ -916,7 +918,12 @@ const GameManager = (function () {
   function enforcePlayerGroundSnap() {
     if (typeof window.VoxelWorld === 'undefined') return;
 
-    var terrainY = window.VoxelWorld.getTerrainHeight(player.position.x, player.position.z) + player.height;
+    // Use top-solid scan so craters / placed structures don't trick us into
+    // snapping to procedural noise height while the player is in a hole.
+    var topY = (typeof window.VoxelWorld.getTopSolidY === 'function')
+      ? window.VoxelWorld.getTopSolidY(player.position.x, player.position.z)
+      : window.VoxelWorld.getTerrainHeight(player.position.x, player.position.z) + 1;
+    var terrainY = topY + player.height;
     var gap = player.position.y - terrainY;
 
     // Hard-correct under-surface cases immediately, regardless of traversal state.
@@ -2201,6 +2208,23 @@ const GameManager = (function () {
     // In QA mode, skip drone selection entirely
     if (typeof window !== 'undefined' && window.__QA_MODE) {
       if (onComplete) onComplete();
+      return;
+    }
+    // If user already chose a drone (or "none") on the unified start screen, honor it.
+    if (typeof window !== 'undefined' && typeof window.__chosenDroneType === 'string') {
+      var preChoice = window.__chosenDroneType;
+      window.__chosenDroneType = ''; // consume so it doesn't repeat next time
+      if (preChoice === '') {
+        if (onComplete) onComplete();
+        return;
+      }
+      // Launch drone immediately, no second screen
+      var d = launchAndPossessDrone(preChoice);
+      if (d && typeof HUD !== 'undefined' && HUD.notifyPickup) {
+        var nm = { fpv_attack: 'FPV ATTACK', surveillance: 'SURVEILLANCE', bomb: 'BOMBER' };
+        HUD.notifyPickup('\uD83D\uDEE9 ' + (nm[preChoice] || 'DRONE') + ' LAUNCHED! [T] VIEW [F] EXIT', '#00ccff');
+      }
+      if (onComplete) setTimeout(onComplete, 800);
       return;
     }
     _droneSelectionCallback = onComplete;
@@ -6406,6 +6430,8 @@ const GameManager = (function () {
         if (typeof Economy !== 'undefined' && Economy.setCurrency) Economy.setCurrency(999999);
         else if (player.coins !== undefined) player.coins = 999999;
       } catch (e) {}
+      // Unlimited hand grenades
+      player.grenades = Infinity;
       // Enable stealth (enemies can't see player)
       player.stealth = true;
       Enemies.setPlayerStealth(true);
@@ -6433,6 +6459,8 @@ const GameManager = (function () {
       Enemies.setPlayerStealth(false);
       var stInd = document.getElementById('stealth-indicator');
       if (stInd) stInd.style.display = 'none';
+      // Reset grenades to default 5
+      player.grenades = 5;
       HUD.notifyPickup('⚡ GOD MODE DEACTIVATED', '#ff6600');
     }
   }

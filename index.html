@@ -23,6 +23,16 @@
   <link rel="stylesheet" href="style.css" />
 </head>
   <body>
+    <!-- ── Boot Preloader (gates GameManager.init until everything is ready) ── -->
+    <div id="boot-preloader" style="position:fixed;inset:0;z-index:99998;background:#0a0a0a;color:#aaa;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:monospace;text-align:center;padding:24px">
+      <div style="font-size:32px;letter-spacing:6px;color:#ff4444;text-shadow:0 0 20px #ff4444;margin-bottom:6px">OCCUPANT KILLER</div>
+      <div style="font-size:12px;color:#666;margin-bottom:24px;letter-spacing:2px">LOADING ASSETS</div>
+      <div id="boot-progress-bar-track" style="width:min(420px,80vw);height:14px;background:#111;border:1px solid #333;border-radius:7px;overflow:hidden">
+        <div id="boot-progress-bar-fill" style="width:0%;height:100%;background:linear-gradient(90deg,#ff4444,#ffaa00);transition:width 0.18s ease"></div>
+      </div>
+      <div id="boot-progress-label" style="font-size:11px;color:#888;margin-top:10px;letter-spacing:1px">0% — initializing</div>
+      <div id="boot-progress-detail" style="font-size:10px;color:#444;margin-top:4px;height:14px">&nbsp;</div>
+    </div>
     <div id="error-overlay" style="display:none;position:fixed;z-index:99999;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);color:#fff;font-family:monospace;font-size:18px;padding:40px 20px 20px 20px;overflow:auto;"></div>
     <div id="conn-status" style="position:fixed;top:4px;right:8px;z-index:9999;font-family:monospace;font-size:11px;padding:2px 8px;border-radius:6px;background:rgba(34,34,34,0.7);color:#fff;border:1px solid rgba(68,68,68,0.5);">Srv <span id="conn-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#aaa;vertical-align:middle;"></span></div>
     <script src="page-prelude.js"></script>
@@ -452,6 +462,17 @@
       <button class="btn" id="god-mode-btn" style="font-size:13px;padding:6px 16px;border-color:#ff0;color:#ff0;display:inline-block;margin:0 6px;text-shadow:0 0 8px #ff0">⚡ GOD MODE</button>
       <p id="god-mode-desc" style="color:#666;font-size:11px;margin:4px 0;display:none">All weapons · Infinite health · Invisible to enemies</p>
     </div>
+    <!-- Inline drone choice (replaces second start screen) -->
+    <div id="start-drone-row" style="margin:10px 0">
+      <p style="color:#ccc;font-size:13px;margin:4px 0">Drone Loadout (optional):</p>
+      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+        <button class="btn start-drone-btn" data-drone="" style="font-size:11px;padding:4px 10px;border-color:#888;color:#888">🚶 None (on foot)</button>
+        <button class="btn start-drone-btn" data-drone="fpv_attack" style="font-size:11px;padding:4px 10px;border-color:#ff4444;color:#ff4444">🎯 FPV Attack</button>
+        <button class="btn start-drone-btn" data-drone="surveillance" style="font-size:11px;padding:4px 10px;border-color:#00ccff;color:#00ccff">👁 Surveillance</button>
+        <button class="btn start-drone-btn" data-drone="bomb" style="font-size:11px;padding:4px 10px;border-color:#ffaa00;color:#ffaa00">💣 Bomber</button>
+      </div>
+      <p id="start-drone-desc" style="color:#666;font-size:11px;margin:4px 0">No drone — fight on foot (default)</p>
+    </div>
     <div id="start-weapons-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin:8px auto;max-width:520px;font-size:10px"></div>
     <div id="challenge-select" style="margin:8px 0">
       <p style="color:#ccc;font-size:13px;margin:4px 0">Challenge Mode (optional):</p>
@@ -862,21 +883,120 @@
 document.addEventListener('DOMContentLoaded', function () {
 
   'use strict';
+
+  // ── Boot Preloader ────────────────────────────────────
+  var __bootStages = [
+    { pct: 5,  label: 'parsing scripts' },
+    { pct: 25, label: 'checking modules' },
+    { pct: 50, label: 'loading audio system' },
+    { pct: 70, label: 'building voxel world' },
+    { pct: 90, label: 'spawning entities' },
+    { pct: 100, label: 'ready' }
+  ];
+  function setBootProgress(pct, label, detail) {
+    var fill = document.getElementById('boot-progress-bar-fill');
+    var lab  = document.getElementById('boot-progress-label');
+    var det  = document.getElementById('boot-progress-detail');
+    if (fill) fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+    if (lab)  lab.textContent = Math.round(pct) + '% — ' + (label || '');
+    if (det)  det.textContent = detail || '\u00a0';
+  }
+  function hideBootPreloader() {
+    var pre = document.getElementById('boot-preloader');
+    if (pre) {
+      pre.style.transition = 'opacity 0.35s ease';
+      pre.style.opacity = '0';
+      setTimeout(function () { if (pre.parentNode) pre.parentNode.removeChild(pre); }, 400);
+    }
+  }
+  // Expose so GameManager can drive progress from inside init()
+  window.__bootProgress = setBootProgress;
+  window.__bootHide = hideBootPreloader;
+
+  // Verify required modules before booting GameManager
+  var REQUIRED_MODULES = [
+    'THREE', 'VoxelWorld', 'AudioSystem', 'Weapons', 'Enemies', 'HUD',
+    'GameManager', 'DroneSystem', 'VehicleSystem', 'Tracers'
+  ];
+  function checkModules() {
+    var missing = [];
+    for (var i = 0; i < REQUIRED_MODULES.length; i++) {
+      if (typeof window[REQUIRED_MODULES[i]] === 'undefined') missing.push(REQUIRED_MODULES[i]);
+    }
+    return missing;
+  }
+
   function bootWhenReady(attempts) {
-    if (typeof window.GameManager !== 'undefined' && typeof window.GameManager.init === 'function') {
-      window.GameManager.init();
-    } else if ((attempts || 0) < 500) {
-      setTimeout(function() { bootWhenReady((attempts||0)+1); }, 20);
+    var a = attempts || 0;
+    var missing = checkModules();
+    var loadedCount = REQUIRED_MODULES.length - missing.length;
+    var modulePct = 5 + Math.round((loadedCount / REQUIRED_MODULES.length) * 20); // 5 → 25
+    setBootProgress(modulePct, 'checking modules', missing.length ? 'waiting: ' + missing.slice(0,3).join(', ') : 'all modules loaded');
+
+    if (missing.length === 0 && typeof window.GameManager.init === 'function') {
+      setBootProgress(30, 'starting game manager', '');
+      try {
+        window.GameManager.init();
+        setBootProgress(100, 'ready', '');
+        setTimeout(hideBootPreloader, 220);
+      } catch (e) {
+        var ov = document.getElementById('error-overlay');
+        if (ov) {
+          ov.style.display = 'block';
+          ov.innerText = 'BOOT ERROR:\n' + (e && e.message ? e.message : e) + '\n\nTry reloading the page.';
+        }
+        console.error('[BOOT]', e);
+      }
+    } else if (a < 500) {
+      setTimeout(function () { bootWhenReady(a + 1); }, 20);
     } else {
-      console.error('[BOOT] GameManager not ready after waiting');
       var overlay = document.getElementById('error-overlay');
       if (overlay) {
         overlay.style.display = 'block';
-        overlay.innerText = 'BOOT ERROR:\nGameManager did not initialize in time.\nTry reloading the page.';
+        overlay.innerText = 'BOOT ERROR:\nGameManager did not initialize in time.\n' +
+          (missing.length ? 'Missing modules: ' + missing.join(', ') : '') +
+          '\nTry reloading the page.';
       }
+      console.error('[BOOT] GameManager not ready after waiting; missing:', missing);
     }
   }
+  setBootProgress(5, 'parsing scripts', '');
   bootWhenReady(0);
+
+  // ── Inline drone choice on start screen (replaces second drone-select overlay) ──
+  (function () {
+    window.__chosenDroneType = ''; // empty = none
+    var droneDescs = {
+      '': 'No drone — fight on foot (default)',
+      fpv_attack: 'FPV Attack — kamikaze drone, dives into targets',
+      surveillance: 'Surveillance — scout battlefield, mark enemies',
+      bomb: 'Bomber — heavy payload, drop munitions on targets'
+    };
+    var btns = document.querySelectorAll('.start-drone-btn');
+    var desc = document.getElementById('start-drone-desc');
+    function setActiveDrone(val) {
+      window.__chosenDroneType = val || '';
+      for (var i = 0; i < btns.length; i++) {
+        var v = btns[i].getAttribute('data-drone') || '';
+        if (v === window.__chosenDroneType) {
+          btns[i].style.boxShadow = '0 0 12px currentColor';
+          btns[i].style.background = 'rgba(255,255,255,0.08)';
+        } else {
+          btns[i].style.boxShadow = '';
+          btns[i].style.background = '';
+        }
+      }
+      if (desc) desc.textContent = droneDescs[window.__chosenDroneType] || droneDescs[''];
+    }
+    for (var i = 0; i < btns.length; i++) {
+      (function (btn) {
+        btn.addEventListener('click', function () {
+          setActiveDrone(btn.getAttribute('data-drone') || '');
+        });
+      })(btns[i]);
+    }
+    setActiveDrone('');
+  })();
 
   // ── Button wiring ──────────────────────────────────────
   // ── Quick-start for new players ───────────────────────

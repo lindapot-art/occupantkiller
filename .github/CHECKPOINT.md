@@ -4,13 +4,42 @@
 > On crash recovery, KING reads this to know exactly where work stopped.
 
 ## Last Update
-- **Timestamp**: 2026-04-26 — Session 37: Traversal runtime-noise cleanup batch
+- **Timestamp**: 2026-04-27 — Session 38: User audit response — unify start screens + add boot preloader
 - **Agent**: KING
-- **Status**: COMPLETE — Local implementation + proxy QA complete; external Render verification still blocked
+- **Status**: COMPLETE for this batch (P0 fixes shipped). User has open complaints — see `.github/AUDIT-2026-04-27.md` and `.github/TASK_QUEUE.md` for queued work.
 
 ## Current Task
-- DONE: Traversal runtime log-noise cleanup in `traversal.js` (debug info logs gated behind `window.__QA_MODE || window.__DEBUG_TRAVERSAL`, warnings/errors preserved)
-- QA: `/healthz` 200, `/api/health` 200, `node --check traversal.js` PASS, `tools/test-master.js` 38/0/0, `tools/test-qa-v2.js` 21/0, `tools/test-gameplay.js` fast profile PASS with `GAMEPLAY_EXIT:0`
+- DONE: Wrote honest audit at `.github/AUDIT-2026-04-27.md` covering missed/poor work
+- DONE: Unified `overlay-start` + drone selection. Drone choice is now an inline button row on the main start screen; the legacy `overlay-drone-select` is bypassed when the user pre-selects via `window.__chosenDroneType`
+- DONE: Made `#overlay-start` vertically scrollable so all options fit on small screens
+- DONE: Added a boot preloader (`#boot-preloader`) with progress bar that gates `GameManager.init()` until required modules (THREE, VoxelWorld, AudioSystem, Weapons, Enemies, HUD, GameManager, DroneSystem, VehicleSystem, Tracers) are present. Surfaces module wait list as detail text.
+- DONE: Exposed `window.__bootProgress(pct, label, detail)` and `window.__bootHide()` so GameManager.init can drive progress from inside.
+- DONE: Updated `TASK_QUEUE.md` with formal entries for every new request: Overseer agent, 333-screenshot QA, god-mode dugout, RF-dugout assault mission, grenade gear, NPC sitting-mat, detail polish, project tracking improvements, under-terrain investigation.
+- QA: `node --check game-manager.js` PASS, `/healthz` 200, `/` 200, `boot-preloader` + `start-drone-row` confirmed served in HTML, `test-master.js` 38/0/0, `test-qa-v2.js` 21/0, `test-gameplay.js` Errors NONE, 37 weapons confirmed via API check.
+
+## Steps Completed This Session (Session 38)
+1. [x] Read CHECKPOINT, TASK_QUEUE, audit screenshots — confirmed under-terrain bug visible in `gameplay-260-game3-final.png`
+2. [x] Wrote `.github/AUDIT-2026-04-27.md`
+3. [x] Added boot preloader to `index.html`
+4. [x] Added inline drone choice section to `overlay-start`
+5. [x] Made `#overlay-start` scrollable in `style.css`
+6. [x] Updated boot script in `index.html` with module-presence check + progress driver
+7. [x] Patched `showDroneSelection()` in `game-manager.js` to honor `window.__chosenDroneType`
+8. [x] Updated `.github/TASK_QUEUE.md` with all queued user requests
+9. [x] Ran proxy QA — all green
+10. [x] Captured live preloader screenshot showing 15% with module wait list
+
+## Deferred (in TASK_QUEUE as PENDING)
+- Under-terrain bug investigation (needs repro instrumentation)
+- Full-time Overseer agent (P1)
+- 333-screenshot QA per stage with real play (P1)
+- God-mode dugout building (P1)
+- "Clear RF Dugouts" assault mission (P1)
+- Grenade gear default 5 / unlimited god (P1)
+- NPC sitting-mat detail (P1)
+- Detail polish pass (P1)
+
+## Steps Completed Prior to Session 38
 - DONE: Revalidated Render blocker state (`https://occupantkiller.onrender.com`) — endpoint still times out on 2026-04-25 recheck
 - DONE: Drone remote usability hardening in `game-manager.js` (launch/link helper chain, reliable release flow, dedicated drone view toggle helper, KeyV guard while controlling drone/vehicle)
 - DONE: Mobile remote controls upgraded (`btn-use` exits drone remote when possessing; `btn-view` toggles drone eye/chase while possessing)
