@@ -3337,6 +3337,7 @@ const Weapons = (() => {
   // ── Per-frame update ──────────────────────────────────────
   function update(delta) {
     _updateDroppedMags(delta);
+    _updateBloodStains(delta);
     // Muzzle flash fade
     if (muzzleTimer > 0) {
       muzzleTimer -= delta;
@@ -3879,6 +3880,77 @@ const Weapons = (() => {
 
   let weaponAttachments = {}; // { weaponIdx: [attachmentId, ...] }
 
+  // ── Blood-stain layer on the current weapon mesh ────────────────────
+  // Each kill paints a small red sprite on the gun (handle / barrel).
+  // Stains slowly fade after ~30 s without further blood.  Kept on the
+  // weapon group so it persists across attacks but vanishes if the weapon
+  // is swapped out.
+  let _bloodStainSprites = [];   // { mesh, life }
+  let _bloodStainGeo = null;
+  function _initBloodGeo() {
+    if (_bloodStainGeo) return;
+    _bloodStainGeo = new THREE.PlaneGeometry(1, 1);
+  }
+  function markBlooded(amount) {
+    try {
+      var g = gunMeshes && gunMeshes[currentIdx];
+      if (!g) return;
+      _initBloodGeo();
+      // Pick a child mesh that's most likely a barrel/blade — the
+      // longest-axis box.  Fallback to the gun root.
+      var host = g;
+      var bestLen = 0;
+      g.traverse(function (c) {
+        if (!c.geometry || !c.geometry.boundingBox) {
+          if (c.geometry && c.geometry.computeBoundingBox) try { c.geometry.computeBoundingBox(); } catch(e){}
+        }
+        if (c.geometry && c.geometry.boundingBox) {
+          var s = c.geometry.boundingBox.getSize(new THREE.Vector3());
+          var ml = Math.max(s.x, s.y, s.z);
+          if (ml > bestLen) { bestLen = ml; host = c; }
+        }
+      });
+      var n = 1 + Math.floor(Math.min(3, (amount || 10) / 30));
+      for (var i = 0; i < n; i++) {
+        var col = Math.random() < 0.4 ? 0x550000 : 0x880000;
+        var mat = new THREE.MeshBasicMaterial({
+          color: col, transparent: true, opacity: 0.85,
+          depthWrite: false, side: THREE.DoubleSide,
+        });
+        var sp = new THREE.Mesh(_bloodStainGeo, mat);
+        var sz = 0.018 + Math.random() * 0.025;
+        sp.scale.set(sz, sz, sz);
+        // Random spot on host mesh
+        sp.position.set(
+          (Math.random() - 0.5) * 0.04,
+          (Math.random() - 0.5) * 0.04,
+          (Math.random() - 0.5) * 0.10
+        );
+        sp.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+        host.add(sp);
+        _bloodStainSprites.push({ mesh: sp, mat: mat, life: 30, host: host });
+      }
+      // Cap accumulated stains
+      while (_bloodStainSprites.length > 24) {
+        var old = _bloodStainSprites.shift();
+        if (old.host && old.mesh) try { old.host.remove(old.mesh); } catch(e){}
+        if (old.mat) try { old.mat.dispose(); } catch(e){}
+      }
+    } catch (e) {}
+  }
+  function _updateBloodStains(delta) {
+    for (var i = _bloodStainSprites.length - 1; i >= 0; i--) {
+      var s = _bloodStainSprites[i];
+      s.life -= delta;
+      if (s.life <= 5 && s.mat) s.mat.opacity = Math.max(0, (s.life / 5) * 0.85);
+      if (s.life <= 0) {
+        if (s.host && s.mesh) try { s.host.remove(s.mesh); } catch(e){}
+        if (s.mat) try { s.mat.dispose(); } catch(e){}
+        _bloodStainSprites.splice(i, 1);
+      }
+    }
+  }
+
   function addAttachment(weaponIdx, attachId) {
     if (!ATTACHMENTS[attachId]) return false;
     if (!isCompatible(weaponIdx, attachId)) return false;
@@ -4024,6 +4096,7 @@ const Weapons = (() => {
     setWeaponSkin:          setWeaponSkin,
     getWeaponSkin:          getWeaponSkin,
     applySkinToMesh:        applySkinToMesh,
+    markBlooded:            markBlooded,
   };
 })();
 

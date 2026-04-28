@@ -3534,15 +3534,16 @@ const Enemies = (() => {
 
     // Spawn blood voxel particles (shared geometry + materials)
     if (scene && enemy.mesh) {
-      var bloodCount = Math.min(8, Math.ceil(amount / 10));
+      // 2x base count + bigger gibs — UA patriot gore mode
+      var bloodCount = Math.min(16, Math.ceil(amount / 5));
       // Explosive / heavy weapons => bigger gib burst
       var _wt = weaponType || '';
       var isExplosive = (_wt === 'AT' || _wt === 'ATGM' || _wt === 'THERMOBARIC' ||
                          _wt === 'EXPLOSIVE' || _wt === 'INCENDIARY' || _wt === 'GRENADE');
-      if (isExplosive) bloodCount = Math.min(20, bloodCount + 12);
-      else if (isHeadshot) bloodCount = Math.min(14, bloodCount + 4);
+      if (isExplosive) bloodCount = Math.min(40, bloodCount + 24);
+      else if (isHeadshot) bloodCount = Math.min(28, bloodCount + 10);
       for (var b = 0; b < bloodCount; b++) {
-        var bloodSize = 0.08 + Math.random() * 0.12;
+        var bloodSize = 0.12 + Math.random() * 0.18;   // bigger gibs
         var bloodMesh = new THREE.Mesh(_bloodGeo, Math.random() < 0.5 ? _bloodMatLight : _bloodMatDark);
         bloodMesh.scale.setScalar(bloodSize);
         bloodMesh.position.copy(enemy.mesh.position);
@@ -3552,14 +3553,18 @@ const Enemies = (() => {
           mesh: bloodMesh,
           _origScale: bloodSize,
           velocity: new THREE.Vector3(
-            (Math.random() - 0.5) * (isExplosive ? 12 : 4),
-            (isExplosive ? 3 : 1.5) + Math.random() * (isExplosive ? 6 : 3),
-            (Math.random() - 0.5) * (isExplosive ? 12 : 4)
+            (Math.random() - 0.5) * (isExplosive ? 16 : 6),
+            (isExplosive ? 4 : 2.2) + Math.random() * (isExplosive ? 8 : 4),
+            (Math.random() - 0.5) * (isExplosive ? 16 : 6)
           ),
-          life: 1.5 + Math.random() * 1.0,
+          life: 2.0 + Math.random() * 1.5,
           gravity: 12,
         });
       }
+      // Notify weapon system so blade/barrel can pick up a blood stain.
+      try {
+        if (typeof Weapons !== 'undefined' && Weapons.markBlooded) Weapons.markBlooded(amount);
+      } catch (eMB) {}
     }
 
     if (enemy.hp <= 0) {

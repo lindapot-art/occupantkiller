@@ -4138,6 +4138,22 @@ const GameManager = (function () {
       MLSystem.trackKillTiming(); // AI Smart Learning: track kill timing patterns
       // INFILTRATE mission: count occupant kills (stealth bonus if disguise still up)
       try { if (typeof MissionSystem !== 'undefined' && MissionSystem.onEnemyKilled) MissionSystem.onEnemyKilled(); } catch (eMK) {}
+      // Patriotic kill flair — occasional Ukrainian battle cries on streak.
+      try {
+        if (player.killStreak >= 3 && Math.random() < 0.18 && typeof HUD !== 'undefined' && HUD.showToast) {
+          var _cries = [
+            'СЛАВА УКРАЇНІ! 🇺🇦',
+            'ГЕРОЯМ СЛАВА!',
+            'PUTIN KHUYLO!',
+            'Ghost of Kyiv strikes!',
+            'For Mariupol! 🇺🇦',
+            'BAYRAKTAR! 🚁',
+            'Russian warship — go fuck yourself.',
+            'НА БАЙРАКТАРИ!',
+          ];
+          HUD.showToast(_cries[Math.floor(Math.random() * _cries.length)], 1800, '#ffd500');
+        }
+      } catch (eUC) {}
       // Streak score multiplier: 3+ kills in chain = +10% per streak (capped at +150%)
       var _streakMult = 1 + Math.min(1.5, Math.max(0, player.killStreak - 1) * 0.1);
       var _scoreGain = Math.round((enemy.scoreValue || 0) * _streakMult);

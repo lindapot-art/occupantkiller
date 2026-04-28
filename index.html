@@ -254,6 +254,30 @@
     <!-- In-game God Mode toggle (always visible) -->
     <button id="hud-god-mode-btn" style="position:fixed;top:4px;right:148px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,0,0.5);color:#ff0;padding:2px 10px;border-radius:4px;font-size:11px;font-family:monospace;z-index:210;cursor:pointer;text-shadow:0 0 6px #ff0" title="Toggle God Mode (all weapons + invincible)">⚡ GOD</button>
 
+    <!-- Jukebox (Ukrainian rap) -->
+    <button id="jukebox-btn" style="position:fixed;top:4px;right:224px;background:rgba(0,0,0,0.5);border:1px solid rgba(0,90,255,0.5);color:#ffd500;padding:2px 10px;border-radius:4px;font-size:11px;font-family:monospace;z-index:210;cursor:pointer;text-shadow:0 0 6px #005abd" title="Jukebox — Ukrainian rap & drill (J key)">🎵 JUKEBOX</button>
+    <div id="jukebox-panel" style="display:none;position:fixed;top:36px;right:12px;width:280px;background:linear-gradient(180deg,rgba(0,30,80,0.95) 0%,rgba(20,20,30,0.95) 50%,rgba(80,50,0,0.95) 100%);border:2px solid #ffd500;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;z-index:215;color:#fff;box-shadow:0 0 20px rgba(0,90,255,0.4),0 0 30px rgba(255,213,0,0.3)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border-bottom:1px solid rgba(255,213,0,0.4);padding-bottom:6px">
+        <div style="font-weight:bold;color:#ffd500;font-size:12px">🎵 JUKEBOX 🇺🇦</div>
+        <button id="jukebox-close" style="background:none;border:none;color:#fff;cursor:pointer;font-size:14px;line-height:1">✕</button>
+      </div>
+      <div id="jukebox-now" style="font-size:11px;margin-bottom:6px;line-height:1.4">
+        <div id="jukebox-title" style="color:#ffd500">— stopped —</div>
+        <div id="jukebox-artist" style="color:#88aaff;font-size:9px"></div>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        <button id="jukebox-prev" class="jbx-ctrl" style="flex:1;padding:6px 0;background:rgba(0,0,0,0.4);border:1px solid #555;color:#fff;cursor:pointer;border-radius:3px">⏮</button>
+        <button id="jukebox-play" class="jbx-ctrl" style="flex:2;padding:6px 0;background:rgba(0,90,255,0.3);border:1px solid #ffd500;color:#ffd500;cursor:pointer;border-radius:3px;font-weight:bold">▶ PLAY</button>
+        <button id="jukebox-next" class="jbx-ctrl" style="flex:1;padding:6px 0;background:rgba(0,0,0,0.4);border:1px solid #555;color:#fff;cursor:pointer;border-radius:3px">⏭</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:10px">
+        <span>VOL</span>
+        <input id="jukebox-vol" type="range" min="0" max="100" value="35" style="flex:1;accent-color:#ffd500">
+      </div>
+      <div id="jukebox-list" style="max-height:200px;overflow-y:auto;border-top:1px solid rgba(255,213,0,0.3);padding-top:6px"></div>
+      <div style="font-size:9px;color:#888;margin-top:6px;text-align:center;font-style:italic">Slava Ukraini! 🇺🇦</div>
+    </div>
+
     <!-- Build Materials HUD (shown when holding shovel) -->
     <div id="build-materials-hud" style="display:none;position:fixed;bottom:85px;right:12px;background:rgba(0,0,0,0.6);border:1px solid rgba(139,105,20,0.4);padding:6px 10px;border-radius:4px;font-size:10px;font-family:monospace;z-index:200;pointer-events:none;color:#ccc">
       <div style="color:#8B6914;font-weight:bold;margin-bottom:3px">⛏ MATERIALS</div>
@@ -879,6 +903,7 @@
 <script src="weapons.js"></script>
 <script src="enemies.js"></script>
 <script src="audio-system.js"></script>
+<script src="jukebox.js"></script>
 <script src="weather-system.js"></script>
 <script src="ml-system.js"></script>
 <script src="npc-ml.js"></script>
@@ -1308,6 +1333,76 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('inventory-btn').addEventListener('click', function () {
     GameManager.toggleInventory();
   });
+
+  // ── Jukebox UI wiring ─────────────────────────────────────
+  (function () {
+    if (typeof Jukebox === 'undefined') return;
+    var btn   = document.getElementById('jukebox-btn');
+    var panel = document.getElementById('jukebox-panel');
+    var closeBtn = document.getElementById('jukebox-close');
+    var playBtn = document.getElementById('jukebox-play');
+    var prevBtn = document.getElementById('jukebox-prev');
+    var nextBtn = document.getElementById('jukebox-next');
+    var volEl   = document.getElementById('jukebox-vol');
+    var titleEl = document.getElementById('jukebox-title');
+    var artistEl= document.getElementById('jukebox-artist');
+    var listEl  = document.getElementById('jukebox-list');
+
+    function buildList() {
+      var tracks = Jukebox.getTracks();
+      var cur = Jukebox.getCurrent();
+      var html = '';
+      for (var i = 0; i < tracks.length; i++) {
+        var t = tracks[i];
+        var active = cur && cur.id === t.id;
+        var flag = t.flag ? '🇺🇦 ' : '';
+        html += '<div class="jbx-row" data-idx="' + i + '" style="padding:5px 6px;cursor:pointer;border-radius:3px;margin-bottom:2px;' +
+                (active ? 'background:rgba(255,213,0,0.15);border-left:3px solid #ffd500' : 'border-left:3px solid transparent') +
+                '">' +
+                '<div style="color:' + (active ? '#ffd500' : '#fff') + ';font-size:11px">' + flag + t.title + '</div>' +
+                '<div style="color:#88aaff;font-size:9px">' + t.artist + ' · ' + t.bpm + ' BPM</div>' +
+                '</div>';
+      }
+      listEl.innerHTML = html;
+      // Click on track to play
+      var rows = listEl.querySelectorAll('.jbx-row');
+      for (var r = 0; r < rows.length; r++) {
+        rows[r].addEventListener('click', function () {
+          var idx = parseInt(this.getAttribute('data-idx'), 10);
+          Jukebox.play(idx);
+        });
+        rows[r].addEventListener('mouseenter', function () { this.style.background = 'rgba(0,90,255,0.2)'; });
+        rows[r].addEventListener('mouseleave', function () { refresh(); });
+      }
+    }
+    function refresh() {
+      var cur = Jukebox.getCurrent();
+      titleEl.textContent  = cur ? cur.title  : '— stopped —';
+      artistEl.textContent = cur ? cur.artist : '';
+      playBtn.textContent  = Jukebox.isPlaying() ? '⏸ STOP' : '▶ PLAY';
+      buildList();
+    }
+    Jukebox.onChange(refresh);
+    refresh();
+
+    function togglePanel() {
+      panel.style.display = (panel.style.display === 'none' || !panel.style.display) ? 'block' : 'none';
+    }
+    btn.addEventListener('click', togglePanel);
+    closeBtn.addEventListener('click', function () { panel.style.display = 'none'; });
+    playBtn.addEventListener('click', function () { Jukebox.toggle(); });
+    prevBtn.addEventListener('click', function () { Jukebox.prev(); });
+    nextBtn.addEventListener('click', function () { Jukebox.next(); });
+    volEl.addEventListener('input', function () { Jukebox.setVolume(parseInt(volEl.value, 10) / 100); });
+
+    // J key shortcut
+    document.addEventListener('keydown', function (ev) {
+      if (ev.code === 'KeyJ' && !ev.repeat &&
+          document.activeElement && document.activeElement.tagName !== 'INPUT') {
+        togglePanel();
+      }
+    });
+  })();
 
   // ── God Mode toggle ────────────────────────────────────
   function updateGodModeButtons() {
