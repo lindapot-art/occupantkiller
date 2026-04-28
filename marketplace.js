@@ -882,6 +882,65 @@ const Marketplace = (function () {
     return Object.keys(NFT_BADGES).map(function (k) { return NFT_BADGES[k]; });
   }
 
+  /* ── CashApp / Fiat Top-Ups ─────────────────────────────────────
+     Cards work because CashApp's $cashtag pay page accepts Visa/MC/
+     Amex/debit through the user's CashApp wallet — no merchant bank
+     needed. Backend handles manual settlement; admin confirms in
+     /admin once funds arrive in the CashApp inbox. */
+  async function getFiatPacks() {
+    if (typeof ApiClient !== 'undefined' && canUseApi()) {
+      try {
+        var r = await ApiClient.cashappPacks();
+        markApiSuccess();
+        return r;
+      } catch (_) { markApiFailure(); }
+    }
+    /* Offline fallback uses Tokenomics if loaded */
+    if (typeof Tokenomics !== 'undefined' && Tokenomics.getFiatPacks) {
+      return { cashtag: '$lindapot', packs: Tokenomics.getFiatPacks() };
+    }
+    return { cashtag: '$lindapot', packs: [] };
+  }
+
+  async function buyOKCWithCashApp(packId) {
+    if (typeof ApiClient === 'undefined' || !canUseApi()) {
+      throw new Error('Backend offline — cannot create CashApp order');
+    }
+    var r = await ApiClient.cashappCreate(packId);
+    if (!r || !r.ok) throw new Error('cashapp order failed');
+    markApiSuccess();
+    addTx('fiat-pending', 'CashApp order ' + r.refCode + ' for $' + r.usd, 0, 'USD');
+    return r; /* { refCode, cashtag, payUrl, usd, okcAmount, instructions } */
+  }
+
+  async function confirmCashAppPayment(refCode, txid) {
+    if (typeof ApiClient === 'undefined' || !canUseApi()) {
+      throw new Error('Backend offline');
+    }
+    var r = await ApiClient.cashappSubmit(refCode, txid);
+    if (!r || !r.ok) throw new Error('submit failed');
+    addTx('fiat-submitted', 'CashApp payment confirmed (pending review): ' + refCode, 0, 'USD');
+    return r;
+  }
+
+  async function getCashAppOrders() {
+    if (typeof ApiClient === 'undefined' || !canUseApi()) return { orders: [] };
+    try {
+      var r = await ApiClient.cashappMine();
+      markApiSuccess();
+      return r;
+    } catch (_) { markApiFailure(); return { orders: [] }; }
+  }
+
+  async function getCashAppOrderStatus(refCode) {
+    if (typeof ApiClient === 'undefined' || !canUseApi()) return null;
+    try {
+      var r = await ApiClient.cashappStatus(refCode);
+      markApiSuccess();
+      return r;
+    } catch (_) { markApiFailure(); return null; }
+  }
+
   /* ── Reset ─────────────────────────────────────────────────────── */
   function reset() {
     okcBalance     = 0;
@@ -931,6 +990,10 @@ const Marketplace = (function () {
     buyPremiumAmmoWithOKC, buyPremiumAmmoWithPOL,
     equipPremiumAmmo, getActiveAmmoId, getActiveAmmoInfo,
     consumeAmmoShot, getAmmoDamageMult,
+
+    /* CashApp / fiat top-ups */
+    getFiatPacks, buyOKCWithCashApp, confirmCashAppPayment,
+    getCashAppOrders, getCashAppOrderStatus,
 
     /* nft club (off-chain) */
     getClubTiers, getClubTier, getClubMember,

@@ -134,6 +134,13 @@ const ApiClient = (function () {
     return _request('GET', '/api/deployments' + (network ? ('?network=' + encodeURIComponent(network)) : ''));
   }
 
+  /* CashApp / fiat top-ups */
+  async function cashappPacks()  { return _request('GET',  '/api/payments/cashapp/packs'); }
+  async function cashappCreate(packId) { return _request('POST', '/api/payments/cashapp/create', { packId }); }
+  async function cashappSubmit(refCode, txid) { return _request('POST', '/api/payments/cashapp/submit', { refCode, txid }); }
+  async function cashappStatus(refCode) { return _request('GET', '/api/payments/cashapp/status/' + encodeURIComponent(refCode)); }
+  async function cashappMine()   { return _request('GET',  '/api/payments/cashapp/mine'); }
+
   function cachedProfile() { return _profile; }
 
   return {
@@ -143,6 +150,7 @@ const ApiClient = (function () {
     mintVeteran, catalog, buyCosmetic,
     marketActive, marketList, marketCancel,
     deployments, cachedProfile,
+    cashappPacks, cashappCreate, cashappSubmit, cashappStatus, cashappMine,
   };
 })();
 

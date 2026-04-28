@@ -130,6 +130,26 @@ function initDB() {
     CREATE INDEX IF NOT EXISTS idx_earn_player_time ON earn_events(player_id, created_at);
   `);
 
+  // CashApp / fiat orders — manual settlement (no merchant API)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cashapp_orders (
+      ref_code     TEXT    PRIMARY KEY,
+      player_id    INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      pack_id      TEXT    NOT NULL,
+      usd_amount   REAL    NOT NULL,
+      okc_amount   INTEGER NOT NULL,
+      cashtag      TEXT    NOT NULL,
+      status       TEXT    NOT NULL DEFAULT 'PENDING',
+      txid_user    TEXT,
+      admin_notes  TEXT,
+      created_at   TEXT    DEFAULT (datetime('now')),
+      submitted_at TEXT,
+      confirmed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_cashapp_player ON cashapp_orders(player_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_cashapp_status ON cashapp_orders(status, created_at DESC);
+  `);
+
   return db;
 }
 

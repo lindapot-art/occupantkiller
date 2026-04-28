@@ -301,6 +301,140 @@ app.get('/api/player/ledger', authAnon, (req, res) => {
   res.json({ entries: rows });
 });
 
+// ── CashApp / Fiat Payments ─────────────────────────────────────────
+// Manual settlement: user sends USD to $cashtag with a unique reference
+// note. Admin reviews CashApp inbox, marks order as confirmed → OKC
+// credited. Cards work because CashApp accepts Visa/MC/Amex on the
+// $cashtag payment page. No merchant bank required.
+const CASHAPP_TAG       = process.env.CASHAPP_TAG || '$lindapot';
+const CASHAPP_ADMIN_KEY = process.env.CASHAPP_ADMIN_KEY || ''; // required to confirm
+const FIAT_PACKS = [
+  { id: 'pack_starter',  usd:   5, baseOKC:   5_000, bonusPct:  0 },
+  { id: 'pack_grunt',    usd:  10, baseOKC:  10_000, bonusPct:  5 },
+  { id: 'pack_squad',    usd:  25, baseOKC:  25_000, bonusPct: 10 },
+  { id: 'pack_platoon',  usd:  50, baseOKC:  50_000, bonusPct: 15 },
+  { id: 'pack_company',  usd: 100, baseOKC: 100_000, bonusPct: 25 },
+  { id: 'pack_battalion',usd: 250, baseOKC: 250_000, bonusPct: 35 },
+  { id: 'pack_brigade',  usd: 500, baseOKC: 500_000, bonusPct: 50 },
+];
+function _packTotal(p) {
+  const bonus = Math.floor(p.baseOKC * p.bonusPct / 100);
+  return p.baseOKC + bonus;
+}
+function _newRef() {
+  return 'OK-' + require('crypto').randomBytes(4).toString('hex').toUpperCase();
+}
+
+app.get('/api/payments/cashapp/packs', (req, res) => {
+  res.json({
+    cashtag: CASHAPP_TAG,
+    packs:   FIAT_PACKS.map(p => Object.assign({}, p, {
+      bonusOKC: Math.floor(p.baseOKC * p.bonusPct / 100),
+      totalOKC: _packTotal(p),
+    })),
+  });
+});
+
+app.post('/api/payments/cashapp/create', authAnon, financialLimiter, (req, res) => {
+  const { packId } = req.body || {};
+  const pack = FIAT_PACKS.find(p => p.id === packId);
+  if (!pack) return res.status(400).json({ error: 'invalid packId' });
+  // limit pending orders per player to 3
+  const pending = db.prepare("SELECT COUNT(*) AS n FROM cashapp_orders WHERE player_id = ? AND status IN ('PENDING','SUBMITTED')").get(req.player.id);
+  if (pending.n >= 3) return res.status(429).json({ error: 'too many pending orders — submit or cancel existing first' });
+  let ref;
+  // ensure unique
+  for (let i = 0; i < 5; i++) {
+    ref = _newRef();
+    const exists = db.prepare('SELECT 1 FROM cashapp_orders WHERE ref_code = ?').get(ref);
+    if (!exists) break;
+    ref = null;
+  }
+  if (!ref) return res.status(500).json({ error: 'ref-code collision' });
+  const okcAmount = _packTotal(pack);
+  db.prepare(`INSERT INTO cashapp_orders (ref_code, player_id, pack_id, usd_amount, okc_amount, cashtag, status)
+              VALUES (?, ?, ?, ?, ?, ?, 'PENDING')`)
+    .run(ref, req.player.id, pack.id, pack.usd, okcAmount, CASHAPP_TAG);
+  // Build CashApp pay URL: cash.app/$cashtag/AMOUNT — opens app/web with note prefilled if supported
+  const tagSlug = CASHAPP_TAG.replace(/^\$/, '');
+  const payUrl  = `https://cash.app/${encodeURIComponent('$' + tagSlug)}/${pack.usd}`;
+  res.json({
+    ok: true, refCode: ref, cashtag: CASHAPP_TAG, payUrl,
+    usd: pack.usd, okcAmount,
+    instructions: `Send $${pack.usd} to ${CASHAPP_TAG} on CashApp with the note "${ref}" — required for credit. Then click "I sent it" and paste your CashApp transaction ID.`,
+  });
+});
+
+app.post('/api/payments/cashapp/submit', authAnon, financialLimiter, (req, res) => {
+  const { refCode, txid } = req.body || {};
+  if (!refCode || !txid) return res.status(400).json({ error: 'refCode + txid required' });
+  const order = db.prepare('SELECT * FROM cashapp_orders WHERE ref_code = ?').get(refCode);
+  if (!order) return res.status(404).json({ error: 'order not found' });
+  if (order.player_id !== req.player.id) return res.status(403).json({ error: 'not your order' });
+  if (order.status !== 'PENDING') return res.status(409).json({ error: 'order already ' + order.status });
+  const cleanTxid = String(txid).trim().slice(0, 64);
+  if (cleanTxid.length < 4) return res.status(400).json({ error: 'invalid txid' });
+  db.prepare(`UPDATE cashapp_orders SET status = 'SUBMITTED', txid_user = ?, submitted_at = datetime('now') WHERE ref_code = ?`)
+    .run(cleanTxid, refCode);
+  res.json({ ok: true, refCode, status: 'SUBMITTED' });
+});
+
+app.get('/api/payments/cashapp/status/:ref', authAnon, (req, res) => {
+  const order = db.prepare('SELECT ref_code, pack_id, usd_amount, okc_amount, cashtag, status, created_at, submitted_at, confirmed_at FROM cashapp_orders WHERE ref_code = ? AND player_id = ?')
+    .get(req.params.ref, req.player.id);
+  if (!order) return res.status(404).json({ error: 'not found' });
+  res.json(order);
+});
+
+app.get('/api/payments/cashapp/mine', authAnon, (req, res) => {
+  const rows = db.prepare(`SELECT ref_code, pack_id, usd_amount, okc_amount, status, created_at, submitted_at, confirmed_at
+                           FROM cashapp_orders WHERE player_id = ?
+                           ORDER BY created_at DESC LIMIT 20`).all(req.player.id);
+  res.json({ orders: rows });
+});
+
+// ── Admin endpoints (require X-Admin-Key) ────────────────────────────
+function authAdmin(req, res, next) {
+  if (!CASHAPP_ADMIN_KEY) return res.status(503).json({ error: 'admin key not configured' });
+  if (req.get('X-Admin-Key') !== CASHAPP_ADMIN_KEY) return res.status(401).json({ error: 'admin key required' });
+  next();
+}
+
+app.get('/api/admin/cashapp/pending', authAdmin, (req, res) => {
+  const rows = db.prepare(`SELECT o.ref_code, o.player_id, p.anon_id, o.pack_id, o.usd_amount, o.okc_amount,
+                                  o.status, o.txid_user, o.created_at, o.submitted_at
+                           FROM cashapp_orders o
+                           JOIN players p ON p.id = o.player_id
+                           WHERE o.status IN ('PENDING','SUBMITTED')
+                           ORDER BY o.created_at DESC LIMIT 200`).all();
+  res.json({ orders: rows });
+});
+
+app.post('/api/admin/cashapp/confirm', authAdmin, (req, res) => {
+  const { refCode, action, notes } = req.body || {};
+  if (!refCode || !['CONFIRM', 'REJECT'].includes(action)) {
+    return res.status(400).json({ error: 'refCode + action(CONFIRM|REJECT) required' });
+  }
+  const order = db.prepare('SELECT * FROM cashapp_orders WHERE ref_code = ?').get(refCode);
+  if (!order) return res.status(404).json({ error: 'not found' });
+  if (order.status === 'CONFIRMED' || order.status === 'REJECTED') {
+    return res.status(409).json({ error: 'already ' + order.status });
+  }
+  if (action === 'CONFIRM') {
+    const tx = db.transaction(() => {
+      creditOKC(db, order.player_id, order.okc_amount, 'cashapp_purchase', { refCode, usd: order.usd_amount });
+      db.prepare(`UPDATE cashapp_orders SET status = 'CONFIRMED', admin_notes = ?, confirmed_at = datetime('now') WHERE ref_code = ?`)
+        .run(notes || null, refCode);
+    });
+    tx();
+    res.json({ ok: true, refCode, credited: order.okc_amount });
+  } else {
+    db.prepare(`UPDATE cashapp_orders SET status = 'REJECTED', admin_notes = ?, confirmed_at = datetime('now') WHERE ref_code = ?`)
+      .run(notes || null, refCode);
+    res.json({ ok: true, refCode, status: 'REJECTED' });
+  }
+});
+
 // ── Deployments (public — contract addresses for the frontend) ──
 app.get('/api/deployments', (req, res) => {
   try {
