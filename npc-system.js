@@ -837,6 +837,40 @@ function buildCivilianMesh(npc) {
         group.add(antenna);
       } catch (e) {}
     }
+    // Canteen on hip (every soldier) — short olive cylinder
+    try {
+      var canteen = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.05, 0.13, 8),
+        new THREE.MeshLambertMaterial({ color: 0x5a6a3a })
+      );
+      canteen.position.set(0.22, 0.46, 0.04);
+      group.add(canteen);
+    } catch (e) {}
+    // Helmet scrim/cover with grass tufts — ~30% of NPCs
+    if (Math.random() < 0.3) {
+      try {
+        var scrimMat = new THREE.MeshLambertMaterial({ color: 0x3a4a1a });
+        for (var st = 0; st < 4; st++) {
+          var tuft = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.02), scrimMat);
+          var ang = (st / 4) * Math.PI * 2;
+          tuft.position.set(Math.cos(ang) * 0.10, 1.62, Math.sin(ang) * 0.10);
+          tuft.rotation.y = ang;
+          tuft.rotation.z = (Math.random() - 0.5) * 0.4;
+          group.add(tuft);
+        }
+      } catch (e) {}
+    }
+    // Knee pads — ~25% of NPCs
+    if (Math.random() < 0.25) {
+      try {
+        var kpMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+        var kpL = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.08, 0.13), kpMat);
+        kpL.position.set(-0.10, 0.30, 0.08);
+        var kpR = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.08, 0.13), kpMat);
+        kpR.position.set(0.10, 0.30, 0.08);
+        group.add(kpL); group.add(kpR);
+      } catch (e) {}
+    }
     return group;
   }
 
