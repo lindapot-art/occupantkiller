@@ -11,6 +11,7 @@ const MissionSystem = (function () {
     RECON:      'recon',
     DEFENSE:    'defense',
     ESCORT:     'escort',
+    INFILTRATE: 'infiltrate',
   });
 
   /* ── Templates ───────────────────────────────────────────────────── */
@@ -162,6 +163,30 @@ const MissionSystem = (function () {
       },
       check(mission) { return mission.arrived && mission.convoyHealth > 0; },
     },
+
+    // ── INFILTRATE: Player starts disguised as a Russian occupant.
+    //    Walk among them undetected; when ready, ambush and kill the
+    //    designated number of high-value targets. Disguise is blown the
+    //    instant the player damages anyone — survive the resulting alarm.
+    infiltrate: {
+      name: 'Infiltrate the Occupants',
+      description: 'You are inserted in a Russian uniform. Walk among them, then eliminate {kills} occupants. Disguise breaks when you attack — survive the response.',
+      tier: 4,
+      generate() {
+        const kills = 8 + Math.floor(Math.random() * 5); // 8–12
+        return {
+          type: MISSION_TYPE.INFILTRATE,
+          targetKills: kills,
+          kills: 0,
+          disguiseBlown: false,
+          completed: false,
+          // Bonus objective: stealth-kill at least 3 before disguise is blown
+          stealthKills: 0,
+          stealthBonus: 3,
+        };
+      },
+      check(mission) { return mission.kills >= mission.targetKills; },
+    },
   };
 
   /* ── State ───────────────────────────────────────────────────────── */
@@ -195,6 +220,15 @@ const MissionSystem = (function () {
     };
 
     activeMissions.push(mission);
+    // INFILTRATE: activate Russian-uniform disguise on the player.
+    try {
+      if (type === MISSION_TYPE.INFILTRATE && typeof Enemies !== 'undefined' && Enemies.setPlayerDisguised) {
+        Enemies.setPlayerDisguised(true);
+        if (typeof HUD !== 'undefined' && HUD.showToast) {
+          HUD.showToast('🕵 DISGUISE ACTIVE — Russian uniform on. Walk among them.', 4500, '#88ff88');
+        }
+      }
+    } catch (e) {}
     return mission;
   }
 
@@ -212,6 +246,18 @@ const MissionSystem = (function () {
         m.status = 'completed';
         completedMissions.push(m);
         activeMissions.splice(i, 1);
+
+        // INFILTRATE: turn off disguise on completion.
+        try {
+          if (m.type === MISSION_TYPE.INFILTRATE && typeof Enemies !== 'undefined' && Enemies.setPlayerDisguised) {
+            Enemies.setPlayerDisguised(false);
+            if (typeof HUD !== 'undefined' && HUD.showToast) {
+              const stealth = m.data.stealthKills || 0;
+              const bonus = stealth >= (m.data.stealthBonus || 0) ? ' +STEALTH BONUS' : '';
+              HUD.showToast(`✓ INFILTRATION COMPLETE (${stealth} stealth kills)${bonus}`, 4000, '#88ff88');
+            }
+          }
+        } catch (eIC) {}
 
         // Reward
         var reward = (typeof Economy !== 'undefined' && Economy.missionReward) ? Economy.missionReward(m.tier) : 0;
@@ -235,6 +281,19 @@ const MissionSystem = (function () {
     for (const m of activeMissions) {
       if (m.data.type === MISSION_TYPE.DEFENSE) {
         m.data.completedWaves++;
+      }
+    }
+  }
+
+  // INFILTRATE: called every time the player kills a Russian occupant.
+  function onEnemyKilled() {
+    for (const m of activeMissions) {
+      if (m.data.type === MISSION_TYPE.INFILTRATE) {
+        m.data.kills++;
+        // Stealth bonus: kills before disguise was blown
+        const blown = (typeof Enemies !== 'undefined' && Enemies.isDisguiseBlown) ? Enemies.isDisguiseBlown() : true;
+        if (!blown) m.data.stealthKills++;
+        else m.data.disguiseBlown = true;
       }
     }
   }
@@ -453,6 +512,7 @@ const MissionSystem = (function () {
     onResourceGathered,
     onWaveCompleted,
     onDroneScout,
+    onEnemyKilled,
     getActive,
     getCompleted,
     getById,

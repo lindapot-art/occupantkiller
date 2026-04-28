@@ -4136,6 +4136,8 @@ const GameManager = (function () {
       }
       MLSystem.onKill(Weapons.getCurrentId());
       MLSystem.trackKillTiming(); // AI Smart Learning: track kill timing patterns
+      // INFILTRATE mission: count occupant kills (stealth bonus if disguise still up)
+      try { if (typeof MissionSystem !== 'undefined' && MissionSystem.onEnemyKilled) MissionSystem.onEnemyKilled(); } catch (eMK) {}
       // Streak score multiplier: 3+ kills in chain = +10% per streak (capped at +150%)
       var _streakMult = 1 + Math.min(1.5, Math.max(0, player.killStreak - 1) * 0.1);
       var _scoreGain = Math.round((enemy.scoreValue || 0) * _streakMult);

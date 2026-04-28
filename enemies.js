@@ -825,6 +825,8 @@ const Enemies = (() => {
   let stageMult  = 1;    // stage difficulty multiplier
   let _playerPos = null; // cached player position for spawning
   let _playerStealth = false; // player stealth state
+  let _playerDisguised = false; // INFILTRATION: player wearing Russian uniform
+  let _disguiseBlown = false;   // becomes true once player attacks anyone
   let _aiStrategy = null; // ML counter-strategy for this wave
   let _adaptiveMult = 1.0; // B25: adaptive difficulty multiplier
 
@@ -2138,7 +2140,12 @@ const Enemies = (() => {
         weatherVisionMod = WeatherSystem.getModifiers().visionRange || 1.0;
       }
       const effectiveDetectionRange = DETECTION_RANGE * weatherVisionMod;
-      if (!_playerStealth && distToPlayer < effectiveDetectionRange) {
+      // ── DISGUISE: Russian uniform fools enemies until disguise is blown.
+      //    Even disguised, point-blank stares (<1.5m) and active fire break it.
+      const _disguisedSafe = _playerDisguised && !_disguiseBlown;
+      if (_disguisedSafe && distToPlayer >= 1.6) {
+        e.spotLevel = Math.max(0, e.spotLevel - delta * 1.5);
+      } else if (!_playerStealth && distToPlayer < effectiveDetectionRange) {
         // Check if player is roughly in front of enemy (FOV cone)
         const facingDir = _tmpVec3d.set(0, 0, -1).applyQuaternion(e.mesh.quaternion);
         const angleToPlayer = facingDir.angleTo(_tmpVec3e.copy(dirToPlayer).normalize());
@@ -3375,6 +3382,24 @@ const Enemies = (() => {
   // ── Set player stealth state ──────────────────────────────
   function setPlayerStealth(val) { _playerStealth = !!val; }
 
+  // ── INFILTRATION: disguise mechanic ───────────────────────
+  function setPlayerDisguised(val) {
+    _playerDisguised = !!val;
+    if (_playerDisguised) _disguiseBlown = false;
+  }
+  function isPlayerDisguised() { return _playerDisguised && !_disguiseBlown; }
+  function isDisguiseBlown()   { return _disguiseBlown; }
+  function blowDisguise() {
+    if (_playerDisguised && !_disguiseBlown) {
+      _disguiseBlown = true;
+      try {
+        if (typeof HUD !== 'undefined' && HUD.showToast) {
+          HUD.showToast('⚠ DISGUISE BLOWN — ENGAGE!', 3500, '#ff4444');
+        }
+      } catch (e) {}
+    }
+  }
+
   // ── Tag attacker: brief red outline ring over their head when they hit player ──
   var _attackerTagGeo = new THREE.RingGeometry(0.55, 0.78, 14);
   function tagAttacker(enemy) {
@@ -3414,6 +3439,18 @@ const Enemies = (() => {
   // ── Apply damage, return remaining HP ─────────────────────
   function damage(enemy, amount, isHeadshot, weaponType) {
     if (!enemy.alive) return 0;
+
+    // INFILTRATION: any damage dealt by player blows the disguise instantly.
+    if (_playerDisguised && !_disguiseBlown) {
+      _disguiseBlown = true;
+      try {
+        if (typeof HUD !== 'undefined' && HUD.showToast) {
+          HUD.showToast('⚠ DISGUISE BLOWN — ENGAGE!', 3500, '#ff4444');
+        } else if (typeof HUD !== 'undefined' && HUD.notifyPickup) {
+          HUD.notifyPickup('⚠ DISGUISE BLOWN');
+        }
+      } catch (eD) {}
+    }
 
     // ML: track damage taken with source direction & weapon (session-scoped brain)
     if (enemy._ml && typeof NPCML !== 'undefined') {
@@ -3646,6 +3683,9 @@ const Enemies = (() => {
   function isWaveDone() { return allDead; }
 
   function clear() {
+    // Reset disguise state on stage clear / restart
+    _playerDisguised = false;
+    _disguiseBlown = false;
     // Wipe all per-enemy ML brains (session-scoped) — NPCSystem.clear also calls this; idempotent
     if (typeof NPCML !== 'undefined' && NPCML.clear) NPCML.clear();
     // Clean up blood particles
@@ -3753,6 +3793,10 @@ const Enemies = (() => {
     getAll,
     getAssaultGroups,
     setPlayerStealth,
+    setPlayerDisguised,
+    isPlayerDisguised,
+    isDisguiseBlown,
+    blowDisguise,
     tagAttacker,
     getSurrenderCount,
     spawnSingle: function (typeName, pos, opts) { spawnOne(typeName, -1, pos, opts); },
