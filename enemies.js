@@ -1586,6 +1586,8 @@ const Enemies = (() => {
       _patrolTimer:  0,
       _patrolAngle:  Math.random() * Math.PI * 2,
       _alertedTimer: 0,   // counts down after losing sight; returns to post when 0
+      // Per-enemy ML brain (session-scoped, in-memory only)
+      _ml: (typeof NPCML !== 'undefined' && NPCML.createBrain) ? NPCML.createBrain({ typeName: typeName }) : null,
     });
     return idx;
   }
@@ -1807,6 +1809,11 @@ const Enemies = (() => {
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
       if (!e) continue; // null = removed corpse, skip
+
+      // ML decay per living enemy (session-scoped brain)
+      if (e.alive && e._ml && typeof NPCML !== 'undefined' && NPCML.decayBrain) {
+        NPCML.decayBrain(e._ml, delta);
+      }
 
       if (!e.alive) {
         // Hide HP bar, sink corpse with topple animation, then remove
@@ -3250,6 +3257,15 @@ const Enemies = (() => {
   function damage(enemy, amount, isHeadshot, weaponType) {
     if (!enemy.alive) return 0;
 
+    // ML: track damage taken with source direction & weapon (session-scoped brain)
+    if (enemy._ml && typeof NPCML !== 'undefined') {
+      var srcDir = null;
+      if (_playerPos && enemy.mesh) {
+        srcDir = { x: _playerPos.x - enemy.mesh.position.x, z: _playerPos.z - enemy.mesh.position.z };
+      }
+      NPCML.onDamaged(enemy._ml, amount, srcDir, weaponType || null);
+    }
+
     // Shield bearer: route damage through EnemyTypes shield check
     if (typeof EnemyTypes !== 'undefined' && enemy.typeCfg && enemy.typeCfg.name === 'SHIELD_BEARER') {
       var fromAngle = 0;
@@ -3472,6 +3488,8 @@ const Enemies = (() => {
   function isWaveDone() { return allDead; }
 
   function clear() {
+    // Wipe all per-enemy ML brains (session-scoped) — NPCSystem.clear also calls this; idempotent
+    if (typeof NPCML !== 'undefined' && NPCML.clear) NPCML.clear();
     // Clean up blood particles
     bloodParticles.forEach(bp => {
       if (scene) scene.remove(bp.mesh);

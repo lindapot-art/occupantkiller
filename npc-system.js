@@ -417,6 +417,11 @@ function buildCivilianMesh(npc) {
       guardPos:  null,
     };
 
+    // Per-NPC ML brain (session-scoped, in-memory only)
+    if (typeof NPCML !== 'undefined' && NPCML.createBrain) {
+      npc._ml = NPCML.createBrain(npc);
+    }
+
     npc.mesh = (rank === NPC_RANK.CIVILIAN) ? buildCivilianMesh(npc) : buildNPCMesh(npc);
     npc.mesh.position.copy(npc.position);
     return npc;
@@ -1049,6 +1054,8 @@ function buildCivilianMesh(npc) {
 
     for (const npc of npcs) {
       if (!npc.alive) continue;
+      // ML decay per living NPC (session-scoped brain)
+      if (npc._ml && typeof NPCML !== 'undefined' && NPCML.decayBrain) NPCML.decayBrain(npc._ml, delta);
       if (npc.rank === 'wildlife' || npc.type === 'wildlife' || npc.type === WILDLIFE_TYPE.BIRD || npc.type === WILDLIFE_TYPE.DOG || npc.type === WILDLIFE_TYPE.CAT) {
         updateWildlifeAI(npc, delta);
       } else {
@@ -1300,17 +1307,29 @@ function buildCivilianMesh(npc) {
       npc.combatCooldown -= delta;
       if (npc.combatCooldown <= 0) {
         npc.combatCooldown = Math.max(0.3, wep.fireRate - npc.skills.combat * 0.005);
+        // ML decision: accuracy bonus from learned hit-rate + experience
+        var mlDec = (npc._ml && typeof NPCML !== 'undefined') ? NPCML.getDecision(npc._ml) : null;
+        var accBonus = mlDec ? mlDec.accuracyBonus : 0;
         // Weapon damage + skill bonus, morale accuracy modifier
         var baseDmg = wep.damage + npc.skills.combat * 0.15;
-        var hitChance = moraleFx.accuracyMult * (0.5 + npc.skills.combat * 0.005);
+        var hitChance = moraleFx.accuracyMult * (0.5 + npc.skills.combat * 0.005 + accBonus);
         var dmg = Math.random() < hitChance ? baseDmg : 0; // miss on low morale/skill
+
+        // ML: register shot fired
+        if (npc._ml && typeof NPCML !== 'undefined') NPCML.onFired(npc._ml);
 
         if (dmg > 0 && typeof Enemies !== 'undefined' && Enemies.damage) {
           const remaining = Enemies.damage(enemy, dmg);
+          // ML: register hit & engagement-range learning
+          if (npc._ml && typeof NPCML !== 'undefined') {
+            NPCML.onHit(npc._ml, dmg);
+            NPCML.onEngagementSurvived(npc._ml, dist);
+          }
           if (remaining <= 0) {
             npc.stress = Math.max(0, npc.stress - 5);
             npc.morale = Math.min(100, npc.morale + 5);
             npc.combatTarget = null;
+            if (npc._ml && typeof NPCML !== 'undefined') NPCML.onKill(npc._ml);
           }
         }
 
@@ -1696,7 +1715,21 @@ function buildCivilianMesh(npc) {
     if (!npc || !npc.alive) return;
     npc.health -= amount;
     npc.stress = Math.min(100, npc.stress + 15);
-    if (npc.health <= 0) killNPC(npc);
+    // ML: track damage taken (no source dir at this entry point yet)
+    if (npc._ml && typeof NPCML !== 'undefined') NPCML.onDamaged(npc._ml, amount, null, null);
+    if (npc.health <= 0) {
+      // ML: notify nearby allies of loss
+      if (typeof NPCML !== 'undefined') {
+        for (var ai = 0; ai < npcs.length; ai++) {
+          var ally = npcs[ai];
+          if (ally && ally.alive && ally !== npc && ally._ml &&
+              ally.position.distanceTo(npc.position) < 18) {
+            NPCML.onAllyLost(ally._ml);
+          }
+        }
+      }
+      killNPC(npc);
+    }
   }
 
   /* ── Feed NPC ────────────────────────────────────────────────────── */
@@ -1741,6 +1774,8 @@ function buildCivilianMesh(npc) {
     npcs.length = 0;
     _npcById = {};
     friendlyGroups.length = 0;
+    // Wipe all per-NPC ML brains (session-scoped)
+    if (typeof NPCML !== 'undefined' && NPCML.clear) NPCML.clear();
   }
 
   /* ── NPC Dialogue System — Context-sensitive barks ─────────────── */
