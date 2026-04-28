@@ -1344,6 +1344,162 @@ const Enemies = (() => {
       } catch (e) {}
     }
 
+    // ── Wounded / mobility-impaired flavor variants ─────────
+    // ~6% of basic infantry get one of: donkey rider, wheelchair, crutches, crawling.
+    // Skips bosses, mechs, vehicles, dogs, drones, kamikaze, snipers.
+    var _wvSkip = { BOSS:1, BOSS_MARIUPOL:1, BOSS_CRIMEA:1, BOSS_CHORNOBYL:1,
+      WAR_DOG:1, KAMIKAZE_DRONE:1, ASSAULT_MECH:1, TANK:1, BTR:1,
+      MORTAR:1, HEAVY_SNIPER:1, SNIPER_ELITE:1, SNIPER:1, BOMBER:1,
+      EW_OPERATOR:1, DRONE_OP:1 };
+    if (!_wvSkip[typeCfg.name] && Math.random() < 0.06) {
+      try {
+        var wv = Math.floor(Math.random() * 4); // 0=donkey 1=wheelchair 2=crutches 3=crawling
+        group.userData.woundedVariant = ['donkey','wheelchair','crutches','crawling'][wv];
+        var brown = 0x6b4423, darkBrown = 0x3a2410, metal = 0x444444, rubber = 0x1a1a1a;
+
+        if (wv === 0) {
+          // Donkey: rider sits on top, soldier raised, donkey body below.
+          var donkey = new THREE.Group();
+          var dBody = new THREE.Mesh(
+            new THREE.BoxGeometry(0.55 * s, 0.45 * s, 1.05 * s),
+            new THREE.MeshLambertMaterial({ color: brown })
+          );
+          dBody.position.y = 0.55 * s;
+          donkey.add(dBody);
+          var dHead = new THREE.Mesh(
+            new THREE.BoxGeometry(0.30 * s, 0.32 * s, 0.42 * s),
+            new THREE.MeshLambertMaterial({ color: brown })
+          );
+          dHead.position.set(0, 0.85 * s, 0.65 * s);
+          donkey.add(dHead);
+          var dSnout = new THREE.Mesh(
+            new THREE.BoxGeometry(0.20 * s, 0.18 * s, 0.18 * s),
+            new THREE.MeshLambertMaterial({ color: 0x4a2a18 })
+          );
+          dSnout.position.set(0, 0.74 * s, 0.92 * s);
+          donkey.add(dSnout);
+          // Ears
+          for (var ed = -1; ed <= 1; ed += 2) {
+            var dEar = new THREE.Mesh(
+              new THREE.BoxGeometry(0.06 * s, 0.18 * s, 0.04 * s),
+              new THREE.MeshLambertMaterial({ color: brown })
+            );
+            dEar.position.set(ed * 0.10 * s, 1.05 * s, 0.55 * s);
+            donkey.add(dEar);
+          }
+          // 4 legs
+          for (var dlx = -1; dlx <= 1; dlx += 2) {
+            for (var dlz = -1; dlz <= 1; dlz += 2) {
+              var dLeg = new THREE.Mesh(
+                new THREE.BoxGeometry(0.10 * s, 0.55 * s, 0.10 * s),
+                new THREE.MeshLambertMaterial({ color: darkBrown })
+              );
+              dLeg.position.set(dlx * 0.18 * s, 0.27 * s, dlz * 0.40 * s);
+              donkey.add(dLeg);
+            }
+          }
+          // Tail
+          var dTail = new THREE.Mesh(
+            new THREE.BoxGeometry(0.05 * s, 0.30 * s, 0.05 * s),
+            new THREE.MeshLambertMaterial({ color: darkBrown })
+          );
+          dTail.position.set(0, 0.55 * s, -0.55 * s);
+          dTail.rotation.x = -0.4;
+          donkey.add(dTail);
+          group.add(donkey);
+          // Lift the rider up to sit on the donkey
+          group.position.y += 0.85 * s;
+          group.userData.donkeyMount = donkey;
+
+        } else if (wv === 1) {
+          // Wheelchair: rider sits, no walking. Frame + 2 big wheels + 2 small front.
+          var chair = new THREE.Group();
+          var seat = new THREE.Mesh(
+            new THREE.BoxGeometry(0.50 * s, 0.06 * s, 0.50 * s),
+            new THREE.MeshLambertMaterial({ color: metal })
+          );
+          seat.position.y = 0.40 * s;
+          chair.add(seat);
+          var back = new THREE.Mesh(
+            new THREE.BoxGeometry(0.50 * s, 0.55 * s, 0.05 * s),
+            new THREE.MeshLambertMaterial({ color: metal })
+          );
+          back.position.set(0, 0.70 * s, -0.22 * s);
+          chair.add(back);
+          // Big rear wheels
+          for (var wx = -1; wx <= 1; wx += 2) {
+            var wheel = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.32 * s, 0.32 * s, 0.04 * s, 16),
+              new THREE.MeshLambertMaterial({ color: rubber })
+            );
+            wheel.rotation.z = Math.PI / 2;
+            wheel.position.set(wx * 0.32 * s, 0.32 * s, -0.05 * s);
+            chair.add(wheel);
+          }
+          // Small front wheels
+          for (var wxf = -1; wxf <= 1; wxf += 2) {
+            var fwheel = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.12 * s, 0.12 * s, 0.04 * s, 12),
+              new THREE.MeshLambertMaterial({ color: rubber })
+            );
+            fwheel.rotation.z = Math.PI / 2;
+            fwheel.position.set(wxf * 0.26 * s, 0.12 * s, 0.30 * s);
+            chair.add(fwheel);
+          }
+          group.add(chair);
+          // Hide legs (sit pose) — fold them under seat
+          legL.position.set(-0.14 * s, 0.42 * s, 0.20 * s);
+          legL.rotation.x = -1.2;
+          legR.position.set(0.14 * s, 0.42 * s, 0.20 * s);
+          legR.rotation.x = -1.2;
+
+        } else if (wv === 2) {
+          // Crutches: two angled sticks under armpits.
+          for (var cx = -1; cx <= 1; cx += 2) {
+            var crutch = new THREE.Mesh(
+              new THREE.BoxGeometry(0.04 * s, 1.10 * s, 0.04 * s),
+              new THREE.MeshLambertMaterial({ color: 0x8a6a3a })
+            );
+            crutch.position.set(cx * 0.45 * s, 0.55 * s, 0.05 * s);
+            crutch.rotation.z = cx * 0.18;
+            group.add(crutch);
+            // Armpit pad
+            var pad = new THREE.Mesh(
+              new THREE.BoxGeometry(0.08 * s, 0.04 * s, 0.10 * s),
+              new THREE.MeshLambertMaterial({ color: 0x222222 })
+            );
+            pad.position.set(cx * 0.50 * s, 1.08 * s, 0.05 * s);
+            group.add(pad);
+          }
+          // One leg bandaged white & raised slightly
+          var bandage = new THREE.Mesh(
+            new THREE.BoxGeometry(0.24 * s, 0.20 * s, 0.24 * s),
+            new THREE.MeshLambertMaterial({ color: 0xeeeedd })
+          );
+          bandage.position.set(0.14 * s, 0.20 * s, 0);
+          group.add(bandage);
+
+        } else {
+          // Crawling wounded: rotate group flat, drop to floor
+          group.rotation.x = -Math.PI / 2;
+          group.position.y -= 0.55 * s;
+          // Bandage on head — bloody white wrap
+          var hWrap = new THREE.Mesh(
+            new THREE.BoxGeometry(0.36 * s, 0.10 * s, 0.36 * s),
+            new THREE.MeshLambertMaterial({ color: 0xeeeedd })
+          );
+          hWrap.position.y = 1.45 * s;
+          group.add(hWrap);
+          var blood = new THREE.Mesh(
+            new THREE.BoxGeometry(0.12 * s, 0.04 * s, 0.04 * s),
+            new THREE.MeshLambertMaterial({ color: 0x661111 })
+          );
+          blood.position.set(0.06 * s, 1.48 * s, 0.18 * s);
+          group.add(blood);
+        }
+      } catch (e) {}
+    }
+
     return group;
   }
 
