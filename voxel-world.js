@@ -3958,10 +3958,238 @@ window.VoxelWorld = (function () {
   }
 
   /* ── Level Generation ──────────────────────────────────────────── */
+  /* ════════════════════════════════════════════════════════════════
+   *  WAR-ZONE RUINED-BUILDINGS GENERATOR
+   *  Real-reference: post-strike apartment blocks, blown-out shop fronts,
+   *  sheared-off facades, exposed reinforced-concrete floor slabs, twisted
+   *  rebar columns, smashed glass, smoking craters, scattered debris.
+   * ═════════════════════════════════════════════════════════════════ */
+
+  // A single ruined HOUSE (1-2 storey, residential): partial walls, blown
+  // roof, broken windows, scorched, rubble pile inside, debris around.
+  function generateRuinedHouse(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    const w = 5 + Math.floor(Math.random() * 3);          // 5-7 wide
+    const d = 5 + Math.floor(Math.random() * 3);          // 5-7 deep
+    const storeys = 1 + (Math.random() < 0.5 ? 1 : 0);    // 1-2 floors
+    const wallMat = Math.random() < 0.5 ? BLOCK.BRICK : BLOCK.PLASTER;
+    const collapseSide = Math.floor(Math.random() * 4);   // 0=N,1=S,2=E,3=W
+
+    for (let s = 0; s < storeys; s++) {
+      const floorY = surfH + s * 4;
+      // Floor slab (reinforced concrete) — partially broken on upper storeys
+      for (let x = 0; x < w; x++) {
+        for (let z = 0; z < d; z++) {
+          if (s > 0 && Math.random() < 0.30) continue;    // collapsed slab tiles
+          setBlock(ox + x, floorY, oz + z, BLOCK.CONCRETE);
+        }
+      }
+      // Walls — perimeter, with damage
+      for (let y = 1; y <= 3; y++) {
+        for (let x = 0; x < w; x++) {
+          for (let z = 0; z < d; z++) {
+            const isWall = (x === 0 || x === w - 1 || z === 0 || z === d - 1);
+            if (!isWall) continue;
+            // Mark a "blown-out" side: skip large chunk of that wall
+            if (collapseSide === 0 && z === 0      && y >= 2 && Math.random() < 0.75) continue;
+            if (collapseSide === 1 && z === d - 1  && y >= 2 && Math.random() < 0.75) continue;
+            if (collapseSide === 2 && x === w - 1  && y >= 2 && Math.random() < 0.75) continue;
+            if (collapseSide === 3 && x === 0      && y >= 2 && Math.random() < 0.75) continue;
+            // Random shrapnel holes
+            if (Math.random() < 0.18) continue;
+            // Window slots row at y=2
+            if (y === 2 && (x === Math.floor(w / 2) || z === Math.floor(d / 2))) {
+              if (Math.random() < 0.4) continue;          // broken window = hole
+              setBlock(ox + x, floorY + y, oz + z, BLOCK.GLASS);
+              continue;
+            }
+            setBlock(ox + x, floorY + y, oz + z, wallMat);
+          }
+        }
+      }
+    }
+    // Rubble pile inside (1-3 high)
+    const rubbleN = 6 + Math.floor(Math.random() * 6);
+    for (let r = 0; r < rubbleN; r++) {
+      const rx = ox + 1 + Math.floor(Math.random() * (w - 2));
+      const rz = oz + 1 + Math.floor(Math.random() * (d - 2));
+      const rh = 1 + Math.floor(Math.random() * 2);
+      for (let yy = 0; yy < rh; yy++) {
+        setBlock(rx, surfH + 1 + yy, rz, BLOCK.RUBBLE);
+      }
+    }
+    // Twisted rebar (vertical METAL columns sticking up where roof failed)
+    for (let r = 0; r < 3 + Math.floor(Math.random() * 3); r++) {
+      const rx = ox + 1 + Math.floor(Math.random() * (w - 2));
+      const rz = oz + 1 + Math.floor(Math.random() * (d - 2));
+      const rh = 2 + Math.floor(Math.random() * 3);
+      for (let yy = 0; yy < rh; yy++) {
+        setBlock(rx, surfH + 4 + yy, rz, BLOCK.METAL);
+      }
+    }
+    // Scorch / soot ring (RUBBLE blocks scattered around perimeter)
+    for (let r = 0; r < 14; r++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = (Math.max(w, d) / 2) + 1 + Math.random() * 3;
+      const rx = ox + Math.floor(w / 2) + Math.floor(Math.cos(ang) * rad);
+      const rz = oz + Math.floor(d / 2) + Math.floor(Math.sin(ang) * rad);
+      const rh = getTerrainHeight(rx, rz);
+      if (rh > 0) setBlock(rx, rh + 1, rz, BLOCK.RUBBLE);
+    }
+    // Doorway hole (front face)
+    setBlock(ox + Math.floor(w / 2), surfH + 1, oz, BLOCK.AIR);
+    setBlock(ox + Math.floor(w / 2), surfH + 2, oz, BLOCK.AIR);
+    // Burning fire pocket inside (small, ~25% chance)
+    if (Math.random() < 0.25) {
+      setBlock(ox + 1, surfH + 1, oz + 1, BLOCK.FIRE);
+    }
+  }
+
+  // A single ruined COMMERCIAL building (shop / office): wider, shop-front
+  // glass mostly shattered, signage block, sheared upper floors, more rubble.
+  function generateRuinedCommercial(ox, oz) {
+    const surfH = getTerrainHeight(ox, oz);
+    const w = 8 + Math.floor(Math.random() * 5);          // 8-12 wide
+    const d = 6 + Math.floor(Math.random() * 4);          // 6-9 deep
+    const storeys = 2 + Math.floor(Math.random() * 2);    // 2-3 floors
+    const collapseSide = Math.floor(Math.random() * 4);
+
+    for (let s = 0; s < storeys; s++) {
+      const floorY = surfH + s * 4;
+      // Concrete floor slab (with damage on upper floors)
+      for (let x = 0; x < w; x++) {
+        for (let z = 0; z < d; z++) {
+          if (s > 0 && Math.random() < 0.40) continue;    // upper floor partially gone
+          setBlock(ox + x, floorY, oz + z, BLOCK.CONCRETE);
+        }
+      }
+      // Walls — mostly concrete
+      for (let y = 1; y <= 3; y++) {
+        for (let x = 0; x < w; x++) {
+          for (let z = 0; z < d; z++) {
+            const isWall = (x === 0 || x === w - 1 || z === 0 || z === d - 1);
+            if (!isWall) continue;
+            // Blown-out face on collapse side, upper half
+            if (collapseSide === 0 && z === 0     && y >= 2 && Math.random() < 0.85) continue;
+            if (collapseSide === 1 && z === d - 1 && y >= 2 && Math.random() < 0.85) continue;
+            if (collapseSide === 2 && x === w - 1 && y >= 2 && Math.random() < 0.85) continue;
+            if (collapseSide === 3 && x === 0     && y >= 2 && Math.random() < 0.85) continue;
+            // Ground floor = shop-front: alternate glass and concrete pillars
+            if (s === 0 && y === 1 && (z === 0 || z === d - 1)) {
+              const isPillar = (x % 3 === 0);
+              if (isPillar) {
+                setBlock(ox + x, floorY + y, oz + z, BLOCK.CONCRETE);
+              } else if (Math.random() < 0.35) {
+                setBlock(ox + x, floorY + y, oz + z, BLOCK.GLASS);
+              } // else hole (smashed shopfront)
+              continue;
+            }
+            // Upper floors: random window grid
+            if (y === 2 && Math.random() < 0.30) continue; // blown window
+            // Random shrapnel holes
+            if (Math.random() < 0.14) continue;
+            setBlock(ox + x, floorY + y, oz + z, BLOCK.CONCRETE);
+          }
+        }
+      }
+    }
+    // Hanging signage (METAL block at front-top)
+    setBlock(ox + Math.floor(w / 2), surfH + storeys * 4 - 1, oz - 1, BLOCK.SIGN || BLOCK.METAL);
+
+    // Big rubble pile inside (15-25 blocks)
+    const rubbleN = 15 + Math.floor(Math.random() * 11);
+    for (let r = 0; r < rubbleN; r++) {
+      const rx = ox + 1 + Math.floor(Math.random() * (w - 2));
+      const rz = oz + 1 + Math.floor(Math.random() * (d - 2));
+      const rh = 1 + Math.floor(Math.random() * 3);
+      for (let yy = 0; yy < rh; yy++) {
+        setBlock(rx, surfH + 1 + yy, rz, BLOCK.RUBBLE);
+      }
+    }
+    // Twisted rebar (vertical METAL stalks)
+    for (let r = 0; r < 6; r++) {
+      const rx = ox + 1 + Math.floor(Math.random() * (w - 2));
+      const rz = oz + 1 + Math.floor(Math.random() * (d - 2));
+      const rh = 3 + Math.floor(Math.random() * 4);
+      for (let yy = 0; yy < rh; yy++) {
+        setBlock(rx, surfH + storeys * 4 + yy - 2, rz, BLOCK.METAL);
+      }
+    }
+    // Glass shards & broken-window debris around
+    for (let r = 0; r < 25; r++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = (Math.max(w, d) / 2) + 1 + Math.random() * 4;
+      const rx = ox + Math.floor(w / 2) + Math.floor(Math.cos(ang) * rad);
+      const rz = oz + Math.floor(d / 2) + Math.floor(Math.sin(ang) * rad);
+      const rh = getTerrainHeight(rx, rz);
+      if (rh > 0) setBlock(rx, rh + 1, rz, Math.random() < 0.3 ? BLOCK.GLASS : BLOCK.RUBBLE);
+    }
+    // 1-2 fire pockets inside
+    for (let f = 0; f < 1 + Math.floor(Math.random() * 2); f++) {
+      const fx = ox + 1 + Math.floor(Math.random() * (w - 2));
+      const fz = oz + 1 + Math.floor(Math.random() * (d - 2));
+      setBlock(fx, surfH + 1, fz, BLOCK.FIRE);
+    }
+    // Doorway / smashed entrance
+    for (let dx = -1; dx <= 1; dx++) {
+      setBlock(ox + Math.floor(w / 2) + dx, surfH + 1, oz, BLOCK.AIR);
+      setBlock(ox + Math.floor(w / 2) + dx, surfH + 2, oz, BLOCK.AIR);
+    }
+  }
+
+  // Distribute many ruined homes + commercial buildings across the map,
+  // avoiding the central ~25 m radius (player spawn) and any existing
+  // friendly outpost area. Real-zone density: 25-40 ruins per stage.
+  function generateWarZoneRuins(opts) {
+    opts = opts || {};
+    const homeCount       = opts.homes       || (18 + Math.floor(Math.random() * 8));   // 18-25
+    const commercialCount = opts.commercial  || (8  + Math.floor(Math.random() * 6));   // 8-13
+    const minR            = opts.minR        || 22;   // keep clear of player spawn
+    const maxR            = opts.maxR        || (WORLD_CHUNKS * CHUNK_SIZE * 0.42);
+
+    function pick(size) {
+      // Try a few times to find a flat spot
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const ang = Math.random() * Math.PI * 2;
+        const rad = minR + Math.random() * (maxR - minR);
+        const ox = Math.floor(Math.cos(ang) * rad);
+        const oz = Math.floor(Math.sin(ang) * rad);
+        // Avoid water
+        const h = getTerrainHeight(ox, oz);
+        if (h < 1) continue;
+        // Avoid already-occupied spots (cheap test: top block isn't AIR)
+        const top = getBlock(ox, h + 1, oz);
+        if (top !== BLOCK.AIR) continue;
+        return { ox, oz };
+      }
+      return null;
+    }
+
+    for (let i = 0; i < homeCount; i++) {
+      const p = pick(7);
+      if (p) generateRuinedHouse(p.ox, p.oz);
+    }
+    for (let i = 0; i < commercialCount; i++) {
+      const p = pick(12);
+      if (p) generateRuinedCommercial(p.ox, p.oz);
+    }
+    // Bonus: a "destroyed block" cluster — 3-4 ruins close together (city block hit hard)
+    for (let cluster = 0; cluster < 2; cluster++) {
+      const center = pick(20);
+      if (!center) continue;
+      const cnt = 3 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < cnt; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const r   = 8 + Math.random() * 10;
+        const cx  = center.ox + Math.floor(Math.cos(ang) * r);
+        const cz  = center.oz + Math.floor(Math.sin(ang) * r);
+        if (Math.random() < 0.5) generateRuinedHouse(cx, cz);
+        else                     generateRuinedCommercial(cx, cz);
+      }
+    }
+  }
+
   function generateLevel(index) {
-    const level = getLevelDef(index);
-    setTheme(level.theme);
-    _theme.seed = index * 3137;
 
     regenerate();
     _droneNestPositions.length = 0; // Reset nests for this level
@@ -4015,6 +4243,16 @@ window.VoxelWorld = (function () {
       generateDroneNest(36, -40);
       generateDroneNest(-36, -40);
     }
+    // ── War-zone ruined homes & commercial buildings (every stage) ──
+    // Real Ukraine war reference: Mariupol, Bakhmut, Avdiivka districts
+    // after months of bombardment — partial walls, blown roofs, exposed
+    // rebar, smashed shopfronts, rubble piles, scorched ruins, fire pockets.
+    try {
+      generateWarZoneRuins({
+        homes:      18 + Math.floor(Math.random() * 8),
+        commercial:  8 + Math.floor(Math.random() * 6),
+      });
+    } catch (e) { console.warn('warZoneRuins generation skipped:', e); }
     rebuildAll();
     _levelSpawnPoint = resolveLevelSpawnPoint(level);
     return level;
