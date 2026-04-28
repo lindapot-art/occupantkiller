@@ -4370,6 +4370,9 @@ window.VoxelWorld = (function () {
   }
 
   function generateLevel(index) {
+    const level = getLevelDef(index);
+    setTheme(level.theme);
+    _theme.seed = index * 3137;
 
     regenerate();
     _droneNestPositions.length = 0; // Reset nests for this level
