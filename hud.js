@@ -1799,3 +1799,5 @@ const HUD = (() => {
     updateTargetAssist,
   };
 })();
+
+if (typeof window !== 'undefined') window.HUD = HUD;

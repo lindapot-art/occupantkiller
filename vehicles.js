@@ -2267,3 +2267,5 @@ const VehicleSystem = (function () {
     getTankReloadProgress: getTankReloadProgress,
   };
 })();
+
+if (typeof window !== 'undefined') window.VehicleSystem = VehicleSystem;

@@ -5,6 +5,7 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+const { assertGameReady, assertFramesVary } = require('./qa-verify');
 
 const URL_BASE  = process.argv[2] || 'http://localhost:3000';
 const PER_STAGE = parseInt(process.argv[3] || '333', 10);
@@ -40,6 +41,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   }
   await page.evaluate(() => { if (window.forceStartGame) window.forceStartGame(); });
   await sleep(3000);
+
+  // HARD GATE — exits non-zero if boot-error overlay visible or required modules missing.
+  // Cannot be silenced. Replaces the silent try/catch hide-failure pattern.
+  await assertGameReady(page, { timeoutMs: 45000 });
 
   // Unlock all + god mode (gives all materials, all weapons, infinite grenades, all perks)
   await page.evaluate(() => {
@@ -129,7 +134,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
           }
           // Fire bursts on most frames
           if (f % 3 !== 0 && GameManager._testFireStart) GameManager._testFireStart();
-        } catch (e) {}
+        } catch (e) {
+          // Surface per-frame failures instead of swallowing — anti-fake-stamp rule.
+          if (window.__qaFrameErrs === undefined) window.__qaFrameErrs = [];
+          window.__qaFrameErrs.push(String(e && e.message || e));
+        }
       }, { f, wc: Math.max(1, WEAPON_COUNT) });
 
       await sleep(Math.min(600, INTERVAL / 4));
@@ -144,6 +153,18 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   console.log(`\n[TOUR-333] Captured ${totalShots} shots in ${SHOTS_DIR}`);
   console.log(`[TOUR-333] Errors: ${errors.length}`);
   if (errors.length) errors.slice(0, 25).forEach(e => console.log('  ' + e));
+
+  // Surface per-frame action failures (previously swallowed).
+  const frameErrs = await page.evaluate(() => window.__qaFrameErrs || []);
+  if (frameErrs.length) {
+    console.log(`[TOUR-333] Per-frame action failures: ${frameErrs.length}`);
+    const counts = {};
+    frameErrs.forEach(e => counts[e] = (counts[e] || 0) + 1);
+    Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10).forEach(([msg,n]) => console.log(`  x${n}: ${msg}`));
+  }
+
+  // HARD GATE — fails if frames are byte-identical (boot error / static screen).
+  assertFramesVary(SHOTS_DIR);
 
   await browser.close();
   process.exit(errors.length === 0 ? 0 : 1);

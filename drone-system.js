@@ -1127,3 +1127,5 @@ const DroneSystem = (function () {
     getNearestNest: getNearestNest,
   };
 })();
+
+if (typeof window !== 'undefined') window.DroneSystem = DroneSystem;

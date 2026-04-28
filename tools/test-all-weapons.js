@@ -12,6 +12,7 @@
  * Reports per-weapon PASS/FAIL with first error.
  */
 const puppeteer = require('puppeteer');
+const { assertGameReady } = require('./qa-verify');
 
 (async () => {
   const url = process.argv[2] || 'http://localhost:3000';
@@ -56,6 +57,9 @@ const puppeteer = require('puppeteer');
     if (typeof GameManager.toggleGodMode === 'function' && !GameManager.getPlayer().godMode) GameManager.toggleGodMode();
   });
   await new Promise(r => setTimeout(r, 1500));
+
+  // HARD GATE — exits 2 if boot-error overlay or any required module missing.
+  await assertGameReady(page, { timeoutMs: 45000 });
 
   // Run the per-weapon harness in-page
   const result = await page.evaluate(() => {

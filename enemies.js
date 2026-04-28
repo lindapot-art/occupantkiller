@@ -3527,3 +3527,5 @@ const Enemies = (() => {
     UNITS,
   };
 })();
+
+if (typeof window !== 'undefined') window.Enemies = Enemies;

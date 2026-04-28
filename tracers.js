@@ -853,3 +853,5 @@ const Tracers = (() => {
     }
   };
 })();
+
+if (typeof window !== 'undefined') window.Tracers = Tracers;
