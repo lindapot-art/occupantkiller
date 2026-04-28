@@ -6,12 +6,13 @@ const MissionSystem = (function () {
 
   /* ── Mission Types ───────────────────────────────────────────────── */
   const MISSION_TYPE = Object.freeze({
-    GATHER:     'gather',
-    EXPAND:     'expand',
-    RECON:      'recon',
-    DEFENSE:    'defense',
-    ESCORT:     'escort',
-    INFILTRATE: 'infiltrate',
+    GATHER:         'gather',
+    EXPAND:         'expand',
+    RECON:          'recon',
+    DEFENSE:        'defense',
+    ESCORT:         'escort',
+    INFILTRATE:     'infiltrate',
+    CLEAR_BUILDING: 'clear_building',
   });
 
   /* ── Templates ───────────────────────────────────────────────────── */
@@ -187,6 +188,75 @@ const MissionSystem = (function () {
       },
       check(mission) { return mission.kills >= mission.targetKills; },
     },
+
+    // ── CLEAR_BUILDING: Player enters a marked apartment block and
+    //    eliminates every Russian occupant inside.  Enemies are spawned
+    //    on each floor's hallway when the mission starts.  Mission
+    //    completes when no enemies remain inside the building bbox.
+    clear_building: {
+      name: 'Clear the Building',
+      description: 'Russian occupants have holed up inside an apartment block. Enter and eliminate every hostile on every floor.',
+      tier: 3,
+      generate() {
+        var building = null;
+        try {
+          if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getBuildings) {
+            var list = VoxelWorld.getBuildings();
+            if (list && list.length) building = list[Math.floor(Math.random() * list.length)];
+          }
+        } catch (e) {}
+        // Fallback: synthesize a small bbox at world origin if no apartments
+        if (!building) {
+          building = { kind: 'apartment', x: -9, z: -5, w: 18, d: 10, baseY: 0, floorH: 3, floors: 4, cx: 0, cz: 0 };
+        }
+        // Spawn 2 enemies per floor in the hallway center.
+        var spawned = 0;
+        try {
+          if (typeof Enemies !== 'undefined' && Enemies.spawnSingle) {
+            var types = ['CONSCRIPT', 'RIFLEMAN', 'GRENADIER'];
+            for (var f = 0; f < building.floors; f++) {
+              for (var n = 0; n < 2; n++) {
+                var tp = types[Math.floor(Math.random() * types.length)];
+                var px = building.x + 4 + Math.floor(Math.random() * (building.w - 8));
+                var pz = building.cz + (n === 0 ? -1 : 1);
+                var py = building.baseY + f * building.floorH + 1; // stand on slab
+                Enemies.spawnSingle(tp, { x: px + 0.5, z: pz + 0.5, y: py });
+                spawned++;
+              }
+            }
+          }
+        } catch (e2) {}
+        return {
+          type: MISSION_TYPE.CLEAR_BUILDING,
+          building: building,
+          spawned: spawned,
+          remaining: spawned,
+          completed: false,
+        };
+      },
+      check(mission) {
+        // Count enemies whose mesh.position lies inside the building bbox.
+        if (typeof Enemies === 'undefined' || !Enemies.getAll) return mission.spawned === 0;
+        var b = mission.building;
+        var minX = b.x, maxX = b.x + b.w;
+        var minZ = b.z, maxZ = b.z + b.d;
+        var minY = b.baseY - 1;
+        var maxY = b.baseY + b.floors * b.floorH + 1;
+        var alive = 0;
+        var all = Enemies.getAll();
+        for (var i = 0; i < all.length; i++) {
+          var e = all[i];
+          if (!e || e.dead || !e.mesh) continue;
+          var p = e.mesh.position;
+          if (p.x >= minX && p.x <= maxX && p.z >= minZ && p.z <= maxZ &&
+              p.y >= minY && p.y <= maxY) alive++;
+        }
+        mission.remaining = alive;
+        // Completion requires the player to have actually entered (i.e. at
+        // least one enemy was spawned) and the building is now empty.
+        return mission.spawned > 0 && alive === 0;
+      },
+    },
   };
 
   /* ── State ───────────────────────────────────────────────────────── */
@@ -229,6 +299,16 @@ const MissionSystem = (function () {
         }
       }
     } catch (e) {}
+    // CLEAR_BUILDING: show building coords + floor count so the player
+    // knows where to push.
+    try {
+      if (type === MISSION_TYPE.CLEAR_BUILDING && typeof HUD !== 'undefined' && HUD.showToast) {
+        var b = mission.data.building;
+        var msg = '🏚 CLEAR BUILDING — ' + mission.data.spawned + ' hostiles across ' +
+                  b.floors + ' floors @ (' + Math.round(b.x + b.w/2) + ', ' + Math.round(b.z + b.d/2) + ')';
+        HUD.showToast(msg, 5000, '#ffaa44');
+      }
+    } catch (eCB) {}
     return mission;
   }
 

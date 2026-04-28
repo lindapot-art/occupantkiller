@@ -1806,6 +1806,16 @@ window.VoxelWorld = (function () {
     stories = Math.min(stories, maxFloors);
     if (stories < 3) return;
 
+    // Register this building so missions (CLEAR_BUILDING) can target it.
+    _buildings.push({
+      kind: 'apartment',
+      x: ox, z: oz, w: W, d: D,
+      baseY: surfH, floorH: FH, floors: stories,
+      // Hallway center for enemy placement
+      cx: ox + Math.floor(W / 2),
+      cz: oz + Math.floor(D / 2),
+    });
+
     // Hallway runs at z-center: z offsets 4 and 5 (2-block wide corridor)
     const hallZ1 = 4;
     const hallZ2 = 5;
@@ -4098,6 +4108,8 @@ window.VoxelWorld = (function () {
 
   /* ── Drone Nest Generator ──────────────────────────────────────── */
   var _droneNestPositions = [];
+  // Track every clearable building generated this level (for mission targeting).
+  var _buildings = [];
 
   function generateDroneNest(cx, cz) {
     var surfH = getTerrainHeight(cx, cz);
@@ -4376,6 +4388,7 @@ window.VoxelWorld = (function () {
 
     regenerate();
     _droneNestPositions.length = 0; // Reset nests for this level
+    _buildings.length = 0;          // Reset clearable building registry
 
     // Main road network — every stage gets visible asphalt arteries so
     // the world doesn't look like an empty sandbox. User reported "no
@@ -4495,6 +4508,7 @@ window.VoxelWorld = (function () {
     generateLevel: typeof generateLevel === 'function' ? generateLevel : function () { return null; },
     getRoadWaypoints: function () { return _roadWaypoints.slice(); },
     getDroneNestPositions: function () { return _droneNestPositions.slice(); },
+    getBuildings: function () { return _buildings.slice(); },
     spawnVehicle,
     updateVehicles,
     getActiveVehicles,

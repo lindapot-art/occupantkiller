@@ -1657,10 +1657,16 @@ const Enemies = (() => {
       sx = px + Math.cos(angle) * r;
       sz = pz + Math.sin(angle) * r;
     }
-    const sy = (typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.getTopSolidY)
+    let sy;
+    if (spawnPos && typeof spawnPos.y === 'number') {
+      // Caller forced Y (e.g. CLEAR_BUILDING placing on specific apartment floor)
+      sy = spawnPos.y;
+    } else {
+      sy = (typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.getTopSolidY)
       ? window.VoxelWorld.getTopSolidY(sx, sz)
       : ((typeof window.VoxelWorld !== 'undefined' && window.VoxelWorld.getTerrainHeight)
         ? window.VoxelWorld.getTerrainHeight(sx, sz) + 1 : 0);
+    }
     const mesh  = buildMesh(typeCfg);
     // Attach rank-based weapon visual to enemy mesh
     attachWeaponVisual(mesh, typeCfg);
