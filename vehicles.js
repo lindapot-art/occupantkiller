@@ -417,6 +417,27 @@ const VehicleSystem = (function () {
       arm.rotation.z = side * 0.3;
       body.add(arm);
     }
+    // Chest rig: 3 grenade pouches across belt line
+    const pouchMat = new THREE.MeshLambertMaterial({ color: 0x2a3018 });
+    for (let p = -1; p <= 1; p++) {
+      const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.12, 0.07), pouchMat);
+      pouch.position.set(p * 0.13, 0.10, 0.18);
+      body.add(pouch);
+    }
+    // Backpack
+    const pack = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.45, 0.18),
+      new THREE.MeshLambertMaterial({ color: 0x4a5530 })
+    );
+    pack.position.set(0, 0.30, -0.22);
+    body.add(pack);
+    // Canteen on hip
+    const canteen = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.13, 8),
+      new THREE.MeshLambertMaterial({ color: 0x5a6a3a })
+    );
+    canteen.position.set(0.28, 0.05, 0.05);
+    body.add(canteen);
     body.castShadow = true;
     return body;
   }

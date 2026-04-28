@@ -1802,6 +1802,7 @@ const GameManager = (function () {
             'F4': 'droneHangar',
             'F5': 'commandCenter',
             'F6': 'wall',
+            'F7': 'dugout',
           };
           if (templateKeys[e.code]) {
             e.preventDefault();

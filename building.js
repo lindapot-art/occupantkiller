@@ -174,6 +174,36 @@ const Building = (function () {
         return blocks;
       }
     },
+
+    dugout: {
+      name: 'Foxhole / Dugout',
+      cost: { dirt: 20, wood: 15 },
+      size: { x: 4, y: 3, z: 4 },
+      generate(ox, oy, oz) {
+        const blocks = [];
+        // Carve out 2-deep pit, 3x3 inside footprint
+        for (let x = 0; x < 3; x++)
+          for (let z = 0; z < 3; z++) {
+            blocks.push({ x: ox + x + 1, y: oy - 1, z: oz + z + 1, t: B.AIR });
+            blocks.push({ x: ox + x + 1, y: oy - 2, z: oz + z + 1, t: B.AIR });
+          }
+        // Sandbag rim around pit (1 block tall)
+        for (let x = 0; x < 4; x++) {
+          blocks.push({ x: ox + x, y: oy, z: oz, t: B.SAND });
+          blocks.push({ x: ox + x, y: oy, z: oz + 3, t: B.SAND });
+        }
+        for (let z = 1; z < 3; z++) {
+          blocks.push({ x: ox, y: oy, z: oz + z, t: B.SAND });
+          blocks.push({ x: ox + 3, y: oy, z: oz + z, t: B.SAND });
+        }
+        // Wooden plank roof partial (front-facing firing slit open)
+        for (let x = 0; x < 4; x++) {
+          blocks.push({ x: ox + x, y: oy + 1, z: oz + 3, t: B.WOOD });
+        }
+        // Leave firing slit at front (oz=0) — no roof cover there
+        return blocks;
+      }
+    },
   };
 
   /* ── Placed structures tracking ──────────────────────────────────── */
