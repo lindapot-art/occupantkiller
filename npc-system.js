@@ -871,6 +871,16 @@ function buildCivilianMesh(npc) {
         group.add(kpL); group.add(kpR);
       } catch (e) {}
     }
+    // Sleeping roll across top of backpack — ~20% of NPCs
+    if (Math.random() < 0.20) {
+      try {
+        var rollMat = new THREE.MeshLambertMaterial({ color: 0x55421a });
+        var sleepRoll = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.45, 8), rollMat);
+        sleepRoll.rotation.z = Math.PI / 2;
+        sleepRoll.position.set(0, 0.95, -0.22);
+        group.add(sleepRoll);
+      } catch (e) {}
+    }
     return group;
   }
 

@@ -6410,7 +6410,7 @@ const GameManager = (function () {
     _scene.add(nade);
     var fwd = _camera.getWorldDirection(new THREE.Vector3());
     var vel = new THREE.Vector3(fwd.x * 18, 6 + fwd.y * 14, fwd.z * 18);
-    _handGrenades.push({ mesh: nade, vel: vel, fuse: 2.5 });
+    _handGrenades.push({ mesh: nade, vel: vel, fuse: 2.5, spin: new THREE.Vector3(8, 6, 4) });
     if (!player.godMode) player.grenades = Math.max(0, player.grenades - 1);
     if (HUD.setHandGrenades) HUD.setHandGrenades(player.godMode ? Infinity : player.grenades);
     _handGrenadeCooldown = 0.45;
@@ -6427,6 +6427,12 @@ const GameManager = (function () {
       g.mesh.position.x += g.vel.x * delta;
       g.mesh.position.y += g.vel.y * delta;
       g.mesh.position.z += g.vel.z * delta;
+      // Tumble while flying
+      if (g.spin) {
+        g.mesh.rotation.x += g.spin.x * delta;
+        g.mesh.rotation.y += g.spin.y * delta;
+        g.mesh.rotation.z += g.spin.z * delta;
+      }
       var groundY = 0;
       try {
         if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTopSolidY) {
