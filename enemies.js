@@ -1480,7 +1480,8 @@ const Enemies = (() => {
   }
 
   // ── Spawn one enemy ───────────────────────────────────────
-  function spawnOne(typeName, groupId, spawnPos) {
+  // opts: { guardPost: {x,y,z}, guardRadius: number, garrisonRole: 'GUARD'|'PATROL'|'SENTRY' }
+  function spawnOne(typeName, groupId, spawnPos, opts) {
     const typeCfg = TYPES[typeName] || TYPES.CONSCRIPT;
     const rank = pickRank(wave);
     const unit = pickUnit();
@@ -1578,6 +1579,13 @@ const Enemies = (() => {
       _surrenderClaimed: false,
       _spawnTimer: 0.3, // spawn-in scale animation duration
       alertIcon: _alertIcon,
+      // ── Garrison/guard role (set when bound to a fixed defensive position like a dugout) ──
+      _guardPost:    (opts && opts.guardPost)    ? { x: opts.guardPost.x, y: opts.guardPost.y || 0, z: opts.guardPost.z } : null,
+      _guardRadius:  (opts && opts.guardRadius)  ? opts.guardRadius : 0,
+      _garrisonRole: (opts && opts.garrisonRole) ? opts.garrisonRole : null,
+      _patrolTimer:  0,
+      _patrolAngle:  Math.random() * Math.PI * 2,
+      _alertedTimer: 0,   // counts down after losing sight; returns to post when 0
     });
     return idx;
   }
@@ -2057,6 +2065,63 @@ const Enemies = (() => {
           e._formationTarget.set(baseTarget.x + fOff.x, 0, baseTarget.z + fOff.z);
           moveTarget = e._formationTarget;
           targetDist = e.mesh.position.distanceTo(moveTarget);
+        }
+      }
+      if (!moveTarget) {
+        // ── Garrison/guard behavior ──────────────────────────
+        // Enemies bound to a defensive post (e.g. dugout) hold that post until
+        // they actively spot the player. They never random-wander.
+        if (e._guardPost) {
+          if (e.playerSpotted) {
+            // Engage from post but don't chase beyond guardRadius * 2.5
+            e._alertedTimer = 4.0;
+          } else if (e._alertedTimer > 0) {
+            e._alertedTimer -= delta;
+          }
+          var holdPost = !e.playerSpotted && e._alertedTimer <= 0;
+          if (holdPost) {
+            if (!e._wanderTarget) e._wanderTarget = new THREE.Vector3();
+            var role = e._garrisonRole || 'GUARD';
+            if (role === 'PATROL') {
+              // Slow circle patrol around the post within guardRadius
+              e._patrolTimer -= delta;
+              if (e._patrolTimer <= 0 || e.mesh.position.distanceTo(e._wanderTarget) < 1.2) {
+                e._patrolAngle += 0.6 + Math.random() * 0.9;
+                var pr = (e._guardRadius || 4) * (0.6 + Math.random() * 0.4);
+                e._wanderTarget.set(
+                  e._guardPost.x + Math.cos(e._patrolAngle) * pr,
+                  0,
+                  e._guardPost.z + Math.sin(e._patrolAngle) * pr
+                );
+                e._patrolTimer = 3 + Math.random() * 4;
+              }
+            } else {
+              // GUARD/SENTRY: stay at post; only adjust target if drifted
+              if (e.mesh.position.distanceTo(new THREE.Vector3(e._guardPost.x, e.mesh.position.y, e._guardPost.z)) > (e._guardRadius || 2)) {
+                e._wanderTarget.set(e._guardPost.x, 0, e._guardPost.z);
+              } else {
+                // Already at post — stand still (target = self position)
+                e._wanderTarget.set(e.mesh.position.x, 0, e.mesh.position.z);
+              }
+            }
+            moveTarget = e._wanderTarget;
+            targetDist = e.mesh.position.distanceTo(moveTarget);
+          } else if (!e.playerSpotted && e._alertedTimer > 0) {
+            // Recently alerted but lost sight — sweep last known direction
+            if (!e._wanderTarget) e._wanderTarget = new THREE.Vector3();
+            e._wanderTarget.set(playerPos.x, 0, playerPos.z);
+            // Clamp to guard leash
+            var leash = (e._guardRadius || 4) * 2.5;
+            var lx = e._wanderTarget.x - e._guardPost.x;
+            var lz = e._wanderTarget.z - e._guardPost.z;
+            var ld = Math.sqrt(lx * lx + lz * lz);
+            if (ld > leash) {
+              e._wanderTarget.x = e._guardPost.x + (lx / ld) * leash;
+              e._wanderTarget.z = e._guardPost.z + (lz / ld) * leash;
+            }
+            moveTarget = e._wanderTarget;
+            targetDist = e.mesh.position.distanceTo(moveTarget);
+          }
         }
       }
       if (!moveTarget) {
@@ -3514,7 +3579,7 @@ const Enemies = (() => {
     setPlayerStealth,
     tagAttacker,
     getSurrenderCount,
-    spawnSingle: function (typeName, pos) { spawnOne(typeName, -1, pos); },
+    spawnSingle: function (typeName, pos, opts) { spawnOne(typeName, -1, pos, opts); },
     spawnReinforcement: function (x, z, count) {
       count = count || 2;
       var types = ['CONSCRIPT', 'CONSCRIPT', 'RIFLEMAN', 'GRENADIER'];

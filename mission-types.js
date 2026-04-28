@@ -165,12 +165,25 @@ const MissionTypes = (function () {
               try { window.VoxelWorld.placeDugout(dx, dy, dz, 5); } catch (e) {}
             }
             missionProgress.dugoutPositions.push({ x: dx, y: dy, z: dz, cleared: false });
-            // Garrison: spawn RU enemies in/around this dugout
+            // Garrison: spawn RU enemies in/around this dugout with proper guard/patrol roles
             if (typeof window !== 'undefined' && window.Enemies && window.Enemies.spawnSingle) {
-              for (var gi = 0; gi < (type.rusGarrisonPerHole || 3); gi++) {
-                var ox = dx + (Math.random() - 0.5) * 1.5;
-                var oz = dz + (Math.random() - 0.5) * 1.5;
-                try { window.Enemies.spawnSingle('CONSCRIPT', { x: ox, z: oz }); } catch (e) {}
+              var garrison = type.rusGarrisonPerHole || 3;
+              for (var gi = 0; gi < garrison; gi++) {
+                // Tight cluster — defenders inside the dugout, not wandering
+                var ang2 = (gi / garrison) * Math.PI * 2;
+                var rad2 = 0.6 + Math.random() * 0.8;
+                var ox = dx + Math.cos(ang2) * rad2;
+                var oz = dz + Math.sin(ang2) * rad2;
+                // First defender = sentry at center; others split GUARD/PATROL
+                var role = (gi === 0) ? 'SENTRY' : ((gi % 2 === 0) ? 'GUARD' : 'PATROL');
+                var unitType = (gi === 0) ? 'RIFLEMAN' : 'CONSCRIPT'; // sentry slightly tougher
+                try {
+                  window.Enemies.spawnSingle(unitType, { x: ox, z: oz }, {
+                    guardPost: { x: dx, y: dy, z: dz },
+                    guardRadius: 5,
+                    garrisonRole: role
+                  });
+                } catch (e) {}
               }
             }
           }
@@ -414,3 +427,4 @@ const MissionTypes = (function () {
     getActive, getProgress, cancelMission, completeMission, clear
   };
 })();
+if (typeof window !== 'undefined') window.MissionTypes = MissionTypes;
