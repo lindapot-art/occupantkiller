@@ -1195,6 +1195,12 @@ const GameManager = (function () {
     if (typeof MissionTypes !== 'undefined' && MissionTypes && typeof MissionTypes.clear === 'function') MissionTypes.clear();
     if (typeof Feedback !== 'undefined' && Feedback && typeof Feedback.init === 'function') Feedback.init();
     if (typeof Progression !== 'undefined' && Progression && typeof Progression.init === 'function') Progression.init();
+    // Birds + Mortar + Premium + Lottery + Gyro
+    try { if (window.Birds   && Birds.init)   Birds.init(_scene); } catch (e) {}
+    try { if (window.Mortar  && Mortar.init)  Mortar.init(_scene, _camera, _controls); } catch (e) {}
+    try { if (window.Premium && Premium.init) Premium.init(); } catch (e) {}
+    try { if (window.Lottery && Lottery.init) Lottery.init(); } catch (e) {}
+    try { if (window.Gyro    && Gyro.init)    Gyro.init(_camera); } catch (e) {}
 
     // Create weapons
     Weapons.createGunMesh(_camera);
@@ -5440,6 +5446,10 @@ const GameManager = (function () {
       if (typeof StageVFX !== 'undefined') StageVFX.update(delta);
       if (typeof Flags !== 'undefined' && Flags.update) Flags.update(delta);
       if (typeof Environment !== 'undefined' && Environment.update) Environment.update(delta);
+      // Birds / Mortar / Gyro per-frame
+      try { if (window.Birds  && Birds.update)  Birds.update(delta); } catch (eBU) {}
+      try { if (window.Mortar && Mortar.update) Mortar.update(delta); } catch (eMU) {}
+      try { if (window.Gyro   && Gyro.update)   Gyro.update(delta); } catch (eGU) {}
 
       // ═══ NEW FEATURE SYSTEM UPDATES (59 features) ═══
 
@@ -5891,7 +5901,14 @@ const GameManager = (function () {
       }
     }
 
-    _renderer.render(_scene, _camera);
+    // Switch to mortar bird's-eye cam if deployed
+    var renderCam = _camera;
+    try {
+      if (window.Mortar && window.Mortar.isDeployed && window.Mortar.isDeployed() && window.GameManager.__mortarCam) {
+        renderCam = window.GameManager.__mortarCam;
+      }
+    } catch (eMR) {}
+    _renderer.render(_scene, renderCam);
   }
 
   /* ── Extended HUD Updates ────────────────────────────────────────── */

@@ -32,7 +32,14 @@ window.AudioSystem = (function () {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
       masterGain = ctx.createGain();
       masterGain.gain.value = volume;
-      masterGain.connect(ctx.destination);
+      // Bass-heavy master EQ: low-shelf +6 dB at 120 Hz, slight high cut to soften screech
+      var bass = ctx.createBiquadFilter(); bass.type = 'lowshelf'; bass.frequency.value = 120; bass.gain.value = 6;
+      var sub  = ctx.createBiquadFilter(); sub.type  = 'peaking';  sub.frequency.value  =  60; sub.gain.value  = 4; sub.Q.value = 0.9;
+      var hicut= ctx.createBiquadFilter(); hicut.type= 'highshelf'; hicut.frequency.value = 9000; hicut.gain.value = -2;
+      masterGain.connect(bass);
+      bass.connect(sub);
+      sub.connect(hicut);
+      hicut.connect(ctx.destination);
     } catch (e) {
       enabled = false;
     }
@@ -1716,9 +1723,144 @@ window.AudioSystem = (function () {
     }
   }
 
+  // ── Bass-heavy enemy / player wound + death sounds ─────────────────
+  function playEnemyWound(spatialPos) {
+    if (!enabled || !ctx) return;
+    var now = ctx.currentTime;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.45, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+    g.connect(masterGain);
+    var o = ctx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(180 + Math.random() * 40, now);
+    o.frequency.exponentialRampToValueAtTime(80, now + 0.5);
+    var f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 320; f.Q.value = 4;
+    o.connect(f); f.connect(g);
+    o.start(now); o.stop(now + 0.6);
+  }
+  function playEnemyDying(spatialPos) {
+    if (!enabled || !ctx) return;
+    var now = ctx.currentTime;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.55, now + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 1.4);
+    g.connect(masterGain);
+    var o = ctx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(140, now);
+    o.frequency.exponentialRampToValueAtTime(50, now + 1.2);
+    var f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 600;
+    // Choke / gurgle: noise burst
+    var noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.8, ctx.sampleRate);
+    var nd = noiseBuf.getChannelData(0);
+    for (var i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
+    var nSrc = ctx.createBufferSource(); nSrc.buffer = noiseBuf;
+    var nFilt = ctx.createBiquadFilter(); nFilt.type = 'bandpass'; nFilt.frequency.value = 600; nFilt.Q.value = 5;
+    var nGain = ctx.createGain(); nGain.gain.value = 0.25;
+    nSrc.connect(nFilt); nFilt.connect(nGain); nGain.connect(g);
+    o.connect(f); f.connect(g);
+    o.start(now); o.stop(now + 1.4);
+    nSrc.start(now); nSrc.stop(now + 0.8);
+  }
+  function playPlayerWound() {
+    if (!enabled || !ctx) return;
+    var now = ctx.currentTime;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.5, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+    g.connect(masterGain);
+    var o = ctx.createOscillator(); o.type = 'triangle';
+    o.frequency.setValueAtTime(220, now);
+    o.frequency.exponentialRampToValueAtTime(110, now + 0.6);
+    var f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 800;
+    o.connect(f); f.connect(g);
+    o.start(now); o.stop(now + 0.7);
+  }
+  function playVehicleIdle(rpm) {
+    // Returns a handle so caller can stop / update
+    if (!enabled || !ctx) return null;
+    var now = ctx.currentTime;
+    var g = ctx.createGain(); g.gain.value = 0.18; g.connect(masterGain);
+    var o1 = ctx.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = 50 + (rpm || 0) * 30;
+    var o2 = ctx.createOscillator(); o2.type = 'square';   o2.frequency.value = 25 + (rpm || 0) * 18;
+    var f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 320;
+    o1.connect(f); o2.connect(f); f.connect(g);
+    var lfo = ctx.createOscillator(); lfo.frequency.value = 6;
+    var lfoG = ctx.createGain(); lfoG.gain.value = 8;
+    lfo.connect(lfoG); lfoG.connect(o1.frequency);
+    o1.start(now); o2.start(now); lfo.start(now);
+    return {
+      setRpm: function (v) {
+        try { o1.frequency.setTargetAtTime(50 + v * 30, ctx.currentTime, 0.1); o2.frequency.setTargetAtTime(25 + v * 18, ctx.currentTime, 0.1); } catch (e) {}
+      },
+      stop: function () {
+        var t = ctx.currentTime;
+        try { g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); } catch (e) {}
+        try { o1.stop(t + 0.32); o2.stop(t + 0.32); lfo.stop(t + 0.32); } catch (e) {}
+      }
+    };
+  }
+  function playMortarFire() {
+    if (!enabled || !ctx) return;
+    var now = ctx.currentTime;
+    var g = ctx.createGain(); g.connect(masterGain);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.9, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+    var o = ctx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(120, now);
+    o.frequency.exponentialRampToValueAtTime(35, now + 0.6);
+    var f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 380;
+    o.connect(f); f.connect(g);
+    o.start(now); o.stop(now + 0.8);
+    // Click on top
+    var nb = ctx.createBuffer(1, ctx.sampleRate * 0.06, ctx.sampleRate);
+    var nd = nb.getChannelData(0);
+    for (var i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1);
+    var ns = ctx.createBufferSource(); ns.buffer = nb;
+    var ng = ctx.createGain(); ng.gain.value = 0.3;
+    ns.connect(ng); ng.connect(masterGain);
+    ns.start(now); ns.stop(now + 0.06);
+  }
+  function playBirdCaw() {
+    if (!enabled || !ctx) return;
+    var now = ctx.currentTime;
+    var g = ctx.createGain(); g.connect(masterGain);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.22, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+    var o = ctx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(900 + Math.random() * 200, now);
+    o.frequency.exponentialRampToValueAtTime(400, now + 0.3);
+    var f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 6;
+    o.connect(f); f.connect(g);
+    o.start(now); o.stop(now + 0.4);
+  }
+  function playBrickShatter() {
+    if (!enabled || !ctx) return;
+    var now = ctx.currentTime;
+    var nb = ctx.createBuffer(1, ctx.sampleRate * 0.45, ctx.sampleRate);
+    var nd = nb.getChannelData(0);
+    for (var i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nd.length, 2);
+    var ns = ctx.createBufferSource(); ns.buffer = nb;
+    var f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 3;
+    var g = ctx.createGain(); g.gain.value = 0.4;
+    ns.connect(f); f.connect(g); g.connect(masterGain);
+    ns.start(now); ns.stop(now + 0.45);
+  }
+
   return {
     init: init,
     resume: resume,
+    playEnemyWound: playEnemyWound,
+    playEnemyDying: playEnemyDying,
+    playPlayerWound: playPlayerWound,
+    playVehicleIdle: playVehicleIdle,
+    playMortarFire: playMortarFire,
+    playBirdCaw: playBirdCaw,
+    playBrickShatter: playBrickShatter,
     playGunshot: playGunshot,
     playSpatialGunshot: playSpatialGunshot,
     playExplosion: playExplosion,

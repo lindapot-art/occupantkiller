@@ -2459,6 +2459,12 @@ const Weapons = (() => {
     if (_camera && typeof Tracers !== 'undefined' && Tracers.spawnCasing) {
       Tracers.spawnCasing(_camera);
     }
+    // Scare birds nearby — chaotic flock scatter on every shot
+    try {
+      if (window.Birds && window.Birds.scareNear && _camera) {
+        window.Birds.scareNear(_camera.position, 40);
+      }
+    } catch (eSB) {}
   }
 
   // ── Recoil / reload animation state ───────────────────────
@@ -4097,6 +4103,31 @@ const Weapons = (() => {
     getWeaponSkin:          getWeaponSkin,
     applySkinToMesh:        applySkinToMesh,
     markBlooded:            markBlooded,
+    // AP Ammo (premium): more penetration, larger damage on hit
+    addAPAmmo: function (n) {
+      try { window._apAmmo = (window._apAmmo || 0) + (n | 0); } catch (e) {}
+      try { window.HUD && window.HUD.showToast && window.HUD.showToast('🛡 +' + n + ' AP rounds', 1800, '#88ddff'); } catch (e) {}
+    },
+    getAPAmmo: function () { return window._apAmmo || 0; },
+    consumeAPAmmo: function (n) {
+      var have = window._apAmmo || 0;
+      if (have <= 0) return false;
+      window._apAmmo = Math.max(0, have - (n | 1));
+      return true;
+    },
+    // Unlock a random not-yet-owned weapon (used by lottery prize)
+    unlockRandomWeapon: function () {
+      var locked = [];
+      for (var i = 0; i < unlocked.length; i++) { if (!unlocked[i]) locked.push(i); }
+      if (!locked.length) return -1;
+      var pick = locked[Math.floor(Math.random() * locked.length)];
+      unlocked[pick] = true;
+      try {
+        var wname = (WEAPONS[pick] && WEAPONS[pick].name) || ('Weapon #' + pick);
+        if (window.HUD && window.HUD.showToast) window.HUD.showToast('🎁 New weapon unlocked: ' + wname, 3500, '#00ff88');
+      } catch (e) {}
+      return pick;
+    },
   };
 })();
 

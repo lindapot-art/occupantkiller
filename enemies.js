@@ -3490,6 +3490,13 @@ const Enemies = (() => {
 
     enemy.hp = Math.max(0, enemy.hp - amount);
 
+    // Wound grunt (bass-heavy) on non-fatal hit
+    try {
+      if (enemy.hp > 0 && window.AudioSystem && window.AudioSystem.playEnemyWound && Math.random() < 0.5) {
+        window.AudioSystem.playEnemyWound();
+      }
+    } catch (eWG) {}
+
     // Floating damage number + white flash on hit
     if (enemy.mesh) {
       // 3D damage numbers disabled — Feedback.spawnDamageNumber (CSS DOM) handles this
@@ -3579,6 +3586,8 @@ const Enemies = (() => {
         var _relA = Math.atan2(_ddx, _ddz) - _camY;
         window.AudioSystem.playEnemyDeath(_dDist, Math.sin(_relA));
       }
+      // Bass-heavy "dying" gurgle layered on top
+      try { if (window.AudioSystem && window.AudioSystem.playEnemyDying) window.AudioSystem.playEnemyDying(); } catch (eED) {}
       // Spawn persistent blood pool decal on the ground at corpse position
       if (scene && enemy.mesh) {
         try {
