@@ -1122,25 +1122,47 @@ const GameManager = (function () {
     })();
 
     // ── Init all sub-systems ─────────────────────────────────
+    // Lightweight progress reporter so the boot preloader keeps moving
+    // during the ~1s init() blocks the main thread; otherwise it looks
+    // frozen on desktop (and worse on mobile / slow GPUs).
+    var _initStep = 0;
+    var _initSteps = 14;
+    function _bootStep(label) {
+      _initStep++;
+      if (typeof window.__bootProgress === 'function') {
+        var pct = 30 + Math.round((_initStep / _initSteps) * 65); // 30→95
+        try { window.__bootProgress(pct, label, ''); } catch (e) {}
+      }
+    }
 
     if (CameraSystem && typeof CameraSystem.init === 'function') CameraSystem.init(_camera);
+    _bootStep('camera');
     if (window.VoxelWorld && typeof window.VoxelWorld.init === 'function') window.VoxelWorld.init(_scene);
+    _bootStep('voxel world');
 
     if (TimeSystem && typeof TimeSystem.init === 'function') TimeSystem.init(_scene, sunLight, ambLight, hemiLight);
+    _bootStep('time');
     if (Building && typeof Building.init === 'function') Building.init(_scene);
+    _bootStep('building');
     if (NPCSystem && typeof NPCSystem.init === 'function') NPCSystem.init(_scene);
+    _bootStep('npc system');
     if (DroneSystem && typeof DroneSystem.init === 'function') DroneSystem.init(_scene, _camera);
+    _bootStep('drones');
     if (typeof RefineryStrike !== 'undefined' && RefineryStrike.init) RefineryStrike.init(_scene);
     if (VehicleSystem && typeof VehicleSystem.init === 'function') VehicleSystem.init(_scene);
+    _bootStep('vehicles');
     if (Economy && typeof Economy.init === 'function') Economy.init();
     if (SkillSystem && typeof SkillSystem.init === 'function') SkillSystem.init();
     if (RankSystem && typeof RankSystem.init === 'function') RankSystem.init();
+    _bootStep('progression');
     if (MissionSystem && typeof MissionSystem.init === 'function') MissionSystem.init();
     if (Automation && typeof Automation.init === 'function') Automation.init();
     if (Pickups && typeof Pickups.init === 'function') Pickups.init(_scene);
+    _bootStep('missions');
 
     // Tracers system
     if (typeof Tracers !== 'undefined' && Tracers && typeof Tracers.init === 'function') Tracers.init(_scene);
+    _bootStep('tracers');
 
     // Audio, Weather & ML systems
     if (window.AudioSystem && typeof window.AudioSystem.init === 'function') window.AudioSystem.init();
@@ -3556,9 +3578,10 @@ const GameManager = (function () {
       var itemId = shopBtns[si2].getAttribute('data-item');
       if (btnTexts[itemId]) shopBtns[si2].textContent = btnTexts[itemId];
     }
-    // Auto-start countdown (15s)
+    // Auto-start countdown (5s) — short so wave-clear feels snappy.
+    // Click anywhere on the overlay or press SPACE to skip immediately.
     if (window._shopCountdownId) clearInterval(window._shopCountdownId);
-    var _shopSec = 15;
+    var _shopSec = 5;
     var countdownEl = document.getElementById('shop-countdown');
     if (countdownEl) countdownEl.textContent = _shopSec;
     window._shopCountdownId = setInterval(function () {
@@ -3571,6 +3594,23 @@ const GameManager = (function () {
         if (nwBtn) nwBtn.click();
       }
     }, 1000);
+    // Tap-to-skip / Space-to-skip (bound once per wave-clear).
+    var ovWC = document.getElementById('overlay-waveclear');
+    if (ovWC && !ovWC.__skipBound) {
+      ovWC.__skipBound = true;
+      var skip = function (e) {
+        // Don't skip when the user clicked a shop button or the next-wave button itself.
+        if (e && e.target && (e.target.classList.contains('shop-buy-btn') || e.target.id === 'next-wave-btn')) return;
+        if (window._shopCountdownId) { clearInterval(window._shopCountdownId); window._shopCountdownId = null; }
+        var nwBtn = document.getElementById('next-wave-btn');
+        if (nwBtn) nwBtn.click();
+      };
+      ovWC.addEventListener('click', skip);
+      ovWC.addEventListener('touchstart', skip, { passive: true });
+      window.addEventListener('keydown', function (e) {
+        if (e.code === 'Space' && ovWC.style.display !== 'none') { e.preventDefault(); skip(e); }
+      });
+    }
   }
 
   /* ── Player Movement ─────────────────────────────────────────────── */
