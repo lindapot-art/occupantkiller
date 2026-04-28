@@ -619,6 +619,10 @@ const Feedback = (function () {
     _tipCheckTimer += 0.016; // roughly per-frame, throttled by caller
     if (_tipCheckTimer < 1.0) return; // check every 1s
     _tipCheckTimer = 0;
+    // Desktop key tips (SHIFT/R/T/B/F/G/Q/E) are useless and visually intrusive on mobile.
+    var isMobile = typeof document !== 'undefined' && document.documentElement
+      && document.documentElement.classList && document.documentElement.classList.contains('is-mobile');
+    if (isMobile) return;
     for (var i = 0; i < _tips.length; i++) {
       var tip = _tips[i];
       if (_shownTips[tip.id]) continue;
