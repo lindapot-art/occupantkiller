@@ -3297,7 +3297,16 @@ const Weapons = (() => {
   function getClip()     { return cur().type === 'MELEE' ? Infinity : curState().clip; }
   function getReserve()  { return cur().type === 'MELEE' ? '—' : curState().reserve; }
   function getClipSize() { return cur().clipSize || 0; }
-  function getDamage()   { return cur().damage; }
+  function getDamage()   {
+    var base = cur().damage;
+    /* WoT-style premium ammo: if equipped + compatible, multiply damage AND
+       consume one round. Falls back to 1.0 when no pack equipped or empty. */
+    if (typeof Marketplace !== 'undefined' && typeof Marketplace.consumeAmmoShot === 'function') {
+      var mult = Marketplace.consumeAmmoShot(cur().type);
+      if (mult && mult !== 1.0) return Math.round(base * mult);
+    }
+    return base;
+  }
   function isZoomed()    { return zoomed; }
   function setHoldBreath(v) { _holdingBreath = !!v; }
   function startInspect() { if (_inspectTimer <= 0 && !curState().reloading) _inspectTimer = INSPECT_DUR; }

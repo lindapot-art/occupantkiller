@@ -137,7 +137,52 @@ const Marketplace = (function () {
   ];
 
   /* ── Premium State ─────────────────────────────────────────────── */
-  let activePremium = null;  // { tier, expiresAt }
+  let activePremium = null;  // { tier, expiresAt, durationKey }
+
+  /* ── Premium Subscription Durations (WoT-style flexible billing) ─
+     Each duration is a price multiplier on the base 30-day tier cost.
+     1-day = 5% (5x daily premium), week = 25%, month = 100% (base),
+     90-day = 270% (10% off), year = 950% (~21% off). */
+  const PREMIUM_DURATIONS = [
+    { key: 'day',     label: '1 Day',    days: 1,   priceMult: 0.05 },
+    { key: 'week',    label: '1 Week',   days: 7,   priceMult: 0.25 },
+    { key: 'month',   label: '1 Month',  days: 30,  priceMult: 1.00 },
+    { key: 'quarter', label: '3 Months', days: 90,  priceMult: 2.70 },
+    { key: 'year',    label: '1 Year',   days: 365, priceMult: 9.50 },
+  ];
+
+  function getPremiumDurations() { return PREMIUM_DURATIONS.slice(); }
+
+  function getPremiumPriceFor(tierIdx, durationKey) {
+    var tier = PREMIUM_TIERS[tierIdx];
+    var dur  = PREMIUM_DURATIONS.find(function (d) { return d.key === durationKey; });
+    if (!tier || !dur) return null;
+    return {
+      polCost: parseFloat((tier.polCost * dur.priceMult).toFixed(4)),
+      okcCost: Math.ceil(tier.okcCost * dur.priceMult),
+      days:    dur.days,
+      label:   dur.label,
+    };
+  }
+
+  /* ── Premium Ammo (WoT-style consumable boost rounds) ────────────
+     Each pack contains N rounds. While equipped, every shot consumes
+     one round and applies the pack's damage/penetration multiplier.
+     When pack is empty, it auto-unequips and the weapon falls back to
+     standard ammo. Compatible weapon classes are checked at equip. */
+  const PREMIUM_AMMO = [
+    { id: 'AMMO_AP',   name: '🔩 AP Rounds (Armor-Piercing)',  damageMult: 1.50, penMult: 2.00, packSize: 30, polCost: 0.10, okcCost: 100, weaponTypes: ['ASSAULT','NATO','SNIPER','LMG','HMG','MACHINEGUN','AMR','MINIGUN','GATLING','SILENT'] },
+    { id: 'AMMO_HE',   name: '💥 HE Rounds (High-Explosive)',  damageMult: 1.80, penMult: 1.20, packSize: 20, polCost: 0.15, okcCost: 150, weaponTypes: ['ASSAULT','NATO','LMG','MACHINEGUN','GRENADE','AT','ATGM','AA','THERMOBARIC'] },
+    { id: 'AMMO_HEAT', name: '🔥 HEAT Rounds (Anti-Tank)',     damageMult: 2.50, penMult: 3.00, packSize: 5,  polCost: 0.40, okcCost: 400, weaponTypes: ['AT','ATGM','THERMOBARIC','SNIPER','AMR'] },
+    { id: 'AMMO_GOLD', name: '🥇 GOLD Rounds (Premium APCR)',  damageMult: 2.00, penMult: 2.50, packSize: 25, polCost: 0.50, okcCost: 500, weaponTypes: ['ASSAULT','NATO','SNIPER','LMG','HMG','MACHINEGUN','PISTOL','SMG','AMR','MINIGUN','GATLING','SILENT','SHOTGUN'] },
+    { id: 'AMMO_INC',  name: '🔥 Incendiary Rounds',           damageMult: 1.30, penMult: 1.00, packSize: 40, polCost: 0.08, okcCost: 80,  weaponTypes: ['ASSAULT','NATO','SMG','LMG','MACHINEGUN','PISTOL','MINIGUN','SHOTGUN','SILENT'] },
+    { id: 'AMMO_TRACER',name:'✨ Tracer Rounds (+visibility)', damageMult: 1.10, penMult: 1.10, packSize: 50, polCost: 0.05, okcCost: 50,  weaponTypes: ['ASSAULT','NATO','SMG','LMG','HMG','MACHINEGUN','MINIGUN','GATLING'] },
+  ];
+
+  /* Inventory: { AMMO_AP: roundsRemaining, ... } */
+  let premiumAmmoInv = {};
+  /* Currently equipped pack id, or null */
+  let activeAmmoId = null;
 
   /* ── Game Assets (NFT-like purchasable content) ────────────────── */
   const GAME_ASSETS = [
@@ -411,29 +456,126 @@ const Marketplace = (function () {
   }
 
   /* ── Purchase Premium Subscription ─────────────────────────────── */
-  async function buyPremiumWithPOL(tierIdx) {
+  function _grantPremium(tier, durationDays, durationKey) {
+    /* Stack: if already premium of same tier, EXTEND. Else replace. */
+    var addMs = durationDays * 86400000;
+    var base  = (activePremium && activePremium.tier.id === tier.id && activePremium.expiresAt > Date.now())
+                ? activePremium.expiresAt : Date.now();
+    activePremium = { tier: tier, expiresAt: base + addMs, durationKey: durationKey || 'month' };
+  }
+
+  async function buyPremiumWithPOL(tierIdx, durationKey) {
     var tier = PREMIUM_TIERS[tierIdx];
     if (!tier) return false;
     if (!Blockchain.isConnected()) { return false; }
-    var result = await Blockchain.purchaseWithDonation(GAME_WALLET, tier.polCost);
+    var price = durationKey ? getPremiumPriceFor(tierIdx, durationKey)
+                            : { polCost: tier.polCost, days: tier.duration, label: tier.name };
+    if (!price) return false;
+    var result = await Blockchain.purchaseWithDonation(GAME_WALLET, price.polCost);
     if (result) {
-      activePremium = { tier: tier, expiresAt: Date.now() + tier.duration * 86400000 };
-      addTx('premium', 'Purchased ' + tier.name, -tier.polCost, 'POL');
+      _grantPremium(tier, price.days, durationKey || 'month');
+      addTx('premium', 'Purchased ' + tier.name + ' (' + (price.label || price.days + 'd') + ')', -price.polCost, 'POL');
       return true;
     }
     return false;
   }
 
-  function buyPremiumWithOKC(tierIdx) {
+  function buyPremiumWithOKC(tierIdx, durationKey) {
     var tier = PREMIUM_TIERS[tierIdx];
     if (!tier) return false;
-    if (okcBalance >= tier.okcCost) {
-      okcBalance -= tier.okcCost;
-      activePremium = { tier: tier, expiresAt: Date.now() + tier.duration * 86400000 };
-      addTx('premium', 'Purchased ' + tier.name, -tier.okcCost, 'OKC');
+    var price = durationKey ? getPremiumPriceFor(tierIdx, durationKey)
+                            : { okcCost: tier.okcCost, days: tier.duration, label: tier.name };
+    if (!price) return false;
+    if (okcBalance >= price.okcCost) {
+      okcBalance -= price.okcCost;
+      _grantPremium(tier, price.days, durationKey || 'month');
+      addTx('premium', 'Purchased ' + tier.name + ' (' + (price.label || price.days + 'd') + ')', -price.okcCost, 'OKC');
       return true;
     }
     return false;
+  }
+
+  /* ── Premium Ammo Operations ─────────────────────────────────── */
+  function getPremiumAmmoTypes() { return PREMIUM_AMMO.slice(); }
+  function getPremiumAmmoInv()   { return Object.assign({}, premiumAmmoInv); }
+  function getActiveAmmoId()     { return activeAmmoId; }
+  function getActiveAmmoInfo() {
+    if (!activeAmmoId) return null;
+    var def = PREMIUM_AMMO.find(function (a) { return a.id === activeAmmoId; });
+    if (!def) return null;
+    return {
+      id: def.id, name: def.name, damageMult: def.damageMult, penMult: def.penMult,
+      remaining: premiumAmmoInv[def.id] || 0,
+      weaponTypes: def.weaponTypes.slice(),
+    };
+  }
+
+  function buyPremiumAmmoWithOKC(typeId, packs) {
+    packs = Math.max(1, packs|0 || 1);
+    var def = PREMIUM_AMMO.find(function (a) { return a.id === typeId; });
+    if (!def) return false;
+    var cost = def.okcCost * packs;
+    if (okcBalance < cost) return false;
+    okcBalance -= cost;
+    premiumAmmoInv[def.id] = (premiumAmmoInv[def.id] || 0) + def.packSize * packs;
+    addTx('ammo', 'Bought ' + packs + 'x ' + def.name + ' (' + (def.packSize * packs) + ' rds)', -cost, 'OKC');
+    return true;
+  }
+
+  async function buyPremiumAmmoWithPOL(typeId, packs) {
+    packs = Math.max(1, packs|0 || 1);
+    var def = PREMIUM_AMMO.find(function (a) { return a.id === typeId; });
+    if (!def) return false;
+    if (typeof Blockchain === 'undefined' || !Blockchain.isConnected()) return false;
+    var cost = parseFloat((def.polCost * packs).toFixed(4));
+    var ok = await Blockchain.purchaseWithDonation(GAME_WALLET, cost);
+    if (!ok) return false;
+    premiumAmmoInv[def.id] = (premiumAmmoInv[def.id] || 0) + def.packSize * packs;
+    addTx('ammo', 'Bought ' + packs + 'x ' + def.name + ' (' + (def.packSize * packs) + ' rds)', -cost, 'POL');
+    return true;
+  }
+
+  function equipPremiumAmmo(typeId) {
+    if (typeId === null) { activeAmmoId = null; return true; }
+    var def = PREMIUM_AMMO.find(function (a) { return a.id === typeId; });
+    if (!def) return false;
+    if ((premiumAmmoInv[def.id] || 0) <= 0) return false;
+    activeAmmoId = def.id;
+    return true;
+  }
+
+  function _isAmmoCompatible(weaponType) {
+    if (!activeAmmoId) return false;
+    var def = PREMIUM_AMMO.find(function (a) { return a.id === activeAmmoId; });
+    if (!def) return false;
+    return def.weaponTypes.indexOf(weaponType) >= 0;
+  }
+
+  /* Returns multiplier for current shot AND consumes one round if applicable.
+     Called by Weapons.getDamage() per shot. */
+  function consumeAmmoShot(weaponType) {
+    if (!activeAmmoId) return 1.0;
+    if (!_isAmmoCompatible(weaponType)) return 1.0;
+    var def = PREMIUM_AMMO.find(function (a) { return a.id === activeAmmoId; });
+    if (!def) return 1.0;
+    if ((premiumAmmoInv[def.id] || 0) <= 0) {
+      activeAmmoId = null;
+      return 1.0;
+    }
+    premiumAmmoInv[def.id]--;
+    if (premiumAmmoInv[def.id] <= 0) {
+      delete premiumAmmoInv[def.id];
+      activeAmmoId = null;
+    }
+    return def.damageMult;
+  }
+
+  /* Read-only check (does NOT consume) — for UI/HUD damage preview. */
+  function getAmmoDamageMult(weaponType) {
+    if (!activeAmmoId) return 1.0;
+    if (!_isAmmoCompatible(weaponType)) return 1.0;
+    var def = PREMIUM_AMMO.find(function (a) { return a.id === activeAmmoId; });
+    return def ? def.damageMult : 1.0;
   }
 
   /* ── Sell Weapon for OKC ───────────────────────────────────────── */
@@ -748,6 +890,8 @@ const Marketplace = (function () {
     txHistory      = [];
     clubMembership = null;
     ownedNfts      = [];
+    premiumAmmoInv = {};
+    activeAmmoId   = null;
   }
 
   /* ── Getters ───────────────────────────────────────────────────── */
@@ -780,6 +924,13 @@ const Marketplace = (function () {
 
     /* premium */
     isPremium, getPremiumInfo, getEarnMultiplier, getShopDiscount,
+    getPremiumDurations, getPremiumPriceFor,
+
+    /* premium ammo (WoT-style consumables) */
+    getPremiumAmmoTypes, getPremiumAmmoInv,
+    buyPremiumAmmoWithOKC, buyPremiumAmmoWithPOL,
+    equipPremiumAmmo, getActiveAmmoId, getActiveAmmoInfo,
+    consumeAmmoShot, getAmmoDamageMult,
 
     /* nft club (off-chain) */
     getClubTiers, getClubTier, getClubMember,
