@@ -2096,34 +2096,214 @@ window.VoxelWorld = (function () {
       const vz = randInWorld();
       const h = getTerrainHeight(vx, vz);
       if (h <= 1) continue;
-      const type = Math.random();
-      if (type < 0.5) {
-        // Destroyed car/truck (small)
-        for (let x = 0; x < 3; x++) {
-          for (let z = 0; z < 2; z++) {
-            setBlock(vx + x, h, vz + z, BLOCK.METAL);
-            if (x > 0 && x < 2) setBlock(vx + x, h + 1, vz + z, BLOCK.METAL);
-          }
-        }
-        // Burnt marks
-        setBlock(vx + 1, h + 2, vz, BLOCK.RUBBLE);
-      } else {
-        // Destroyed APC/tank (larger)
-        for (let x = 0; x < 5; x++) {
-          for (let z = 0; z < 3; z++) {
-            setBlock(vx + x, h, vz + z, BLOCK.METAL);
-            if (x >= 1 && x <= 3 && z >= 0 && z <= 2) {
-              setBlock(vx + x, h + 1, vz + z, BLOCK.METAL);
-            }
-          }
-        }
-        // Turret
-        setBlock(vx + 2, h + 2, vz + 1, BLOCK.METAL);
-        setBlock(vx + 3, h + 2, vz + 1, BLOCK.METAL);
-        // Rubble/debris around
-        setBlock(vx - 1, h, vz + 1, BLOCK.RUBBLE);
-        setBlock(vx + 5, h, vz, BLOCK.RUBBLE);
+      const r = Math.random();
+      if (r < 0.30)      generateWreckedTank(vx, vz);
+      else if (r < 0.50) generateWreckedAPC(vx, vz);
+      else if (r < 0.70) generateWreckedCar(vx, vz);
+      else if (r < 0.85) generateWreckedTruck(vx, vz);
+      else if (r < 0.95) generateWreckedBus(vx, vz);
+      else               generateWreckedAmbulance(vx, vz);
+    }
+  }
+
+  // ── Wrecked T-72 / BMP-style tank: hull, blown turret, broken track,
+  //    open hatch, scorched hull, oil/fuel rubble, ammo cookoff blast ring.
+  function generateWreckedTank(ox, oz) {
+    const h = getTerrainHeight(ox, oz);
+    if (h < 1) return;
+    // Hull (6x3x2) — METAL
+    for (let x = 0; x < 6; x++) {
+      for (let z = 0; z < 3; z++) {
+        setBlock(ox + x, h + 1, oz + z, BLOCK.METAL);
+        if (x > 0 && x < 5) setBlock(ox + x, h + 2, oz + z, BLOCK.METAL);
       }
+    }
+    // Tracks — left & right rows, partly blown off
+    for (let x = 0; x < 6; x++) {
+      if (Math.random() < 0.7) setBlock(ox + x, h + 1, oz - 1, BLOCK.METAL);
+      if (Math.random() < 0.7) setBlock(ox + x, h + 1, oz + 3, BLOCK.METAL);
+    }
+    // Turret BLOWN OFF — landed beside hull, upside-down
+    const turX = ox + 3 + (Math.random() < 0.5 ? -5 : 5);
+    const turZ = oz + (Math.random() < 0.5 ? -3 : 4);
+    for (let x = 0; x < 3; x++) for (let z = 0; z < 2; z++) {
+      setBlock(turX + x, h + 1, turZ + z, BLOCK.METAL);
+    }
+    // Gun barrel sticking from displaced turret
+    for (let i = 0; i < 4; i++) setBlock(turX - 1 - i, h + 1, turZ, BLOCK.METAL);
+    // Hatch hole (open) on top of hull
+    setBlock(ox + 2, h + 3, oz + 1, BLOCK.AIR);
+    // Scorch/oil ring
+    for (let i = 0; i < 16; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = 2 + Math.random() * 4;
+      const rx = ox + 3 + Math.floor(Math.cos(ang) * rad);
+      const rz = oz + 1 + Math.floor(Math.sin(ang) * rad);
+      const rh = getTerrainHeight(rx, rz);
+      if (rh > 0) setBlock(rx, rh + 1, rz, BLOCK.RUBBLE);
+    }
+    // Fire pocket on hull (cookoff)
+    if (Math.random() < 0.6) setBlock(ox + 2, h + 3, oz + 1, BLOCK.FIRE);
+  }
+
+  // ── Wrecked BTR / MT-LB APC: 8-wheeled-style wider hull, blown roof, no turret.
+  function generateWreckedAPC(ox, oz) {
+    const h = getTerrainHeight(ox, oz);
+    if (h < 1) return;
+    for (let x = 0; x < 7; x++) {
+      for (let z = 0; z < 3; z++) {
+        setBlock(ox + x, h + 1, oz + z, BLOCK.METAL);
+        if (x > 0 && x < 6 && Math.random() > 0.15) setBlock(ox + x, h + 2, oz + z, BLOCK.METAL);
+      }
+    }
+    // Roof blown — random gaps
+    for (let x = 1; x < 6; x++) for (let z = 0; z < 3; z++) {
+      if (Math.random() < 0.4) setBlock(ox + x, h + 2, oz + z, BLOCK.AIR);
+    }
+    // Wheels (visible as METAL pylons on each side)
+    for (let i = 0; i < 4; i++) {
+      const wx = ox + 1 + i * 1.5 | 0;
+      if (Math.random() < 0.7) setBlock(wx, h + 1, oz - 1, BLOCK.METAL);
+      if (Math.random() < 0.7) setBlock(wx, h + 1, oz + 3, BLOCK.METAL);
+    }
+    // Debris ring
+    for (let i = 0; i < 10; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = 2 + Math.random() * 3;
+      const rx = ox + 3 + Math.floor(Math.cos(ang) * rad);
+      const rz = oz + 1 + Math.floor(Math.sin(ang) * rad);
+      const rh = getTerrainHeight(rx, rz);
+      if (rh > 0) setBlock(rx, rh + 1, rz, BLOCK.RUBBLE);
+    }
+    if (Math.random() < 0.4) setBlock(ox + 3, h + 2, oz + 1, BLOCK.FIRE);
+  }
+
+  // ── Wrecked civilian car: small, flipped, smashed glass.
+  function generateWreckedCar(ox, oz) {
+    const h = getTerrainHeight(ox, oz);
+    if (h < 1) return;
+    const flipped = Math.random() < 0.4;
+    // Body 3x2
+    for (let x = 0; x < 3; x++) for (let z = 0; z < 2; z++) {
+      setBlock(ox + x, h + 1, oz + z, BLOCK.METAL);
+    }
+    if (!flipped) {
+      // Roof / cabin
+      for (let x = 1; x < 3; x++) {
+        setBlock(ox + x, h + 2, oz, Math.random() < 0.6 ? BLOCK.METAL : BLOCK.GLASS);
+        setBlock(ox + x, h + 2, oz + 1, Math.random() < 0.6 ? BLOCK.METAL : BLOCK.GLASS);
+      }
+      // Hood blown open (RUBBLE on engine)
+      setBlock(ox, h + 1, oz, BLOCK.RUBBLE);
+    } else {
+      // Flipped: wheels up
+      setBlock(ox, h + 2, oz, BLOCK.METAL);
+      setBlock(ox + 2, h + 2, oz, BLOCK.METAL);
+      setBlock(ox, h + 2, oz + 1, BLOCK.METAL);
+      setBlock(ox + 2, h + 2, oz + 1, BLOCK.METAL);
+    }
+    // Glass shards around
+    for (let i = 0; i < 5; i++) {
+      const rx = ox + Math.floor((Math.random() - 0.5) * 6);
+      const rz = oz + Math.floor((Math.random() - 0.5) * 6);
+      const rh = getTerrainHeight(rx, rz);
+      if (rh > 0) setBlock(rx, rh + 1, rz, Math.random() < 0.4 ? BLOCK.GLASS : BLOCK.RUBBLE);
+    }
+    if (Math.random() < 0.25) setBlock(ox + 1, h + 2, oz, BLOCK.FIRE);
+  }
+
+  // ── Wrecked civilian truck (fuel/grain truck): longer, cargo bed crushed.
+  function generateWreckedTruck(ox, oz) {
+    const h = getTerrainHeight(ox, oz);
+    if (h < 1) return;
+    // Cab 2x2
+    for (let x = 0; x < 2; x++) for (let z = 0; z < 2; z++) {
+      setBlock(ox + x, h + 1, oz + z, BLOCK.METAL);
+      setBlock(ox + x, h + 2, oz + z, x === 0 ? BLOCK.GLASS : BLOCK.METAL);
+    }
+    // Cargo bed 4x2 (some crushed)
+    for (let x = 2; x < 6; x++) for (let z = 0; z < 2; z++) {
+      setBlock(ox + x, h + 1, oz + z, BLOCK.METAL);
+      if (Math.random() < 0.7) setBlock(ox + x, h + 2, oz + z, BLOCK.RUBBLE);
+    }
+    // Wheels visual hint
+    for (let x = 0; x < 6; x += 2) {
+      setBlock(ox + x, h + 1, oz - 1, BLOCK.METAL);
+      setBlock(ox + x, h + 1, oz + 2, BLOCK.METAL);
+    }
+    // Fuel spill / scorch
+    for (let i = 0; i < 8; i++) {
+      const rx = ox + Math.floor((Math.random() - 0.5) * 8);
+      const rz = oz + Math.floor((Math.random() - 0.5) * 8);
+      const rh = getTerrainHeight(rx, rz);
+      if (rh > 0) setBlock(rx, rh + 1, rz, BLOCK.RUBBLE);
+    }
+    if (Math.random() < 0.5) setBlock(ox + 3, h + 2, oz + 1, BLOCK.FIRE);
+  }
+
+  // ── Wrecked bus (yellow/marshrutka style): long hull, broken windows row.
+  function generateWreckedBus(ox, oz) {
+    const h = getTerrainHeight(ox, oz);
+    if (h < 1) return;
+    for (let x = 0; x < 8; x++) for (let z = 0; z < 2; z++) {
+      setBlock(ox + x, h + 1, oz + z, BLOCK.METAL);
+      // Window row — half blown out
+      if (Math.random() < 0.45) setBlock(ox + x, h + 2, oz + z, BLOCK.GLASS);
+      // Roof (some collapsed)
+      if (Math.random() < 0.5) setBlock(ox + x, h + 3, oz + z, BLOCK.METAL);
+    }
+    // Wheels
+    for (let x = 1; x < 8; x += 3) {
+      setBlock(ox + x, h + 1, oz - 1, BLOCK.METAL);
+      setBlock(ox + x, h + 1, oz + 2, BLOCK.METAL);
+    }
+    // Glass shards & rubble
+    for (let i = 0; i < 12; i++) {
+      const rx = ox + Math.floor((Math.random() - 0.5) * 10);
+      const rz = oz + Math.floor((Math.random() - 0.5) * 6);
+      const rh = getTerrainHeight(rx, rz);
+      if (rh > 0) setBlock(rx, rh + 1, rz, Math.random() < 0.4 ? BLOCK.GLASS : BLOCK.RUBBLE);
+    }
+    if (Math.random() < 0.4) setBlock(ox + 4, h + 3, oz + 1, BLOCK.FIRE);
+  }
+
+  // ── Wrecked ambulance / civilian van: shorter than bus, RED-CROSS hint via FLAG block.
+  function generateWreckedAmbulance(ox, oz) {
+    const h = getTerrainHeight(ox, oz);
+    if (h < 1) return;
+    for (let x = 0; x < 5; x++) for (let z = 0; z < 2; z++) {
+      setBlock(ox + x, h + 1, oz + z, BLOCK.METAL);
+      setBlock(ox + x, h + 2, oz + z, x < 2 ? BLOCK.GLASS : BLOCK.METAL);
+    }
+    // Red cross marker (SIGN block on side if available)
+    setBlock(ox + 3, h + 2, oz - 1, BLOCK.SIGN || BLOCK.METAL);
+    // Wheels
+    setBlock(ox, h + 1, oz - 1, BLOCK.METAL);
+    setBlock(ox + 4, h + 1, oz - 1, BLOCK.METAL);
+    setBlock(ox, h + 1, oz + 2, BLOCK.METAL);
+    setBlock(ox + 4, h + 1, oz + 2, BLOCK.METAL);
+    // Rubble ring
+    for (let i = 0; i < 6; i++) {
+      const rx = ox + Math.floor((Math.random() - 0.5) * 7);
+      const rz = oz + Math.floor((Math.random() - 0.5) * 5);
+      const rh = getTerrainHeight(rx, rz);
+      if (rh > 0) setBlock(rx, rh + 1, rz, BLOCK.RUBBLE);
+    }
+    if (Math.random() < 0.3) setBlock(ox + 2, h + 2, oz + 1, BLOCK.FIRE);
+  }
+
+  // Convoy cluster: 2-4 wrecks lined up along an axis (ambushed column).
+  function generateWreckedConvoy(ox, oz) {
+    const horizontal = Math.random() < 0.5;
+    const cnt = 3 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < cnt; i++) {
+      const off = i * (8 + Math.floor(Math.random() * 4));
+      const cx = ox + (horizontal ? off : 0);
+      const cz = oz + (horizontal ? 0 : off);
+      const r = Math.random();
+      if (r < 0.4)      generateWreckedTank(cx, cz);
+      else if (r < 0.7) generateWreckedAPC(cx, cz);
+      else              generateWreckedTruck(cx, cz);
     }
   }
 
@@ -4253,6 +4433,19 @@ window.VoxelWorld = (function () {
         commercial:  8 + Math.floor(Math.random() * 6),
       });
     } catch (e) { console.warn('warZoneRuins generation skipped:', e); }
+    // Ruined military + civilian vehicles scattered + 2 ambushed convoys.
+    // Real Ukraine reference: shattered armoured columns near Hostomel,
+    // burnt marshrutky and ambulances near Bakhmut, civilian wrecks on
+    // every approach road.
+    try {
+      generateDestroyedVehicles(14 + Math.floor(Math.random() * 8));
+      // Ambushed convoy clusters along axis lines (off-road)
+      for (let c = 0; c < 2; c++) {
+        const cx = Math.floor((Math.random() - 0.5) * WORLD_CHUNKS * CHUNK_SIZE * 0.7);
+        const cz = Math.floor((Math.random() - 0.5) * WORLD_CHUNKS * CHUNK_SIZE * 0.7);
+        if (getTerrainHeight(cx, cz) > 0) generateWreckedConvoy(cx, cz);
+      }
+    } catch (e) { console.warn('destroyedVehicles generation skipped:', e); }
     rebuildAll();
     _levelSpawnPoint = resolveLevelSpawnPoint(level);
     return level;
