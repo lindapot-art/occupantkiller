@@ -200,17 +200,46 @@ window.Bradley = (function () {
 
   function enter() {
     if (!_vehicle) {
-      // Spawn a Bradley right in front of the player
-      var px = _gameCam.position.x, pz = _gameCam.position.z;
-      var py = 0;
-      try { if (window.VoxelWorld && VoxelWorld.getTerrainHeight) py = VoxelWorld.getTerrainHeight(px, pz) || 0; } catch (e) {}
-      _spawnVehicle(new THREE.Vector3(px, py, pz - 6));
+      // Instead of spawning a new Bradley, transfer control to the nearest existing Bradley if available
+      if (window.VehicleSystem && VehicleSystem.getNearestVehicle) {
+        const playerPos = _gameCam ? _gameCam.position : {x:0,y:0,z:0};
+        const nearest = VehicleSystem.getNearestVehicle('bradley', playerPos);
+        if (nearest) {
+          _vehicle = nearest;
+        } else {
+          var px = _gameCam.position.x, pz = _gameCam.position.z;
+          var py = 0;
+          try { if (window.VoxelWorld && VoxelWorld.getTerrainHeight) py = VoxelWorld.getTerrainHeight(px, pz) || 0; } catch (e) {}
+          _spawnVehicle(new THREE.Vector3(px, py, pz - 6));
+        }
+      } else {
+        var px = _gameCam.position.x, pz = _gameCam.position.z;
+        var py = 0;
+        try { if (window.VoxelWorld && VoxelWorld.getTerrainHeight) py = VoxelWorld.getTerrainHeight(px, pz) || 0; } catch (e) {}
+        _spawnVehicle(new THREE.Vector3(px, py, pz - 6));
+      }
     }
     _active = true;
     _camYaw = _vehicle.group.rotation.y;
     _camPitch = -0.22;
     _turretYaw = 0; _turretPitch = 0;
     _ensureChaseCam();
+    // Add first-person interior camera and viewport slit effect
+    if (_gameCam && _vehicle && _vehicle.group) {
+      // Place camera inside vehicle, looking out a narrow slit
+      _gameCam.position.copy(_vehicle.group.position).add(new THREE.Vector3(0, 1.25, -2.1));
+      _gameCam.lookAt(_vehicle.group.position.x, _vehicle.group.position.y + 1.25, _vehicle.group.position.z + 4);
+      // Optionally, add a simple black mesh as a viewport slit
+      if (!_vehicle.viewportSlit) {
+        const slitGeo = new THREE.BoxGeometry(1.2, 0.12, 0.02);
+        const slitMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+        const slit = new THREE.Mesh(slitGeo, slitMat);
+        slit.position.set(0, 1.18, 2.7);
+        slit.renderOrder = 9999;
+        _vehicle.group.add(slit);
+        _vehicle.viewportSlit = slit;
+      }
+    }
     try {
       if (window.GameManager) {
         window.GameManager.__bradleyCam = _chaseCam;

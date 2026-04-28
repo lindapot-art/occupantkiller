@@ -350,6 +350,14 @@ const DroneSystem = (function () {
       if (CameraSystem.setDroneViewMode) CameraSystem.setDroneViewMode('eye');
       CameraSystem.setMode(CameraSystem.MODE.DRONE);
       CameraSystem.setDroneTarget(drone.mesh);
+      // Force camera to follow drone immediately
+      if (CameraSystem.getCamera && CameraSystem.getDroneViewMode && CameraSystem.getMode) {
+        const cam = CameraSystem.getCamera();
+        if (cam && CameraSystem.getMode() === CameraSystem.MODE.DRONE) {
+          cam.position.copy(drone.mesh.position);
+          cam.quaternion.copy(drone.mesh.quaternion);
+        }
+      }
     }
     return true;
   }
