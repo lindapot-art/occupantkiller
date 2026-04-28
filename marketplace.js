@@ -81,6 +81,7 @@ const Marketplace = (function () {
     { id: 'stim_pack',        name: 'Stim Pack',          okcCost: 35,   polCost: 0.035, type: 'stim',    value: 1 },
     { id: 'airdrop_beacon',   name: 'Airdrop Beacon',     okcCost: 80,   polCost: 0.08,  type: 'airdrop', value: 1 },
     { id: 'grenade_pack',     name: 'Grenade Pack (x3)',  okcCost: 45,   polCost: 0.045, type: 'grenade', value: 3 },
+    { id: 'nightvision_goggles', name: 'Nightvision Goggles', okcCost: 500, polCost: 0.5, type: 'gear', value: 1, desc: 'See in the dark. Unlocks nightvision mode.' },
   ];
 
   /* ── Premium Subscriptions ─────────────────────────────────────── */

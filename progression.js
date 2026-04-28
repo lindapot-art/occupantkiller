@@ -52,6 +52,7 @@ const Progression = (function () {
 
   /* ── Feature 54: Daily Challenges ──────────── */
   const DAILY_CHALLENGES = [
+    { id: 'unlock_nightvision', name: 'Nightvision Unlocked', desc: 'Unlock nightvision goggles via shop or progression', target: 1, reward: 300, stat: 'nightvisionUnlocked' },
     { id: 'headshot_10', name: 'Headhunter', desc: 'Get 10 headshots', target: 10, reward: 200, stat: 'headshots' },
     { id: 'kill_50', name: 'Body Count', desc: 'Kill 50 enemies', target: 50, reward: 150, stat: 'kills' },
     { id: 'survive_5', name: 'Endurance', desc: 'Survive 5 waves', target: 5, reward: 100, stat: 'wavesCleared' },
@@ -178,6 +179,11 @@ const Progression = (function () {
   ];
 
   let unlockedEntries = new Set();
+
+  // Nightvision progression unlock
+  let nightvisionUnlocked = false;
+  function unlockNightvision() { nightvisionUnlocked = true; }
+  function hasNightvision() { return nightvisionUnlocked; }
 
   function unlockJournalEntry(entryId) {
     if (unlockedEntries.has(entryId)) return false;

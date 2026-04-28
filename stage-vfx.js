@@ -1,3 +1,40 @@
+// === 33 Modern 3D World Effects (for implementation tracking) ===
+// 1. Screen-space ambient occlusion (SSAO)
+// 2. Distance blur (DOF)
+// 3. Bloom
+// 4. Motion blur
+// 5. God rays (volumetric light shafts)
+// 6. Dynamic fog (volumetric)
+// 7. Rain/snow/precipitation
+// 8. Wetness/reflection on surfaces
+// 9. Lens dirt/flare
+// 10. Chromatic aberration
+// 11. Color grading/film LUT
+// 12. Vignette
+// 13. Sharpen filter
+// 14. Heat distortion
+// 15. Blood splatter on camera
+// 16. Water droplets on camera
+// 17. Screen cracks (damage)
+// 18. Dynamic sun shadow maps
+// 19. Real-time reflections (SSR)
+// 20. Subsurface scattering (skin)
+// 21. Particle light interaction
+// 22. Lightning flashes
+// 23. Wind-blown debris
+// 24. Fire/smoke volumetrics
+// 25. Explosive shockwave distortion
+// 26. Ground scorch marks
+// 27. Tracer round glow
+// 28. Muzzle flash bloom
+// 29. Nightvision post-process
+// 30. Thermal vision post-process
+// 31. EMP/flicker effect
+// 32. Underwater caustics
+// 33. Camera shake/trauma
+
+// SSAO and blur effect hooks (to be implemented in render pipeline)
+// Example: StageVFX.enableSSAO(true); StageVFX.setBlurAmount(0.5);
 /* ───────────────────────────────────────────────────────────
    STAGE VFX — Per-stage environmental particle effects
    Depends on: THREE (global)

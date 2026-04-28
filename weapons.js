@@ -33,6 +33,7 @@ const Weapons = (() => {
       id: 'AK74', name: 'AK-74M', damage: 30,
       fireRate: 0.095, clipSize: 30, maxReserve: 150, reloadTime: 1.8,
       spread: 0.018, auto: true, type: 'ASSAULT', recoilY: 0.013, recoilX: 0.005,
+      hasScope: true,
     },
     {
       id: 'RPK74', name: 'RPK-74', damage: 22,
@@ -63,6 +64,7 @@ const Weapons = (() => {
       id: 'M4A1', name: 'M4A1', damage: 30,
       fireRate: 0.09, clipSize: 30, maxReserve: 120, reloadTime: 2.0,
       spread: 0.018, auto: true, type: 'NATO', recoilY: 0.013, recoilX: 0.005,
+      hasScope: true,
     },
     {
       id: 'JAVELIN', name: 'FGM-148 Javelin', damage: 1200,
@@ -88,6 +90,7 @@ const Weapons = (() => {
       id: 'SCARH', name: 'FN SCAR-H', damage: 35,
       fireRate: 0.085, clipSize: 20, maxReserve: 100, reloadTime: 2.3,
       spread: 0.016, auto: true, type: 'NATO_HEAVY', recoilY: 0.018, recoilX: 0.007,
+      hasScope: true,
     },
     {
       id: 'DSHK', name: 'DShK', damage: 45,
@@ -104,6 +107,7 @@ const Weapons = (() => {
       id: 'MG3', name: 'MG3 Machine Gun', damage: 24,
       fireRate: 0.065, clipSize: 120, maxReserve: 360, reloadTime: 5.5,
       spread: 0.055, auto: true, type: 'MACHINEGUN', recoilY: 0.022, recoilX: 0.011,
+      hasScope: true,
     },
     {
       id: 'MP5', name: 'MP5 SMG', damage: 18,
@@ -271,6 +275,7 @@ const Weapons = (() => {
   }
 
   // ── Scope zoom state ──────────────────────────────────────
+  // All eligible weapons now have hasScope: true for proper scope overlay/zoom
   let _camera      = null;
   let _scene       = null;
   let zoomed       = false;
