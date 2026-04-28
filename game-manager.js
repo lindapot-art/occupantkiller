@@ -5176,9 +5176,11 @@ const GameManager = (function () {
           if (HUD.updateArmor) HUD.updateArmor(player.armor / 100);
           HUD.notifyPickup('+50 ARMOR', '#4488ff');
         } else if (type === 'GRENADE') {
-          // Area damage around player pickup spot
-          Enemies.damageInRadius(player.position, 6, 60);
-          HUD.notifyPickup('GRENADE BLAST!', '#ff6622');
+          // Replenish throwables (+3) and minor area damage so it still feels explosive
+          if (!player.godMode) player.grenades = Math.min(99, (player.grenades || 0) + 3);
+          if (HUD.setHandGrenades) HUD.setHandGrenades(player.godMode ? Infinity : player.grenades);
+          Enemies.damageInRadius(player.position, 4, 30);
+          HUD.notifyPickup('+3 GRENADES', '#ff6622');
         } else if (type === 'MEDKIT') {
           player.hp = player.maxHp;
           HUD.setHealth(player.hp, player.maxHp);
@@ -6686,7 +6688,9 @@ const GameManager = (function () {
       player.hp += item.value;
       HUD.setHealth(player.hp, player.maxHp);
     } else if (item.type === 'grenade') {
-      Weapons.addAmmo(item.value);
+      // Restock throwable hand grenades (player.grenades) — was incorrectly adding gun ammo
+      if (!player.godMode) player.grenades = Math.min(99, (player.grenades || 0) + (item.value || 1));
+      if (HUD.setHandGrenades) HUD.setHandGrenades(player.godMode ? Infinity : player.grenades);
     }
   }
 

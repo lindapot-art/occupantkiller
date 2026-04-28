@@ -881,6 +881,38 @@ function buildCivilianMesh(npc) {
         group.add(sleepRoll);
       } catch (e) {}
     }
+    // Cigarette + smoke puff — ~15% of NPCs are smokers (only visible while sitting/idle)
+    if (Math.random() < 0.15) {
+      try {
+        var cigGroup = new THREE.Group();
+        var cigBody = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.008, 0.05, 6),
+          new THREE.MeshLambertMaterial({ color: 0xe8dcc0 })
+        );
+        cigBody.rotation.z = Math.PI / 2;
+        cigBody.position.set(0.04, 0, 0);
+        cigGroup.add(cigBody);
+        var ember = new THREE.Mesh(
+          new THREE.SphereGeometry(0.008, 6, 4),
+          new THREE.MeshBasicMaterial({ color: 0xff5a14 })
+        );
+        ember.position.set(0.075, 0, 0);
+        cigGroup.add(ember);
+        // Smoke puff above ember
+        var puff = new THREE.Mesh(
+          new THREE.SphereGeometry(0.04, 6, 4),
+          new THREE.MeshBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.35 })
+        );
+        puff.position.set(0.10, 0.06, 0);
+        cigGroup.add(puff);
+        cigGroup.position.set(0.10, 1.55, 0.12); // near mouth
+        cigGroup.visible = false; // shown when sitting
+        group.add(cigGroup);
+        group.userData.cigarette = cigGroup;
+        group.userData.cigEmber = ember;
+        group.userData.cigPuff = puff;
+      } catch (e) {}
+    }
     return group;
   }
 
@@ -958,6 +990,44 @@ function buildCivilianMesh(npc) {
       }
 
       friendlyGroups.push(group);
+      // Camp prop: ~50% of squads have a clothesline with drying laundry behind their leader
+      if (_scene && Math.random() < 0.5) {
+        try {
+          var camp = new THREE.Group();
+          // Two short posts
+          var postMat = new THREE.MeshLambertMaterial({ color: 0x4a3018 });
+          var p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 6), postMat);
+          p1.position.set(-1.0, 0.7, 0);
+          var p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 6), postMat);
+          p2.position.set(1.0, 0.7, 0);
+          camp.add(p1); camp.add(p2);
+          // Rope (thin cylinder horizontal)
+          var rope = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.012, 0.012, 2.0, 4),
+            new THREE.MeshLambertMaterial({ color: 0xb0a070 })
+          );
+          rope.rotation.z = Math.PI / 2;
+          rope.position.set(0, 1.30, 0);
+          camp.add(rope);
+          // 3-4 garments (rectangles) hanging
+          var shirtColors = [0x4a5028, 0x6a4030, 0x405068, 0x553322, 0x707048];
+          var nGar = 3 + Math.floor(Math.random() * 2);
+          for (var ig = 0; ig < nGar; ig++) {
+            var col = shirtColors[Math.floor(Math.random() * shirtColors.length)];
+            var shirt = new THREE.Mesh(
+              new THREE.PlaneGeometry(0.30, 0.42),
+              new THREE.MeshLambertMaterial({ color: col, side: THREE.DoubleSide })
+            );
+            shirt.position.set(-0.7 + ig * 0.45, 1.05, 0);
+            shirt.rotation.y = (Math.random() - 0.5) * 0.2;
+            camp.add(shirt);
+          }
+          // Place behind leader
+          camp.position.set(lx + Math.cos(leaderAngle + Math.PI) * 2.0, lh, lz + Math.sin(leaderAngle + Math.PI) * 2.0);
+          camp.rotation.y = leaderAngle;
+          _scene.add(camp);
+        } catch (eC) {}
+      }
     }
   }
 
@@ -994,6 +1064,27 @@ function buildCivilianMesh(npc) {
           var sitting = npc._idleTime > 4.0;
           ud.sittingMatRolled.visible = !sitting;
           ud.sittingMatFlat.visible = sitting;
+        }
+        // Cigarette: only visible while idle/sitting; ember pulses, puff drifts
+        if (ud && ud.cigarette) {
+          var movingC = !!(npc.velocity && (Math.abs(npc.velocity.x) + Math.abs(npc.velocity.z) > 0.05));
+          npc._idleTime = (movingC ? 0 : (npc._idleTime || 0) + delta);
+          var smoking = npc._idleTime > 2.5;
+          ud.cigarette.visible = smoking;
+          if (smoking) {
+            npc._cigT = (npc._cigT || 0) + delta;
+            if (ud.cigEmber) {
+              var glow = 0.6 + 0.4 * Math.sin(npc._cigT * 4 + npc.id * 0.7);
+              ud.cigEmber.scale.setScalar(0.8 + glow * 0.5);
+            }
+            if (ud.cigPuff) {
+              // drift puff up slowly, reset every ~2s
+              var puffPhase = (npc._cigT % 2.0) / 2.0;
+              ud.cigPuff.position.y = 0.06 + puffPhase * 0.15;
+              ud.cigPuff.material.opacity = 0.35 * (1 - puffPhase);
+              ud.cigPuff.scale.setScalar(1 + puffPhase * 0.8);
+            }
+          }
         }
       }
     }
