@@ -14,9 +14,10 @@ const puppeteer = require('puppeteer');
     if (r) break;
     await new Promise(r=>setTimeout(r,100));
   }
-  // Wait for preloader to actually hide
+  // Wait for preloader to actually hide (it removes itself from the DOM
+  // after a 0.35s opacity fade, so check for missing-from-DOM, not display:none).
   for (let i=0; i<200; i++) {
-    const hidden = await page.evaluate(()=> { const p=document.getElementById('boot-preloader'); return !p || getComputedStyle(p).display==='none'; });
+    const hidden = await page.evaluate(()=> { const p=document.getElementById('boot-preloader'); return !p || p.style.opacity === '0'; });
     if (hidden) break;
     await new Promise(r=>setTimeout(r,100));
   }

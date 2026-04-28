@@ -3594,22 +3594,32 @@ const GameManager = (function () {
         if (nwBtn) nwBtn.click();
       }
     }, 1000);
-    // Tap-to-skip / Space-to-skip (bound once per wave-clear).
+    // Tap-to-skip / Space-to-skip. 300ms grace period prevents a stray
+    // mouseup (from killing the last enemy) from instantly skipping the
+    // shop the player wanted to use. Re-armed on every wave-clear.
     var ovWC = document.getElementById('overlay-waveclear');
-    if (ovWC && !ovWC.__skipBound) {
-      ovWC.__skipBound = true;
-      var skip = function (e) {
-        // Don't skip when the user clicked a shop button or the next-wave button itself.
-        if (e && e.target && (e.target.classList.contains('shop-buy-btn') || e.target.id === 'next-wave-btn')) return;
-        if (window._shopCountdownId) { clearInterval(window._shopCountdownId); window._shopCountdownId = null; }
-        var nwBtn = document.getElementById('next-wave-btn');
-        if (nwBtn) nwBtn.click();
-      };
-      ovWC.addEventListener('click', skip);
-      ovWC.addEventListener('touchstart', skip, { passive: true });
-      window.addEventListener('keydown', function (e) {
-        if (e.code === 'Space' && ovWC.style.display !== 'none') { e.preventDefault(); skip(e); }
-      });
+    if (ovWC) {
+      ovWC.__skipArmedAt = Date.now() + 300;
+      if (!ovWC.__skipBound) {
+        ovWC.__skipBound = true;
+        var skip = function (e) {
+          if (Date.now() < (ovWC.__skipArmedAt || 0)) return;
+          // Don't skip when the user clicked a shop button or the next-wave button itself.
+          if (e && e.target) {
+            var cls = e.target.classList;
+            if ((cls && cls.contains && cls.contains('shop-buy-btn')) || e.target.id === 'next-wave-btn') return;
+          }
+          if (window._shopCountdownId) { clearInterval(window._shopCountdownId); window._shopCountdownId = null; }
+          var nwBtn = document.getElementById('next-wave-btn');
+          if (nwBtn) nwBtn.click();
+        };
+        ovWC.addEventListener('click', skip);
+        ovWC.addEventListener('touchstart', skip, { passive: true });
+        // Single window-level keydown listener (NOT re-added per wave).
+        window.addEventListener('keydown', function (e) {
+          if (e.code === 'Space' && ovWC.style.display !== 'none') { e.preventDefault(); skip(e); }
+        });
+      }
     }
   }
 
@@ -7070,6 +7080,7 @@ const GameManager = (function () {
     nextStage,
     update,
     beginWave,
+    onWaveComplete,
     showOverlay,
     hideOverlays,
     requestPointerLock,
