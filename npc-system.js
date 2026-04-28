@@ -1666,12 +1666,13 @@ function buildCivilianMesh(npc) {
     }
 
     if (npc.target && !npc.asleep) {
+      // Walk cadence ~2.5 Hz (was 6 — looked frantic). Amplitude trimmed slightly for natural stride.
       npc.mesh.children.forEach(child => {
         if (child.userData.isLeg) {
-          child.rotation.x = Math.sin(_animTime * 6 + (child.position.x > 0 ? Math.PI : 0)) * 0.4;
+          child.rotation.x = Math.sin(_animTime * 2.5 + (child.position.x > 0 ? Math.PI : 0)) * 0.35;
         }
         if (child.userData.isArm) {
-          child.rotation.x = Math.sin(_animTime * 6 + (child.position.x > 0 ? 0 : Math.PI)) * 0.3;
+          child.rotation.x = Math.sin(_animTime * 2.5 + (child.position.x > 0 ? 0 : Math.PI)) * 0.25;
         }
       });
     }
