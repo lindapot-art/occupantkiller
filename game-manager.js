@@ -1457,6 +1457,9 @@ const GameManager = (function () {
                 if (targetVehicle.isTank) showTankHUD();
                 HUD.notifyPickup('🚗 ENTERED VEHICLE', '#44ff44');
               }
+            } else {
+              // No nearby vehicle: fall back to throwing a hand grenade
+              throwHandGrenade();
             }
           }
         }
@@ -2767,6 +2770,7 @@ const GameManager = (function () {
     HUD.setKills(0);
     HUD.setStage(STAGES[0].id, STAGES[0].name);
     HUD.setWeapon(Weapons.getCurrentName(), Weapons.getCurrentIdx());
+    if (HUD.setHandGrenades) HUD.setHandGrenades(player.godMode ? Infinity : (player.grenades || 0));
 
     // Delay pointer lock slightly so the button click doesn't interfere
     setTimeout(function () {
@@ -5561,6 +5565,9 @@ const GameManager = (function () {
         MissionSystem.updateMissionTimer(delta);
       }
 
+      // Hand-thrown grenades (player-thrown via KeyG when no nearby vehicle)
+      updateHandGrenades(delta);
+
       // World features update (fires, trees, mines, airdrops, smoke)
       if (typeof WorldFeatures !== 'undefined') {
         var enemyPositions = [];
@@ -6382,6 +6389,92 @@ const GameManager = (function () {
     if (pl) pl.style.opacity = player.role === 'lonewolf' ? '1' : '0.4';
   }
 
+  // ── Hand grenade throw ──────────────────────────────────────
+  var _handGrenades = [];
+  var _handGrenadeCooldown = 0;
+
+  function throwHandGrenade() {
+    if (_handGrenadeCooldown > 0) return;
+    if (!player.godMode && (!player.grenades || player.grenades <= 0)) {
+      HUD.notifyPickup('🚫 NO GRENADES', '#ff6600');
+      return;
+    }
+    if (!_scene || !_camera) return;
+    var geo = new THREE.SphereGeometry(0.10, 8, 6);
+    var mat = new THREE.MeshLambertMaterial({ color: 0x2a3018 });
+    var nade = new THREE.Mesh(geo, mat);
+    var origin = player.position.clone();
+    origin.y -= 0.4;
+    nade.position.copy(origin);
+    _scene.add(nade);
+    var fwd = _camera.getWorldDirection(new THREE.Vector3());
+    var vel = new THREE.Vector3(fwd.x * 18, 6 + fwd.y * 14, fwd.z * 18);
+    _handGrenades.push({ mesh: nade, vel: vel, fuse: 2.5 });
+    if (!player.godMode) player.grenades = Math.max(0, player.grenades - 1);
+    if (HUD.setHandGrenades) HUD.setHandGrenades(player.godMode ? Infinity : player.grenades);
+    _handGrenadeCooldown = 0.45;
+    HUD.notifyPickup('💣 GRENADE OUT', '#ffaa00');
+  }
+
+  function updateHandGrenades(delta) {
+    if (_handGrenadeCooldown > 0) _handGrenadeCooldown = Math.max(0, _handGrenadeCooldown - delta);
+    if (_handGrenades.length === 0) return;
+    for (var i = _handGrenades.length - 1; i >= 0; i--) {
+      var g = _handGrenades[i];
+      g.fuse -= delta;
+      g.vel.y -= 18 * delta;
+      g.mesh.position.x += g.vel.x * delta;
+      g.mesh.position.y += g.vel.y * delta;
+      g.mesh.position.z += g.vel.z * delta;
+      var groundY = 0;
+      try {
+        if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTopSolidY) {
+          groundY = VoxelWorld.getTopSolidY(g.mesh.position.x, g.mesh.position.z);
+        } else if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) {
+          groundY = VoxelWorld.getTerrainHeight(g.mesh.position.x, g.mesh.position.z) + 1;
+        }
+      } catch (e) {}
+      if (g.mesh.position.y <= groundY + 0.1) {
+        g.mesh.position.y = groundY + 0.1;
+        g.vel.y = Math.abs(g.vel.y) * 0.35;
+        g.vel.x *= 0.55;
+        g.vel.z *= 0.55;
+        if (g.vel.length() < 0.4) g.vel.set(0, 0, 0);
+      }
+      if (g.fuse <= 0) {
+        var pos = g.mesh.position.clone();
+        if (typeof Tracers !== 'undefined' && Tracers.spawnExplosion) Tracers.spawnExplosion(pos, 2.2);
+        if (window.AudioSystem && window.AudioSystem.playExplosion) {
+          try { window.AudioSystem.playExplosion(); } catch (e) {}
+        }
+        if (typeof Enemies !== 'undefined' && Enemies.damageInRadius) Enemies.damageInRadius(pos, 6.5, 110);
+        if (CameraSystem.shake) CameraSystem.shake(0.35, 0.4);
+        if (!player.godMode) {
+          var dx = player.position.x - pos.x, dy = player.position.y - pos.y, dz = player.position.z - pos.z;
+          var d2 = dx * dx + dy * dy + dz * dz;
+          if (d2 < 36) {
+            var falloff = 1 - Math.sqrt(d2) / 6;
+            onPlayerHit(60 * falloff, pos);
+          }
+        }
+        if (_scene) _scene.remove(g.mesh);
+        if (g.mesh.geometry) g.mesh.geometry.dispose();
+        if (g.mesh.material) g.mesh.material.dispose();
+        _handGrenades.splice(i, 1);
+      }
+    }
+  }
+
+  function clearHandGrenades() {
+    for (var i = 0; i < _handGrenades.length; i++) {
+      var g = _handGrenades[i];
+      if (_scene) _scene.remove(g.mesh);
+      if (g.mesh.geometry) g.mesh.geometry.dispose();
+      if (g.mesh.material) g.mesh.material.dispose();
+    }
+    _handGrenades.length = 0;
+  }
+
   function toggleStealth() {
     player.stealth = !player.stealth;
     var stInd = document.getElementById('stealth-indicator');
@@ -6432,6 +6525,7 @@ const GameManager = (function () {
       } catch (e) {}
       // Unlimited hand grenades
       player.grenades = Infinity;
+      if (HUD.setHandGrenades) HUD.setHandGrenades(Infinity);
       // Enable stealth (enemies can't see player)
       player.stealth = true;
       Enemies.setPlayerStealth(true);
@@ -6461,6 +6555,7 @@ const GameManager = (function () {
       if (stInd) stInd.style.display = 'none';
       // Reset grenades to default 5
       player.grenades = 5;
+      if (HUD.setHandGrenades) HUD.setHandGrenades(5);
       HUD.notifyPickup('⚡ GOD MODE DEACTIVATED', '#ff6600');
     }
   }

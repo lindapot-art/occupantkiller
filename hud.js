@@ -305,6 +305,19 @@ const HUD = (() => {
     _adrEl.style.opacity = String(0.35 + t * 0.55);
   }
 
+  // ── Hand-grenade count display ──────────────────────────────
+  function setHandGrenades(n) {
+    var el = document.getElementById('grenade-display');
+    if (!el) return;
+    if (n === Infinity || n >= 999) {
+      el.textContent = '∞';
+      el.style.color = '#ffd54a';
+    } else {
+      el.textContent = String(Math.max(0, Math.floor(n)));
+      el.style.color = n > 0 ? '#a8e063' : '#888';
+    }
+  }
+
   // ── Incoming grenade warning ─────────────────────────────────
   // dist: distance to nearest enemy grenade in metres, or -1 to clear
   var _grenWarnEl = null;
@@ -1752,7 +1765,7 @@ const HUD = (() => {
     setWaveProgress,
     setHealth, setAmmo, setWeapon, showReload,
     flashHit, flashDamage, flashHeal, showBloodDrops,
-    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout, setSprintIntensity, setGrenadeWarning,
+    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout, setSprintIntensity, setGrenadeWarning, setHandGrenades,
     announceWave, announceStage,
     addKill, showHitDirection, showHitDirectionScaled, updateMinimap,
     updateCompass, setCompassThreats, showStreak, showBleed, showProne, showJam,
