@@ -164,8 +164,8 @@ const HUD = (() => {
     slotContainer.innerHTML = '';
     el.weaponSlots = [];
     const weapons = Weapons.getAll();
-    // Limit to 26 slots (1-9, 0, F1-F12, Shift+1-4)
-    const maxSlots = 26;
+    // Show all weapons (legacy cap was 26 — bumped to handle full arsenal)
+    const maxSlots = weapons.length;
     for (let i = 0; i < Math.min(weapons.length, maxSlots); i++) {
       const slot = document.createElement('div');
       slot.className = 'weapon-slot';

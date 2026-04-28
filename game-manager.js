@@ -6529,6 +6529,12 @@ const GameManager = (function () {
       try {
         if (typeof Economy !== 'undefined' && Economy.setCurrency) Economy.setCurrency(999999);
         else if (player.coins !== undefined) player.coins = 999999;
+        // Top up build resources so structure placement (which gates on Economy) always succeeds
+        if (typeof Economy !== 'undefined' && Economy.add) {
+          ['wood','metal','electronics','fuel','stone','food'].forEach(function(r){
+            try { Economy.add(r, 9999); } catch(e3) {}
+          });
+        }
       } catch (e) {}
       // Unlimited hand grenades
       player.grenades = Infinity;

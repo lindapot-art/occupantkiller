@@ -177,7 +177,7 @@ const Building = (function () {
 
     dugout: {
       name: 'Foxhole / Dugout',
-      cost: { dirt: 20, wood: 15 },
+      cost: { stone: 20, wood: 15 },
       size: { x: 4, y: 3, z: 4 },
       generate(ox, oy, oz) {
         const blocks = [];
