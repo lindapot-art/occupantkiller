@@ -2265,6 +2265,10 @@ const VehicleSystem = (function () {
     getTankAmmo: getTankAmmo,
     isTankReloading: isTankReloading,
     getTankReloadProgress: getTankReloadProgress,
+    // Diagnostic: live count of in-flight projectiles fired by player vehicle.
+    getProjectileCount: function () { return turretProjectiles.length; },
+    // Diagnostic: snapshot of vehicle input keys (test harness only)
+    _getVehicleKeys: function () { return Object.assign({}, _vKeys); },
   };
 })();
 
