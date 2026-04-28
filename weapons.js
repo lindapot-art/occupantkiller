@@ -281,6 +281,323 @@ const Weapons = (() => {
   // ── Gun meshes ────────────────────────────────────────────
   const gunMeshes = [];
 
+  /* ════════════════════════════════════════════════════════════════
+   * WD — Weapon Detail Kit.
+   * Reusable mini-mesh helpers for super-detailed firearm meshes:
+   * Picatinny rails, iron sights, safety selectors with engravings,
+   * checkered grips, bolt-carrier faces, muzzle crowns, screws,
+   * rivets, mag-window slots, heat-shield vents, charging-handle
+   * knurling, lever/button details. All take a parent group + anchor.
+   * Based on real firearm reference (AK-74M, M4A1, Makarov PM,
+   * Glock 17, SVD Dragunov, MP5A3, RPG-7).
+   * ════════════════════════════════════════════════════════════════ */
+  const WD = (function () {
+    const M = (c, opts) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, opts || {}));
+    const P = (c, sh) => new THREE.MeshPhongMaterial({ color: c, shininess: sh || 60, specular: 0x666666 });
+    // Cached materials — avoid re-creating per rivet
+    const matSteel    = P(0x9aa0a6, 80);
+    const matBlued    = P(0x1a1c20, 40);
+    const matMatte    = M(0x2a2a2e);
+    const matDark     = M(0x14141a);
+    const matBrass    = P(0xb88a3a, 50);
+    const matWhite    = M(0xe6e6ea);
+    const matRed      = M(0xc02020);
+    const matRubber   = M(0x101012);
+
+    // ── Picatinny rail: row of teeth + slots, MIL-STD-1913 spaced ──
+    function picatinnyRail(g, ax, ay, az, length, opts) {
+      opts = opts || {};
+      const width = opts.width || 0.022;
+      const height = opts.height || 0.008;
+      const teeth = Math.max(3, Math.floor(length / 0.015));
+      const base = new THREE.Mesh(
+        new THREE.BoxGeometry(width, height * 0.55, length),
+        matMatte
+      );
+      base.position.set(ax, ay, az);
+      g.add(base);
+      for (let i = 0; i < teeth; i++) {
+        const t = new THREE.Mesh(
+          new THREE.BoxGeometry(width, height, 0.008),
+          matBlued
+        );
+        t.position.set(ax, ay + height * 0.30, az - length * 0.5 + 0.006 + i * (length / teeth));
+        g.add(t);
+      }
+    }
+
+    // ── Iron sights: front post with protective ears + rear aperture/notch ──
+    function ironSights(g, frontPos, rearPos, opts) {
+      opts = opts || {};
+      // Front post + ears
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.018, 0.004), matSteel);
+      post.position.copy(frontPos);
+      g.add(post);
+      const earL = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.020, 0.005), matMatte);
+      earL.position.set(frontPos.x - 0.008, frontPos.y, frontPos.z); g.add(earL);
+      const earR = earL.clone(); earR.position.x = frontPos.x + 0.008; g.add(earR);
+      // Front sight base
+      const fbase = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.006, 0.014), matMatte);
+      fbase.position.set(frontPos.x, frontPos.y - 0.013, frontPos.z); g.add(fbase);
+      // Rear sight: aperture or notch
+      if (opts.aperture) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.006, 0.0018, 6, 12), matMatte);
+        ring.position.copy(rearPos); ring.rotation.y = Math.PI / 2; g.add(ring);
+      } else {
+        const rear = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.008, 0.006), matMatte);
+        rear.position.copy(rearPos); g.add(rear);
+        const notch = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.005, 0.008), matDark);
+        notch.position.set(rearPos.x, rearPos.y + 0.003, rearPos.z); g.add(notch);
+        // White dots either side of notch
+        for (let s = -1; s <= 1; s += 2) {
+          const dot = new THREE.Mesh(new THREE.BoxGeometry(0.0015, 0.0015, 0.0015), matWhite);
+          dot.position.set(rearPos.x + s * 0.005, rearPos.y + 0.001, rearPos.z); g.add(dot);
+        }
+      }
+    }
+
+    // ── Safety selector lever with engraved markings (S / F / A) ──
+    function safetySelector(g, ax, ay, az, opts) {
+      opts = opts || {};
+      // Lever
+      const lever = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.030, 0.012), matBlued);
+      lever.position.set(ax, ay, az); g.add(lever);
+      // Pivot screw
+      const pivot = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.005, 8), matSteel);
+      pivot.position.set(ax, ay, az); pivot.rotation.z = Math.PI / 2; g.add(pivot);
+      // Slot (Phillips cross)
+      const sl1 = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.0008, 0.0008), matDark);
+      sl1.position.set(ax + 0.002, ay, az); g.add(sl1);
+      const sl2 = sl1.clone(); sl2.rotation.x = Math.PI / 2; g.add(sl2);
+      // Engraved S/F/A pip markings (simulated as tiny white boxes)
+      const marks = opts.marks || ['S', 'F', 'A'];
+      for (let i = 0; i < marks.length; i++) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.003, 0.0008), matWhite);
+        m.position.set(ax - 0.004, ay + 0.004 - i * 0.008, az); g.add(m);
+      }
+    }
+
+    // ── Diagonal checkering for pistol grip (reference: Glock RTF) ──
+    function checkering(g, ax, ay, az, w, h, opts) {
+      opts = opts || {};
+      const rows = opts.rows || 8;
+      const cols = opts.cols || 4;
+      const matG = M(opts.color || 0x111114);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const dot = new THREE.Mesh(new THREE.BoxGeometry(0.0025, 0.0025, 0.0025), matG);
+          dot.position.set(
+            ax + (c - cols / 2 + 0.5) * (w / cols),
+            ay - (r - rows / 2 + 0.5) * (h / rows),
+            az
+          );
+          g.add(dot);
+        }
+      }
+    }
+
+    // ── Finger grooves (pistol front-strap) ──
+    function fingerGrooves(g, ax, ay, az, count, w) {
+      count = count || 4;
+      w = w || 0.024;
+      for (let i = 0; i < count; i++) {
+        const grv = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, w, 6), M(0x080808));
+        grv.position.set(ax, ay - i * 0.011, az);
+        grv.rotation.z = Math.PI / 2; g.add(grv);
+      }
+    }
+
+    // ── Bolt-carrier face with extractor + firing pin (visible thru port) ──
+    function boltFace(g, ax, ay, az) {
+      const face = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.003, 12), matSteel);
+      face.position.set(ax, ay, az); face.rotation.x = Math.PI / 2; g.add(face);
+      const pin = new THREE.Mesh(new THREE.BoxGeometry(0.0015, 0.0015, 0.002), matDark);
+      pin.position.set(ax, ay, az + 0.0015); g.add(pin);
+      const ext = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.005, 0.002), matBlued);
+      ext.position.set(ax + 0.005, ay + 0.002, az + 0.0015); g.add(ext);
+    }
+
+    // ── Muzzle crown: recessed ring with rifling slot hint ──
+    function muzzleCrown(g, ax, ay, az, radius) {
+      radius = radius || 0.012;
+      const crown = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius * 0.95, 0.005, 12),
+        matBlued
+      );
+      crown.position.set(ax, ay, az); crown.rotation.x = Math.PI / 2; g.add(crown);
+      const bore = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius * 0.55, radius * 0.55, 0.004, 10),
+        matDark
+      );
+      bore.position.set(ax, ay, az); bore.rotation.x = Math.PI / 2; g.add(bore);
+      // Suggest 4 lands of rifling
+      for (let i = 0; i < 4; i++) {
+        const land = new THREE.Mesh(new THREE.BoxGeometry(radius * 0.4, 0.0008, 0.003), matSteel);
+        land.position.set(ax, ay, az + 0.0005);
+        land.rotation.z = (i / 4) * Math.PI; g.add(land);
+      }
+    }
+
+    // ── Phillips screw head ──
+    function screw(g, ax, ay, az, size) {
+      size = size || 0.005;
+      const head = new THREE.Mesh(new THREE.CylinderGeometry(size, size, size * 0.4, 8), matSteel);
+      head.position.set(ax, ay, az); head.rotation.x = Math.PI / 2; g.add(head);
+      const sl1 = new THREE.Mesh(new THREE.BoxGeometry(size * 1.6, size * 0.3, size * 0.15), matDark);
+      sl1.position.set(ax, ay, az + size * 0.21); g.add(sl1);
+      const sl2 = sl1.clone(); sl2.rotation.z = Math.PI / 2; g.add(sl2);
+    }
+
+    // ── Rivet (small metallic dome) ──
+    function rivet(g, ax, ay, az, size) {
+      size = size || 0.003;
+      const r = new THREE.Mesh(new THREE.SphereGeometry(size, 6, 4), matSteel);
+      r.position.set(ax, ay, az); g.add(r);
+    }
+
+    // ── Charging handle knurled grip ──
+    function chargingHandle(g, ax, ay, az, opts) {
+      opts = opts || {};
+      const len = opts.len || 0.018;
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.012, len), matMatte);
+      handle.position.set(ax, ay, az); g.add(handle);
+      // Knurl ridges
+      for (let i = 0; i < 6; i++) {
+        const k = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.0015, 0.0015), matDark);
+        k.position.set(ax, ay + 0.006, az - len * 0.4 + i * (len * 0.16));
+        g.add(k);
+      }
+    }
+
+    // ── Mag release button (round, paddle, or AK-style catch) ──
+    function magReleaseButton(g, ax, ay, az, opts) {
+      opts = opts || {};
+      const r = opts.radius || 0.005;
+      const btn = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.004, 8), matBlued);
+      btn.position.set(ax, ay, az); btn.rotation.z = Math.PI / 2; g.add(btn);
+      // Outer ring
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 1.3, r * 0.25, 4, 10), matMatte);
+      ring.position.set(ax, ay, az); ring.rotation.y = Math.PI / 2; g.add(ring);
+    }
+
+    // ── Heat-shield vent slots (handguard) ──
+    function heatShieldVents(g, ax, ay, az, count, length) {
+      count = count || 6;
+      length = length || 0.10;
+      for (let i = 0; i < count; i++) {
+        const slot = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.001, 0.006), matDark);
+        slot.position.set(ax, ay, az - length * 0.4 + i * (length * 0.85 / count));
+        g.add(slot);
+      }
+    }
+
+    // ── Mag witness/inspection holes (round count holes) ──
+    function magWitnessHoles(g, ax, ay, az, count) {
+      count = count || 5;
+      for (let i = 0; i < count; i++) {
+        const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.0025, 0.001, 6), matDark);
+        hole.position.set(ax, ay - i * 0.012, az);
+        hole.rotation.x = Math.PI / 2; g.add(hole);
+      }
+    }
+
+    // ── Receiver ribs (top-cover stamping detail, AK-style) ──
+    function receiverRibs(g, ax, ay, az, length, count) {
+      count = count || 4;
+      for (let i = 0; i < count; i++) {
+        const rib = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.001, 0.003), matBlued);
+        rib.position.set(ax, ay, az - length * 0.4 + i * (length * 0.8 / count));
+        g.add(rib);
+      }
+    }
+
+    // ── Sling swivel + ring ──
+    function slingSwivel(g, ax, ay, az) {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.005, 0.006), matMatte);
+      base.position.set(ax, ay, az); g.add(base);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.004, 0.0012, 4, 8), matSteel);
+      ring.position.set(ax, ay - 0.006, az); ring.rotation.y = Math.PI / 2; g.add(ring);
+    }
+
+    // ── Manufacturer/serial micro-stamp (visual hint only) ──
+    function serialStamp(g, ax, ay, az, len) {
+      len = len || 0.030;
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(len, 0.001, 0.006), matMatte);
+      plate.position.set(ax, ay, az); g.add(plate);
+      // Micro-letters (5 tiny boxes)
+      for (let i = 0; i < 5; i++) {
+        const l = new THREE.Mesh(new THREE.BoxGeometry(0.002, 0.0008, 0.0008), matDark);
+        l.position.set(ax - len * 0.4 + i * (len * 0.2), ay + 0.001, az);
+        g.add(l);
+      }
+    }
+
+    return {
+      picatinnyRail, ironSights, safetySelector, checkering, fingerGrooves,
+      boltFace, muzzleCrown, screw, rivet, chargingHandle, magReleaseButton,
+      heatShieldVents, magWitnessHoles, receiverRibs, slingSwivel, serialStamp,
+      // ── Universal auto-detail ──
+      // Walks the largest mesh in the weapon group and stamps proportional
+      // rivets, screws, an info-plate, and surface texture stippling so every
+      // weapon (including placeholders) reads as a real machined firearm.
+      autoDetail(g, weaponName) {
+        if (!g || !g.children || g.children.length === 0) return;
+        // Find the geometric center & bbox of the whole weapon
+        const box = new THREE.Box3().setFromObject(g);
+        if (box.isEmpty()) return;
+        const size = box.getSize(new THREE.Vector3());
+        const cen  = box.getCenter(new THREE.Vector3());
+        const halfW = size.x / 2, halfH = size.y / 2, halfL = size.z / 2;
+        // Skip super-small things (knives, throwables) but still add a few details
+        const isSmall = (size.length() < 0.3);
+        // Top side
+        const top = cen.y + halfH * 0.85;
+        const right = cen.x + halfW * 0.95;
+        const front = cen.z - halfL * 0.85;
+        const back  = cen.z + halfL * 0.85;
+        // Stippled texture (random micro-bumps along the body — wear marks)
+        const stippleCount = isSmall ? 6 : 18;
+        for (let i = 0; i < stippleCount; i++) {
+          const px = cen.x + (Math.random() - 0.5) * size.x * 0.7;
+          const py = cen.y + (Math.random() - 0.5) * size.y * 0.7;
+          const pz = cen.z + (Math.random() - 0.5) * size.z * 0.85;
+          const dot = new THREE.Mesh(
+            new THREE.BoxGeometry(0.0015, 0.0015, 0.0015),
+            new THREE.MeshLambertMaterial({ color: 0x0a0a0c })
+          );
+          dot.position.set(px, py, pz); g.add(dot);
+        }
+        // Rivet line along receiver side (right face)
+        const rivetCount = isSmall ? 3 : 7;
+        for (let i = 0; i < rivetCount; i++) {
+          const t = i / (rivetCount - 1 || 1);
+          rivet(g, right, cen.y, cen.z + (t - 0.5) * size.z * 0.55, 0.0022);
+        }
+        // 2 screws on the underside
+        if (!isSmall) {
+          screw(g, cen.x - halfW * 0.5, cen.y - halfH * 0.85, cen.z + halfL * 0.30, 0.004);
+          screw(g, cen.x + halfW * 0.5, cen.y - halfH * 0.85, cen.z + halfL * 0.30, 0.004);
+        }
+        // Tiny serial-stamp on right side
+        if (!isSmall) {
+          serialStamp(g, right, cen.y - halfH * 0.40, cen.z, Math.min(0.04, size.z * 0.22));
+        }
+        // Top vent grooves (heat-relief texture, near the front half)
+        if (!isSmall && size.z > 0.4) {
+          const ventCount = 5;
+          for (let i = 0; i < ventCount; i++) {
+            const groove = new THREE.Mesh(
+              new THREE.BoxGeometry(size.x * 0.28, 0.001, 0.004),
+              new THREE.MeshLambertMaterial({ color: 0x05050a })
+            );
+            groove.position.set(cen.x, top - 0.001, front + 0.04 + i * 0.020);
+            g.add(groove);
+          }
+        }
+      },
+    };
+  })();
+
   function buildShovelMesh() {
     const g = new THREE.Group();
     // Wooden handle — tapered, longer
@@ -449,6 +766,28 @@ const Weapons = (() => {
     g.add(slide, frame, dustc, trig, gFront, gBottom, gRear,
           grip, panL, panR, scrL, scrR, magBase, magRel,
           hammer, safety, slideStop, lanyard);
+
+    // ── Super-detail pass (WD kit) — Makarov PM ──
+    // Real PM has decocker safety (top-rear of slide), 3-dot sights, slide-stop notch,
+    // checkered grip panels with star medallion, lanyard loop, takedown screw.
+    WD.muzzleCrown(g, 0.18, -0.130, -0.368, 0.009);
+    WD.boltFace(g, 0.198, -0.120, -0.27);
+    WD.checkering(g, 0.163, -0.195, -0.225, 0.022, 0.040, { rows: 6, cols: 3 });
+    WD.checkering(g, 0.197, -0.195, -0.225, 0.022, 0.040, { rows: 6, cols: 3 });
+    WD.screw(g, 0.180, -0.218, -0.225, 0.004); // grip-panel screw bottom
+    WD.screw(g, 0.180, -0.165, -0.225, 0.004); // grip-panel screw top
+    WD.magReleaseButton(g, 0.198, -0.155, -0.235, { radius: 0.004 });
+    WD.serialStamp(g, 0.198, -0.142, -0.260, 0.020);
+    // 5 slide-serration mirrors on right side
+    for (let si = 0; si < 8; si++) {
+      const ser = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.002, 0.003), new THREE.MeshLambertMaterial({ color: 0x222228 }));
+      ser.position.set(0.18, -0.144, -0.22 + si * 0.005);
+      g.add(ser);
+    }
+    // Star medallion (CCCP) on grip
+    const star = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.0015, 5), new THREE.MeshLambertMaterial({ color: 0xb88a3a }));
+    star.position.set(0.163, -0.190, -0.224); star.rotation.y = Math.PI / 2; g.add(star);
+    const star2 = star.clone(); star2.position.x = 0.197; g.add(star2);
     return g;
   }
 
@@ -551,6 +890,34 @@ const Weapons = (() => {
           stock, buttpad, hinge,
           trig, grdFr, grdBt, safetyLvr,
           slingF, slingR, rod);
+
+    // ── Super-detail pass (WD kit) ──
+    // Real AK-74M: Picatinny side rail, S/F/A safety with engravings, dust-cover ribs,
+    // mag witness ribs, front sight ears, rear notch sight, knurled charging handle,
+    // muzzle crown, grip checkering, stock screws, sling swivels, serial stamp.
+    WD.ironSights(g,
+      new THREE.Vector3(0.18, -0.118, -0.55),  // front post (gas block)
+      new THREE.Vector3(0.18, -0.110, -0.32),  // rear notch (receiver)
+      { aperture: false }
+    );
+    WD.safetySelector(g, 0.211, -0.140, -0.245, { marks: ['A', 'D'] }); // AK selector AB/OD
+    WD.muzzleCrown(g, 0.18, -0.140, -0.66, 0.014);
+    WD.boltFace(g, 0.207, -0.128, -0.265);
+    WD.chargingHandle(g, 0.214, -0.118, -0.215, { len: 0.020 });
+    WD.receiverRibs(g, 0.18, -0.110, -0.235, 0.16, 5);
+    WD.heatShieldVents(g, 0.18, -0.118, -0.42, 6, 0.16);
+    WD.checkering(g, 0.180, -0.205, -0.150, 0.034, 0.060, { rows: 8, cols: 5, color: 0x0a0a08 });
+    WD.fingerGrooves(g, 0.180, -0.180, -0.183, 4, 0.030);
+    WD.magWitnessHoles(g, 0.202, -0.215, -0.236, 4);
+    WD.screw(g, 0.180, -0.140, -0.13, 0.005);  // stock hinge screw
+    WD.screw(g, 0.180, -0.140,  0.05, 0.005);  // butt-pad screw
+    WD.slingSwivel(g, 0.180, -0.182, -0.530);
+    WD.slingSwivel(g, 0.180, -0.165,  0.040);
+    WD.serialStamp(g, 0.207, -0.140, -0.235, 0.040);
+    // 6 rivets along receiver (real AK stamping)
+    for (let ri = 0; ri < 6; ri++) {
+      WD.rivet(g, 0.207, -0.155, -0.32 + ri * 0.025, 0.0025);
+    }
     return g;
   }
 
@@ -879,6 +1246,29 @@ const Weapons = (() => {
           mag, magPlate, magRel, grip, gS,
           bufferTube, stockBody, buttpad, latch,
           trig, tGuard, tGuardFr, safety, sMount);
+
+    // ── Super-detail pass (WD kit) — M4A1 carbine ──
+    // Real M4A1: SAFE/SEMI/AUTO selector, A2 pistol grip checkering, BUIS sights,
+    // M-LOK rail teeth, shell-deflector ridges, dust-cover hinge, takedown pins.
+    WD.ironSights(g,
+      new THREE.Vector3(0.18, -0.085, -0.45),  // front BUIS post
+      new THREE.Vector3(0.18, -0.085, -0.16),  // rear BUIS aperture
+      { aperture: true }
+    );
+    WD.safetySelector(g, 0.203, -0.155, -0.195, { marks: ['S', 'F', 'A'] });
+    WD.muzzleCrown(g, 0.18, -0.140, -0.640, 0.012);
+    WD.boltFace(g, 0.203, -0.125, -0.235);
+    WD.chargingHandle(g, 0.180, -0.092, -0.155, { len: 0.022 });
+    WD.checkering(g, 0.180, -0.205, -0.150, 0.030, 0.060, { rows: 7, cols: 4 });
+    WD.fingerGrooves(g, 0.180, -0.180, -0.183, 4, 0.026);
+    WD.magWitnessHoles(g, 0.197, -0.220, -0.236, 5);
+    WD.magReleaseButton(g, 0.207, -0.160, -0.240, { radius: 0.005 });
+    // Takedown pins (front + rear)
+    WD.screw(g, 0.205, -0.155, -0.165, 0.004);
+    WD.screw(g, 0.205, -0.155, -0.275, 0.004);
+    WD.slingSwivel(g, 0.180, -0.160, -0.500);
+    WD.slingSwivel(g, 0.180, -0.155,  0.030);
+    WD.serialStamp(g, 0.205, -0.165, -0.220, 0.040);
     return g;
   }
 
@@ -1909,6 +2299,9 @@ const Weapons = (() => {
       if (typeof WeaponDetails !== 'undefined' && WeaponDetails.enhanceMesh) {
         WeaponDetails.enhanceMesh(m, WEAPONS[i], i);
       }
+      // Universal weapon-detail pass — rivets, screws, serial stamp, vents, stippled wear.
+      // Adds 30+ micro-meshes per weapon for realistic surface detail.
+      try { WD.autoDetail(m, WEAPONS[i]); } catch (e) {}
       // Weld visual gaps so parts don't look detached / floating in air
       try { _unifyWeaponMesh(m); } catch (e) {}
       gunMeshes.push(m);
