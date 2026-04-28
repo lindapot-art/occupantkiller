@@ -24,12 +24,240 @@ const WeatherSystem = (function () {
   var _lightningTimer = 0;
   var _lightningFlash = null;
 
+  // ── Cloud layer (drifting billboard sprites high above world) ──
+  var _cloudGroup = null;
+  var _clouds = [];          // [{ sprite, baseScale }]
+  var _cloudWind = { x: -2.5, z: 0.6 }; // m/s
+  var _cloudTargetOpacity = 0.85;
+  var _cloudTargetTint = new THREE.Color(1, 1, 1);
+  var CLOUD_COUNT = 56;
+  var CLOUD_HEIGHT = 130;
+  var CLOUD_RADIUS = 260;
+
+  // ── Snow ground accumulation ──
+  var _snowCover = null;     // InstancedMesh of small white discs on terrain top
+  var _snowDummy = null;
+  var _snowAccumulation = 0; // 0..1 — drives instance opacity
+  var _snowAccumulationTarget = 0;
+  var SNOW_PATCH_COUNT = 220;
+  var SNOW_PATCH_RADIUS = 90; // m around camera
+  var _hemiLight = null;
+  var _ambLight = null;
+  var _baseHemiSky = null;
+  var _baseAmbColor = null;
+
   function init(scene, camera) {
     _scene = scene;
     _camera = camera;
     createParticleSystem();
+    createCloudLayer();
+    createSnowCover();
+    // Cache lights for snow tint
+    if (_scene) {
+      _scene.traverse(function (o) {
+        if (o.isHemisphereLight && !_hemiLight) {
+          _hemiLight = o;
+          _baseHemiSky = o.color.clone();
+        } else if (o.isAmbientLight && !_ambLight) {
+          _ambLight = o;
+          _baseAmbColor = o.color.clone();
+        }
+      });
+    }
     // Start with clear weather
     setWeather(WEATHER.CLEAR);
+  }
+
+  /* ── Cloud layer ─────────────────────────────────────────────── */
+  function _makeCloudTexture() {
+    var c = document.createElement('canvas');
+    c.width = c.height = 128;
+    var ctx = c.getContext('2d');
+    // Draw 6-8 overlapping radial-gradient puffs to make a fluffy blob.
+    var puffs = 7;
+    for (var p = 0; p < puffs; p++) {
+      var px = 64 + (Math.random() - 0.5) * 70;
+      var py = 64 + (Math.random() - 0.5) * 50;
+      var pr = 28 + Math.random() * 18;
+      var g = ctx.createRadialGradient(px, py, 1, px, py, pr);
+      g.addColorStop(0, 'rgba(255,255,255,0.95)');
+      g.addColorStop(0.6, 'rgba(255,255,255,0.55)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 128);
+    }
+    var tex = new THREE.CanvasTexture(c);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    return tex;
+  }
+
+  function createCloudLayer() {
+    if (!_scene) return;
+    var tex = _makeCloudTexture();
+    _cloudGroup = new THREE.Group();
+    _cloudGroup.name = 'cloud-layer';
+    for (var i = 0; i < CLOUD_COUNT; i++) {
+      var mat = new THREE.SpriteMaterial({
+        map: tex,
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+        fog: false,
+      });
+      var s = new THREE.Sprite(mat);
+      var scale = 30 + Math.random() * 50;
+      s.scale.set(scale, scale * 0.55, 1);
+      s.position.set(
+        (Math.random() - 0.5) * CLOUD_RADIUS * 2,
+        CLOUD_HEIGHT + (Math.random() - 0.5) * 30,
+        (Math.random() - 0.5) * CLOUD_RADIUS * 2
+      );
+      _cloudGroup.add(s);
+      _clouds.push({ sprite: s, baseScale: scale });
+    }
+    _scene.add(_cloudGroup);
+  }
+
+  function _setCloudWeather(weather) {
+    switch (weather) {
+      case WEATHER.CLEAR:
+        _cloudTargetOpacity = 0.45;
+        _cloudTargetTint.setRGB(1.0, 1.0, 1.0);
+        _cloudWind.x = -2.5; _cloudWind.z = 0.6;
+        break;
+      case WEATHER.OVERCAST:
+        _cloudTargetOpacity = 0.95;
+        _cloudTargetTint.setRGB(0.78, 0.80, 0.86);
+        _cloudWind.x = -3.5; _cloudWind.z = 0.8;
+        break;
+      case WEATHER.RAIN:
+        _cloudTargetOpacity = 1.0;
+        _cloudTargetTint.setRGB(0.55, 0.58, 0.66);
+        _cloudWind.x = -5.0; _cloudWind.z = 1.2;
+        break;
+      case WEATHER.HEAVY_RAIN:
+        _cloudTargetOpacity = 1.0;
+        _cloudTargetTint.setRGB(0.36, 0.38, 0.46);
+        _cloudWind.x = -8.0; _cloudWind.z = 1.8;
+        break;
+      case WEATHER.SNOW:
+        _cloudTargetOpacity = 0.95;
+        _cloudTargetTint.setRGB(0.86, 0.88, 0.93);
+        _cloudWind.x = -1.5; _cloudWind.z = 0.4;
+        break;
+      case WEATHER.FOG:
+        _cloudTargetOpacity = 0.6;
+        _cloudTargetTint.setRGB(0.85, 0.85, 0.85);
+        _cloudWind.x = -1.0; _cloudWind.z = 0.3;
+        break;
+    }
+  }
+
+  function _updateClouds(delta) {
+    if (!_cloudGroup || !_camera) return;
+    var camX = _camera.position.x, camZ = _camera.position.z;
+    for (var i = 0; i < _clouds.length; i++) {
+      var c = _clouds[i];
+      var p = c.sprite.position;
+      p.x += _cloudWind.x * delta;
+      p.z += _cloudWind.z * delta;
+      // Recycle clouds that drift too far from camera (wrap to the other side).
+      var dx = p.x - camX, dz = p.z - camZ;
+      if (Math.abs(dx) > CLOUD_RADIUS) p.x = camX - Math.sign(dx) * CLOUD_RADIUS + (Math.random() - 0.5) * 40;
+      if (Math.abs(dz) > CLOUD_RADIUS) p.z = camZ - Math.sign(dz) * CLOUD_RADIUS + (Math.random() - 0.5) * 40;
+      // Lerp tint + opacity toward weather targets.
+      var m = c.sprite.material;
+      m.opacity += (_cloudTargetOpacity - m.opacity) * Math.min(1, delta * 0.4);
+      m.color.lerp(_cloudTargetTint, Math.min(1, delta * 0.4));
+    }
+  }
+
+  /* ── Snow ground accumulation ────────────────────────────────── */
+  function _makeSnowPatchTexture() {
+    var c = document.createElement('canvas');
+    c.width = c.height = 64;
+    var ctx = c.getContext('2d');
+    var g = ctx.createRadialGradient(32, 32, 1, 32, 32, 30);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.7, 'rgba(245,250,255,0.7)');
+    g.addColorStop(1, 'rgba(220,230,240,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 64);
+    var t = new THREE.CanvasTexture(c);
+    t.minFilter = THREE.LinearFilter;
+    t.magFilter = THREE.LinearFilter;
+    return t;
+  }
+
+  function createSnowCover() {
+    if (!_scene) return;
+    var geo = new THREE.PlaneGeometry(3.6, 3.6);
+    geo.rotateX(-Math.PI / 2);
+    var mat = new THREE.MeshBasicMaterial({
+      map: _makeSnowPatchTexture(),
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    });
+    _snowCover = new THREE.InstancedMesh(geo, mat, SNOW_PATCH_COUNT);
+    _snowCover.frustumCulled = false;
+    _snowCover.name = 'snow-cover';
+    _snowCover.visible = false;
+    _snowDummy = new THREE.Object3D();
+    // Initial scatter; will be re-snapped to terrain when snow starts.
+    for (var i = 0; i < SNOW_PATCH_COUNT; i++) {
+      _snowDummy.position.set(0, -1000, 0);
+      _snowDummy.updateMatrix();
+      _snowCover.setMatrixAt(i, _snowDummy.matrix);
+    }
+    _snowCover.instanceMatrix.needsUpdate = true;
+    _scene.add(_snowCover);
+  }
+
+  function _resnapSnowPatches() {
+    if (!_snowCover || !_camera) return;
+    var camX = _camera.position.x, camZ = _camera.position.z;
+    for (var i = 0; i < SNOW_PATCH_COUNT; i++) {
+      var ang = Math.random() * Math.PI * 2;
+      var r = Math.sqrt(Math.random()) * SNOW_PATCH_RADIUS;
+      var x = camX + Math.cos(ang) * r;
+      var z = camZ + Math.sin(ang) * r;
+      var y = 0.05;
+      if (window.VoxelWorld && typeof window.VoxelWorld.getHeight === 'function') {
+        try { y = window.VoxelWorld.getHeight(x, z) + 0.06; } catch (e) {}
+      }
+      var rot = Math.random() * Math.PI * 2;
+      var sc = 0.7 + Math.random() * 0.9;
+      _snowDummy.position.set(x, y, z);
+      _snowDummy.rotation.set(0, rot, 0);
+      _snowDummy.scale.set(sc, 1, sc);
+      _snowDummy.updateMatrix();
+      _snowCover.setMatrixAt(i, _snowDummy.matrix);
+    }
+    _snowCover.instanceMatrix.needsUpdate = true;
+  }
+
+  function _updateSnowCover(delta) {
+    if (!_snowCover) return;
+    // Accumulate during SNOW; melt otherwise. Lerp constant 0.35 ≈ 3s to peak.
+    _snowAccumulation += (_snowAccumulationTarget - _snowAccumulation) * Math.min(1, delta * 0.35);
+    var op = Math.max(0, Math.min(0.95, _snowAccumulation));
+    if (_snowCover.material) _snowCover.material.opacity = op;
+    _snowCover.visible = op > 0.02;
+
+    // Tint scene lights toward cool white during snow accumulation.
+    if (_hemiLight && _baseHemiSky) {
+      _hemiLight.color.copy(_baseHemiSky).lerp(new THREE.Color(0xc8d8ff), op * 0.5);
+    }
+    if (_ambLight && _baseAmbColor) {
+      _ambLight.color.copy(_baseAmbColor).lerp(new THREE.Color(0xeaf0ff), op * 0.4);
+    }
   }
 
   function createParticleSystem() {
@@ -66,6 +294,14 @@ const WeatherSystem = (function () {
 
   function setWeather(weather) {
     currentWeather = weather;
+    _setCloudWeather(weather);
+    // Snow accumulation: ramp up during SNOW, melt back to 0 otherwise.
+    if (weather === WEATHER.SNOW) {
+      _snowAccumulationTarget = 0.85;
+      _resnapSnowPatches();
+    } else {
+      _snowAccumulationTarget = 0;
+    }
 
     switch (weather) {
       case WEATHER.CLEAR:
@@ -118,6 +354,9 @@ const WeatherSystem = (function () {
 
   function update(delta) {
     if (!_scene || !_camera) return;
+
+    _updateClouds(delta);
+    _updateSnowCover(delta);
 
     // Weather transition timer
     weatherTimer += delta;
@@ -360,6 +599,33 @@ const WeatherSystem = (function () {
       _lightningFlash.dispose();
       _lightningFlash = null;
     }
+    if (_cloudGroup) {
+      for (var ci = 0; ci < _clouds.length; ci++) {
+        var sm = _clouds[ci].sprite.material;
+        if (sm.map) sm.map.dispose();
+        sm.dispose();
+      }
+      if (_scene) _scene.remove(_cloudGroup);
+      _cloudGroup = null;
+      _clouds.length = 0;
+    }
+    if (_snowCover) {
+      if (_scene) _scene.remove(_snowCover);
+      if (_snowCover.geometry) _snowCover.geometry.dispose();
+      if (_snowCover.material) {
+        if (_snowCover.material.map) _snowCover.material.map.dispose();
+        _snowCover.material.dispose();
+      }
+      _snowCover = null;
+      _snowDummy = null;
+    }
+    // Restore light tints
+    if (_hemiLight && _baseHemiSky) _hemiLight.color.copy(_baseHemiSky);
+    if (_ambLight && _baseAmbColor) _ambLight.color.copy(_baseAmbColor);
+    _hemiLight = null; _ambLight = null;
+    _baseHemiSky = null; _baseAmbColor = null;
+    _snowAccumulation = 0;
+    _snowAccumulationTarget = 0;
     particleCount = 0;
     currentWeather = WEATHER.CLEAR;
     weatherTimer = 0;
@@ -393,3 +659,6 @@ const WeatherSystem = (function () {
     getTemperatureEffects: getTemperatureEffects,
   };
 })();
+
+// Expose globally so other modules and test harnesses can access it.
+if (typeof window !== 'undefined') window.WeatherSystem = WeatherSystem;
