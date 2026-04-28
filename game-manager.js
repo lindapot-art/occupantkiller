@@ -1147,6 +1147,7 @@ const GameManager = (function () {
     if (NPCSystem && typeof NPCSystem.init === 'function') NPCSystem.init(_scene);
     _bootStep('npc system');
     if (DroneSystem && typeof DroneSystem.init === 'function') DroneSystem.init(_scene, _camera);
+    if (typeof EnemyArtillery !== 'undefined' && EnemyArtillery.init) EnemyArtillery.init(_scene);
     _bootStep('drones');
     if (typeof RefineryStrike !== 'undefined' && RefineryStrike.init) RefineryStrike.init(_scene);
     if (VehicleSystem && typeof VehicleSystem.init === 'function') VehicleSystem.init(_scene);
@@ -2751,6 +2752,7 @@ const GameManager = (function () {
     Pickups.clear();
     VehicleSystem.clear();
     DroneSystem.clear();
+    if (typeof EnemyArtillery !== 'undefined' && EnemyArtillery.clear) EnemyArtillery.clear();
     NPCSystem.clear();
     if (typeof Building !== 'undefined' && Building.clear) Building.clear();
     if (typeof Tracers !== 'undefined') Tracers.clear();
@@ -2991,6 +2993,7 @@ const GameManager = (function () {
     Enemies.clear();
     Pickups.clear();
     DroneSystem.clear();
+    if (typeof EnemyArtillery !== 'undefined' && EnemyArtillery.clear) EnemyArtillery.clear();
     if (typeof RefineryStrike !== 'undefined' && RefineryStrike.clear) RefineryStrike.clear();
     if (typeof Building !== 'undefined' && Building.clear) Building.clear();
     if (typeof Tracers !== 'undefined' && Tracers.clear) Tracers.clear();
@@ -5272,6 +5275,7 @@ const GameManager = (function () {
       // Hybrid systems
       NPCSystem.update(delta, TimeSystem.getInfo());
       DroneSystem.update(delta);
+      if (typeof EnemyArtillery !== 'undefined') EnemyArtillery.update(delta);
       VehicleSystem.update(delta);
       Automation.update(delta);
       MissionSystem.update(delta);
