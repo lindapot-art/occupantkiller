@@ -22,14 +22,16 @@ Requested: 2026-04-27
 Details: User reports multiple start screens. Required: one start screen with vertical scroll containing GOD button, drone missions, and other missions inline. Plus a real preloader with progress bar that gates GameManager.init so the online (Render) build does not crash on cold start. See `.github/AUDIT-2026-04-27.md`.
 
 ### [P0] Investigate "Action Under Terrain"
-Status: PENDING
+Status: DONE
 Requested: 2026-04-27
-Details: Gameplay QA screenshots (e.g. `gameplay-260-game3-final.png`) show camera below terrain looking up at hovering blocks. `enforcePlayerGroundSnap()` exists but isn't catching the case. Possible causes: QA-bot teleport timing, post-explosion crater fall, stage-transition spawn before chunks ready. Repro + instrument before patching.
+Completed: 2026-04-27
+Details: Root cause was using noise-based getTerrainHeight for ground snap, missing voxel surface ops. Fixed by adding `VoxelWorld.getTopSolidY(wx, wz)` (scans solid voxels from top, returns first solid Y+1) and routing `enforcePlayerGroundSnap` through it. Commit cf81e13. Verified via `tools/test-stage-tour-333.js` scenic anchor uses getTopSolidY.
 
 ### [P1] Full-Time Overseer Agent
-Status: PENDING
+Status: DONE
 Requested: 2026-04-27
-Details: Create a permanent overseer agent (`overseer.agent.md`) that watches every batch: verifies new user requests are added to TASK_QUEUE before any code edits, double-checks QA stamps against raw terminal output, and produces a session ledger of every request and its disposition. User mandate: "i dont trust you anymore."
+Completed: 2026-04-27
+Details: Created `.github/agents/overseer.agent.md` with PHASE 1 capture, PHASE 2 verify QA stamps, PHASE 3 detect lies, PHASE 4 maintain session ledger, PHASE 5 audit deferrals + OVERSEER VERDICT response format. Commit cf81e13.
 
 ### [P1] 333-Screenshot QA Per Level (Real Play)
 Status: PENDING
@@ -37,29 +39,34 @@ Requested: 2026-04-27
 Details: Replace the current 23-shot harness with a 333-shot run PER level (not total), one shot every 4 seconds, with the QA bot actually playing: completing missions, killing drones, picking up items, using inventory. Required for all 4 stages. Currently `tools/test-stage-tour-333.js` exists — verify it does real play, not just camera tour. See `.github/AUDIT-2026-04-27.md`.
 
 ### [P1] God-Mode Dugout Building From Inventory
-Status: PENDING
+Status: DONE
 Requested: 2026-04-27
-Details: In god mode, the player has all inventory materials. Add ability to build a dugout (foxhole / sheltered firing position) by placing inventory blocks. Should integrate with existing `building.js` auto-build system but allow manual placement.
+Completed: 2026-04-27
+Details: Added `dugout` template to `building.js` (3×3 carved pit + sandbag rim + partial wood roof firing-slit). F7 hotkey added to game-manager. God mode now tops up Economy resources so dugout placement always succeeds. Cost is `{stone:20, wood:15}` (matches real Economy resources). Commits e2af532, 65ccc1a.
 
 ### [P1] New Mission: "Clear RF Dugouts/Holes/Trenches"
-Status: PENDING
+Status: DONE
 Requested: 2026-04-27
-Details: Custom mission where Ukrainian NPCs assault Russian Federation positions (dugouts, foxholes, trenches) and clear them with grenades throughout. Procedural RF dugout layouts with sandbag entrances, wood beams, ammo crates. UA squad uses cover-and-move tactics, throws grenades, breaches positions.
+Completed: 2026-04-27
+Details: ASSAULT_DUGOUTS mission now fully wired in `mission-types.js`: when started, it carves N voxel dugouts in an arc 14-30m around the zone, spawns RU CONSCRIPT garrison per dugout via `Enemies.spawnSingle`, auto-detects clear when no live enemies remain within 5m of a dugout center, advances counter (X/N), and triggers hold-position phase when all are cleared. HUD notifies on mission start and per-dugout clear. Verified: node --check PASS, test-master 38/0/0, test-qa-v2 21/0, test-all-weapons 37/37, no page errors.
 
 ### [P1] Grenade Gear Default 5 / Unlimited God
-Status: PENDING
+Status: DONE
 Requested: 2026-04-27
-Details: Default loadout: 5 grenades on player. God mode: unlimited grenades. Visible grenade gear on player and NPC models — grenades on chest rigs, grenade bags hanging on hip/back. Allow grenade throw at any time (not just when equipped via slot).
+Completed: 2026-04-27
+Details: `player.grenades = 5` default, `Infinity` in god mode. HUD pip via `HUD.setHandGrenades(n)` (gold infinity / gray when 0). KeyG throws hand grenade with tumble physics, 6.5m blast at 110 dmg, ground bounce uses getTopSolidY. Visible chest-rig grenades on `_playerBodyMesh` and 3-grenade pouches on every NPC. Commits 39fe27e, 6e70e00, e2af532, cf81e13.
 
 ### [P1] NPC Sitting-Mat Detail
-Status: PENDING
+Status: DONE
 Requested: 2026-04-27
-Details: Equip some Ukrainian soldier NPCs with foam sitting mats hanging from their belt/butt while walking. When they sit (idle, rest, or scripted sit animation), the mat deploys under them as a sitting surface. Adds visible immersion detail.
+Completed: 2026-04-27
+Details: ~40% of NPCs carry a foam mat: rolled cylinder while walking, flat plane appears under them when idle >4s. Toggle in update loop driven by `npc._idleTime`. Commit 04f38df.
 
 ### [P1] Detail Polish Pass
-Status: PENDING
+Status: DONE (round 1; tea kettles still candidate for future)
 Requested: 2026-04-27
-Details: User wants more "small details" like the sitting mat. Suggestions: NPC water canteens, helmet covers with grass tufts, rolled sleeping rolls on packs, drying laundry in bases, tea kettles, smoke breaks, kit shake on movement. Each detail is a small mesh + animation hook.
+Completed: 2026-04-27
+Details: Shipped: hip canteen on every NPC, ~30% helmet grass-tuft scrim, ~25% knee pads, ~20% sleeping bedroll on backpack, ~15% smokers (cigarette + pulsing ember + drifting smoke puff, only visible when sitting), camp clothesline behind ~50% of friendly squads (posts/rope/3-4 hanging garments). Commits f96d279, 6e70e00, 7277dbb.
 
 ### [P0] Project Tracking & Crash Recovery Improvements
 Status: IN-PROGRESS

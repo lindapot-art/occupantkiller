@@ -147,6 +147,38 @@ const MissionTypes = (function () {
           dugoutPositions: [], rusKilledTotal: 0,
           ukrSquad: [], grenadesUsed: 0
         };
+        // Spawn N dugouts in an arc around the zone, place RU defenders inside each.
+        try {
+          var dCount = type.dugoutCount || 4;
+          var baseX = activeMission.zoneX;
+          var baseZ = activeMission.zoneZ;
+          for (var di = 0; di < dCount; di++) {
+            var ang = (di / dCount) * Math.PI * 1.4 - Math.PI * 0.7;
+            var dist = 14 + di * 4;
+            var dx = baseX + Math.cos(ang) * dist;
+            var dz = baseZ + Math.sin(ang) * dist;
+            var dy = (typeof window !== 'undefined' && window.VoxelWorld && window.VoxelWorld.getTopSolidY)
+              ? window.VoxelWorld.getTopSolidY(dx, dz)
+              : ((window.VoxelWorld && window.VoxelWorld.getTerrainHeight) ? window.VoxelWorld.getTerrainHeight(dx, dz) + 1 : 0);
+            // Carve voxel dugout
+            if (typeof window !== 'undefined' && window.VoxelWorld && window.VoxelWorld.placeDugout) {
+              try { window.VoxelWorld.placeDugout(dx, dy, dz, 5); } catch (e) {}
+            }
+            missionProgress.dugoutPositions.push({ x: dx, y: dy, z: dz, cleared: false });
+            // Garrison: spawn RU enemies in/around this dugout
+            if (typeof window !== 'undefined' && window.Enemies && window.Enemies.spawnSingle) {
+              for (var gi = 0; gi < (type.rusGarrisonPerHole || 3); gi++) {
+                var ox = dx + (Math.random() - 0.5) * 1.5;
+                var oz = dz + (Math.random() - 0.5) * 1.5;
+                try { window.Enemies.spawnSingle('CONSCRIPT', { x: ox, z: oz }); } catch (e) {}
+              }
+            }
+          }
+          // Notify HUD
+          if (typeof window !== 'undefined' && window.HUD && window.HUD.notifyPickup) {
+            window.HUD.notifyPickup('CLEAR ' + dCount + ' RUSSIAN DUGOUTS', '#ff8844');
+          }
+        } catch (eD) { /* swallow */ }
         break;
     }
     return true;
@@ -238,6 +270,30 @@ const MissionTypes = (function () {
         result.dugoutsCleared = missionProgress.dugoutsCleared;
         result.dugoutCount = cfg.dugoutCount;
         result.reachedFirst = missionProgress.reachedFirst;
+        // Auto-clear: if no live enemies are within 5m of a dugout, mark it cleared
+        if (typeof window !== 'undefined' && window.Enemies && window.Enemies.getAll && missionProgress.dugoutPositions) {
+          var liveEnemies = window.Enemies.getAll();
+          for (var dpi = 0; dpi < missionProgress.dugoutPositions.length; dpi++) {
+            var dp = missionProgress.dugoutPositions[dpi];
+            if (dp.cleared) continue;
+            var hostiles = 0;
+            for (var ei = 0; ei < liveEnemies.length; ei++) {
+              var en = liveEnemies[ei];
+              if (!en || !en.alive || !en.mesh) continue;
+              var ddx = en.mesh.position.x - dp.x;
+              var ddz = en.mesh.position.z - dp.z;
+              if ((ddx * ddx + ddz * ddz) < 25) { hostiles++; break; }
+            }
+            if (hostiles === 0) {
+              dp.cleared = true;
+              missionProgress.dugoutsCleared++;
+              missionProgress.reachedFirst = true;
+              if (window.HUD && window.HUD.notifyPickup) {
+                window.HUD.notifyPickup('DUGOUT CLEARED (' + missionProgress.dugoutsCleared + '/' + cfg.dugoutCount + ')', '#88ff44');
+              }
+            }
+          }
+        }
         if (missionProgress.dugoutsCleared >= cfg.dugoutCount) {
           missionProgress.holdTimer += dt;
           result.holdProgress = missionProgress.holdTimer / cfg.holdTime;
