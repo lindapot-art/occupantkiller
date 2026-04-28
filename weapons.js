@@ -2304,6 +2304,8 @@ const Weapons = (() => {
       try { WD.autoDetail(m, WEAPONS[i]); } catch (e) {}
       // Weld visual gaps so parts don't look detached / floating in air
       try { _unifyWeaponMesh(m); } catch (e) {}
+      // Apply equipped skin (if any) to the freshly built mesh
+      try { if (weaponSkins[i]) applySkinToMesh(m, weaponSkins[i]); } catch (e) {}
       gunMeshes.push(m);
       m.visible = (i === currentIdx);
       camera.add(m);
@@ -2433,11 +2435,13 @@ const Weapons = (() => {
 
   function showMuzzle() {
     if (!muzzleFlash) return;
-    muzzleFlash.material.opacity = 1;
+    var _mfm = getMuzzleFlashMult(currentIdx);
+    muzzleFlash.material.opacity = 1 * _mfm;
     muzzleFlash.rotation.z = Math.random() * Math.PI * 2;
+    muzzleFlash.scale.setScalar(_mfm);
     muzzleTimer = 0.06;
     // Flash point light burst
-    if (_muzzleLight) _muzzleLight.intensity = 2.5;
+    if (_muzzleLight) _muzzleLight.intensity = 2.5 * _mfm;
     // Trigger lingering smoke puff
     if (_muzzleSmoke) {
       _muzzleSmoke.visible = true;
@@ -2999,7 +3003,7 @@ const Weapons = (() => {
     if (!wep.auto && !newPress) return;
     // Block firing when weapon is overheated
     if (typeof CombatExtras !== 'undefined' && CombatExtras.isOverheated()) return;
-    st.fireCooldown = wep.fireRate;
+    st.fireCooldown = effectiveFireRate(currentIdx);
     _firedThisFrame = true;
 
     // Trigger visual animations (bolt cycle, barrel spin, muzzle smoke)
@@ -3263,14 +3267,15 @@ const Weapons = (() => {
     const wep = cur();
     const st  = curState();
     if (wep.type === 'MELEE') return;
-    if (st.reloading || st.clip === wep.clipSize) return;
+    var effClip = effectiveClipSize(currentIdx);
+    if (st.reloading || st.clip === effClip) return;
     if (st.reserve <= 0) {
       // No ammo — dry fire click
       if (typeof AudioSystem !== 'undefined' && AudioSystem.playDryFire) AudioSystem.playDryFire();
       return;
     }
     st.reloading   = true;
-    st.reloadTimer = wep.reloadTime;
+    st.reloadTimer = effectiveReloadTime(currentIdx);
     reloadAnimAngle = 0;
     HUD.showReload(true);
     // Mag-drop visual: spawn a small black mag that falls + fades
@@ -3609,7 +3614,7 @@ const Weapons = (() => {
         mesh.position.y += rPosY;
       }
       if (st.reloadTimer <= 0) {
-        const need = wep.clipSize - st.clip;
+        const need = effectiveClipSize(currentIdx) - st.clip;
         const fill = Math.min(need, st.reserve);
         st.clip    += fill;
         st.reserve -= fill;
@@ -3675,7 +3680,7 @@ const Weapons = (() => {
   }
 
   function forceReload() { startReload(); }
-  function setClip(val) { var st = curState(); if (typeof val === 'number') { st.clip = Math.min(val, cur().clipSize || val); HUD.setAmmo(st.clip, st.reserve); } }
+  function setClip(val) { var st = curState(); if (typeof val === 'number') { st.clip = Math.min(val, effectiveClipSize(currentIdx) || val); HUD.setAmmo(st.clip, st.reserve); } }
 
   function clearJam() {
     const st = curState();
@@ -3689,9 +3694,9 @@ const Weapons = (() => {
   function isReloading() { return curState().reloading; }
   function getClip()     { return cur().type === 'MELEE' ? Infinity : curState().clip; }
   function getReserve()  { return cur().type === 'MELEE' ? '—' : curState().reserve; }
-  function getClipSize() { return cur().clipSize || 0; }
+  function getClipSize() { return effectiveClipSize(currentIdx) || 0; }
   function getDamage()   {
-    var base = cur().damage;
+    var base = effectiveDamage(currentIdx);
     /* WoT-style premium ammo: if equipped + compatible, multiply damage AND
        consume one round. Falls back to 1.0 when no pack equipped or empty. */
     if (typeof Marketplace !== 'undefined' && typeof Marketplace.consumeAmmoShot === 'function') {
@@ -3734,24 +3739,164 @@ const Weapons = (() => {
 
   // ── B24: Weapon Attachment System ──
   const ATTACHMENTS = {
-    SUPPRESSOR:   { id: 'SUPPRESSOR',   name: 'Suppressor',   damageMult: 0.85, spreadMult: 0.9, sound: 'silent' },
-    EXT_MAG:      { id: 'EXT_MAG',      name: 'Extended Mag', clipMult: 1.5 },
-    RAPID_FIRE:   { id: 'RAPID_FIRE',   name: 'Rapid Fire',   fireRateMult: 0.8 },
-    GRIP:         { id: 'GRIP',         name: 'Foregrip',     recoilMult: 0.7, spreadMult: 0.85 },
-    LASER:        { id: 'LASER',        name: 'Laser Sight',  spreadMult: 0.75 },
-    SCOPE_4X:     { id: 'SCOPE_4X',     name: '4x Scope',     hasScope: true, zoomFOV: 20 },
-    FMJ:          { id: 'FMJ',          name: 'FMJ Rounds',   damageMult: 1.15, penetration: true },
-    SPEED_LOADER: { id: 'SPEED_LOADER', name: 'Speed Loader',  reloadMult: 0.7 },
+    SUPPRESSOR:   { id: 'SUPPRESSOR',   name: 'Suppressor',     damageMult: 0.85, spreadMult: 0.9, sound: 'silent', muzzleFlashMult: 0.25, silent: true, cost: 800,  icon: '🔇' },
+    EXT_MAG:      { id: 'EXT_MAG',      name: 'Extended Mag',   clipMult: 1.5,                                                                              cost: 600,  icon: '📦' },
+    DRUM_MAG:     { id: 'DRUM_MAG',     name: 'Drum Magazine',  clipMult: 2.5, reloadMult: 1.25,                                                            cost: 1400, icon: '🥁' },
+    RAPID_FIRE:   { id: 'RAPID_FIRE',   name: 'Rapid Fire',     fireRateMult: 0.8,                                                                          cost: 900,  icon: '⚡' },
+    GRIP:         { id: 'GRIP',         name: 'Foregrip',       recoilMult: 0.7, spreadMult: 0.85,                                                          cost: 500,  icon: '✊' },
+    LASER:        { id: 'LASER',        name: 'Laser Sight',    spreadMult: 0.75,                                                                           cost: 400,  icon: '🔴' },
+    SCOPE_4X:     { id: 'SCOPE_4X',     name: '4x Scope',       hasScope: true, zoomFOV: 20,                                                                cost: 1100, icon: '🎯' },
+    FMJ:          { id: 'FMJ',          name: 'FMJ Rounds',     damageMult: 1.15, penetration: true,                                                        cost: 700,  icon: '💥' },
+    SPEED_LOADER: { id: 'SPEED_LOADER', name: 'Speed Loader',   reloadMult: 0.7,                                                                            cost: 600,  icon: '🔄' },
+    HEAVY_BARREL: { id: 'HEAVY_BARREL', name: 'Heavy Barrel',   damageMult: 1.20, recoilMult: 1.10, fireRateMult: 1.05,                                     cost: 1000, icon: '🛢' },
   };
+
+  // Compatibility: which attachments suit which weapon TYPE.
+  // Suppressors only on subsonic-friendly types (no rockets, no shotguns of huge
+  // bore, no AT/AGS/HMG/AA/MELEE etc.). Drum mags only on auto fed.
+  const ATTACHMENT_COMPAT = {
+    SUPPRESSOR:   ['PISTOL','ASSAULT','NATO','NATO_HEAVY','SMG','SNIPER','AMR','SILENT','MACHINEGUN','HMG','HMG_HEAVY','LMG'],
+    EXT_MAG:      ['PISTOL','ASSAULT','NATO','NATO_HEAVY','SMG','LMG','MACHINEGUN','HMG','HMG_HEAVY','MINIGUN','GATLING','SNIPER','AMR','SILENT','SHOTGUN'],
+    DRUM_MAG:     ['ASSAULT','NATO','NATO_HEAVY','SMG','LMG','MACHINEGUN','HMG','HMG_HEAVY'],
+    RAPID_FIRE:   ['ASSAULT','NATO','NATO_HEAVY','SMG','LMG','MACHINEGUN','HMG','HMG_HEAVY','MINIGUN','GATLING','PISTOL','SILENT','SHOTGUN'],
+    GRIP:         ['ASSAULT','NATO','NATO_HEAVY','SMG','LMG','MACHINEGUN','HMG','HMG_HEAVY','SHOTGUN','SNIPER','AMR'],
+    LASER:        ['PISTOL','ASSAULT','NATO','NATO_HEAVY','SMG','SHOTGUN','SILENT'],
+    SCOPE_4X:     ['ASSAULT','NATO','NATO_HEAVY','SMG','LMG','MACHINEGUN','SNIPER','AMR','SILENT'],
+    FMJ:          ['PISTOL','ASSAULT','NATO','NATO_HEAVY','SMG','LMG','MACHINEGUN','HMG','HMG_HEAVY','SNIPER','AMR','SILENT','SHOTGUN','MINIGUN','GATLING'],
+    SPEED_LOADER: ['PISTOL','ASSAULT','NATO','NATO_HEAVY','SMG','LMG','MACHINEGUN','HMG','HMG_HEAVY','SNIPER','AMR','SILENT','SHOTGUN'],
+    HEAVY_BARREL: ['SNIPER','AMR','SILENT','LMG','MACHINEGUN','HMG','HMG_HEAVY','ASSAULT','NATO','NATO_HEAVY'],
+  };
+
+  function isCompatible(weaponIdx, attachId) {
+    var w = WEAPONS[weaponIdx];
+    if (!w) return false;
+    var list = ATTACHMENT_COMPAT[attachId];
+    return list && list.indexOf(w.type) >= 0;
+  }
+  function getCompatibleAttachments(weaponIdx) {
+    var out = [];
+    for (var key in ATTACHMENTS) {
+      if (isCompatible(weaponIdx, key)) out.push(ATTACHMENTS[key]);
+    }
+    return out;
+  }
+
+  // ── Weapon Skins (cosmetic + premium upgrades) ──
+  // Each skin defines tint colors mapped onto the procedural mesh.  metal =
+  // primary body, accent = highlight (rails, sights), wood = grips/stock, glow
+  // = optional emissive for premium tiers.
+  const SKINS = {
+    DEFAULT:   { id: 'DEFAULT',   name: 'Standard',          rarity: 'common',    cost: 0,    icon: '⬜', metal: null,     accent: null,     wood: null     },
+    BLACK:     { id: 'BLACK',     name: 'Tactical Black',    rarity: 'common',    cost: 200,  icon: '⬛', metal: 0x111111, accent: 0x222222, wood: 0x222222 },
+    DESERT:    { id: 'DESERT',    name: 'Desert Tan',        rarity: 'uncommon',  cost: 600,  icon: '🏜', metal: 0xc7a679, accent: 0x8a7146, wood: 0x6b4d2a },
+    WOODLAND:  { id: 'WOODLAND',  name: 'Woodland Camo',     rarity: 'uncommon',  cost: 600,  icon: '🌲', metal: 0x4a5d3a, accent: 0x2c3a22, wood: 0x3d2e1b },
+    URBAN:     { id: 'URBAN',     name: 'Urban Camo',        rarity: 'uncommon',  cost: 600,  icon: '🏙', metal: 0x6b6e72, accent: 0x33363a, wood: 0x2a2c2e },
+    JUNGLE:    { id: 'JUNGLE',    name: 'Jungle Tigerstripe', rarity: 'uncommon', cost: 700,  icon: '🐅', metal: 0x445d2a, accent: 0x1a1a0d, wood: 0x2d1f0d },
+    ARCTIC:    { id: 'ARCTIC',    name: 'Arctic White',      rarity: 'uncommon',  cost: 700,  icon: '❄',  metal: 0xe8eef2, accent: 0xb0b8c0, wood: 0xc8cfd3 },
+    DIGITAL:   { id: 'DIGITAL',   name: 'Digital Pixel',     rarity: 'rare',      cost: 1000, icon: '🔳', metal: 0x556680, accent: 0x223344, wood: 0x33445a },
+    REDSTAR:   { id: 'REDSTAR',   name: 'Red Star',          rarity: 'rare',      cost: 1200, icon: '⭐', metal: 0x551111, accent: 0xcc1111, wood: 0x331111 },
+    CHROME:    { id: 'CHROME',    name: 'Chrome',            rarity: 'epic',      cost: 1800, icon: '🪙', metal: 0xeeeef2, accent: 0xb8bfc8, wood: 0x4a4a4e, metalness: 1.0, roughness: 0.15 },
+    GOLD:      { id: 'GOLD',      name: 'Gold Plated',       rarity: 'legendary', cost: 3000, icon: '🌟', metal: 0xf2c14a, accent: 0xb88b1f, wood: 0x3a2410, metalness: 1.0, roughness: 0.20, glow: 0xffaa00 },
+    OBSIDIAN:  { id: 'OBSIDIAN',  name: 'Obsidian',          rarity: 'epic',      cost: 1800, icon: '🖤', metal: 0x0a0a14, accent: 0x141422, wood: 0x0a0a14, metalness: 0.7, roughness: 0.25 },
+    FIRE:      { id: 'FIRE',      name: 'Fire Inferno',      rarity: 'legendary', cost: 3000, icon: '🔥', metal: 0xc23a0c, accent: 0xff7a1a, wood: 0x3a0c0c, glow: 0xff4400 },
+    NEON:      { id: 'NEON',      name: 'Neon Cyber',        rarity: 'legendary', cost: 3000, icon: '💜', metal: 0x1a1a3a, accent: 0x9a44ff, wood: 0x2a1a3a, glow: 0xaa44ff },
+    PRESTIGE:  { id: 'PRESTIGE',  name: 'Founder Prestige',  rarity: 'mythic',    cost: 6000, icon: '👑', metal: 0xd9b347, accent: 0xff2a2a, wood: 0x1a0a0a, metalness: 1.0, roughness: 0.10, glow: 0xff5500 },
+  };
+
+  // Storage: { weaponIdx: skinId }
+  let weaponSkins = {};
+
+  // ── Effective-stat helpers (applied at firing/reload time) ──
+  function _stats(weaponIdx) {
+    var w = WEAPONS[weaponIdx];
+    if (!w) return null;
+    var s = { damage: w.damage, spread: w.spread, fireRate: w.fireRate,
+              clipSize: w.clipSize, reloadTime: w.reloadTime, recoilY: w.recoilY,
+              silent: false, muzzleFlashMult: 1 };
+    var atts = weaponAttachments[weaponIdx] || [];
+    for (var i = 0; i < atts.length; i++) {
+      var a = ATTACHMENTS[atts[i]]; if (!a) continue;
+      if (a.damageMult)        s.damage     = Math.round(s.damage * a.damageMult);
+      if (a.spreadMult)        s.spread    *= a.spreadMult;
+      if (a.fireRateMult)      s.fireRate  *= a.fireRateMult;
+      if (a.clipMult)          s.clipSize   = Math.max(1, Math.floor(s.clipSize * a.clipMult));
+      if (a.reloadMult)        s.reloadTime *= a.reloadMult;
+      if (a.recoilMult)        s.recoilY   *= a.recoilMult;
+      if (a.silent)            s.silent     = true;
+      if (a.muzzleFlashMult != null) s.muzzleFlashMult = Math.min(s.muzzleFlashMult, a.muzzleFlashMult);
+    }
+    return s;
+  }
+  function _curStats() { return _stats(currentIdx); }
+  function effectiveClipSize(idx)  { var s = _stats(idx == null ? currentIdx : idx); return s ? s.clipSize   : 0; }
+  function effectiveReloadTime(idx){ var s = _stats(idx == null ? currentIdx : idx); return s ? s.reloadTime : 0; }
+  function effectiveFireRate(idx)  { var s = _stats(idx == null ? currentIdx : idx); return s ? s.fireRate   : 0; }
+  function effectiveDamage(idx)    { var s = _stats(idx == null ? currentIdx : idx); return s ? s.damage     : 0; }
+  function effectiveSpread(idx)    { var s = _stats(idx == null ? currentIdx : idx); return s ? s.spread     : 0; }
+  function isSilenced(idx)         { var s = _stats(idx == null ? currentIdx : idx); return !!(s && s.silent); }
+  function getMuzzleFlashMult(idx) { var s = _stats(idx == null ? currentIdx : idx); return s ? s.muzzleFlashMult : 1; }
+
+  // ── Skin equip + mesh tint ──
+  function setWeaponSkin(weaponIdx, skinId) {
+    if (!SKINS[skinId]) return false;
+    weaponSkins[weaponIdx] = skinId;
+    if (gunMeshes && gunMeshes[weaponIdx]) applySkinToMesh(gunMeshes[weaponIdx], skinId);
+    return true;
+  }
+  function getWeaponSkin(weaponIdx) { return weaponSkins[weaponIdx] || 'DEFAULT'; }
+
+  function applySkinToMesh(mesh, skinId) {
+    if (!mesh || !skinId) return;
+    var skin = SKINS[skinId];
+    if (!skin || skinId === 'DEFAULT') return;
+    mesh.traverse(function (child) {
+      if (!child.material || !child.material.color) return;
+      var mat = child.material;
+      // Don't tint glass/scope-lens (transparent) or very dark eye dots.
+      if (mat.transparent && mat.opacity < 0.7) return;
+      var name = (child.name || '').toLowerCase();
+      var c = mat.color.getHex();
+      // Heuristic: wood-toned (browns) → wood color; otherwise → metal/accent.
+      var r = (c >> 16) & 0xff, g = (c >> 8) & 0xff, b = c & 0xff;
+      var isWoody = (r > g && g > b && r - b > 30 && r < 200);
+      var target = null;
+      if (isWoody && skin.wood != null)                target = skin.wood;
+      else if (skin.metal != null)                      target = skin.metal;
+      // Accent for very small parts (rails, sight blades) — name hint
+      if (skin.accent != null && (name.indexOf('rail') >= 0 || name.indexOf('sight') >= 0)) {
+        target = skin.accent;
+      }
+      if (target != null) mat.color.setHex(target);
+      if (skin.metalness != null && 'metalness' in mat) mat.metalness = skin.metalness;
+      if (skin.roughness != null && 'roughness' in mat) mat.roughness = skin.roughness;
+      if (skin.glow != null && 'emissive' in mat) {
+        mat.emissive = new THREE.Color(skin.glow);
+        mat.emissiveIntensity = 0.35;
+      }
+    });
+  }
+
 
   let weaponAttachments = {}; // { weaponIdx: [attachmentId, ...] }
 
   function addAttachment(weaponIdx, attachId) {
     if (!ATTACHMENTS[attachId]) return false;
+    if (!isCompatible(weaponIdx, attachId)) return false;
     if (!weaponAttachments[weaponIdx]) weaponAttachments[weaponIdx] = [];
     if (weaponAttachments[weaponIdx].length >= 3) return false; // max 3 attachments
     if (weaponAttachments[weaponIdx].indexOf(attachId) >= 0) return false; // already has it
+    // Mutually exclusive: EXT_MAG and DRUM_MAG share a slot
+    if (attachId === 'EXT_MAG' && weaponAttachments[weaponIdx].indexOf('DRUM_MAG') >= 0) return false;
+    if (attachId === 'DRUM_MAG' && weaponAttachments[weaponIdx].indexOf('EXT_MAG') >= 0) return false;
     weaponAttachments[weaponIdx].push(attachId);
+    // If an extended mag was just added and current clip is at base capacity,
+    // refill into the new larger capacity from reserve.
+    var st = states[weaponIdx];
+    if (st && (attachId === 'EXT_MAG' || attachId === 'DRUM_MAG')) {
+      var newCap = effectiveClipSize(weaponIdx);
+      var fill = Math.min(newCap - st.clip, st.reserve);
+      if (fill > 0) { st.clip += fill; st.reserve -= fill; }
+    }
     return true;
   }
 
@@ -3861,10 +4006,24 @@ const Weapons = (() => {
     // B24 exports
     unlockNext:       unlockNext,
     ATTACHMENTS:      ATTACHMENTS,
+    ATTACHMENT_COMPAT: ATTACHMENT_COMPAT,
     addAttachment:    addAttachment,
     removeAttachment: removeAttachment,
     getAttachments:   getAttachments,
     getModifiedStats: getModifiedStats,
+    isCompatible:           isCompatible,
+    getCompatibleAttachments: getCompatibleAttachments,
+    effectiveClipSize:      effectiveClipSize,
+    effectiveReloadTime:    effectiveReloadTime,
+    effectiveFireRate:      effectiveFireRate,
+    effectiveDamage:        effectiveDamage,
+    effectiveSpread:        effectiveSpread,
+    isSilenced:             isSilenced,
+    getMuzzleFlashMult:     getMuzzleFlashMult,
+    SKINS:                  SKINS,
+    setWeaponSkin:          setWeaponSkin,
+    getWeaponSkin:          getWeaponSkin,
+    applySkinToMesh:        applySkinToMesh,
   };
 })();
 
