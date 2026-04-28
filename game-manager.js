@@ -1198,6 +1198,7 @@ const GameManager = (function () {
     // Birds + Mortar + Premium + Lottery + Gyro
     try { if (window.Birds   && Birds.init)   Birds.init(_scene); } catch (e) {}
     try { if (window.Mortar  && Mortar.init)  Mortar.init(_scene, _camera, _controls); } catch (e) {}
+    try { if (window.Bradley && Bradley.init) Bradley.init(_scene, _camera, _controls); } catch (e) {}
     try { if (window.Premium && Premium.init) Premium.init(); } catch (e) {}
     try { if (window.Lottery && Lottery.init) Lottery.init(); } catch (e) {}
     try { if (window.Gyro    && Gyro.init)    Gyro.init(_camera); } catch (e) {}
@@ -5447,9 +5448,10 @@ const GameManager = (function () {
       if (typeof Flags !== 'undefined' && Flags.update) Flags.update(delta);
       if (typeof Environment !== 'undefined' && Environment.update) Environment.update(delta);
       // Birds / Mortar / Gyro per-frame
-      try { if (window.Birds  && Birds.update)  Birds.update(delta); } catch (eBU) {}
-      try { if (window.Mortar && Mortar.update) Mortar.update(delta); } catch (eMU) {}
-      try { if (window.Gyro   && Gyro.update)   Gyro.update(delta); } catch (eGU) {}
+      try { if (window.Birds   && Birds.update)   Birds.update(delta); } catch (eBU) {}
+      try { if (window.Mortar  && Mortar.update)  Mortar.update(delta); } catch (eMU) {}
+      try { if (window.Bradley && Bradley.update) Bradley.update(delta); } catch (eBV) {}
+      try { if (window.Gyro    && Gyro.update)    Gyro.update(delta); } catch (eGU) {}
 
       // ═══ NEW FEATURE SYSTEM UPDATES (59 features) ═══
 
@@ -5901,10 +5903,12 @@ const GameManager = (function () {
       }
     }
 
-    // Switch to mortar bird's-eye cam if deployed
+    // Switch to mortar bird's-eye cam if deployed, or Bradley chase cam if driving
     var renderCam = _camera;
     try {
-      if (window.Mortar && window.Mortar.isDeployed && window.Mortar.isDeployed() && window.GameManager.__mortarCam) {
+      if (window.Bradley && window.Bradley.isActive && window.Bradley.isActive() && window.GameManager.__bradleyCam) {
+        renderCam = window.GameManager.__bradleyCam;
+      } else if (window.Mortar && window.Mortar.isDeployed && window.Mortar.isDeployed() && window.GameManager.__mortarCam) {
         renderCam = window.GameManager.__mortarCam;
       }
     } catch (eMR) {}

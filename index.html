@@ -260,6 +260,7 @@
     <button id="premium-btn" style="position:fixed;top:4px;right:418px;background:rgba(0,0,0,0.5);border:1px solid rgba(120,255,180,0.5);color:#7fffaa;padding:2px 10px;border-radius:4px;font-size:11px;font-family:monospace;z-index:210;cursor:pointer" title="Premium time tiers (more OKC + XP)">⭐ PREMIUM</button>
     <button id="gyro-btn" style="position:fixed;top:4px;right:514px;background:rgba(0,0,0,0.5);border:1px solid rgba(80,200,255,0.5);color:#88ddff;padding:2px 10px;border-radius:4px;font-size:11px;font-family:monospace;z-index:210;cursor:pointer" title="Toggle mobile gyro aim">🎮 GYRO</button>
     <button id="mortar-btn" style="position:fixed;top:4px;right:608px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,160,80,0.5);color:#ffaa66;padding:2px 10px;border-radius:4px;font-size:11px;font-family:monospace;z-index:210;cursor:pointer" title="Deploy mortar (M key) — bird's-eye aim">🎯 MORTAR</button>
+    <button id="bradley-btn" style="position:fixed;top:4px;right:712px;background:rgba(0,0,0,0.5);border:1px solid rgba(160,200,120,0.5);color:#a0c878;padding:2px 10px;border-radius:4px;font-size:11px;font-family:monospace;z-index:210;cursor:pointer" title="Enter/exit M2A3 Bradley IFV (B key) — Bushmaster 25mm">🚛 BRADLEY</button>
     <div id="jukebox-panel" style="display:none;position:fixed;top:36px;right:12px;width:280px;background:linear-gradient(180deg,rgba(0,30,80,0.95) 0%,rgba(20,20,30,0.95) 50%,rgba(80,50,0,0.95) 100%);border:2px solid #ffd500;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;z-index:215;color:#fff;box-shadow:0 0 20px rgba(0,90,255,0.4),0 0 30px rgba(255,213,0,0.3)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border-bottom:1px solid rgba(255,213,0,0.4);padding-bottom:6px">
         <div style="font-weight:bold;color:#ffd500;font-size:12px">🎵 JUKEBOX 🇺🇦</div>
@@ -912,6 +913,7 @@
 <script src="premium.js"></script>
 <script src="lottery.js"></script>
 <script src="mortar.js"></script>
+<script src="bradley.js"></script>
 <script src="gyro.js"></script>
 <script src="weather-system.js"></script>
 <script src="ml-system.js"></script>
@@ -1440,6 +1442,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (window.Mortar) {
           if (window.Mortar.isDeployed()) window.Mortar.undeploy();
           else window.Mortar.deploy();
+        }
+      } catch (e) {}
+    });
+    var bradBtn = document.getElementById('bradley-btn');
+    if (bradBtn) bradBtn.addEventListener('click', function () {
+      try {
+        if (window.Bradley) {
+          if (window.Bradley.isActive()) window.Bradley.exit();
+          else window.Bradley.enter();
         }
       } catch (e) {}
     });

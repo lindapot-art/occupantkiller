@@ -17,23 +17,101 @@ const MissionSystem = (function () {
 
   /* ── Templates ───────────────────────────────────────────────────── */
   const TEMPLATES = {
-            // NEW: Bradley IFV Mission
+            // NEW: Bradley IFV Assault — drive M2A3 Bradley, clear forest ambush
+            //   M242 Bushmaster 25mm chain gun (200 rpm cyclic, dual-feed HE/AP)
+            //   M240C 7.62mm coax. Press B to enter/exit. WASD drive, mouse aim turret.
             bradley_mission: {
               name: 'Bradley IFV Assault',
-              description: 'Ride the Bradley IFV, use Bushmaster Gatling and 25mm cannon. Enter/exit vehicle. Defend convoy on forest road.',
+              description: 'Drive the M2A3 Bradley. Use the M242 Bushmaster 25mm chain gun and M240 coax to clear {kills} Russian occupants ambushing from the woods.',
               tier: 5,
               generate() {
+                var killTarget = 18 + Math.floor(Math.random() * 7); // 18-24
+                var spawned = 0;
+                var spawnPositions = [];
+                try {
+                  // Find the player position via active camera
+                  var playerPos = new THREE.Vector3(0, 0, 0);
+                  try {
+                    if (typeof GameManager !== 'undefined' && GameManager.getCamera) {
+                      var c = GameManager.getCamera();
+                      if (c) playerPos.copy(c.position);
+                    }
+                  } catch (e) {}
+                  // Forest ambush ahead of player (~80-130 units away)
+                  var fwdAngle = Math.random() * Math.PI * 2;
+                  var fwd = new THREE.Vector3(Math.sin(fwdAngle), 0, Math.cos(fwdAngle));
+                  var center = playerPos.clone().add(fwd.clone().multiplyScalar(105));
+                  if (typeof Enemies !== 'undefined' && Enemies.spawnSingle) {
+                    var types = ['CONSCRIPT', 'RIFLEMAN', 'GRENADIER', 'RIFLEMAN'];
+                    for (var i = 0; i < killTarget; i++) {
+                      // Scatter across an 80x40 forest strip
+                      var ux = (Math.random() - 0.5) * 80;
+                      var uz = (Math.random() - 0.5) * 40;
+                      // Rotate the strip to face the player axis
+                      var rx = ux * fwd.z + uz * fwd.x;
+                      var rz = -ux * fwd.x + uz * fwd.z;
+                      var ex = center.x + rx;
+                      var ez = center.z + rz;
+                      var ey = 0;
+                      try { if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) ey = VoxelWorld.getTerrainHeight(ex, ez) || 0; } catch (e2) {}
+                      try {
+                        var tp = types[Math.floor(Math.random() * types.length)];
+                        Enemies.spawnSingle(tp, { x: ex, y: ey + 1, z: ez });
+                        spawned++;
+                        spawnPositions.push({ x: ex, z: ez });
+                      } catch (eS) {}
+                    }
+                  }
+                  // Auto-spawn the Bradley right next to the player and announce
+                  try {
+                    if (typeof Bradley !== 'undefined' && Bradley.spawnAt) {
+                      var bx = playerPos.x + 4;
+                      var bz = playerPos.z;
+                      var by = 0;
+                      try { if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight) by = VoxelWorld.getTerrainHeight(bx, bz) || 0; } catch (e3) {}
+                      Bradley.spawnAt(new THREE.Vector3(bx, by, bz));
+                    }
+                    if (typeof HUD !== 'undefined' && HUD.showToast) {
+                      HUD.showToast('🚛 BRADLEY READY — Press B to mount. M242 Bushmaster 25mm + M240 coax.', 5000, '#a0c878');
+                    }
+                  } catch (eBR) {}
+                } catch (eAll) {}
                 return {
                   type: 'bradley_mission',
-                  inVehicle: true,
-                  convoyHealth: 200,
-                  roadSegments: 5,
-                  completedSegments: 0,
-                  canExit: true,
-                  forestAmbush: true
+                  killTarget: killTarget,
+                  kills: 0,
+                  spawned: spawned,
+                  spawnPositions: spawnPositions,
+                  startTime: Date.now()
                 };
               },
-              check(mission) { return mission.completedSegments >= mission.roadSegments && mission.convoyHealth > 0; },
+              check(mission) {
+                if (typeof Enemies === 'undefined' || !Enemies.getAll || !mission.spawnPositions) {
+                  return mission.kills >= mission.killTarget;
+                }
+                // Count alive enemies inside the original forest cluster bbox
+                var positions = mission.spawnPositions;
+                if (!positions.length) return false;
+                var minX = positions[0].x, maxX = positions[0].x;
+                var minZ = positions[0].z, maxZ = positions[0].z;
+                for (var i = 1; i < positions.length; i++) {
+                  if (positions[i].x < minX) minX = positions[i].x;
+                  if (positions[i].x > maxX) maxX = positions[i].x;
+                  if (positions[i].z < minZ) minZ = positions[i].z;
+                  if (positions[i].z > maxZ) maxZ = positions[i].z;
+                }
+                minX -= 6; maxX += 6; minZ -= 6; maxZ += 6;
+                var alive = 0;
+                var all = Enemies.getAll();
+                for (var k = 0; k < all.length; k++) {
+                  var e = all[k];
+                  if (!e || e.dead || !e.mesh) continue;
+                  var p = e.mesh.position;
+                  if (p.x >= minX && p.x <= maxX && p.z >= minZ && p.z <= maxZ) alive++;
+                }
+                mission.alive = alive;
+                return mission.spawned > 0 && alive === 0;
+              },
             },
         // NEW: Airborne Assault (Hostomel)
         airborne_assault: {
