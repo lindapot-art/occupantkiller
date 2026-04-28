@@ -447,60 +447,83 @@
 
   <!-- Start screen -->
   <div id="overlay-start" class="overlay">
-    <div id="level-badge">HYBRID VOXEL WARFARE — 12 STAGES</div>
-    <h1>OCCUPANT KILLER</h1>
-    <p>Ukraine. Voxel world. Build. Command. Fight.</p>
-    <p class="subtitle">Clear 12 stages across different battlefields to achieve victory.</p>
-    <!-- Quick start for new players -->
-    <div id="quick-start-section" style="display:none;margin:16px 0">
-      <button class="btn" id="quick-start-btn" style="font-size:18px;padding:12px 36px;border-color:#44ff88;color:#44ff88;text-shadow:0 0 10px rgba(68,255,136,0.4)">▶ QUICK START</button>
-      <p style="color:#666;font-size:11px;margin:6px 0">First time? Jump straight into action!</p>
-      <p style="color:#555;font-size:10px;cursor:pointer;text-decoration:underline" id="show-advanced-start">Show advanced options</p>
-    </div>
-    <!-- Advanced options (hidden for new players) -->
-    <div id="advanced-start-section">
-    <div id="start-role-select" style="margin:10px 0">
-      <p style="color:#ccc;font-size:14px;margin:4px 0">Choose your role:</p>
-      <button class="btn" id="start-role-brigade" style="font-size:13px;padding:6px 16px;border-color:#0af;color:#0af;display:inline-block;margin:0 6px">🎖 ASSAULT BRIGADE</button>
-      <button class="btn" id="start-role-lonewolf" style="font-size:13px;padding:6px 16px;border-color:#fa0;color:#fa0;display:inline-block;margin:0 6px">🐺 LONE WOLF</button>
-      <p id="start-role-desc" style="color:#888;font-size:12px;margin:6px 0">Brigade: fight alongside your squad. Lone Wolf: observe &amp; engage freestyle.</p>
-    </div>
-    <div id="god-mode-select" style="margin:8px 0">
-      <button class="btn" id="god-mode-btn" style="font-size:13px;padding:6px 16px;border-color:#ff0;color:#ff0;display:inline-block;margin:0 6px;text-shadow:0 0 8px #ff0">⚡ GOD MODE</button>
-      <p id="god-mode-desc" style="color:#666;font-size:11px;margin:4px 0;display:none">All weapons · Infinite health · Invisible to enemies</p>
-    </div>
-    <!-- Inline drone choice (replaces second start screen) -->
-    <div id="start-drone-row" style="margin:10px 0">
-      <p style="color:#ccc;font-size:13px;margin:4px 0">Drone Loadout (optional):</p>
-      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
-        <button class="btn start-drone-btn" data-drone="" style="font-size:11px;padding:4px 10px;border-color:#888;color:#888">🚶 None (on foot)</button>
-        <button class="btn start-drone-btn" data-drone="fpv_attack" style="font-size:11px;padding:4px 10px;border-color:#ff4444;color:#ff4444">🎯 FPV Attack</button>
-        <button class="btn start-drone-btn" data-drone="surveillance" style="font-size:11px;padding:4px 10px;border-color:#00ccff;color:#00ccff">👁 Surveillance</button>
-        <button class="btn start-drone-btn" data-drone="bomb" style="font-size:11px;padding:4px 10px;border-color:#ffaa00;color:#ffaa00">💣 Bomber</button>
+    <div class="start-card">
+      <!-- ── Hero header ─────────────────────────────────── -->
+      <header class="start-hero">
+        <div id="level-badge">HYBRID VOXEL WARFARE · 12 STAGES</div>
+        <h1>OCCUPANT KILLER</h1>
+        <p class="start-tagline">Ukraine. Voxel world. Build. Command. Fight.</p>
+      </header>
+
+      <!-- ── Primary CTAs ────────────────────────────────── -->
+      <div class="start-cta-row">
+        <button class="btn btn-primary" id="quick-start-btn" style="display:none">▶ QUICK START</button>
+        <button class="btn btn-primary" id="start-btn">▶ START MISSION</button>
+        <button class="btn btn-continue" id="continue-btn" style="display:none">📂 CONTINUE · Stage <span id="continue-stage">1</span> · Wave <span id="continue-wave">1</span></button>
       </div>
-      <p id="start-drone-desc" style="color:#666;font-size:11px;margin:4px 0">No drone — fight on foot (default)</p>
-    </div>
-    <div id="start-weapons-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin:8px auto;max-width:520px;font-size:10px"></div>
-    <div id="challenge-select" style="margin:8px 0">
-      <p style="color:#ccc;font-size:13px;margin:4px 0">Challenge Mode (optional):</p>
-      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
-        <button class="btn challenge-btn" data-mode="" style="font-size:11px;padding:4px 10px;border-color:#888;color:#888">🎮 Normal</button>
-        <button class="btn challenge-btn" data-mode="HARDCORE" style="font-size:11px;padding:4px 10px;border-color:#ff4444;color:#ff4444">💀 Hardcore</button>
-        <button class="btn challenge-btn" data-mode="SPEEDRUN" style="font-size:11px;padding:4px 10px;border-color:#00ccff;color:#00ccff">⏱️ Speedrun</button>
-        <button class="btn challenge-btn" data-mode="PACIFIST" style="font-size:11px;padding:4px 10px;border-color:#88ff88;color:#88ff88">🕊️ Pacifist</button>
-        <button class="btn challenge-btn" data-mode="ONE_SHOT" style="font-size:11px;padding:4px 10px;border-color:#ffcc00;color:#ffcc00">🎱 One Shot</button>
-        <button class="btn challenge-btn" data-mode="SNIPER_ONLY" style="font-size:11px;padding:4px 10px;border-color:#44ff88;color:#44ff88">🔭 Sniper</button>
-        <button class="btn challenge-btn" data-mode="NIGHT_OPS" style="font-size:11px;padding:4px 10px;border-color:#6644ff;color:#6644ff">🌙 Night Ops</button>
+      <p id="quick-start-hint" style="display:none;color:#777;font-size:11px;margin:4px 0 12px;text-align:center">First time? Quick Start jumps straight in. <a href="#" id="show-advanced-start" style="color:#88ccff">Show loadout options</a></p>
+
+      <!-- ── Loadout grid (advanced) ─────────────────────── -->
+      <div id="advanced-start-section" class="start-grid">
+
+        <section class="start-section">
+          <div class="start-section-title">🎖 ROLE</div>
+          <div id="start-role-select" class="start-section-row">
+            <button class="btn pill" id="start-role-brigade" style="border-color:#0af;color:#0af">🎖 ASSAULT BRIGADE</button>
+            <button class="btn pill" id="start-role-lonewolf" style="border-color:#fa0;color:#fa0">🐺 LONE WOLF</button>
+          </div>
+          <p id="start-role-desc" class="start-section-desc">Brigade: fight alongside your squad. Lone Wolf: observe &amp; engage freestyle.</p>
+        </section>
+
+        <section class="start-section">
+          <div class="start-section-title">🚁 DRONE</div>
+          <div id="start-drone-row" class="start-section-row">
+            <button class="btn pill start-drone-btn" data-drone="" style="border-color:#888;color:#888">🚶 None</button>
+            <button class="btn pill start-drone-btn" data-drone="fpv_attack" style="border-color:#ff4444;color:#ff4444">🎯 FPV Attack</button>
+            <button class="btn pill start-drone-btn" data-drone="surveillance" style="border-color:#00ccff;color:#00ccff">👁 Surveillance</button>
+            <button class="btn pill start-drone-btn" data-drone="bomb" style="border-color:#ffaa00;color:#ffaa00">💣 Bomber</button>
+          </div>
+          <p id="start-drone-desc" class="start-section-desc">No drone — fight on foot (default).</p>
+        </section>
+
+        <section class="start-section start-section-wide">
+          <div class="start-section-title">🎮 CHALLENGE MODE</div>
+          <div id="challenge-select" class="start-section-row">
+            <button class="btn pill challenge-btn" data-mode="" style="border-color:#888;color:#888">🎮 Normal</button>
+            <button class="btn pill challenge-btn" data-mode="HARDCORE" style="border-color:#ff4444;color:#ff4444">💀 Hardcore</button>
+            <button class="btn pill challenge-btn" data-mode="SPEEDRUN" style="border-color:#00ccff;color:#00ccff">⏱ Speedrun</button>
+            <button class="btn pill challenge-btn" data-mode="PACIFIST" style="border-color:#88ff88;color:#88ff88">🕊 Pacifist</button>
+            <button class="btn pill challenge-btn" data-mode="ONE_SHOT" style="border-color:#ffcc00;color:#ffcc00">🎱 One Shot</button>
+            <button class="btn pill challenge-btn" data-mode="SNIPER_ONLY" style="border-color:#44ff88;color:#44ff88">🔭 Sniper</button>
+            <button class="btn pill challenge-btn" data-mode="NIGHT_OPS" style="border-color:#6644ff;color:#6644ff">🌙 Night Ops</button>
+          </div>
+          <p id="challenge-desc" class="start-section-desc"></p>
+        </section>
+
+        <section class="start-section start-section-wide">
+          <div class="start-section-title">⚔ STARTER WEAPONS</div>
+          <div id="start-weapons-grid"></div>
+        </section>
+
+        <section class="start-section">
+          <div class="start-section-title">⚡ CHEATS</div>
+          <div id="god-mode-select" class="start-section-row">
+            <button class="btn pill" id="god-mode-btn" style="border-color:#ff0;color:#ff0;text-shadow:0 0 6px #ff0">⚡ GOD MODE</button>
+          </div>
+          <p id="god-mode-desc" class="start-section-desc" style="display:none">All weapons · Infinite health · Invisible to enemies</p>
+        </section>
+
+        <section id="start-wallet-row" class="start-section" style="display:none">
+          <div class="start-section-title">🦊 WALLET</div>
+          <div class="start-section-row">
+            <button class="btn pill" id="start-connect-wallet" style="border-color:#8247e5;color:#8247e5">🦊 Connect MetaMask</button>
+          </div>
+          <p id="start-wallet-status" class="start-section-desc"></p>
+        </section>
+
       </div>
-      <p id="challenge-desc" style="color:#666;font-size:11px;margin:4px 0"></p>
     </div>
-    <button class="btn" id="start-btn">▶ START MISSION</button>
-    <button class="btn" id="continue-btn" style="display:none;border-color:#44ff88;color:#44ff88;margin-top:6px">📂 CONTINUE (Stage <span id="continue-stage">1</span>, Wave <span id="continue-wave">1</span>)</button>
-    </div>
-    <div id="start-wallet-row" style="margin:8px 0;display:none">
-      <button class="btn" id="start-connect-wallet" style="font-size:12px;padding:5px 14px;border-color:#8247e5;color:#8247e5;display:inline-block">🦊 Connect MetaMask (Polygon)</button>
-      <span id="start-wallet-status" style="font-size:11px;color:#888;margin-left:8px"></span>
-    </div>
+
     <div id="controls-hint">
       WASD · MOVE &nbsp;|&nbsp; MOUSE · AIM &nbsp;|&nbsp; LMB · FIRE &nbsp;|&nbsp; R · RELOAD &nbsp;|&nbsp; 1-0 · WEAPON &nbsp;|&nbsp; SHIFT · SPRINT &nbsp;|&nbsp; SPACE · JUMP<br/>
       V · CAMERA MODE &nbsp;|&nbsp; B · BUILD &nbsp;|&nbsp; F · DRONE &nbsp;|&nbsp; G · VEHICLE &nbsp;|&nbsp; Q/E · SCROLL WEAPONS &nbsp;|&nbsp; TAB · INVENTORY &nbsp;|&nbsp; ESC · PAUSE
@@ -1034,21 +1057,27 @@ document.addEventListener('DOMContentLoaded', function () {
   // ── Quick-start for new players ───────────────────────
   (function () {
     var hasPlayed = localStorage.getItem('ok_has_played');
-    var quickSection = document.getElementById('quick-start-section');
     var advSection = document.getElementById('advanced-start-section');
-    if (!hasPlayed && quickSection && advSection) {
-      quickSection.style.display = 'block';
-      advSection.style.display = 'none';
-      document.getElementById('show-advanced-start').addEventListener('click', function () {
-        quickSection.style.display = 'none';
-        advSection.style.display = 'block';
+    var quickBtn   = document.getElementById('quick-start-btn');
+    var startBtn   = document.getElementById('start-btn');
+    var quickHint  = document.getElementById('quick-start-hint');
+    var showAdvLink = document.getElementById('show-advanced-start');
+    if (!hasPlayed && quickBtn && startBtn && advSection) {
+      quickBtn.style.display = '';
+      startBtn.style.display = 'none';
+      if (advSection)  advSection.style.display = 'none';
+      if (quickHint)   quickHint.style.display = '';
+      if (showAdvLink) showAdvLink.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        quickBtn.style.display = 'none';
+        startBtn.style.display = '';
+        advSection.style.display = '';
+        quickHint.style.display = 'none';
       });
-      document.getElementById('quick-start-btn').addEventListener('click', function () {
+      quickBtn.addEventListener('click', function () {
         if (GameManager.requestFullscreenAndLockLandscape) GameManager.requestFullscreenAndLockLandscape();
         GameManager.startGame();
       });
-    } else if (quickSection) {
-      quickSection.style.display = 'none';
     }
   })();
 
