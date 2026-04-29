@@ -54,7 +54,7 @@ window.AudioSystem = (function () {
 
   function playGunshot(type) {
     // type: 'pistol', 'rifle', 'sniper', 'hmg', 'shotgun', 'smg', 'launcher', 'explosive', 'melee'
-    if (!enabled || !ctx) return;
+    if (!enabled || !ctx || ctx.state === 'suspended') return;
     var now = ctx.currentTime;
     var osc = ctx.createOscillator();
     var noise = createNoise(0.08);
@@ -141,7 +141,7 @@ window.AudioSystem = (function () {
 
   // Procedural explosion sound (deep boom + noise burst)
   function playExplosion() {
-    if (!enabled || !ctx) return;
+    if (!enabled || !ctx || ctx.state === 'suspended') return;
     resume();
     var now = ctx.currentTime;
     // Deep boom
@@ -384,7 +384,7 @@ window.AudioSystem = (function () {
   }
 
   function playReload() {
-    if (!enabled || !ctx) return;
+    if (!enabled || !ctx || ctx.state === 'suspended') return;
     resume();
     const now = ctx.currentTime;
     // Click-clack sound

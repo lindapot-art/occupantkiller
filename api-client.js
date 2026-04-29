@@ -18,7 +18,8 @@ const ApiClient = (function () {
   let _inflight = new Map();
   let _backendDown = false; // circuit breaker — set after first connection failure
   let _backendCheckedAt = 0;
-  const BACKEND_RETRY_MS = 60000; // retry every 60s after going down
+  const BACKEND_RETRY_MS = 15000; // retry every 15s after going down (was 60s)
+  let _healthProbe = null;  // global probe lock so only 1 request hits the wire initially
 
   function _ensureAnonId() {
     if (_anonId) return _anonId;
@@ -89,6 +90,14 @@ const ApiClient = (function () {
   function init(opts) {
     if (opts && typeof opts.baseUrl === 'string') _baseUrl = opts.baseUrl.replace(/\/$/, '');
     _ensureAnonId();
+    // Silent health probe on init: if backend is down, trip breaker immediately
+    // so the first real batch of requests doesn't all fire simultaneously.
+    if (!_healthProbe) {
+      _healthProbe = fetch(_baseUrl + '/api/health', { method: 'HEAD', mode: 'no-cors' })
+        .then(function () { _backendDown = false; })
+        .catch(function () { _backendDown = true; _backendCheckedAt = Date.now(); })
+        .finally(function () { _healthProbe = null; });
+    }
     return _anonId;
   }
 

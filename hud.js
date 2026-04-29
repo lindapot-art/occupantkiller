@@ -233,8 +233,16 @@ const HUD = (() => {
     }, 16);
   }
   function setEnemies(v) { el.enemies.textContent  = 'ENEMIES: ' + v; }
+  var _stageFadeTimer = null;
   function setStage(num, name) {
-    if (el.stage) el.stage.textContent = 'STAGE ' + num + ': ' + name;
+    if (!el.stage) return;
+    el.stage.textContent = 'STAGE ' + num + ': ' + name;
+    el.stage.style.opacity = '1';
+    if (_stageFadeTimer) clearTimeout(_stageFadeTimer);
+    _stageFadeTimer = setTimeout(function () {
+      if (el.stage) el.stage.style.transition = 'opacity 2s ease-out';
+      if (el.stage) el.stage.style.opacity = '0.35';
+    }, 6000);
   }
 
   function setHealth(current, max) {
@@ -303,6 +311,12 @@ const HUD = (() => {
     // Intensity scales: 25% HP = 0.4 opacity, 0% HP = 1.0
     var t = Math.max(0, Math.min(1, (25 - pct) / 25));
     _adrEl.style.opacity = String(0.35 + t * 0.55);
+  }
+
+  // ── Hand-grenade section toggle ─────────────────────────────
+  function showGrenadeSection(show) {
+    var el = document.getElementById('grenade-section');
+    if (el) el.style.display = show ? 'block' : 'none';
   }
 
   // ── Hand-grenade count display ──────────────────────────────
@@ -488,7 +502,7 @@ const HUD = (() => {
       };
     }
     var s = Math.max(0, Math.min(1, amount || 0));
-    var px = Math.round(s * 8); // up to 8px outward
+    var px = Math.round(s * 20); // up to 20px outward for visibility
     if (_chLineCache.top)    _chLineCache.top.style.transform    = 'translateY(' + (-px) + 'px)';
     if (_chLineCache.bottom) _chLineCache.bottom.style.transform = 'translateY(' + ( px) + 'px)';
     if (_chLineCache.left)   _chLineCache.left.style.transform   = 'translateX(' + (-px) + 'px)';
@@ -517,6 +531,18 @@ const HUD = (() => {
       el.style.backgroundColor = col;
       el.style.boxShadow = glow;
     });
+  }
+
+  // Lock-on indicator for guided ATGM / AA
+  var _lockOnEl = null;
+  function showLockOn(locked) {
+    if (!_lockOnEl) {
+      _lockOnEl = document.createElement('div');
+      _lockOnEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff3030;font-size:18px;font-family:monospace;font-weight:bold;text-shadow:0 0 6px #ff0000;pointer-events:none;z-index:165;opacity:0;transition:opacity 0.15s;letter-spacing:2px;';
+      document.body.appendChild(_lockOnEl);
+    }
+    _lockOnEl.textContent = locked ? 'SEEKER LOCK' : '';
+    _lockOnEl.style.opacity = locked ? '1' : '0';
   }
 
   // Range readout under crosshair when ADS-aimed at enemy
@@ -978,7 +1004,7 @@ const HUD = (() => {
       }
     }
     // Degree readout at center
-    html += '<span style="position:absolute;left:50%;transform:translateX(-50%);bottom:0;font-size:9px;color:#666">' + Math.round(degs) + '°</span>';
+    html += '<span style="position:absolute;left:50%;transform:translateX(-50%);bottom:1px;font-size:10px;color:#bbb;font-weight:bold">' + Math.round(degs) + '°</span>';
     compassEl.innerHTML = html;
   }
   // External callers push threat data each frame
@@ -1765,7 +1791,7 @@ const HUD = (() => {
     setWaveProgress,
     setHealth, setAmmo, setWeapon, showReload,
     flashHit, flashDamage, flashHeal, showBloodDrops,
-    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout, setSprintIntensity, setGrenadeWarning, setHandGrenades,
+    showHeadshot, notifyPickup, setCrosshairSpread, setCrosshairTarget, setRangeReadout, setSprintIntensity, setGrenadeWarning, setHandGrenades, showGrenadeSection, showLockOn,
     announceWave, announceStage,
     addKill, showHitDirection, showHitDirectionScaled, updateMinimap,
     updateCompass, setCompassThreats, showStreak, showBleed, showProne, showJam,

@@ -165,9 +165,14 @@ const RefineryStrike = (function () {
     }
     if (bestIdx >= 0) {
       damageTarget(bestIdx, drone.damage || 120);
-      // Kill the drone (kamikaze impact)
-      drone.health = 0;
-      drone.alive = false;
+      // Kill the drone (kamikaze impact) — use proper cleanup so mesh is removed
+      // and camera is released instead of leaving a dangling possessed reference.
+      if (typeof DroneSystem !== 'undefined' && DroneSystem.destroyDrone) {
+        DroneSystem.destroyDrone(drone);
+      } else {
+        drone.health = 0;
+        drone.alive = false;
+      }
       spawnExplosion(drone.position.x, drone.position.y, drone.position.z, 1.5);
     }
   }

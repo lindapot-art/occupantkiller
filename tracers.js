@@ -105,7 +105,7 @@ const Tracers = (() => {
     var light = new THREE.PointLight(0xffaa22, 1.2, 4);
     light.position.copy(flash.position);
     _scene.add(light);
-    flashes.push({ mesh: flash, light: light, life: 0.06 });
+    flashes.push({ mesh: flash, light: light, life: 0.14 });
   }
 
   /* ── Explosion Particles ────────────────────────────────────── */

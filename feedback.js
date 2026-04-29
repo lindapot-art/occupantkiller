@@ -615,6 +615,15 @@ const Feedback = (function () {
     _tipFadeTimer = setTimeout(function () { _tipEl.style.opacity = '0'; }, 5000);
   }
 
+  function dismissTip(id) {
+    if (_tipFadeTimer) clearTimeout(_tipFadeTimer);
+    if (_tipEl) _tipEl.style.opacity = '0';
+    if (id) {
+      _shownTips[id] = true;
+      try { localStorage.setItem('ok_tips_shown', JSON.stringify(_shownTips)); } catch (e) {}
+    }
+  }
+
   function checkTips(currentWave) {
     _tipCheckTimer += 0.016; // roughly per-frame, throttled by caller
     if (_tipCheckTimer < 1.0) return; // check every 1s
@@ -676,7 +685,7 @@ const Feedback = (function () {
     showEnvironmentWarning,
     radioChatter,
     // Contextual tips
-    checkTips, resetTips, showTip,
+    checkTips, resetTips, showTip, dismissTip,
   };
 })();
 if (typeof window !== 'undefined') window.Feedback = Feedback;

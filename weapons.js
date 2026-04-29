@@ -243,15 +243,20 @@ const Weapons = (() => {
   function cur()      { return WEAPONS[currentIdx]; }
   function curState() { return states[currentIdx]; }
 
+  const _LAUNCHER_TYPES = { AT:1, ATGM:1, AT_HEAVY:1, AT_LIGHT:1, AA:1 };
+  function _isLauncherType(t) { return !!_LAUNCHER_TYPES[t]; }
+
   function refreshWeaponHud() {
     if (typeof HUD === 'undefined' || !HUD.setWeapon) return;
     HUD.setWeapon(cur().name, currentIdx);
     if (cur().type === 'MELEE') {
       HUD.setAmmo('∞', '—');
+      if (HUD.showGrenadeSection) HUD.showGrenadeSection(true);
       return;
     }
     const st = curState();
     HUD.setAmmo(st.clip, st.reserve);
+    if (HUD.showGrenadeSection) HUD.showGrenadeSection(!_isLauncherType(cur().type));
   }
 
   // ── Terrain dig callbacks ────────────────────────────────
@@ -2311,6 +2316,8 @@ const Weapons = (() => {
       try { _unifyWeaponMesh(m); } catch (e) {}
       // Apply equipped skin (if any) to the freshly built mesh
       try { if (weaponSkins[i]) applySkinToMesh(m, weaponSkins[i]); } catch (e) {}
+      // Scale down viewmodels so they don't occlude viewport (issue #15)
+      m.scale.set(0.72, 0.72, 0.72);
       gunMeshes.push(m);
       m.visible = (i === currentIdx);
       camera.add(m);
@@ -2591,8 +2598,10 @@ const Weapons = (() => {
     HUD.setWeapon(cur().name, currentIdx);
     if (cur().type === 'MELEE') {
       HUD.setAmmo('∞', '—');
+      if (HUD.showGrenadeSection) HUD.showGrenadeSection(true);
     } else {
       HUD.setAmmo(st.clip, st.reserve);
+      if (HUD.showGrenadeSection) HUD.showGrenadeSection(!_isLauncherType(cur().type));
     }
     HUD.showReload(st.reloading);
   }
@@ -3530,6 +3539,45 @@ const Weapons = (() => {
     // WeaponDetails visual animations (bolt, barrel spin, laser, smoke, scope overlay)
     if (typeof WeaponDetails !== 'undefined' && WeaponDetails.update) {
       WeaponDetails.update(delta, mesh, cur(), curState(), _firedThisFrame, zoomed);
+    }
+
+    // ── Guided weapon lock-on indicator ──
+    if (typeof HUD !== 'undefined' && HUD.showLockOn && _camera) {
+      var cw = cur();
+      if (cw.homing && zoomed) {
+        var _hOrigin = _camera.getWorldPosition(new THREE.Vector3());
+        var _hFwd = new THREE.Vector3(0,0,-1).applyQuaternion(_camera.quaternion);
+        var _hBest = null, _hBestScore = -Infinity;
+        var _hMaxR = 220, _hMinDot = 0.82;
+        function _hScore(tp) {
+          var hdx = tp.x - _hOrigin.x, hdy = tp.y - _hOrigin.y, hdz = tp.z - _hOrigin.z;
+          var hdist = Math.sqrt(hdx*hdx + hdy*hdy + hdz*hdz);
+          if (hdist > _hMaxR || hdist < 1) return null;
+          var hdot = (hdx*_hFwd.x + hdy*_hFwd.y + hdz*_hFwd.z) / hdist;
+          if (hdot < _hMinDot) return null;
+          return hdot - hdist * 0.001;
+        }
+        if (cw.type === 'AA' && typeof DroneSystem !== 'undefined' && DroneSystem.getEnemyDrones) {
+          var hdlist = DroneSystem.getEnemyDrones() || [];
+          for (var hdi = 0; hdi < hdlist.length; hdi++) {
+            var hdr = hdlist[hdi];
+            if (!hdr || !hdr.position || hdr.destroyed || hdr.alive === false) continue;
+            var hs = _hScore(hdr.position);
+            if (hs !== null && hs > _hBestScore) { _hBestScore = hs; _hBest = hdr; }
+          }
+        } else if (typeof Enemies !== 'undefined' && Enemies.getAll) {
+          var helist = Enemies.getAll();
+          for (var hei = 0; hei < helist.length; hei++) {
+            var he = helist[hei];
+            if (!he || !he.alive || !he.mesh) continue;
+            var hs2 = _hScore(he.mesh.position);
+            if (hs2 !== null && hs2 > _hBestScore) { _hBestScore = hs2; _hBest = he; }
+          }
+        }
+        HUD.showLockOn(!!_hBest);
+      } else {
+        HUD.showLockOn(false);
+      }
     }
 
     // Reload

@@ -775,6 +775,7 @@ const GameManager = (function () {
   const GRAVITY      = 18;
   const JUMP_SPEED   = 7.0;
   const GROUND_SNAP_EPS = 0.35;
+  const PLAYER_RADIUS = 0.35; // approximate half-width for wall collision
 
   /* ── Mobile Detection ──────────────────────────────────────────── */
   // iPadOS 13+ identifies as Mac; treat touch-capable devices as mobile.
@@ -1879,7 +1880,7 @@ const GameManager = (function () {
 
       // Pause toggle — skip if we just exited fullscreen (browser ESC exits fullscreen first)
       if (e.code === 'Escape') {
-        if (document.fullscreenElement || document.webkitFullscreenElement || _skipNextEsc) {
+        if (e.isTrusted && (document.fullscreenElement || document.webkitFullscreenElement || _skipNextEsc)) {
           _skipNextEsc = false;
           return; // Let the browser handle fullscreen exit without toggling pause
         }
@@ -2222,6 +2223,16 @@ const GameManager = (function () {
 
   function showOverlay(name) {
     document.querySelectorAll('.overlay').forEach(function (el) { el.style.display = 'none'; });
+    // Unified pause: redirect legacy 'pause' to inventory-overlay
+    if (name === 'pause') {
+      var inv = document.getElementById('inventory-overlay');
+      if (inv) {
+        if (typeof showInventory === 'function') showInventory();
+        inv.style.display = 'flex';
+        _releaseMouseForUI();
+        return;
+      }
+    }
     var el = document.getElementById('overlay-' + name);
     if (el) el.style.display = 'flex';
     _releaseMouseForUI();
@@ -2311,7 +2322,8 @@ const GameManager = (function () {
     var bestDistSq = Infinity;
     for (var i = 0; i < drones.length; i++) {
       var d = drones[i];
-      if (!d || !d.alive || !d.active || d.faction !== 'player') continue;
+      // Friendly drones have faction 'ukrainian', enemy have 'russian'
+      if (!d || !d.alive || !d.active || d.faction === 'russian') continue;
       var dx = d.position.x - player.position.x;
       var dz = d.position.z - player.position.z;
       var dsq = dx * dx + dz * dz;
@@ -2646,6 +2658,10 @@ const GameManager = (function () {
 
   /* ── Start Game ──────────────────────────────────────────────────── */
   function startGame() {
+    // CRITICAL: hide overlays immediately so the user doesn't stare at a frozen
+    // death screen while we regenerate the world (which can take 1-3s).
+    hideOverlays();
+    if (window._shopCountdownId) { clearInterval(window._shopCountdownId); window._shopCountdownId = null; }
     try {
       if (typeof window !== 'undefined') {
         console.log('[QA] startGame called, __QA_MODE:', window.__QA_MODE);
@@ -2843,7 +2859,8 @@ const GameManager = (function () {
         currentWave = Math.max(0, Math.floor(save.wave));
       }
       if (typeof save.stage === 'number' && isFinite(save.stage)) {
-        currentStage = Math.max(0, Math.min(STAGES.length - 1, Math.floor(save.stage)));
+        // save.stage is stored 1-based (highest stage reached), convert to 0-based index
+        currentStage = Math.max(0, Math.min(STAGES.length - 1, Math.floor(save.stage) - 1));
       }
       if (typeof save.score === 'number' && isFinite(save.score)) {
         player.score = Math.max(0, Math.floor(save.score));
@@ -2857,6 +2874,32 @@ const GameManager = (function () {
       return true;
     } catch (_e) {
       return false;
+    }
+  }
+
+  function saveGame() {
+    try {
+      var save = {
+        wave: currentWave,
+        stage: currentStage + 1, // store 1-based for human readability
+        score: player.score,
+        kills: player.kills,
+        hp: player.hp,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem('ok_save', JSON.stringify(save));
+    } catch (_e) {
+      // noop (private mode, quota exceeded, etc.)
+    }
+  }
+
+  function notifyNPCDeath(npc) {
+    // Friendly fire casualty — show feedback and track morale
+    if (HUD.notifyPickup) {
+      HUD.notifyPickup('💀 FRIENDLY NPC KILLED: ' + (npc.rank || 'soldier').toUpperCase(), '#ff4444');
+    }
+    if (typeof Progression !== 'undefined' && Progression.trackStat) {
+      Progression.trackStat('friendlyDeaths', 1);
     }
   }
 
@@ -2943,14 +2986,17 @@ const GameManager = (function () {
   function getCurrentStage() { return STAGES[currentStage]; }
 
   function nextStage() {
+    hideOverlays();
+    if (window._shopCountdownId) { clearInterval(window._shopCountdownId); window._shopCountdownId = null; }
+    try {
     currentStage++;
     if (currentStage >= STAGES.length) {
       // All stages done — win!
       gameState = STATE.WIN;
       showOverlay('win');
-      document.getElementById('win-score').textContent = player.score;
-      document.getElementById('win-kills').textContent = player.kills;
-      document.getElementById('win-stages').textContent = STAGES.length;
+      var _ws = document.getElementById('win-score');  if (_ws) _ws.textContent = player.score;
+      var _wk = document.getElementById('win-kills');  if (_wk) _wk.textContent = player.kills;
+      var _wst = document.getElementById('win-stages'); if (_wst) _wst.textContent = STAGES.length;
       return;
     }
 
@@ -3056,6 +3102,11 @@ const GameManager = (function () {
     _waveStartTimer = setTimeout(function () {
       showDroneSelection(function () { beginWave(1); });
     }, 3200);
+    } catch (err) {
+      console.error('[nextStage] error:', err);
+      // If stage transition fails, at least put us back in a playable state
+      gameState = STATE.PLAYING;
+    }
   }
 
   /* ── Wave Management ─────────────────────────────────────────────── */
@@ -3293,6 +3344,7 @@ const GameManager = (function () {
   }
 
   function onWaveComplete() {
+    try {
     player.score += SCORE_WAVE_BONUS;
     HUD.setScore(player.score);
     MLSystem.onWaveComplete(currentWave, currentStage, player.hp / player.maxHp);
@@ -3490,6 +3542,9 @@ const GameManager = (function () {
       HUD.setScore(player.score);
       if (typeof Feedback !== 'undefined' && Feedback.radioChatter) Feedback.radioChatter('stage_clear');
 
+      // Auto-save checkpoint on stage clear
+      saveGame();
+
       // Track highest stage reached for save/load
       if (typeof Progression !== 'undefined' && Progression.setHighestStage) {
         Progression.setHighestStage(currentStage + 1);
@@ -3525,10 +3580,10 @@ const GameManager = (function () {
       gameState = STATE.STAGE_CLEAR;
       if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playLevelComplete) window.AudioSystem.playLevelComplete();
       showOverlay('stageclear');
-      document.getElementById('stageclear-num').textContent = stageDef.id;
-      document.getElementById('stageclear-name').textContent = stageDef.name;
-      document.getElementById('stageclear-score').textContent = player.score;
-      document.getElementById('stageclear-kills').textContent = player.kills;
+      var _scn = document.getElementById('stageclear-num');   if (_scn) _scn.textContent = stageDef.id;
+      var _scna = document.getElementById('stageclear-name'); if (_scna) _scna.textContent = stageDef.name;
+      var _scs = document.getElementById('stageclear-score'); if (_scs) _scs.textContent = player.score;
+      var _sck = document.getElementById('stageclear-kills'); if (_sck) _sck.textContent = player.kills;
 
       // Show heal preview
       const missingHp = player.maxHp - player.hp;
@@ -3541,17 +3596,19 @@ const GameManager = (function () {
       }
 
       const nextStageDef = STAGES[currentStage + 1];
-      document.getElementById('stageclear-next-name').textContent = nextStageDef.name;
-      document.getElementById('stageclear-next-label').style.display = '';
+      var _scnn = document.getElementById('stageclear-next-name');   if (_scnn) _scnn.textContent = nextStageDef.name;
+      var _scnl = document.getElementById('stageclear-next-label');  if (_scnl) _scnl.style.display = '';
+      // Defensive: ensure no lingering auto-countdown can bypass stage clear
+      if (window._shopCountdownId) { clearInterval(window._shopCountdownId); window._shopCountdownId = null; }
       return;
     }
 
     gameState = STATE.WAVE_CLEAR;
     showOverlay('waveclear');
-    document.getElementById('waveclear-num').textContent = currentWave;
-    document.getElementById('waveclear-total').textContent = stageDef.wavesPerStage;
-    document.getElementById('waveclear-stage-info').textContent =
-      'Stage ' + stageDef.id + ': ' + stageDef.name;
+    var _wvn = document.getElementById('waveclear-num');   if (_wvn) _wvn.textContent = currentWave;
+    var _wvt = document.getElementById('waveclear-total'); if (_wvt) _wvt.textContent = stageDef.wavesPerStage;
+    var _wvi = document.getElementById('waveclear-stage-info');
+    if (_wvi) _wvi.textContent = 'Stage ' + stageDef.id + ': ' + stageDef.name;
 
     // Populate wave shop stats
     var shopKills = document.getElementById('shop-kills');
@@ -3631,6 +3688,7 @@ const GameManager = (function () {
         });
       }
     }
+    } catch (e) { console.error('[onWaveComplete] error:', e); }
   }
 
   /* ── Player Movement ─────────────────────────────────────────────── */
@@ -3732,7 +3790,12 @@ const GameManager = (function () {
     const isMoving = moveDir.lengthSq() > 0;
     if (isMoving) {
       moveDir.normalize();
+      var wasSprinting = player.sprinting;
       player.sprinting = !!keys['ShiftLeft'] || touch.sprinting;
+      // Dismiss sprint tip on first sprint
+      if (player.sprinting && !wasSprinting && typeof Feedback !== 'undefined' && Feedback.dismissTip) {
+        Feedback.dismissTip('sprint');
+      }
       // Cancel reload when sprinting
       if (player.sprinting && Weapons.isReloading()) {
         Weapons.cancelReload();
@@ -3822,12 +3885,31 @@ const GameManager = (function () {
     newPos.z += moveDir.z;
     newPos.y += player.velocity.y * delta;
 
-    // Terrain collision
-    const terrainH = window.VoxelWorld.getTerrainHeight(newPos.x, newPos.z) + player.height;
+    // Terrain collision — use getTopSolidY so player snaps to actual voxel surface
+    // (not procedural noise) for consistency with enforcePlayerGroundSnap().
+    var _solidH = (typeof window.VoxelWorld.getTopSolidY === 'function')
+      ? window.VoxelWorld.getTopSolidY(newPos.x, newPos.z)
+      : window.VoxelWorld.getTerrainHeight(newPos.x, newPos.z) + 1;
+    const terrainH = _solidH + player.height;
 
-    // Horizontal block collision
+    // Horizontal block collision — radius-aware so player can't clip through walls
     const checkH = newPos.y - player.height + 0.5;
-    if (window.VoxelWorld.isSolid(newPos.x, checkH, newPos.z)) {
+    var _blockedX = false, _blockedZ = false;
+    // Check four corners of the player's bounding cylinder
+    var _corners = [
+      { x: newPos.x + PLAYER_RADIUS, z: newPos.z + PLAYER_RADIUS },
+      { x: newPos.x + PLAYER_RADIUS, z: newPos.z - PLAYER_RADIUS },
+      { x: newPos.x - PLAYER_RADIUS, z: newPos.z + PLAYER_RADIUS },
+      { x: newPos.x - PLAYER_RADIUS, z: newPos.z - PLAYER_RADIUS },
+    ];
+    for (var _ci = 0; _ci < _corners.length; _ci++) {
+      if (window.VoxelWorld.isSolid(_corners[_ci].x, checkH, _corners[_ci].z)) {
+        // Determine which axis is primarily blocked by comparing against current position
+        if (window.VoxelWorld.isSolid(_corners[_ci].x, checkH, player.position.z)) _blockedX = true;
+        if (window.VoxelWorld.isSolid(player.position.x, checkH, _corners[_ci].z)) _blockedZ = true;
+      }
+    }
+    if (_blockedX || _blockedZ) {
       // Try mantling over a wall when blocked horizontally and not on ground
       if (!player.onGround && typeof Traversal !== 'undefined' && !Traversal.isMantling()) {
         _gmTmp2.set(0, 0, -1).applyQuaternion(_camera.quaternion);
@@ -3835,11 +3917,11 @@ const GameManager = (function () {
           return window.VoxelWorld.getBlock(bx, by, bz);
         });
       }
-      // Try sliding along axes
-      if (!window.VoxelWorld.isSolid(player.position.x, checkH, newPos.z)) {
-        newPos.x = player.position.x;
-      } else if (!window.VoxelWorld.isSolid(newPos.x, checkH, player.position.z)) {
+      // Slide along whichever axis is still free
+      if (!_blockedX) {
         newPos.z = player.position.z;
+      } else if (!_blockedZ) {
+        newPos.x = player.position.x;
       } else {
         newPos.x = player.position.x;
         newPos.z = player.position.z;
@@ -4710,6 +4792,7 @@ const GameManager = (function () {
       }
       gameState = STATE.DEAD;
       if (_waveStartTimer) { clearTimeout(_waveStartTimer); _waveStartTimer = null; }
+      if (window._shopCountdownId) { clearInterval(window._shopCountdownId); window._shopCountdownId = null; }
       // Streak-end banner: show what was ended
       if (player.killStreak >= 5 && HUD.showStreakBanner) {
         HUD.showStreakBanner('STREAK ENDED — ' + player.killStreak + ' KILLS', 0);
@@ -4745,10 +4828,10 @@ const GameManager = (function () {
       }
       showOverlay('dead');
 
-      document.getElementById('dead-stage').textContent = STAGES[currentStage].id;
-      document.getElementById('dead-score').textContent = player.score;
-      document.getElementById('dead-kills').textContent = player.kills;
-      document.getElementById('dead-wave').textContent = currentWave;
+      var _ds = document.getElementById('dead-stage');   if (_ds) _ds.textContent = STAGES[currentStage].id;
+      var _dsc = document.getElementById('dead-score');  if (_dsc) _dsc.textContent = player.score;
+      var _dk = document.getElementById('dead-kills');   if (_dk) _dk.textContent = player.kills;
+      var _dw = document.getElementById('dead-wave');    if (_dw) _dw.textContent = currentWave;
 
       // ── Gameplay Tip Overlay on Death ──
       var tips = [
@@ -4884,6 +4967,15 @@ const GameManager = (function () {
       // AI Smart Learning: track player position for behavior profiling
       MLSystem.trackPlayerPosition(player.position.x, player.position.z, delta);
       updatePlayer(delta);
+
+      // When possessing a drone or driving a vehicle, updatePlayer returns early
+      // and skips CameraSystem.update(). We must still update the camera so the
+      // drone/vehicle view doesn't freeze.
+      if (DroneSystem.isPossessing() || VehicleSystem.isInVehicle()) {
+        CameraSystem.update(delta, player.position, false, false);
+        if (CameraSystem.updateKillCam) CameraSystem.updateKillCam(delta);
+        updateSuppression(delta);
+      }
 
       // Bleed DOT (skipped in god mode)
       if (player.bleeding && player.bleedTimer > 0) {
@@ -5070,6 +5162,41 @@ const GameManager = (function () {
 
       // Compass update
       if (HUD.updateCompass) HUD.updateCompass(CameraSystem.getYaw());
+
+      // Objective pointer: big arrow toward nearest enemy so the player always knows where to go
+      try {
+        var _objPtr = document.getElementById('objective-pointer');
+        var _objArrow = document.getElementById('objective-arrow');
+        var _objDist = document.getElementById('objective-dist');
+        if (_objPtr && Enemies.getAll) {
+          var _enList = Enemies.getAll();
+          var _nearest = null, _nearD = Infinity;
+          for (var _oi = 0; _oi < _enList.length; _oi++) {
+            var _oe = _enList[_oi];
+            if (!_oe || !_oe.alive || !_oe.mesh) continue;
+            var _odx = _oe.mesh.position.x - player.position.x;
+            var _odz = _oe.mesh.position.z - player.position.z;
+            var _od = _odx*_odx + _odz*_odz;
+            if (_od < _nearD) { _nearD = _od; _nearest = _oe; }
+          }
+          if (_nearest && _nearD > 16*16) { // only show when enemy is >16m away
+            _objPtr.style.display = 'block';
+            var _odx2 = _nearest.mesh.position.x - player.position.x;
+            var _odz2 = _nearest.mesh.position.z - player.position.z;
+            var _oAngle = Math.atan2(_odx2, _odz2);
+            var _oYaw = CameraSystem.getYaw();
+            var _oRel = _oAngle - _oYaw;
+            while (_oRel > Math.PI) _oRel -= Math.PI*2;
+            while (_oRel < -Math.PI) _oRel += Math.PI*2;
+            var _oDeg = _oRel * 180 / Math.PI;
+            if (_objArrow) _objArrow.style.transform = 'rotate(' + _oDeg + 'deg)';
+            if (_objDist) _objDist.textContent = Math.round(Math.sqrt(_nearD)) + 'm';
+          } else {
+            if (_objPtr) _objPtr.style.display = 'none';
+          }
+        }
+      } catch (eObj) {}
+
       // Sprint intensity → HUD vignette + footstep dust puffs
       try {
         var _spdNow = player.velocity ? player.velocity.length() : 0;
@@ -5851,30 +5978,28 @@ const GameManager = (function () {
                 var d = dailies[di2];
                 var pct = Math.min(100, Math.round((d.progress / d.target) * 100));
                 var color = d.completed ? '#44ff44' : '#ccc';
-                dHTML += '<div style="color:' + color + '">' + (d.completed ? '✅' : '⬜') + ' ' + d.name + ': ' + d.progress + '/' + d.target + ' (' + pct + '%)</div>';
+                dHTML += '<div style="color:' + color + '">' + (d.completed ? '&#10003;' : '&#9744;') + ' ' + d.name + ': ' + d.progress + '/' + d.target + ' (' + pct + '%)</div>';
               }
               dailyList.innerHTML = dHTML;
             }
           }
         }
 
-        // Bounty display
+        // Bounty display (rendered inside daily-challenges panel so it doesn't free-float)
         var bountyPanel = document.getElementById('bounty-display');
-        if (bountyPanel) {
+        if (bountyPanel) bountyPanel.style.display = 'none';
+        var dailyList = document.getElementById('daily-challenges-list');
+        if (dailyList) {
           var bounties = Progression.getBounties();
           if (bounties.length > 0) {
-            bountyPanel.style.display = 'block';
-            var bountyList = document.getElementById('bounty-list');
-            if (bountyList) {
-              var bHTML = '';
-              for (var bi2 = 0; bi2 < bounties.length; bi2++) {
-                var b = bounties[bi2];
-                var bpct = Math.min(100, Math.round((b.progress / b.target) * 100));
-                var bcolor = b.completed ? '#44ff44' : '#ffaa00';
-                bHTML += '<div style="color:' + bcolor + '">' + (b.completed ? '✅' : '💰') + ' ' + b.name + ': ' + b.progress + '/' + b.target + ' (+' + b.reward + ' OKC)</div>';
-              }
-              bountyList.innerHTML = bHTML;
+            var bHTML = '<div style="color:#ffaa00;font-weight:bold;margin-top:6px;border-top:1px solid rgba(255,170,0,0.3);padding-top:4px">BOUNTIES</div>';
+            for (var bi2 = 0; bi2 < bounties.length; bi2++) {
+              var b = bounties[bi2];
+              var bpct = Math.min(100, Math.round((b.progress / b.target) * 100));
+              var bcolor = b.completed ? '#44ff44' : '#ffaa00';
+              bHTML += '<div style="color:' + bcolor + '">' + (b.completed ? '&#10003;' : '$') + ' ' + b.name + ': ' + b.progress + '/' + b.target + ' (+' + b.reward + ' OKC)</div>';
             }
+            dailyList.innerHTML += bHTML;
           }
         }
 
@@ -5954,10 +6079,14 @@ const GameManager = (function () {
     const resEl = document.getElementById('hud-resources');
     if (resEl) {
       const r = Economy.getResources();
-      resEl.textContent =
-        '🪵' + r.wood + ' 🔩' + r.metal + ' ⚡' + r.electronics +
-        ' ⛽' + r.fuel + ' 🪨' + r.stone + ' 🍞' + r.food +
-        ' | 💰' + Economy.getCurrency();
+      resEl.innerHTML =
+        '<span style="color:#8B6914">W' + r.wood + '</span> ' +
+        '<span style="color:#aaa">M' + r.metal + '</span> ' +
+        '<span style="color:#00ccff">E' + r.electronics + '</span> ' +
+        '<span style="color:#ff8800">F' + r.fuel + '</span> ' +
+        '<span style="color:#999">S' + r.stone + '</span> ' +
+        '<span style="color:#aacc44">Fd' + r.food + '</span> ' +
+        '| <span style="color:#ffcc00">$' + Economy.getCurrency() + '</span>';
     }
 
     const modeEl = document.getElementById('hud-mode');
@@ -7122,7 +7251,9 @@ const GameManager = (function () {
     startGame,
     hasSave,
     loadGame,
+    saveGame,
     deleteSave,
+    notifyNPCDeath,
     nextStage,
     update,
     beginWave,

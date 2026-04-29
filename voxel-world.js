@@ -4438,6 +4438,151 @@ window.VoxelWorld = (function () {
       // Drone nests along enemy approach corridor
       generateDroneNest(36, -40);
       generateDroneNest(-36, -40);
+    } else if (level.id === 'MARIUPOL') {
+      // Azovstal steelworks — industrial hellscape
+      generateIndustrialComplex(0, 0);
+      generateBurningRuin(-20, -20);
+      generateBurningRuin(20, 20);
+      generateBurningRuin(-15, 25);
+      generateArtilleryBattery(30, -30);
+      generateAmmoDepot(-30, 30);
+      generateDroneNest(40, 40);
+      generateDroneNest(-40, -40);
+    } else if (level.id === 'CRIMEA') {
+      // Crimea Bridge — long span over water
+      generateBridge(0, 0, 60, 6);
+      generateBridgeFortification(10, 10);
+      generateBridgeFortification(-10, -10);
+      generateCheckpoint(25, 0, true);
+      generateAntiTankHedgehogs(8);
+      generateDroneNest(35, 35);
+    } else if (level.id === 'CHORNOBYL') {
+      // Irradiated exclusion zone — abandoned, broken, cratered
+      generateBrokenTrees(20);
+      generateCraters(8);
+      generateRuins(6);
+      generateBunker(-20, -20);
+      generateBunker(20, 20);
+      generateWatchtower(0, -30);
+      generateWatchtower(0, 30);
+      generateDroneNest(40, -40);
+    } else if (level.id === 'MOSCOW') {
+      // Kremlin outskirts — dense city blocks, checkpoints, barricades
+      generateUkrainianApartment(-20, -20, 8);
+      generateUkrainianApartment(20, -20, 10);
+      generateUkrainianApartment(-20, 20, 8);
+      generateUkrainianApartment(20, 20, 10);
+      generateCheckpoint(0, 35, false);
+      generateCheckpoint(0, -35, false);
+      generateDefensivePosition(-35, 0);
+      generateDefensivePosition(35, 0);
+      generateBarbedWire(0, 0, 20, true);
+      generateBarbedWire(0, 0, 20, false);
+      generateDroneNest(45, 45);
+      generateDroneNest(-45, -45);
+    } else if (level.id === 'SEVASTOPOL') {
+      // Naval base — docks, cranes, coastal fortifications
+      generateBridge(0, 20, 40, 5);
+      generateBridgeFortification(0, 40);
+      generateIndustrialComplex(-30, -30);
+      generateAmmoDepot(30, 30);
+      generateAntiAirPosition(-25, 25);
+      generateDroneNest(40, 0);
+      generateDroneNest(-40, 0);
+    } else if (level.id === 'DONBAS') {
+      // Mining country — trenches, slag heaps, industrial ruins
+      generateTrenchNetwork(0, 0);
+      generateMinefield(-20, -20);
+      generateMinefield(20, 20);
+      generateIndustrialComplex(-30, 30);
+      generateSaltMine(30, -30);
+      generatePowerLines(0, 0, 6);
+      generateDroneNest(40, -40);
+      generateDroneNest(-40, 40);
+    } else if (level.id === 'BELGOROD') {
+      // Border offensive — fortifications, razor wire, bunkers
+      generateRazorWireField(0, 0);
+      generateBunker(-20, -20);
+      generateBunker(20, 20);
+      generateBunker(-20, 20);
+      generateBunker(20, -20);
+      generateAntiTankHedgehogs(12);
+      generateCheckpoint(0, 30, true);
+      generateCheckpoint(0, -30, true);
+      generateDroneNest(35, 35);
+      generateDroneNest(-35, -35);
+    } else if (level.id === 'KREMLIN') {
+      // The final showdown — Red Square inspired, heavily fortified
+      generateUkrainianApartment(-25, -25, 12);
+      generateUkrainianApartment(25, -25, 12);
+      generateUkrainianApartment(-25, 25, 12);
+      generateUkrainianApartment(25, 25, 12);
+      generateRazorWireField(0, 0);
+      generateCheckpoint(0, 40, false);
+      generateCheckpoint(0, -40, false);
+      generateCheckpoint(40, 0, true);
+      generateCheckpoint(-40, 0, true);
+      generateArtilleryBattery(30, 30);
+      generateArtilleryBattery(-30, -30);
+      generateAntiAirPosition(0, 0);
+      generateCommandPost(0, 0);
+      generateDroneNest(45, 0);
+      generateDroneNest(-45, 0);
+      generateDroneNest(0, 45);
+      generateDroneNest(0, -45);
+    } else if (level.id === 'SNAKE') {
+      // Snake Island — small rocky outpost, lighthouse, coastal guns
+      generateCommTower(0, 0);
+      generateDefensivePosition(-15, -15);
+      generateDefensivePosition(15, 15);
+      generateAmmoDepot(-10, 10);
+      generateAmmoDepot(10, -10);
+      generateDroneNest(20, 20);
+      generateDroneNest(-20, -20);
+    } else if (level.id === 'SAKY') {
+      // Airbase — runway, control tower, hangars
+      generateRunway(0, 0, 80, 10);
+      generateControlTower(10, 15);
+      generateIndustrialComplex(-20, -20);
+      generateAmmoDepot(20, 20);
+      generateAntiAirPosition(-30, 30);
+      generateDroneNest(40, 0);
+      generateDroneNest(-40, 0);
+    } else if (level.id === 'VUHLEDAR') {
+      // Tank graveyard — extra wrecks, minefields, craters
+      generateDestroyedVehicles(30);
+      generateWreckedTank(-15, -15);
+      generateWreckedTank(15, 15);
+      generateWreckedTank(-15, 15);
+      generateWreckedTank(15, -15);
+      generateWreckedAPC(0, -20);
+      generateWreckedAPC(0, 20);
+      generateMinefield(-25, -25);
+      generateMinefield(25, 25);
+      generateCraters(10);
+      generateTrenchNetwork(0, 0);
+      generateDroneNest(35, 35);
+      generateDroneNest(-35, -35);
+    } else if (level.id === 'ANTONOV') {
+      // Bridge strike — bridge, fortifications, supply dumps
+      generateBridge(0, 0, 50, 6);
+      generateBridgeFortification(15, 0);
+      generateBridgeFortification(-15, 0);
+      generateAmmoDepot(-25, 25);
+      generateFuelDepot(25, -25);
+      generateCheckpoint(30, 0, true);
+      generateCheckpoint(-30, 0, true);
+      generateDroneNest(40, 40);
+    } else if (level.id === 'REFINERY') {
+      // Oil refinery — fuel tanks, industrial towers, pipelines
+      generateFuelDepot(0, 0);
+      generateFuelDepot(20, 20);
+      generateFuelDepot(-20, -20);
+      generateIndustrialComplex(15, -15);
+      generateIndustrialComplex(-15, 15);
+      generateControlTower(0, 30);
+      generateAmmoDepot(30, 0);
+      generateBurningRuin(-10, 10);
     }
     // ── War-zone ruined homes & commercial buildings (every stage) ──
     // Real Ukraine war reference: Mariupol, Bakhmut, Avdiivka districts

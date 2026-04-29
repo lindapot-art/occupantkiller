@@ -701,6 +701,9 @@ const VehicleSystem = (function () {
       detachPlayerBody();
       _occupiedVehicle = null;
       _hijackState = null;
+      // Clear stuck fire keys so exiting while firing doesn't auto-fire on re-entry (audit #33)
+      _vKeys.fire = false;
+      _vKeys.mgFire = false;
       // Clear vehicle camera target so FPS camera doesn't stay locked to vehicle
       CameraSystem.setVehicleTarget(null);
       CameraSystem.setMode(CameraSystem.MODE.FIRST_PERSON);
@@ -1607,9 +1610,14 @@ const VehicleSystem = (function () {
     // Tank uses specific cannon fire
     if (v.isTank) { fireTankCannon(v); return; }
     v.fireCooldown = v.fireRate;
-    // Fire in the direction the camera is facing (player-controlled)
+    // Fire in the direction the camera is facing (player-controlled) — includes pitch for helicopters/infantry
     const yaw = CameraSystem.getYaw();
-    _vTmp1.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const pitch = CameraSystem.getPitch();
+    _vTmp1.set(
+      -Math.sin(yaw) * Math.cos(pitch),
+      Math.sin(pitch),
+      -Math.cos(yaw) * Math.cos(pitch)
+    ).normalize();
     spawnTurretProjectile(v.position, _vTmp1, v.damage);
     if (typeof AudioSystem !== 'undefined') AudioSystem.playGunshot('hmg');
   }
@@ -1651,7 +1659,7 @@ const VehicleSystem = (function () {
     _scene.add(shellMesh);
     turretProjectiles.push({
       mesh: shellMesh, dir: _vTmp1.clone(), speed: TANK_CANNON_PROJ_SPEED,
-      damage: v.damage, life: 4.0, isCannonShell: true,
+      damage: v.damage, life: 4.0, isCannonShell: true, _spawnImmunity: 0.08,
     });
 
     // Screen shake for cannon blast
@@ -1873,7 +1881,7 @@ const VehicleSystem = (function () {
     _scene.add(mesh);
     turretProjectiles.push({
       mesh: mesh, dir: dir.clone(), speed: TURRET_PROJ_SPEED,
-      damage: damage, life: 3.0,
+      damage: damage, life: 3.0, _spawnImmunity: 0.08,
     });
   }
 
@@ -1919,16 +1927,20 @@ const VehicleSystem = (function () {
         }
       }
 
-      // Check terrain collision
+      // Check terrain collision (skip during spawn immunity so projectiles don't die on own muzzle voxel)
       let terrainHit = null;
       if (!hit && typeof VoxelWorld !== 'undefined') {
-        _vTmp2.copy(p.mesh.position);
-        const fakeCamera = {
-          position: _vTmp2,
-          getWorldDirection: function(v) { return v.copy(p.dir); },
-        };
-        terrainHit = VoxelWorld.raycastBlock(fakeCamera, p.speed * delta + 0.5);
-        if (terrainHit) hit = true;
+        if (p._spawnImmunity > 0) {
+          p._spawnImmunity -= delta;
+        } else {
+          _vTmp2.copy(p.mesh.position);
+          const fakeCamera = {
+            position: _vTmp2,
+            getWorldDirection: function(v) { return v.copy(p.dir); },
+          };
+          terrainHit = VoxelWorld.raycastBlock(fakeCamera, p.speed * delta + 0.5);
+          if (terrainHit) hit = true;
+        }
       }
 
       if (hit || p.life <= 0) {

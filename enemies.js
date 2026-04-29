@@ -92,7 +92,7 @@ const Enemies = (() => {
       d.life -= delta;
       d.sprite.material.opacity = Math.max(0, d.life / 0.8);
       if (d.life <= 0) {
-        scene.remove(d.sprite);
+        if (scene) scene.remove(d.sprite);
         if (d.sprite.material.map) d.sprite.material.map.dispose();
         d.sprite.material.dispose();
         _dmgNumbers[i] = null;
@@ -156,7 +156,7 @@ const Enemies = (() => {
       b.life -= delta;
       b.sprite.material.opacity = Math.max(0, b.life / 1.5);
       if (b.life <= 0) {
-        scene.remove(b.sprite);
+        if (scene) scene.remove(b.sprite);
         if (b.sprite.material.map) b.sprite.material.map.dispose();
         b.sprite.material.dispose();
         _barkSprites.splice(i, 1);
@@ -671,7 +671,7 @@ const Enemies = (() => {
 
   // ── Assault Group System ────────────────────────────────
   // 5 enemy assault groups, Russian army "штурмовая группа" style
-  const NUM_ASSAULT_GROUPS = 5;
+  const NUM_ASSAULT_GROUPS = 8;
   const assaultGroups = [];
   var _aliveMembersBuf = [];  // reusable buffer for alive member indices
 
@@ -908,7 +908,7 @@ const Enemies = (() => {
             onPlayerHit(Math.round(g.dmg * falloff), pos);
           }
         }
-        scene.remove(g.mesh);
+        if (scene) scene.remove(g.mesh);
         if (g._beaconMat) g._beaconMat.dispose();
         _enemyGrenades.splice(i, 1);
       }
@@ -1875,12 +1875,12 @@ const Enemies = (() => {
     // Additional loose enemies spawn over time (stragglers, reinforcements)
     // Stage-scaled: more reinforcements + faster spawn in later stages
     var stageNum = (typeof _stageId === 'number') ? _stageId : 1;
-    const baseExtra = 12 + (w - 1) * 5 + stageNum * 2;
+    const baseExtra = 18 + (w - 1) * 8 + stageNum * 3;
     var extraMultiplier = battlePlan && isFinite(battlePlan.extraMultiplier) ? battlePlan.extraMultiplier : 1;
     const extraCount = Math.max(4, Math.floor(baseExtra * (1 + (stageMult - 1) * 0.5) * extraMultiplier));
     spawnQueue  = Array.from({ length: extraCount }, () => pickTypeForPlan(w, battlePlan));
     var spawnIntervalMultiplier = battlePlan && isFinite(battlePlan.spawnIntervalMultiplier) ? battlePlan.spawnIntervalMultiplier : 1;
-    spawnTimer  = (Math.max(3, 8 - stageNum * 0.4) + Math.random() * 4) * spawnIntervalMultiplier;
+    spawnTimer  = (Math.max(1, 5 - stageNum * 0.3) + Math.random() * 3) * spawnIntervalMultiplier;
   }
 
   // ── Per-frame update ──────────────────────────────────────
@@ -1954,12 +1954,12 @@ const Enemies = (() => {
     // Update enemy grenades
     updateEnemyGrenades(delta, playerPos);
 
-    // Spawn reinforcements from queue (slow drip every 3-6s)
+    // Spawn reinforcements from queue (drip every 1.5-3.5s for denser waves)
     if (spawnQueue.length > 0) {
       spawnTimer -= delta;
       if (spawnTimer <= 0) {
         spawnOne(spawnQueue.pop());
-        spawnTimer = 3.0 + Math.random() * 3.0;
+        spawnTimer = 1.5 + Math.random() * 2.0;
       }
     }
 
@@ -2017,14 +2017,14 @@ const Enemies = (() => {
           if (e._laserLine) {
             e._laserLine.geometry.dispose();
             e._laserLine.material.dispose();
-            scene.remove(e._laserLine);
+            if (scene) scene.remove(e._laserLine);
             e._laserLine = null;
           }
           disposeMeshTree(e.mesh);
-          scene.remove(e.mesh);
+          if (scene) scene.remove(e.mesh);
           if (e.hpBar) {
             disposeMeshTree(e.hpBar.group);
-            scene.remove(e.hpBar.group);
+            if (scene) scene.remove(e.hpBar.group);
             e.hpBar = null;
           }
           enemies[i] = null;
@@ -2648,6 +2648,28 @@ const Enemies = (() => {
                 // Suppression: near-miss bullets stress the player
                 if (typeof GameManager !== 'undefined' && GameManager.addSuppression) {
                   GameManager.addSuppression(0.12);
+                }
+              }
+            }
+            // Friendly fire: bullets can hit NPCs in the line of fire
+            if (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) {
+              var npcsFF = NPCSystem.getAll();
+              for (var nfi = 0; nfi < npcsFF.length; nfi++) {
+                var npcFF = npcsFF[nfi];
+                if (!npcFF || !npcFF.alive || !npcFF.position) continue;
+                var ndx = npcFF.position.x - e.mesh.position.x;
+                var ndz = npcFF.position.z - e.mesh.position.z;
+                var ndist = Math.sqrt(ndx*ndx + ndz*ndz);
+                if (ndist > e.typeCfg.range) continue;
+                // Check if NPC is close to the aim line (within 1.2m of the ray)
+                var tDirFF = _tmpVec3e.set(playerPos.x - e.mesh.position.x, 0, playerPos.z - e.mesh.position.z).normalize();
+                var npcOff = _tmpVec3f.set(ndx, 0, ndz);
+                var along = npcOff.dot(tDirFF);
+                var perp = Math.sqrt(Math.max(0, ndist*ndist - along*along));
+                if (along > 0 && along < distToPlayer && perp < 1.2 && Math.random() < 0.35) {
+                  npcFF.hp = Math.max(0, npcFF.hp - e.typeCfg.rangedDmg * 0.6);
+                  if (npcFF.hp <= 0) { npcFF.alive = false; if (GameManager.notifyNPCDeath) GameManager.notifyNPCDeath(npcFF); }
+                  break; // one bullet, one victim
                 }
               }
             }
@@ -3769,6 +3791,24 @@ const Enemies = (() => {
         const falloff = 1 - (dist / radius) * 0.5;
         const remaining = damage(e, amount * falloff);
         results.push({ enemy: e, remaining });
+      }
+    }
+    // Friendly fire: explosions also hurt nearby NPCs
+    if (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) {
+      var npcs = NPCSystem.getAll();
+      for (var ni = 0; ni < npcs.length; ni++) {
+        var npc = npcs[ni];
+        if (!npc || !npc.alive || !npc.position) continue;
+        var nd = npc.position.distanceTo(pos);
+        if (nd <= radius) {
+          var nFalloff = 1 - (nd / radius) * 0.5;
+          var nDmg = amount * nFalloff;
+          npc.hp = Math.max(0, npc.hp - nDmg);
+          if (npc.hp <= 0) {
+            npc.alive = false;
+            if (typeof GameManager !== 'undefined' && GameManager.notifyNPCDeath) GameManager.notifyNPCDeath(npc);
+          }
+        }
       }
     }
     return results;

@@ -270,6 +270,7 @@ const Marketplace = (function () {
   let backendReady = false;
   let apiFailCount = 0;
   let apiBackoffUntil = 0;
+  let _initBackendPromise = null;
 
   function hasApi() {
     return (typeof ApiClient !== 'undefined' && ApiClient);
@@ -281,8 +282,8 @@ const Marketplace = (function () {
 
   function markApiFailure() {
     apiFailCount += 1;
-    if (apiFailCount >= 3) {
-      apiBackoffUntil = Date.now() + 60000;
+    if (apiFailCount >= 1) {
+      apiBackoffUntil = Date.now() + 30000;
       apiFailCount = 0;
     }
   }
@@ -295,20 +296,27 @@ const Marketplace = (function () {
   async function initBackendSync() {
     if (!canUseApi()) return false;
     if (backendReady) return true;
-    try {
-      ApiClient.init();
-      var profile = await ApiClient.auth();
-      if (profile && profile.stats && typeof profile.stats.okc_balance === 'number') {
-        okcBalance = Math.floor(profile.stats.okc_balance);
+    if (_initBackendPromise) return _initBackendPromise;
+    _initBackendPromise = (async function () {
+      try {
+        ApiClient.init();
+        var profile = await ApiClient.auth();
+        if (profile && profile.stats && typeof profile.stats.okc_balance === 'number') {
+          okcBalance = Math.floor(profile.stats.okc_balance);
+        }
+        await refreshCatalog();
+        backendReady = true;
+        markApiSuccess();
+        return true;
+      } catch (_) {
+        markApiFailure();
+        backendReady = false;
+        return false;
+      } finally {
+        _initBackendPromise = null;
       }
-      await refreshCatalog();
-      backendReady = true;
-      markApiSuccess();
-      return true;
-    } catch (_) {
-      markApiFailure();
-      return false;
-    }
+    })();
+    return _initBackendPromise;
   }
 
   async function refreshFromBackend() {

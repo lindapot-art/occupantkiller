@@ -79,7 +79,7 @@
 
     <!-- ── Resource bar ────────────────────────────────────── -->
     <div id="resource-bar">
-      <span id="hud-resources">🪵50 🔩30 ⚡10 ⛽20 🪨40 🍞60 | 💰500</span>
+      <span id="hud-resources"><span style="color:#8B6914">W50</span> <span style="color:#aaa">M30</span> <span style="color:#00ccff">E10</span> <span style="color:#ff8800">F20</span> <span style="color:#999">S40</span> <span style="color:#aacc44">Fd60</span> | <span style="color:#ffcc00">$500</span></span>
     </div>
 
     <div id="bottom-bar">
@@ -165,10 +165,17 @@
     </div>
 
     <!-- Stealth indicator -->
-    <div id="stealth-indicator" style="display:none;position:fixed;top:132px;left:50%;transform:translateX(-50%);background:rgba(0,255,100,0.15);border:1px solid #00ff66;color:#00ff66;padding:3px 14px;border-radius:4px;font-size:12px;z-index:200;pointer-events:none">👻 STEALTH ACTIVE</div>
+    <div id="stealth-indicator" style="display:none;position:fixed;top:90px;left:12px;background:rgba(0,255,100,0.15);border:1px solid #00ff66;color:#00ff66;padding:3px 10px;border-radius:4px;font-size:10px;z-index:200;pointer-events:none;font-family:monospace">STEALTH ACTIVE</div>
 
     <!-- Tactical compass bar -->
-    <div id="tactical-compass" style="position:fixed;top:84px;left:50%;transform:translateX(-50%);width:300px;height:20px;background:rgba(0,0,0,0.5);border-bottom:1px solid rgba(0,255,0,0.2);z-index:200;pointer-events:none;overflow:hidden;font-family:monospace"></div>
+    <div id="tactical-compass" style="position:fixed;top:58px;left:50%;transform:translateX(-50%);width:300px;height:20px;background:rgba(0,0,0,0.5);border-bottom:1px solid rgba(0,255,0,0.2);z-index:200;pointer-events:none;overflow:hidden;font-family:monospace"></div>
+
+    <!-- Objective pointer (nearest enemy / wave direction) -->
+    <div id="objective-pointer" style="display:none;position:fixed;top:84px;left:50%;transform:translateX(-50%);z-index:200;pointer-events:none;font-family:monospace;text-align:center">
+      <div id="objective-arrow" style="font-size:28px;color:#ff4444;text-shadow:0 0 10px rgba(255,0,0,0.6);transition:transform 0.15s">⬇</div>
+      <div id="objective-label" style="font-size:10px;color:#ff8888;margin-top:-4px;text-shadow:0 0 6px rgba(255,0,0,0.4)">ENEMY</div>
+      <div id="objective-dist" style="font-size:9px;color:#aaa"></div>
+    </div>
 
     <!-- Kill streak display -->
     <div id="streak-display" style="display:none;position:fixed;top:108px;left:50%;transform:translateX(-50%);font-size:14px;font-weight:bold;font-family:monospace;z-index:200;pointer-events:none;text-shadow:0 0 8px rgba(255,100,0,0.6)"></div>
@@ -186,7 +193,7 @@
     <div id="role-indicator" style="position:fixed;top:52px;right:12px;color:#aaa;font-size:12px;z-index:200;pointer-events:none"></div>
 
     <!-- AI Learning indicator -->
-    <div id="ai-learning-indicator" style="display:none;position:fixed;top:68px;right:12px;background:rgba(255,0,255,0.1);border:1px solid #ff00ff;color:#ff00ff;padding:2px 10px;border-radius:3px;font-size:11px;z-index:200;pointer-events:none;font-family:monospace">🧠 LEARNING</div>
+    <div id="ai-learning-indicator" style="display:none;position:fixed;top:86px;right:12px;background:rgba(255,0,255,0.1);border:1px solid #ff00ff;color:#ff00ff;padding:2px 10px;border-radius:3px;font-size:11px;z-index:200;pointer-events:none;font-family:monospace">LEARNING</div>
 
     <!-- Kill feed (top-right scrolling list) -->
     <div id="kill-feed"></div>
@@ -427,9 +434,9 @@
       <div id="daily-challenges-list"></div>
     </div>
 
-    <!-- Bounty board display -->
+    <!-- Bounty board display (attached inside daily-challenges via JS) -->
     <div id="bounty-display" style="display:none;position:fixed;top:200px;left:12px;background:rgba(0,0,0,0.7);border:1px solid rgba(255,170,0,0.3);padding:8px 12px;border-radius:6px;z-index:200;font-family:monospace;font-size:10px;pointer-events:none;color:#ccc;max-width:220px">
-      <div style="color:#ffaa00;font-weight:bold;margin-bottom:4px">💰 BOUNTIES</div>
+      <div style="color:#ffaa00;font-weight:bold;margin-bottom:4px">BOUNTIES</div>
       <div id="bounty-list"></div>
     </div>
 
@@ -828,11 +835,6 @@
 
   <!-- Mobile Controls -->
   <div id="mobile-controls" style="display:none">
-    <div id="mobile-look-zone" class="mobile-ctrl">
-      <div class="mobile-look-label">LOOK</div>
-      <div class="mobile-look-reticle"></div>
-    </div>
-
     <!-- Left joystick area -->
     <div id="joystick-zone" class="mobile-ctrl">
       <div id="joystick-base"></div>
@@ -865,6 +867,12 @@
 
     <!-- Inventory/Pause button -->
     <button id="btn-pause" class="mobile-btn pause-btn">⏸</button>
+
+    <!-- Look zone MUST be last in DOM so it paints on top of action buttons -->
+    <div id="mobile-look-zone" class="mobile-ctrl">
+      <div class="mobile-look-label">LOOK</div>
+      <div class="mobile-look-reticle"></div>
+    </div>
   </div>
 
   <!-- Portrait orientation warning (mobile only) -->

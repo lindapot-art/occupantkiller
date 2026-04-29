@@ -136,7 +136,7 @@ canvas {
 
 #top-bar {
   position: absolute;
-  top: 24px;
+  top: 40px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -486,7 +486,7 @@ canvas {
   text-align: center;
   pointer-events: none;
   display: none;
-  z-index: 50;
+  z-index: 100;
 }
 #wave-announce.visible { display: block; animation: fadeInOut 2s forwards; }
 #wave-announce h2 { font-size: 40px; color: #ffaa00; text-shadow: 0 0 20px #ffaa00; letter-spacing: 4px; }
@@ -853,7 +853,7 @@ canvas {
 
 #info-panel-left {
   position: absolute;
-  bottom: 80px;
+  bottom: 100px;
   left: 16px;
   font-size: 11px;
   color: #aaa;
@@ -947,14 +947,16 @@ canvas {
 #mobile-look-zone {
   position: absolute;
   right: 18px;
-  bottom: 120px;
-  width: min(42vw, 220px);
-  height: min(42vw, 220px);
+  bottom: 280px;
+  width: min(32vw, 160px);
+  height: min(32vw, 160px);
   border-radius: 26px;
   border: 1px solid rgba(90, 220, 255, 0.24);
   background: radial-gradient(circle at center, rgba(90, 220, 255, 0.08), rgba(4, 16, 30, 0.18));
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 12px 28px rgba(0,0,0,0.22);
   backdrop-filter: blur(3px);
+  z-index: 10;
+  touch-action: none;
 }
 
 .mobile-look-label {
@@ -1026,6 +1028,8 @@ canvas {
 
 #mobile-actions {
   position: absolute;
+  bottom: 20px;
+  right: 20px;
   bottom: max(20px, env(safe-area-inset-bottom));
   right: max(20px, env(safe-area-inset-right));
   display: grid;
@@ -1218,15 +1222,23 @@ html.is-mobile #hud-okc-bar {
 
 html.is-mobile #bottom-bar {
   left: 50%;
-  width: min(58vw, 460px);
+  width: min(72vw, 520px);
   transform: translateX(-50%);
-  bottom: calc(var(--mobile-safe-bottom) + 8px);
-  padding: 8px 10px;
-  border-radius: 8px;
+  bottom: calc(var(--mobile-safe-bottom) + 4px);
+  padding: 4px 8px;
+  border-radius: 6px;
   background: rgba(0, 0, 0, 0.48);
   border: 1px solid rgba(255, 255, 255, 0.14);
   backdrop-filter: blur(3px);
   align-items: center;
+}
+
+html.is-mobile #health-section,
+html.is-mobile #ammo-section,
+html.is-mobile #grenade-section,
+html.is-mobile #weapon-section {
+  transform: scale(0.85);
+  transform-origin: bottom center;
 }
 
 html.is-mobile #health-bar-container { width: 104px; }
@@ -1246,9 +1258,6 @@ html.is-mobile #tank-hud {
   bottom: calc(var(--mobile-touch-reserve) + var(--mobile-safe-bottom) + 10px) !important;
 }
 
-html.is-mobile #minimap-canvas {
-  display: none !important;
-}
 
 @media (orientation: landscape) {
   html.is-mobile #joystick-zone {
@@ -1260,7 +1269,7 @@ html.is-mobile #minimap-canvas {
   html.is-mobile #joystick-thumb { width: 54px; height: 54px; left: 38px; top: 38px; }
   html.is-mobile #mobile-look-zone {
     right: max(14px, env(safe-area-inset-right));
-    bottom: 150px;
+    bottom: 260px;
     width: min(34vh, 200px);
     height: min(34vh, 200px);
   }
@@ -1292,12 +1301,18 @@ html.is-mobile #minimap-canvas {
   html.is-mobile #mobile-look-zone {
     width: min(22vh, 130px) !important;
     height: min(22vh, 130px) !important;
-    bottom: 130px !important;
+    bottom: 240px !important;
     opacity: 0.45;
   }
   html.is-mobile #joystick-zone {
     width: 110px !important; height: 110px !important;
   }
+  /* Mobile: hide minimap to free screen real estate for touch controls */
+  html.is-mobile #minimap-container,
+  html.is-mobile #minimap-canvas { display: none !important; }
+  /* Mobile: compact bottom HUD bar */
+  html.is-mobile #bottom-bar { transform: translateX(-50%) scale(0.85); transform-origin: bottom center; }
+  html.is-mobile #hud-resources { font-size: 9px !important; }
   html.is-mobile #joystick-base { width: 110px !important; height: 110px !important; }
   html.is-mobile #joystick-thumb { width: 46px !important; height: 46px !important; left: 32px !important; top: 32px !important; }
   /* Hide non-essential HUD in mobile landscape to avoid clutter */
@@ -1385,7 +1400,7 @@ html.is-mobile #minimap-canvas {
   html.is-mobile #joystick-zone { width: 110px; height: 110px; }
   html.is-mobile #joystick-base { width: 110px; height: 110px; }
   html.is-mobile #joystick-thumb { width: 46px; height: 46px; left: 32px; top: 32px; }
-  html.is-mobile #mobile-look-zone { width: 110px; height: 110px; bottom: 130px; }
+  html.is-mobile #mobile-look-zone { width: 110px; height: 110px; bottom: 230px; }
   html.is-mobile .mobile-btn { width: 46px; height: 46px; font-size: 18px; }
   html.is-mobile .mobile-btn.sm { width: 36px; height: 36px; font-size: 14px; }
   html.is-mobile .fire-btn { width: 56px; height: 56px; font-size: 22px; }
@@ -1515,7 +1530,7 @@ html.is-mobile #minimap-canvas {
   }
   #mobile-look-zone {
     right: 12px;
-    bottom: 118px;
+    bottom: 280px;
     width: min(46vw, 220px);
     height: min(46vw, 220px);
   }
@@ -1623,7 +1638,7 @@ html.is-mobile #minimap-canvas {
   #mobile-look-zone {
     width: min(48vw, 180px);
     height: min(48vw, 180px);
-    bottom: 104px;
+    bottom: 280px;
   }
   #top-bar {
     font-size: 11px;

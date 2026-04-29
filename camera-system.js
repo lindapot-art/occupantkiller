@@ -238,7 +238,7 @@ const CameraSystem = (function () {
 
     var targetY = playerPos.y + bobOffset + shakeOffsetY;
     if (_fpsSmoothedY === null) _fpsSmoothedY = targetY;
-    var yLerpRate = isGrounded ? 16 : 9;
+    var yLerpRate = isGrounded ? 10 : 6;
     _fpsSmoothedY += (targetY - _fpsSmoothedY) * Math.min(1, delta * yLerpRate);
 
     _camera.position.set(
