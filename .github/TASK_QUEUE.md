@@ -312,6 +312,26 @@ Requested: 2026-04-06
 Completed: 2026-04-06 (Session 7)
 Details: 37 innerHTML usages reviewed. All use game-generated content. playerName displayed via textContent. Risk: zero.
 
+### [P0] Master Brain Doc + MP3 Jukebox with Inventory Controls
+Status: DONE
+Requested: 2026-04-29
+Completed: 2026-04-29
+Details: Created `.github/MASTER_BRAIN.md` as crash-recovery brain doc aggregating all project context for agent reboots. Rewrote `jukebox.js` to support both MP3 playback (HTMLAudioElement) from `gamemusic/` folder and original procedural Web Audio mode. Added `/api/music` endpoint to `server.js` for dynamic MP3 manifest. Enhanced game HUD jukebox panel with mode toggle (MP3/Procedural) and autoplay toggle. Added mini jukebox controls inside inventory/pause overlay. QA: test-master 38/0/0, test-qa-v2 21/0, /healthz 200, /api/music 200.
+
+### [P0] Gameplay Rehaul — Artillery Damage, FPV Terrain Destruction, Drone Jammer, More Enemy Drones, Stage Purpose
+Status: DONE
+Requested: 2026-04-30
+Completed: 2026-04-30
+Details: Major gameplay action pass in response to "not enough action or purpose" feedback.
+- **Drone Jammer Rifle**: Added `DRONEJAMMER` weapon to `weapons.js` with EMP cone pulse (45m range, ~35° cone) that disables enemy drones for 6s and damages their HP. 3x damage to DRONE_OP/EW_OPERATOR/SWARM_OP enemy types. Unlocked by default alongside Gatling and Shovel. Custom mesh with antenna prongs and glowing EMP coil.
+- **FPV Drone Terrain Destruction**: Friendly FPV drone impact in `drone-system.js` now carves a 3x3 voxel crater, damages player/NPCs in 4m radius (with falloff), and damages enemies in 4m radius (up from 3m). Same for manual `fireAttack()` detonation.
+- **Enemy Artillery Terrain Destruction**: `enemy-artillery.js` `_detonate()` now destroys actual voxels in a spherical blast radius (scaled by craterR). No more fake visual craters — the ground is actually blown apart.
+- **More Enemy Drones**: `enemy-artillery.js` drone spawn interval reduced 25-50s → 12-26s. Strike interval reduced 9-21s → 5-13s. `enemy-types.js` DRONE_OP droneInterval 8→4s, maxDrones 2→4. SWARM_OP swarmInterval 12→8s, swarmSize 5→8. Added DRONE_OP/SWARM_OP to more wave compositions (waves 6, 10, 16, 19-24).
+- **Stage Purpose & Distinction**: Added `objective` field to all 18 stages in `game-manager.js` with clear, actionable goals (e.g. "Destroy all enemy VDV paratroopers", "Hold the coking plant", "Ambush the convoy"). Enhanced `hud.js` `announceStage()` to display objectives in gold with a divider, larger text, longer 5s display, and text shadows.
+
+Files changed: weapons.js, drone-system.js, enemy-artillery.js, enemy-types.js, game-manager.js, hud.js
+QA: test-master 38/0/0, test-qa-v2 21/0, syntax PASS all changed files.
+
 <!-- Add your requests below this line -->
 
 ---

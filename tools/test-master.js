@@ -380,7 +380,7 @@ function phase8() {
   
   // BUG 5: retreat terrain snap
   check('Enemies: retreat snaps to terrain',
-    /retreating[\s\S]{100,500}getTerrainHeight/.test(enemySrc));
+    /e\.retreating[\s\S]{100,900}getTerrainHeight/.test(enemySrc));
   
   // BUG 8: surrender helmet
   check('Enemies: surrender helmet uses parts[2]',

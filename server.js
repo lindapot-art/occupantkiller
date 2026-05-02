@@ -50,6 +50,30 @@ server = http.createServer((req, res) => {
     return res.end('ok');
   }
 
+  // Music manifest endpoint — lists MP3 files in gamemusic/
+  if (req.url === '/api/music') {
+    try {
+      const musicDir = path.join(ROOT, 'gamemusic');
+      const files = fs.readdirSync(musicDir).filter(function (f) {
+        return f.toLowerCase().endsWith('.mp3');
+      }).map(function (f) {
+        // Derive a clean title from filename
+        var title = f.replace(/\.mp3$/i, '').replace(/[_-]+/g, ' ').trim();
+        return {
+          filename: f,
+          title: title,
+          artist: 'OccupantKiller OST',
+          src: 'gamemusic/' + encodeURIComponent(f),
+        };
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json', ...SECURITY_HEADERS });
+      return res.end(JSON.stringify(files));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json', ...SECURITY_HEADERS });
+      return res.end(JSON.stringify({ error: 'Unable to read music directory' }));
+    }
+  }
+
   let url;
   try { url = decodeURIComponent(req.url.split('?')[0]); } catch(e) {
     res.writeHead(400, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });

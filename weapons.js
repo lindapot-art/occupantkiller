@@ -206,6 +206,12 @@ const Weapons = (() => {
       fireRate: 1.5, clipSize: 1, maxReserve: 3, reloadTime: 2.0,
       spread: 0, auto: false, type: 'EXPLOSIVE', blastRadius: 7, recoilY: 0, recoilX: 0,
     },
+    {
+      id: 'DRONEJAMMER', name: 'Drone Jammer Rifle', damage: 8,
+      fireRate: 0.14, clipSize: 30, maxReserve: 120, reloadTime: 2.2,
+      spread: 0.025, auto: true, type: 'JAMMER', recoilY: 0.005, recoilX: 0.002,
+      description: 'EMP pulse rifle. Disables enemy drones and damages electronics in a forward cone.',
+    },
   ];
 
   // ── Per-weapon mutable state ───────────────────────────────
@@ -221,22 +227,20 @@ const Weapons = (() => {
   }
   let states     = WEAPONS.map(makeState);
   let currentIdx = 0;
-  // Only Shovel (0) + Makarov (1) start unlocked; rest earned via drops & stage clears
-  // Only Gatling and Shovel start unlocked (indices 0 and 1)
-  // Only Gatling (0) and Shovel (1) start unlocked; rest locked
-  // Unlock pacing: only first 2 weapons unlocked at start, rest unlock per stage
-  let unlocked   = WEAPONS.map(function(_, i) { return i <= 1; });
+  // Gatling (0), Shovel (1), and Drone Jammer (last) start unlocked
+  let _jammerIdx = WEAPONS.findIndex(function(w) { return w.id === 'DRONEJAMMER'; });
+  let unlocked   = WEAPONS.map(function(_, i) { return i <= 1 || i === _jammerIdx; });
 
   // Unlock weapons per stage (example: 2 new weapons per stage)
   function unlockForStage(stageNum) {
-    // Always keep first 2 unlocked
+    // Always keep first 2 + jammer unlocked
     for (let i = 2; i < WEAPONS.length; i++) {
-      unlocked[i] = false;
+      unlocked[i] = (i === _jammerIdx);
     }
     // Example: unlock 2 new weapons per stage (after first 2)
     let unlockCount = Math.min(2 * stageNum, WEAPONS.length - 2);
     for (let i = 2; i < 2 + unlockCount; i++) {
-      if (i < WEAPONS.length) unlocked[i] = true;
+      if (i < WEAPONS.length && i !== _jammerIdx) unlocked[i] = true;
     }
   }
 
@@ -267,11 +271,35 @@ const Weapons = (() => {
   function setOnTerrainShot(fn) { _onTerrainShot = fn; }
 
   // Helper: destroy a block and notify
+  // Block-type to resource mapping for destructible environment rewards
+  var BLOCK_RESOURCE_MAP = {
+    1: { type: 'stone', amount: 1 },   // dirt
+    2: { type: 'wood', amount: 1 },    // grass
+    3: { type: 'stone', amount: 2 },   // stone
+    4: { type: 'wood', amount: 3 },    // wood
+    5: { type: 'metal', amount: 2 },   // metal
+    9: { type: 'stone', amount: 2 },   // concrete
+    10:{ type: 'stone', amount: 2 },   // brick
+    11:{ type: 'electronics', amount: 1 }, // glass
+    14:{ type: 'metal', amount: 3 },   // reinforced
+  };
+  function _awardBlockResource(blockType) {
+    var drop = BLOCK_RESOURCE_MAP[blockType];
+    if (!drop) return;
+    if (typeof Economy !== 'undefined' && Economy.add) {
+      Economy.add(drop.type, drop.amount);
+    }
+    // Show tiny floating text for the drop
+    if (typeof HUD !== 'undefined' && HUD.showToast) {
+      HUD.showToast('+' + drop.amount + ' ' + drop.type.toUpperCase(), 600, '#aaa');
+    }
+  }
   function destroyBlock(x, y, z, isShovel) {
     if (typeof VoxelWorld === 'undefined') return;
     var blockType = VoxelWorld.getBlock(x, y, z);
     if (!blockType || blockType === 0) return; // already air
     VoxelWorld.setBlock(x, y, z, 0);
+    _awardBlockResource(blockType);
     if (isShovel && _onTerrainDig) {
       _onTerrainDig(x, y, z, blockType);
     } else if (!isShovel && _onTerrainShot) {
@@ -2273,6 +2301,66 @@ const Weapons = (() => {
     return g;
   }
 
+  // ── Drone Jammer Rifle mesh ──
+  function buildDroneJammerMesh() {
+    const g = new THREE.Group();
+    // Main body — bulky EMP rifle
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.055, 0.065, 0.38),
+      new THREE.MeshPhongMaterial({ color: 0x2a3a2a, shininess: 40, specular: 0x334433 })
+    );
+    body.position.set(0.17, -0.14, -0.28);
+    g.add(body);
+    // Barrel / emitter
+    const barrel = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.015, 0.22, 8),
+      new THREE.MeshPhongMaterial({ color: 0x444444, shininess: 80, specular: 0x555555 })
+    );
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0.17, -0.14, -0.52);
+    g.add(barrel);
+    // EMP antenna — 3 prongs
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      const ant = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.003, 0.003, 0.14, 6),
+        new THREE.MeshBasicMaterial({ color: 0x888888 })
+      );
+      ant.position.set(0.17 + Math.cos(a) * 0.025, -0.06, -0.42 + Math.sin(a) * 0.025);
+      g.add(ant);
+    }
+    // Glowing EMP coil
+    const coil = new THREE.Mesh(
+      new THREE.TorusGeometry(0.018, 0.004, 6, 12),
+      new THREE.MeshBasicMaterial({ color: 0x00ff88 })
+    );
+    coil.position.set(0.17, -0.14, -0.44);
+    g.add(coil);
+    // Scope
+    const scope = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.012, 0.16, 8),
+      new THREE.MeshPhongMaterial({ color: 0x222222, shininess: 60 })
+    );
+    scope.rotation.x = Math.PI / 2;
+    scope.position.set(0.17, -0.10, -0.30);
+    g.add(scope);
+    // Grip
+    const grip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.035, 0.09, 0.04),
+      new THREE.MeshPhongMaterial({ color: 0x1a1a1e })
+    );
+    grip.position.set(0.17, -0.22, -0.12);
+    g.add(grip);
+    // Magazine
+    const mag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, 0.08, 0.045),
+      new THREE.MeshPhongMaterial({ color: 0x3a3a3e })
+    );
+    mag.position.set(0.17, -0.20, -0.22);
+    g.add(mag);
+    return g;
+  }
+
   // Placeholder mesh builder for missing weapons
   function buildPlaceholderMesh() {
     const g = new THREE.Group();
@@ -2293,7 +2381,7 @@ const Weapons = (() => {
     buildClaymoreMesh, buildSmokeMesh, buildFlashbangMesh,
     buildAk12Mesh, buildP90Mesh, buildAt4Mesh, buildGlockMesh,
     buildKs23Mesh, buildAgs17Mesh, buildVssMesh, buildStingerMesh,
-    buildThrowKnifeMesh, buildC4Mesh
+    buildThrowKnifeMesh, buildC4Mesh, buildDroneJammerMesh
   ];
 
   // Ensure meshBuilders matches WEAPONS length
@@ -2486,7 +2574,7 @@ const Weapons = (() => {
   let switchAnimTimer = 0;  // weapon switch bob animation
   const SWITCH_ANIM_DUR_DEFAULT = 0.22;
   const SWITCH_SPEED_BY_TYPE = {
-    MELEE: 0.12, PISTOL: 0.16, SMG: 0.20, SILENT: 0.20,
+    MELEE: 0.12, PISTOL: 0.16, SMG: 0.20, SILENT: 0.20, JAMMER: 0.22,
     ASSAULT: 0.24, NATO: 0.24, SHOTGUN: 0.24,
     SNIPER: 0.35, AMR: 0.35,
     LMG: 0.40, HMG: 0.40, MACHINEGUN: 0.40, NATO_HEAVY: 0.35, HMG_HEAVY: 0.45,
@@ -2523,7 +2611,7 @@ const Weapons = (() => {
   let _inertiaX = 0;  // horizontal lag offset
   let _inertiaY = 0;  // vertical lag offset
   const INERTIA_MAX = 0.06;
-  const INERTIA_WEIGHT = { PISTOL: 0.75, SMG: 0.7, ASSAULT: 0.6, NATO: 0.6, SILENT: 0.65,
+  const INERTIA_WEIGHT = { PISTOL: 0.75, SMG: 0.7, ASSAULT: 0.6, NATO: 0.6, SILENT: 0.65, JAMMER: 0.6,
     SHOTGUN: 0.55, SNIPER: 0.45, AMR: 0.4, LMG: 0.35, HMG: 0.3, MACHINEGUN: 0.35,
     MINIGUN: 0.25, AT: 0.35, ATGM: 0.35, MELEE: 0.85, GRENADE: 0.8 };
 
@@ -3158,16 +3246,105 @@ const Weapons = (() => {
       return;
     }
 
+    // ── Drone Jammer: EMP cone pulse ────────────────────
+    if (wep.type === 'JAMMER') {
+      if (st.clip <= 0) { startReload(); _firedThisFrame = false; return; }
+      st.clip--;
+      HUD.setAmmo(st.clip, st.reserve);
+      showMuzzle();
+      recoilOffset = 0.02;
+      // Cone disable: find enemy drones in front of camera
+      if (typeof DroneSystem !== 'undefined' && DroneSystem.getEnemyDrones) {
+        const origin = camera.getWorldPosition(new THREE.Vector3());
+        const fwd = camera.getWorldDirection(new THREE.Vector3());
+        const dlist = DroneSystem.getEnemyDrones() || [];
+        let hitCount = 0;
+        for (let di = 0; di < dlist.length; di++) {
+          const dr = dlist[di];
+          if (!dr || !dr.mesh || dr.destroyed) continue;
+          const to = new THREE.Vector3().subVectors(dr.mesh.position, origin);
+          const dist = to.length();
+          to.normalize();
+          const dot = to.dot(fwd);
+          if (dist < 45 && dot > 0.82) {   // 45m range, ~35° cone
+            dr.disabled = true;
+            dr.disabledTimer = 6.0;        // 6 seconds disabled
+            dr.hp = Math.max(0, (dr.hp || 30) - wep.damage); // also damage drone HP
+            if (dr.hp <= 0 && DroneSystem.destroyDrone) DroneSystem.destroyDrone(dr.id);
+            hitCount++;
+          }
+        }
+        if (hitCount > 0 && typeof HUD !== 'undefined' && HUD.showToast) {
+          HUD.showToast('⚡ ' + hitCount + ' drone' + (hitCount > 1 ? 's' : '') + ' jammed', 1200, '#00ff88');
+        }
+      }
+      // Also damage enemy electronics (DRONE_OP, EW_OPERATOR) via raycast
+      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+      raycaster.far = 45;
+      const hits = raycaster.intersectObjects(targets, true);
+      if (hits.length > 0) {
+        var h = hits[0];
+        // Check if target is a drone operator or EW type
+        var enemyObj = h.object;
+        while (enemyObj && !enemyObj.userData && enemyObj.parent) enemyObj = enemyObj.parent;
+        if (enemyObj && enemyObj.userData && enemyObj.userData.enemyType) {
+          var et = enemyObj.userData.enemyType;
+          if (et === 'DRONE_OP' || et === 'EW_OPERATOR' || et === 'SWARM_OP') {
+            onHit(h, wep.damage * 3); // 3x damage to drone operators
+          } else {
+            onHit(h, wep.damage); // normal damage to anyone else
+          }
+        } else {
+          onHit(h, wep.damage);
+        }
+      }
+      if (st.clip === 0 && st.reserve > 0) startReload();
+      return;
+    }
+
     // ── Standard hitscan fire ───────────────────────────
     if (st.clip <= 0) { startReload(); _firedThisFrame = false; return; }
     st.clip--;
     HUD.setAmmo(st.clip, st.reserve);
 
+    // ── Auto-aim: snap ray toward nearest enemy if enabled ──
+    var _autoAimEnabled = (typeof window !== 'undefined' && window.__AUTO_AIM);
+    var _autoAimCone = 0.16; // ~9° cone
+    var _autoAimMaxDist = 35;
+    var _aimSnapDir = null;
+    if (_autoAimEnabled && targets && targets.length) {
+      var camPos = camera.getWorldPosition(new THREE.Vector3());
+      var camDir = camera.getWorldDirection(new THREE.Vector3());
+      var bestDot = -1, bestTarget = null;
+      for (var ai = 0; ai < targets.length; ai++) {
+        var tObj = targets[ai];
+        if (!tObj || !tObj.position) continue;
+        var toT = new THREE.Vector3().subVectors(tObj.position, camPos);
+        var distT = toT.length();
+        if (distT > _autoAimMaxDist) continue;
+        toT.normalize();
+        var dotT = toT.dot(camDir);
+        if (dotT > _autoAimCone && dotT > bestDot) {
+          bestDot = dotT; bestTarget = tObj;
+        }
+      }
+      if (bestTarget) {
+        _aimSnapDir = new THREE.Vector3().subVectors(bestTarget.position, camPos).normalize();
+      }
+    }
+
     spreadVec.set(
       (Math.random() - 0.5) * wep.spread * 2,
       (Math.random() - 0.5) * wep.spread * 2
     );
-    raycaster.setFromCamera(spreadVec, camera);
+    if (_aimSnapDir) {
+      raycaster.ray.origin.copy(camera.getWorldPosition(new THREE.Vector3()));
+      raycaster.ray.direction.copy(_aimSnapDir).add(
+        new THREE.Vector3((Math.random()-0.5)*wep.spread, (Math.random()-0.5)*wep.spread, (Math.random()-0.5)*wep.spread)
+      ).normalize();
+    } else {
+      raycaster.setFromCamera(spreadVec, camera);
+    }
     raycaster.far = Infinity;
     const hits = raycaster.intersectObjects(targets, true);
     showMuzzle();
@@ -3267,16 +3444,8 @@ const Weapons = (() => {
         } else {
           // Cover degradation: accumulate damage instead of instant destroy
           var wepDmg = wep.damage || 10;
-          // Explosives and high-caliber weapons deal more block damage
-          if (wep.type === 'EXPLOSIVE' || wep.type === 'RPG' || wep.type === 'GRENADE_LAUNCHER') wepDmg *= 5;
-          else if (wep.type === 'AMR' || wep.type === 'HMG' || wep.type === 'HMG_HEAVY') wepDmg *= 3;
-          else if (wep.type === 'SNIPER' || wep.type === 'LMG') wepDmg *= 2;
-          else if (wep.type === 'SHOTGUN') wepDmg *= 1.5;
-          if (typeof VoxelWorld !== 'undefined' && VoxelWorld.damageBlock) {
-            VoxelWorld.damageBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z, wepDmg);
-          } else {
-            destroyBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z, false);
-          }
+          // All bullets now destroy terrain blocks instantly (not just high-caliber)
+          destroyBlock(bRay.hit.x, bRay.hit.y, bRay.hit.z, false);
         }
       }
     }
@@ -3690,7 +3859,7 @@ const Weapons = (() => {
   function reset() {
     states     = WEAPONS.map(makeState);
     currentIdx = 0;
-    unlocked   = WEAPONS.map((_, i) => i <= 1);
+    unlocked   = WEAPONS.map((_, i) => i <= 1 || i === _jammerIdx);
     if (zoomed) exitZoom();
     recoilOffset = 0;
     recoilOffsetY = 0;

@@ -92,19 +92,19 @@ const WeaponDetails = (() => {
   //  PER-TYPE ZOOM FOV MAP (Features 6-8)
   // ══════════════════════════════════════════════════════════
   var ZOOM_FOV = {
-    SNIPER: 10, AMR: 10,
-    ATGM: 14, AT_HEAVY: 14,
-    AT: 22, AT_LIGHT: 22, AA: 22,
-    THERMOBARIC: 20,
-    GRENADE: 30,
-    ASSAULT: 42, NATO: 42, NATO_HEAVY: 40,
-    SILENT: 38,
-    LMG: 48, HMG: 48, MACHINEGUN: 48, HMG_HEAVY: 48,
-    SMG: 52,
-    SHOTGUN: 55,
-    PISTOL: 58,
-    MINIGUN: 50, GATLING: 50,
-    INCENDIARY: 60, MINE: 70, SMOKE: 70, FLASHBANG: 70, EXPLOSIVE: 60,
+    SNIPER: 15, AMR: 15,
+    ATGM: 18, AT_HEAVY: 18,
+    AT: 28, AT_LIGHT: 28, AA: 28,
+    THERMOBARIC: 26,
+    GRENADE: 35,
+    ASSAULT: 50, NATO: 50, NATO_HEAVY: 48,
+    SILENT: 46,
+    LMG: 55, HMG: 55, MACHINEGUN: 55, HMG_HEAVY: 55,
+    SMG: 58,
+    SHOTGUN: 60,
+    PISTOL: 62,
+    MINIGUN: 58, GATLING: 58,
+    INCENDIARY: 65, MINE: 70, SMOKE: 70, FLASHBANG: 70, EXPLOSIVE: 65,
     MELEE: 70
   };
 
@@ -116,11 +116,11 @@ const WeaponDetails = (() => {
   function getAdsOffset(weaponDef, adsLerp) {
     if (!weaponDef) return { x: 0, y: 0, z: 0 };
     if (weaponDef.hasScope) {
-      // Scoped: bring to center, raise to scope eye
-      return { x: -0.17 * adsLerp, y: 0.13 * adsLerp, z: -0.10 * adsLerp };
+      // Scoped: bring near center but lower so scope lens doesn't fill screen
+      return { x: -0.13 * adsLerp, y: -0.32 * adsLerp, z: -0.45 * adsLerp };
     }
-    // Iron sights: partial center, raise to sight line
-    return { x: -0.14 * adsLerp * 0.65, y: 0.09 * adsLerp * 0.65, z: -0.05 * adsLerp };
+    // Iron sights: partial center, push lower so irons don't block target
+    return { x: -0.11 * adsLerp * 0.65, y: -0.22 * adsLerp * 0.65, z: -0.38 * adsLerp };
   }
 
   // ══════════════════════════════════════════════════════════

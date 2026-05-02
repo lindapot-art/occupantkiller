@@ -1735,6 +1735,7 @@ const VehicleSystem = (function () {
     turretProjectiles.push({
       mesh: bulletMesh, dir: _vTmp1.clone(), speed: TANK_MG_PROJ_SPEED,
       damage: stats.mgDamage || 15, life: 2.0, isCannonShell: false,
+      _spawnImmunity: 0.08,
     });
 
     // Tracer every 3rd shot

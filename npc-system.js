@@ -385,6 +385,32 @@ function buildCivilianMesh(npc) {
   var _nTmp2 = new THREE.Vector3();
   var _nTmp3 = new THREE.Vector3();
 
+  // ── NPC Dialogue / Voice Lines ───────────────────────────────────
+  const _NPC_VOICE = {
+    spot:   ['Ось вони!','Ворог!','Там! Там!','Контакт!','Виділяю ціль!'],
+    attack: ['Вогонь!','Поцілюю!','Тримай!','За Україну!','Вперед!'],
+    hit:    ['Влучив!','Точно в ціль!','Гарний постріл!','Є контакт!'],
+    retreat:['Відходимо!','Назад!','Перегрупування!','Захист!'],
+    medic:  ['Потрібен медик!','Поранений!','Допоможіть!','Як багато крові!'],
+    rally:  ['Тримати лінію!','Разом!','Не відступати!','Слава Україні!'],
+    win:    ['Героям слава!','Ми це зробили!','Перемога!','Ворог відступає!'],
+    idle:   ['Чекаю наказів.','Все чисто.','Сканую сектор.','Тихо поки що.'],
+  };
+  var _npcDialogueTimers = new Map(); // npcId -> nextSpeakTime
+
+  function showNPCDialogue(npc, category, duration) {
+    if (!npc || !npc.alive) return;
+    var now = performance.now() / 1000;
+    var next = _npcDialogueTimers.get(npc.id);
+    if (next && now < next) return;
+    _npcDialogueTimers.set(npc.id, now + 4 + Math.random() * 4);
+    var lines = _NPC_VOICE[category] || _NPC_VOICE.idle;
+    var text = lines[Math.floor(Math.random() * lines.length)];
+    if (typeof HUD !== 'undefined' && HUD.showNPCText) {
+      HUD.showNPCText(npc, text, duration || 2.5);
+    }
+  }
+
   function createFriendlyGroup(id) {
     const angle = (id / NUM_FRIENDLY_GROUPS) * Math.PI * 2 + 0.4;
     const dist = 4 + Math.random() * 6;
@@ -1089,6 +1115,15 @@ function buildCivilianMesh(npc) {
       leader.groupRole = 'leader';
       group.members.push(leader.id);
 
+      // Formation offsets (wedge formation) so squad doesn't bunch up
+      var _formOffsets = [
+        { x: 0, z: 0 },        // leader center
+        { x: -1.5, z: 1.2 },   // medic left-rear
+        { x: 1.5, z: 1.2 },    // rifleman right-rear
+        { x: -2.5, z: 2.5 },   // rifleman left-far
+        { x: 2.5, z: 2.5 },    // rifleman right-far
+      ];
+
       // Medic (infantry rank, medic job)
       const mx = lx + (Math.random() - 0.5) * 3;
       const mz = lz + (Math.random() - 0.5) * 3;
@@ -1097,6 +1132,7 @@ function buildCivilianMesh(npc) {
       medic.job = JOB.MEDIC;
       medic.groupId = g;
       medic.groupRole = 'medic';
+      medic._formOff = _formOffsets[1];
       group.members.push(medic.id);
       group.hasMedic = true;
 
@@ -1111,6 +1147,7 @@ function buildCivilianMesh(npc) {
         inf.job = JOB.ASSAULT;
         inf.groupId = g;
         inf.groupRole = 'rifleman';
+        inf._formOff = _formOffsets[2 + i] || { x: (Math.random()-0.5)*3, z: (Math.random()-0.5)*3 };
         group.members.push(inf.id);
       }
 
@@ -1249,6 +1286,17 @@ function buildCivilianMesh(npc) {
   }
 
   /* ── Friendly Assault Group AI ──────────────────────────────────── */
+
+  function _getFormedTarget(npc, basePos, out) {
+    if (!out) out = new THREE.Vector3();
+    out.copy(basePos);
+    if (npc && npc._formOff) {
+      out.x += npc._formOff.x;
+      out.z += npc._formOff.z;
+    }
+    return out;
+  }
+
   function updateFriendlyGroups(delta) {
     for (const grp of friendlyGroups) {
       // Reuse buffer to avoid per-frame alloc
@@ -1276,8 +1324,7 @@ function buildCivilianMesh(npc) {
             for (const npc of aliveMembers) {
               if (npc.job === JOB.ASSAULT || npc.job === JOB.IDLE) {
                 npc.job = JOB.ASSAULT;
-                if (npc.target) npc.target.copy(grp.guardPoint);
-                else npc.target = grp.guardPoint.clone();
+                _getFormedTarget(npc, grp.guardPoint, npc.target || (npc.target = new THREE.Vector3()));
               }
             }
           }
@@ -1304,6 +1351,7 @@ function buildCivilianMesh(npc) {
           if (grp.morale < 35) {
             grp.state = FGROUP_STATE.RETREATING;
             grp.stateTimer = 8 + Math.random() * 10;
+            for (const npc of aliveMembers) showNPCDialogue(npc, 'retreat', 2);
           } else if (grp.stateTimer <= 0 && !inCombat) {
             grp.state = FGROUP_STATE.DEFENDING;
             grp.stateTimer = 20 + Math.random() * 20;
@@ -1321,8 +1369,7 @@ function buildCivilianMesh(npc) {
             for (const npc of aliveMembers) {
               if (npc.job === JOB.GUARD) {
                 npc.job = JOB.ASSAULT;
-                if (npc.target) npc.target.copy(grp.guardPoint);
-                else npc.target = grp.guardPoint.clone();
+                _getFormedTarget(npc, grp.guardPoint, npc.target || (npc.target = new THREE.Vector3()));
               }
             }
           }
@@ -1330,13 +1377,13 @@ function buildCivilianMesh(npc) {
 
         case FGROUP_STATE.RETREATING:
           for (const npc of aliveMembers) {
-            if (npc.target) npc.target.copy(grp.rallyPoint);
-            else npc.target = grp.rallyPoint.clone();
+            _getFormedTarget(npc, grp.rallyPoint, npc.target || (npc.target = new THREE.Vector3()));
           }
           if (grp.stateTimer <= 0) {
             grp.state = FGROUP_STATE.REGROUPING;
             grp.stateTimer = 10 + Math.random() * 10;
             grp.morale = Math.min(100, grp.morale + 20);
+            for (const npc of aliveMembers) showNPCDialogue(npc, 'rally', 2);
           }
           break;
 
@@ -1429,6 +1476,7 @@ function buildCivilianMesh(npc) {
     var moraleFx = applyMoraleEffects(npc);
     if (moraleFx.fleeing) {
       // Fleeing NPC runs away from enemy
+      showNPCDialogue(npc, 'retreat', 2);
       var awayFlee = _nTmp1.subVectors(npc.position, enemy.mesh.position).setY(0).normalize();
       _nTmp2.copy(npc.position).addScaledVector(awayFlee, 10);
       if (npc.target) npc.target.copy(_nTmp2);
@@ -1471,6 +1519,7 @@ function buildCivilianMesh(npc) {
 
         if (dmg > 0 && typeof Enemies !== 'undefined' && Enemies.damage) {
           const remaining = Enemies.damage(enemy, dmg);
+          showNPCDialogue(npc, remaining <= 0 ? 'win' : 'hit', 2);
           // ML: register hit & engagement-range learning
           if (npc._ml && typeof NPCML !== 'undefined') {
             NPCML.onHit(npc._ml, dmg);
@@ -1622,6 +1671,7 @@ function buildCivilianMesh(npc) {
       if (npc.weapon) {
         const nearestEnemy = findNearestEnemy(npc);
         if (nearestEnemy) {
+          if (!npc.combatTarget) showNPCDialogue(npc, 'spot', 2);
           npc.combatTarget = nearestEnemy.enemy;
           updateCombat(npc, delta, nearestEnemy);
           return;
@@ -2029,7 +2079,7 @@ function buildCivilianMesh(npc) {
         grp.stateTimer = 20;
         for (const npc of aliveMembers) {
           npc.job = JOB.ASSAULT;
-          npc.target = grp.guardPoint.clone();
+          _getFormedTarget(npc, grp.guardPoint, npc.target || (npc.target = new THREE.Vector3()));
         }
         break;
       case 'defend':
@@ -2037,14 +2087,14 @@ function buildCivilianMesh(npc) {
         grp.stateTimer = 30;
         for (const npc of aliveMembers) {
           npc.job = JOB.GUARD;
-          npc.guardPos = grp.guardPoint.clone();
+          _getFormedTarget(npc, grp.guardPoint, npc.guardPos || (npc.guardPos = new THREE.Vector3()));
         }
         break;
       case 'regroup':
         grp.state = FGROUP_STATE.REGROUPING;
         grp.stateTimer = 10;
         for (const npc of aliveMembers) {
-          npc.target = grp.rallyPoint.clone();
+          _getFormedTarget(npc, grp.rallyPoint, npc.target || (npc.target = new THREE.Vector3()));
         }
         break;
       case 'flank_left': {
@@ -2054,7 +2104,10 @@ function buildCivilianMesh(npc) {
         flankL.x -= 12;
         for (const npc of aliveMembers) {
           npc.job = JOB.ASSAULT;
-          npc.target = flankL.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, 0, (Math.random() - 0.5) * 3));
+          const ft = flankL.clone();
+          if (npc._formOff) { ft.x += npc._formOff.x; ft.z += npc._formOff.z; }
+          else { ft.x += (Math.random() - 0.5) * 3; ft.z += (Math.random() - 0.5) * 3; }
+          if (npc.target) npc.target.copy(ft); else npc.target = ft;
         }
         break;
       }
@@ -2065,7 +2118,10 @@ function buildCivilianMesh(npc) {
         flankR.x += 12;
         for (const npc of aliveMembers) {
           npc.job = JOB.ASSAULT;
-          npc.target = flankR.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, 0, (Math.random() - 0.5) * 3));
+          const ft = flankR.clone();
+          if (npc._formOff) { ft.x += npc._formOff.x; ft.z += npc._formOff.z; }
+          else { ft.x += (Math.random() - 0.5) * 3; ft.z += (Math.random() - 0.5) * 3; }
+          if (npc.target) npc.target.copy(ft); else npc.target = ft;
         }
         break;
       }

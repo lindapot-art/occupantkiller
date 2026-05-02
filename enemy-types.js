@@ -234,7 +234,7 @@ const EnemyTypes = (function () {
       hp: 50, speed: 1.5, damage: 10, attackRange: 5,
       color: 0x888888, scale: 1.0, xpReward: 70,
       droneHP: 15, droneDamage: 100, droneSpeed: 12,
-      droneInterval: 8, maxDrones: 2,
+      droneInterval: 4, maxDrones: 4,
       behavior: 'send_drones'
     },
     // Feature 28: Spetsnaz
@@ -343,8 +343,8 @@ const EnemyTypes = (function () {
       id: 'SWARM_OP', name: 'Drone Swarm Operator', tier: 3,
       hp: 45, speed: 1.0, damage: 8, attackRange: 5,
       color: 0x777777, scale: 1.0, xpReward: 110,
-      swarmSize: 5, droneDamage: 40, droneSpeed: 15, droneHP: 8,
-      swarmInterval: 12,
+      swarmSize: 8, droneDamage: 40, droneSpeed: 15, droneHP: 8,
+      swarmInterval: 8,
       behavior: 'send_swarm'
     }
   };
@@ -368,17 +368,17 @@ const EnemyTypes = (function () {
     14: { types: ['TANK', 'SPETSNAZ', 'OFFICER', 'MORTAR', 'DRONE_OP'], weights: [0.08, 0.25, 0.17, 0.25, 0.25] },
     15: { types: ['BOSS', 'TANK', 'SPETSNAZ', 'KAMIKAZE_DRONE', 'FLAMETHROWER', 'OFFICER'], weights: [0.08, 0.12, 0.2, 0.2, 0.2, 0.2] },
     // Stages 9-10: Naval & Donbas endgame waves
-    16: { types: ['HEAVY_SNIPER', 'BTR', 'SPETSNAZ', 'DRONE_OP', 'SHIELD_BEARER'], weights: [0.15, 0.15, 0.25, 0.25, 0.2] },
+    16: { types: ['HEAVY_SNIPER', 'BTR', 'SPETSNAZ', 'DRONE_OP', 'SHIELD_BEARER', 'SWARM_OP'], weights: [0.12, 0.12, 0.2, 0.2, 0.16, 0.2] },
     17: { types: ['COMMISSAR', 'WAGNER', 'KADYROVITE', 'FLAMETHROWER', 'MORTAR'], weights: [0.1, 0.25, 0.2, 0.25, 0.2] },
     18: { types: ['THERMOBARIC', 'TANK', 'HEAVY_SNIPER', 'SPETSNAZ', 'EW_OPERATOR'], weights: [0.1, 0.15, 0.2, 0.3, 0.25] },
-    19: { types: ['BOSS', 'THERMOBARIC', 'COMMISSAR', 'BTR', 'SWARM_OP', 'HEAVY_SNIPER'], weights: [0.08, 0.15, 0.12, 0.2, 0.25, 0.2] },
-    20: { types: ['BOSS', 'ASSAULT_MECH', 'TANK', 'THERMOBARIC', 'SWARM_OP', 'SPETSNAZ'], weights: [0.1, 0.05, 0.15, 0.2, 0.25, 0.25] },
+    19: { types: ['BOSS', 'THERMOBARIC', 'COMMISSAR', 'BTR', 'SWARM_OP', 'HEAVY_SNIPER', 'DRONE_OP'], weights: [0.07, 0.13, 0.1, 0.18, 0.22, 0.18, 0.12] },
+    20: { types: ['BOSS', 'ASSAULT_MECH', 'TANK', 'THERMOBARIC', 'SWARM_OP', 'SPETSNAZ', 'DRONE_OP'], weights: [0.08, 0.05, 0.13, 0.18, 0.22, 0.2, 0.14] },
     // Stages 11-12: Belgorod & Kremlin — maximum intensity
-    21: { types: ['ASSAULT_MECH', 'HEAVY_SNIPER', 'COMMISSAR', 'EW_OPERATOR', 'THERMOBARIC', 'SWARM_OP'], weights: [0.08, 0.2, 0.15, 0.17, 0.2, 0.2] },
-    22: { types: ['BOSS', 'ASSAULT_MECH', 'TANK', 'BTR', 'THERMOBARIC', 'SWARM_OP', 'COMMISSAR'], weights: [0.1, 0.08, 0.12, 0.15, 0.2, 0.2, 0.15] },
-    23: { types: ['BOSS', 'ASSAULT_MECH', 'HEAVY_SNIPER', 'SPETSNAZ', 'THERMOBARIC', 'EW_OPERATOR', 'SWARM_OP'], weights: [0.12, 0.1, 0.15, 0.18, 0.15, 0.15, 0.15] },
+    21: { types: ['ASSAULT_MECH', 'HEAVY_SNIPER', 'COMMISSAR', 'EW_OPERATOR', 'THERMOBARIC', 'SWARM_OP', 'DRONE_OP'], weights: [0.07, 0.17, 0.13, 0.15, 0.18, 0.18, 0.12] },
+    22: { types: ['BOSS', 'ASSAULT_MECH', 'TANK', 'BTR', 'THERMOBARIC', 'SWARM_OP', 'COMMISSAR', 'DRONE_OP'], weights: [0.09, 0.07, 0.11, 0.14, 0.18, 0.18, 0.13, 0.1] },
+    23: { types: ['BOSS', 'ASSAULT_MECH', 'HEAVY_SNIPER', 'SPETSNAZ', 'THERMOBARIC', 'EW_OPERATOR', 'SWARM_OP', 'DRONE_OP'], weights: [0.11, 0.09, 0.14, 0.16, 0.14, 0.14, 0.14, 0.08] },
     // Wave 24 = Kremlin final — everything
-    24: { types: ['BOSS', 'ASSAULT_MECH', 'TANK', 'THERMOBARIC', 'HEAVY_SNIPER', 'COMMISSAR', 'SWARM_OP', 'SPETSNAZ'], weights: [0.15, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.13] },
+    24: { types: ['BOSS', 'ASSAULT_MECH', 'TANK', 'THERMOBARIC', 'HEAVY_SNIPER', 'COMMISSAR', 'SWARM_OP', 'SPETSNAZ', 'DRONE_OP'], weights: [0.13, 0.11, 0.11, 0.11, 0.11, 0.11, 0.12, 0.12, 0.08] },
   };
 
   /* ── AI Behavior State ─────────────────────── */

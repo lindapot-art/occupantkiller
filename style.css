@@ -136,7 +136,7 @@ canvas {
 
 #top-bar {
   position: absolute;
-  top: 40px;
+  top: 52px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -838,7 +838,7 @@ canvas {
 
 #resource-bar {
   position: absolute;
-  top: 60px;
+  top: 72px;
   left: 50%;
   transform: translateX(-50%);
   width: auto;
@@ -967,6 +967,8 @@ canvas {
   font-size: 11px;
   letter-spacing: 2px;
   color: rgba(170, 225, 255, 0.85);
+  pointer-events: none;
+  touch-action: none;
 }
 
 .mobile-look-reticle {
@@ -978,6 +980,15 @@ canvas {
   transform: translate(-50%, -50%);
   border: 1px solid rgba(170, 225, 255, 0.3);
   border-radius: 50%;
+  pointer-events: none;
+  touch-action: none;
+}
+
+/* Visual feedback when look zone is actively touched */
+#mobile-look-zone.look-active {
+  border-color: rgba(90, 220, 255, 0.7);
+  background: radial-gradient(circle at center, rgba(90, 220, 255, 0.18), rgba(4, 16, 30, 0.35));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 12px 28px rgba(0,0,0,0.35), 0 0 16px rgba(90,220,255,0.15);
 }
 
 .mobile-look-reticle::before,
@@ -1333,24 +1344,31 @@ html.is-mobile #tank-hud {
   html.is-mobile #info-panel-left,
   html.is-mobile #mission-hud,
   html.is-mobile #objective-tracker { display: none !important; }
-  html.is-mobile #top-bar { font-size: 10px; gap: 10px; top: 20px; }
+  html.is-mobile #top-bar { font-size: 10px; gap: 10px; top: 32px; }
   html.is-mobile #extended-top-bar { font-size: 9px; padding: 3px 8px; }
-  html.is-mobile #resource-bar { font-size: 9px; top: 40px; }
-  html.is-mobile #tactical-compass { top: 58px; width: 240px; }
+  html.is-mobile #resource-bar { font-size: 9px; top: 52px; }
+  html.is-mobile #tactical-compass { top: 8px; width: 240px; }
   html.is-mobile #hud-okc-bar { top: 82px; font-size: 10px; }
   html.is-mobile #weather-indicator { top: 44px; font-size: 9px; }
   html.is-mobile #bottom-bar {
-    width: min(62vw, 440px);
-    bottom: calc(var(--mobile-safe-bottom) + 6px);
-    padding: 6px 8px;
+    width: min(72vw, 380px);
+    bottom: calc(var(--mobile-safe-bottom) + 4px);
+    padding: 4px 6px;
+    transform: scale(0.82);
+    transform-origin: bottom center;
   }
-  html.is-mobile #health-bar-container { width: 140px; }
-  html.is-mobile #ammo-display { font-size: 22px; }
+  html.is-mobile #health-bar-container { width: 110px; height: 10px; }
+  html.is-mobile #health-label { font-size: 9px; }
+  html.is-mobile #health-value { font-size: 10px; }
+  html.is-mobile #ammo-display { font-size: 18px; }
+  html.is-mobile #ammo-label { font-size: 9px; }
+  html.is-mobile #ammo-reserve { font-size: 10px; }
+  html.is-mobile #weapon-label { display: none; }
+  html.is-mobile #weapon-name-display { font-size: 12px; }
   html.is-mobile #inventory-btn,
   html.is-mobile #skill-hud-btn { font-size: 10px; padding: 2px 8px; }
-  html.is-mobile #crosshair { width: 16px; height: 16px; }
-  html.is-mobile #weapon-label { font-size: 11px; bottom: 54px; }
-  html.is-mobile #weapon-name { font-size: 14px; bottom: 36px; right: 220px; }
+  html.is-mobile #crosshair { width: 14px; height: 14px; }
+  html.is-mobile #weapon-name { font-size: 12px; bottom: 36px; right: 220px; }
   html.is-mobile #stage-info { font-size: 10px; }
 
   /* Mobile-landscape: kill desktop-only HUD clutter that overlaps gameplay */

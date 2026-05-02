@@ -612,7 +612,7 @@ const Feedback = (function () {
     _tipEl.textContent = text;
     _tipEl.style.opacity = '1';
     if (_tipFadeTimer) clearTimeout(_tipFadeTimer);
-    _tipFadeTimer = setTimeout(function () { _tipEl.style.opacity = '0'; }, 5000);
+    _tipFadeTimer = setTimeout(function () { if (_tipEl) _tipEl.style.opacity = '0'; }, 4000);
   }
 
   function dismissTip(id) {

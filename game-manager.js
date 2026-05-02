@@ -465,6 +465,14 @@ const GameManager = (function () {
     if (Math.random() < 0.05) {
       spawnLootParticle(worldPos, 1 + Math.floor(Math.random() * 2));
     }
+    // ── B31: Every destroyed block yields OKC for NFT conversion ──
+    var okcReward = 1;
+    if (typeof Economy !== 'undefined' && Economy.addCurrency) {
+      Economy.addCurrency(okcReward);
+      if (typeof HUD !== 'undefined' && HUD.notifyPickup && Math.random() < 0.15) {
+        HUD.notifyPickup('+1 OKC (block destroyed)', '#ffd700');
+      }
+    }
   }
 
   /* ── Shovel Mining Handler (gives materials like Minecraft) ─────── */
@@ -501,6 +509,7 @@ const GameManager = (function () {
       sunIntensity: 0.85,
       exposure:     0.9,
       description:  'Stop the airborne assault at Hostomel Airport.',
+      objective:    'Destroy all enemy VDV paratroopers and anti-air guns. Survive 7 waves.',
     },
     {
       id:           2,
@@ -514,6 +523,7 @@ const GameManager = (function () {
       sunIntensity: 0.7,
       exposure:     0.8,
       description:  'Industrial ruins of Avdiivka. Defend the coking plant.',
+      objective:    'Hold the coking plant against VDV and armored assaults. Watch for snipers.',
     },
     {
       id:           3,
@@ -527,6 +537,7 @@ const GameManager = (function () {
       sunIntensity: 0.65,
       exposure:     0.7,
       description:  'Total destruction in Bakhmut. The city is a graveyard.',
+      objective:    'Navigate the ruins. Wagner mercenaries attack from all angles. Clear 7 waves.',
     },
     {
       id:           4,
@@ -540,6 +551,7 @@ const GameManager = (function () {
       sunIntensity: 0.9,
       exposure:     0.9,
       description:  'Cross the Dnipro at Kherson. Liberate the bridgehead.',
+      objective:    'Secure the Dnipro crossing. Drown enemy armor in the river. 7 waves.',
     },
     {
       id:           5,
@@ -553,6 +565,7 @@ const GameManager = (function () {
       sunIntensity: 0.5,
       exposure:     0.65,
       description:  'Fight through the burning Azovstal steelworks. No retreat.',
+      objective:    'Survive the steelworks inferno. Fire deals constant damage. Clear all 7 waves.',
     },
     {
       id:           6,
@@ -566,6 +579,7 @@ const GameManager = (function () {
       sunIntensity: 0.95,
       exposure:     0.9,
       description:  'Assault the Kerch Strait bridge. Cut off their supply line.',
+      objective:    'Blow the Crimea Bridge. Heavy naval bombardment incoming. 7 waves.',
     },
     {
       id:           7,
@@ -579,6 +593,7 @@ const GameManager = (function () {
       sunIntensity: 0.55,
       exposure:     0.75,
       description:  'The irradiated exclusion zone. Radiation adds periodic damage.',
+      objective:    'Survive Chornobyl. Radiation, mutants, and Spetsnaz. Avoid the red zones.',
     },
     {
       id:           8,
@@ -592,6 +607,7 @@ const GameManager = (function () {
       sunIntensity: 0.4,
       exposure:     0.6,
       description:  'The final push to the Kremlin. End it here.',
+      objective:    'Push through Moscow defenses. Kill the Kremlin boss. 9 waves.',
     },
     {
       id:           9,
@@ -605,6 +621,7 @@ const GameManager = (function () {
       sunIntensity: 0.85,
       exposure:     0.85,
       description:  'Destroy the Black Sea Fleet at Sevastopol. Sink them all.',
+      objective:    'Naval base assault. Ship artillery rains down. Destroy all fleet defenders.',
     },
     {
       id:           10,
@@ -618,6 +635,7 @@ const GameManager = (function () {
       sunIntensity: 0.6,
       exposure:     0.7,
       description:  'Liberate the last occupied stronghold in Donbas.',
+      objective:    'Break the Donbas line. Thermobaric weapons and mechs. 8 waves.',
     },
     {
       id:           11,
@@ -631,6 +649,7 @@ const GameManager = (function () {
       sunIntensity: 0.75,
       exposure:     0.85,
       description:  'Cross into enemy territory. Take the fight to them.',
+      objective:    'Invade Belgorod. Tanks and mechanized infantry counter-attack hard. 8 waves.',
     },
     {
       id:           12,
@@ -644,6 +663,7 @@ const GameManager = (function () {
       sunIntensity: 0.3,
       exposure:     0.5,
       description:  'The ultimate battle for peace. Storm the Kremlin. End the war.',
+      objective:    'Final assault. Every enemy type. Maximum difficulty. Survive 10 waves.',
     },
     {
       id:           13,
@@ -659,6 +679,7 @@ const GameManager = (function () {
       tankFocus:    true,
       hintWeapons:  ['NLAW','FGM148Javelin','RPG7','StugnaP'],
       description:  'Feb 2022. Ambush the Russian armored convoy on the road to Kyiv. NLAW and Javelin teams hold the line.',
+      objective:    'Ambush the convoy. Tanks spawn from wave 1. Use AT weapons. 8 waves.',
     },
     {
       id:           14,
@@ -672,6 +693,7 @@ const GameManager = (function () {
       sunIntensity: 0.65,
       exposure:     0.8,
       description:  'Feb 24, 2022. Russian warship Moskva approaches Snake Island. Reply: "Russian warship, go fuck yourself."',
+      objective:    'Hold Snake Island against naval bombardment. Only 6 waves — make them count.',
     },
     {
       id:           15,
@@ -685,6 +707,7 @@ const GameManager = (function () {
       sunIntensity: 0.95,
       exposure:     0.95,
       description:  'Aug 2022. Crimea. Light up the Saky airbase — every parked Su-24 is a war crime grounded.',
+      objective:    'Airbase raid. Heavy bomber drone presence. Jammer rifle recommended. 7 waves.',
     },
     {
       id:           16,
@@ -700,6 +723,7 @@ const GameManager = (function () {
       tankFocus:    true,
       hintWeapons:  ['NLAW','FGM148Javelin','StugnaP','RPG7'],
       description:  'Feb 2023. The 155th Naval Infantry Brigade walks into a minefield. Make Vuhledar the largest tank graveyard of the war.',
+      objective:    'Tank graveyard. Mines and AT weapons are your friends. 8 waves of armor.',
     },
     {
       id:           17,
@@ -713,6 +737,7 @@ const GameManager = (function () {
       sunIntensity: 0.85,
       exposure:     0.85,
       description:  'Jul-Aug 2022. HIMARS season. Cut the Antonov Bridge supply line and trap the Russian forces in Kherson.',
+      objective:    'Bridge strike. Long-range artillery duels. Precision weapons matter. 7 waves.',
     },
     {
       id:           18,
@@ -727,6 +752,7 @@ const GameManager = (function () {
       exposure:     0.75,
       droneOnly:    true,
       description:  'Pilot a one-way FPV drone deep into a Russian oil refinery. No respawns at the wheel — only at the launch pad.',
+      objective:    'FPV drone mission. Fly into the refinery. Blow the fuel tanks. One wave, one chance.',
     },
   ];
 
@@ -2049,12 +2075,12 @@ const GameManager = (function () {
         e.preventDefault();
         for (let i = 0; i < e.changedTouches.length; i++) {
           const t = e.changedTouches[i];
-          if (touch.lookTouchId === null) {
-            touch.lookTouchId = t.identifier;
-            touch.lookActive = true;
-            touch._lookPrevX = t.clientX;
-            touch._lookPrevY = t.clientY;
-          }
+          // Always accept a new look touch (prevents stuck state if touchend was missed)
+          touch.lookTouchId = t.identifier;
+          touch.lookActive = true;
+          touch._lookPrevX = t.clientX;
+          touch._lookPrevY = t.clientY;
+          try { lookZone.classList.add('look-active'); } catch (_e) {}
         }
       }, { passive: false });
       lookZone.addEventListener('touchmove', function (e) {
@@ -2071,26 +2097,37 @@ const GameManager = (function () {
           }
         }
       }, { passive: false });
-      lookZone.addEventListener('touchend', function (e) {
+      // Also listen on document for touchmove in case the finger drifts outside the look zone
+      document.addEventListener('touchmove', function (e) {
+        if (touch.lookTouchId === null) return;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const t = e.changedTouches[i];
+          if (t.identifier === touch.lookTouchId) {
+            const dx = t.clientX - touch._lookPrevX;
+            const dy = t.clientY - touch._lookPrevY;
+            touch.lookX = dx;
+            touch.lookY = dy;
+            touch._lookPrevX = t.clientX;
+            touch._lookPrevY = t.clientY;
+          }
+        }
+      }, { passive: false });
+      function _releaseLookTouch(e) {
         for (let i = 0; i < e.changedTouches.length; i++) {
           if (e.changedTouches[i].identifier === touch.lookTouchId) {
             touch.lookTouchId = null;
             touch.lookActive = false;
             touch.lookX = 0;
             touch.lookY = 0;
+            try { lookZone.classList.remove('look-active'); } catch (_e) {}
           }
         }
-      }, { passive: true });
-      lookZone.addEventListener('touchcancel', function (e) {
-        for (let i = 0; i < e.changedTouches.length; i++) {
-          if (e.changedTouches[i].identifier === touch.lookTouchId) {
-            touch.lookTouchId = null;
-            touch.lookActive = false;
-            touch.lookX = 0;
-            touch.lookY = 0;
-          }
-        }
-      }, { passive: true });
+      }
+      lookZone.addEventListener('touchend', _releaseLookTouch, { passive: true });
+      lookZone.addEventListener('touchcancel', _releaseLookTouch, { passive: true });
+      // Safety: if touch ends outside the look zone, still release it
+      document.addEventListener('touchend', _releaseLookTouch, { passive: true });
+      document.addEventListener('touchcancel', _releaseLookTouch, { passive: true });
     }
   }
 
@@ -2240,6 +2277,12 @@ const GameManager = (function () {
 
   function hideOverlays() {
     document.querySelectorAll('.overlay').forEach(function (el) { el.style.display = 'none'; });
+    // Release any stuck mobile look touch when overlays change
+    touch.lookTouchId = null;
+    touch.lookActive = false;
+    touch.lookX = 0;
+    touch.lookY = 0;
+    try { var _lz = document.getElementById('mobile-look-zone'); if (_lz) _lz.classList.remove('look-active'); } catch (_e) {}
   }
 
   /* ── Drone Selection Flow ────────────────────────────────────────── */
@@ -2662,6 +2705,12 @@ const GameManager = (function () {
     // death screen while we regenerate the world (which can take 1-3s).
     hideOverlays();
     if (window._shopCountdownId) { clearInterval(window._shopCountdownId); window._shopCountdownId = null; }
+    // Reset mobile touch look state to prevent stuck touches across game sessions
+    touch.lookTouchId = null;
+    touch.lookActive = false;
+    touch.lookX = 0;
+    touch.lookY = 0;
+    try { var _lz = document.getElementById('mobile-look-zone'); if (_lz) _lz.classList.remove('look-active'); } catch (_e) {}
     try {
       if (typeof window !== 'undefined') {
         console.log('[QA] startGame called, __QA_MODE:', window.__QA_MODE);
@@ -2827,7 +2876,7 @@ const GameManager = (function () {
     }, 100);
 
     // Announce first stage then show drone selection
-    HUD.announceStage(STAGES[0].id, STAGES[0].name, STAGES[0].description);
+    HUD.announceStage(STAGES[0].id, STAGES[0].name, STAGES[0].description, STAGES[0].objective);
     if (_waveStartTimer) clearTimeout(_waveStartTimer);
     _waveStartTimer = setTimeout(function () {
       showDroneSelection(function () { beginWave(1); });
@@ -3097,7 +3146,7 @@ const GameManager = (function () {
     requestPointerLock();
 
     // Announce new stage then show drone selection
-    HUD.announceStage(stageDef.id, stageDef.name, stageDef.description);
+    HUD.announceStage(stageDef.id, stageDef.name, stageDef.description, stageDef.objective);
     if (_waveStartTimer) clearTimeout(_waveStartTimer);
     _waveStartTimer = setTimeout(function () {
       showDroneSelection(function () { beginWave(1); });
@@ -3699,7 +3748,7 @@ const GameManager = (function () {
 
     // Apply touch look rotation
     if (isMobile && (touch.lookX !== 0 || touch.lookY !== 0)) {
-      CameraSystem.handleMouseMove(touch.lookX * 0.35, touch.lookY * 0.35);
+      CameraSystem.handleMouseMove(touch.lookX * 4.0, touch.lookY * 4.0);
       touch.lookX = 0;
       touch.lookY = 0;
     }
@@ -5266,10 +5315,10 @@ const GameManager = (function () {
             var mats = player.buildMaterials;
             var eco = Economy.getResources();
             matList.innerHTML =
-              '🪵 Wood: ' + ((mats.wood || 0) + (eco.wood || 0)) + '<br>' +
-              '🪨 Stone: ' + ((mats.stone || 0) + (eco.stone || 0)) + '<br>' +
-              '🔩 Metal: ' + ((mats.metal || 0) + (eco.metal || 0)) + '<br>' +
-              '🟫 Dirt: ' + (mats.dirt || 0) + '<br>' +
+              'W Wood: ' + ((mats.wood || 0) + (eco.wood || 0)) + '<br>' +
+              'S Stone: ' + ((mats.stone || 0) + (eco.stone || 0)) + '<br>' +
+              'M Metal: ' + ((mats.metal || 0) + (eco.metal || 0)) + '<br>' +
+              'D Dirt: ' + (mats.dirt || 0) + '<br>' +
               '🏖 Sand: ' + (mats.sand || 0) + '<br>' +
               '🧱 Brick: ' + (mats.brick || 0);
           }
@@ -5309,6 +5358,8 @@ const GameManager = (function () {
         // Recent fire kick — read recoil accum if available
         var _recoilNow = (typeof Weapons !== 'undefined' && Weapons.getRecoilAccum) ? Weapons.getRecoilAccum() : 0;
         _chSpread += Math.min(0.5, _recoilNow * 8);
+        // Immediate fire spread boost (frame-accurate)
+        if (Weapons.didFire && Weapons.didFire()) _chSpread += 0.25;
         if (Weapons.isZoomed && Weapons.isZoomed()) _chSpread *= 0.25;
         if (HUD.setCrosshairSpread) HUD.setCrosshairSpread(_chSpread);
       } catch (eCh) {}
@@ -5426,6 +5477,9 @@ const GameManager = (function () {
 
       // Hybrid systems
       NPCSystem.update(delta, TimeSystem.getInfo());
+      if (typeof HUD !== 'undefined' && HUD._updateNPCTextPositions) {
+        HUD._updateNPCTextPositions(NPCSystem.getAll(), _camera, _renderer);
+      }
       DroneSystem.update(delta);
       if (typeof EnemyArtillery !== 'undefined') EnemyArtillery.update(delta);
       VehicleSystem.update(delta);
@@ -5948,12 +6002,6 @@ const GameManager = (function () {
       // Feedback system update (damage numbers, kill feed, pings, compass)
       if (typeof Feedback !== 'undefined') {
         Feedback.update(delta, CameraSystem.getYaw());
-
-        // Dynamic crosshair update
-        var isMoving = player.velocity.length() > 0.1;
-        var isFiring = Weapons.didFire && Weapons.didFire();
-        var isADS = Weapons.isZoomed && Weapons.isZoomed();
-        Feedback.updateDynamicCrosshair(0, isMoving, isFiring, isADS);
       }
 
       // Progression tracking - play time
@@ -6407,7 +6455,26 @@ const GameManager = (function () {
     const btnPause = document.getElementById('btn-pause');
     btnPause.addEventListener('touchstart', function (e) {
       e.preventDefault();
-      tapVirtualKey('Escape');
+      // Direct pause toggle — synthetic keyboard events are unreliable on mobile Safari
+      if (gameState === STATE.PLAYING || gameState === STATE.BUILD_MODE) {
+        gameState = STATE.PAUSED;
+        var invOv = document.getElementById('inventory-overlay');
+        if (invOv) {
+          if (typeof showInventory === 'function') showInventory();
+          invOv.style.display = 'flex';
+        } else {
+          showOverlay('pause');
+        }
+        _releaseMouseForUI();
+        if (typeof updateMobileControlsVisibility === 'function') updateMobileControlsVisibility();
+      } else if (gameState === STATE.PAUSED) {
+        gameState = STATE.PLAYING;
+        var invOv2 = document.getElementById('inventory-overlay');
+        if (invOv2) invOv2.style.display = 'none';
+        hideOverlays();
+        requestPointerLock();
+        if (typeof updateMobileControlsVisibility === 'function') updateMobileControlsVisibility();
+      }
     }, { passive: false });
 
     // Restore gyro preference (if previously enabled and no permission gate needed)
@@ -6526,7 +6593,7 @@ const GameManager = (function () {
     var matGrid = document.getElementById('materials-grid');
     if (matGrid) {
       matGrid.innerHTML = '';
-      var resIcons = { wood: '🪵', metal: '🔩', electronics: '⚡', fuel: '⛽', stone: '🪨', food: '🍞' };
+      var resIcons = { wood: 'W', metal: 'M', electronics: 'E', fuel: 'F', stone: 'S', food: 'Fd' };
       var resColors = { wood: '#8B6914', metal: '#aaa', electronics: '#00ccff', fuel: '#ff8800', stone: '#999', food: '#aacc44' };
       var resources = Economy.getResources();
       for (var resType in resources) {

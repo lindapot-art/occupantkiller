@@ -85,8 +85,8 @@ const EnemyArtillery = (function () {
     _scene = scene || (window.GameManager && window.GameManager.getScene && window.GameManager.getScene());
     _activeStrikes.length = 0;
     _activeDebris.length  = 0;
-    _nextStrikeIn = 8 + Math.random() * 8;   // first strike 8-16 s into play
-    _nextDroneIn  = 22 + Math.random() * 14; // first drone  22-36 s
+    _nextStrikeIn = 4 + Math.random() * 6;   // first strike 4-10 s into play
+    _nextDroneIn  = 10 + Math.random() * 10; // first drone  10-20 s
   }
 
   // Pick a random target — usually near the player, sometimes near random enemies
@@ -218,6 +218,27 @@ const EnemyArtillery = (function () {
       }
     } catch (e) {}
 
+    // ── REAL TERRAIN DESTRUCTION ──
+    try {
+      if (typeof VoxelWorld !== 'undefined' && VoxelWorld.setBlock) {
+        const cx = Math.round(s.x);
+        const cy = Math.round(gy);
+        const cz = Math.round(s.z);
+        const blastR = Math.max(1, Math.round(T.craterR * 0.6));
+        for (let bx = -blastR; bx <= blastR; bx++) {
+          for (let by = -blastR; by <= blastR; by++) {
+            for (let bz = -blastR; bz <= blastR; bz++) {
+              if (bx*bx + by*by + bz*bz <= blastR*blastR) {
+                // Don't destroy bedrock (y=0) — keep world intact at bottom
+                var vy = cy + by;
+                if (vy > 0) VoxelWorld.setBlock(cx + bx, vy, cz + bz, 0);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
     // Screen shake + flash
     if (typeof Feedback !== 'undefined' && Feedback.screenShake) Feedback.screenShake(T.shake);
 
@@ -311,14 +332,14 @@ const EnemyArtillery = (function () {
           setTimeout(() => fire('MORTAR'), 400 + i * 700);
         }
       }
-      _nextStrikeIn = 9 + Math.random() * 12; // 9-21 s between strikes
+      _nextStrikeIn = 5 + Math.random() * 8; // 5-13 s between strikes (more intense)
     }
 
     // ── Random enemy drone scheduler ──
     _nextDroneIn -= delta;
     if (_nextDroneIn <= 0) {
       _spawnRandomEnemyDrone();
-      _nextDroneIn = 25 + Math.random() * 25; // 25-50 s
+      _nextDroneIn = 12 + Math.random() * 14; // 12-26 s (more drones)
     }
 
     // ── Active strike progression ──

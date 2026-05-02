@@ -2525,6 +2525,7 @@ const Enemies = (() => {
       }
 
       // ── B25: Retreat when wounded (30-50% HP) — run away from player ──
+      // retreating enemies must snap to terrain so they don't float
       if (!e.surrendered && !e.retreating && e.hp < e.maxHp * 0.3 && e.hp > e.maxHp * 0.1) {
         if (Math.random() < 0.15 * delta) {
           e.retreating = true;

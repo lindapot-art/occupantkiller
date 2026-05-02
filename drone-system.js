@@ -645,10 +645,50 @@ const DroneSystem = (function () {
           drone.velocity.z = (fdz / fd) * drone.speed;
           drone.mesh.rotation.y = Math.atan2(drone.velocity.x, drone.velocity.z);
         } else {
-          // Impact — damage in radius and self-destruct
+          // Impact — damage in radius, terrain destruction, player/NPC damage, self-destruct
           if (typeof Enemies !== 'undefined' && Enemies.damageInRadius) {
-            Enemies.damageInRadius(drone.position, 3, drone.damage);
+            Enemies.damageInRadius(drone.position, 4, drone.damage);
           }
+          // Damage player if too close
+          try {
+            const player = window.GameManager && window.GameManager.getPlayer && window.GameManager.getPlayer();
+            if (player && player.position && !player.godMode) {
+              const ddx = player.position.x - drone.position.x;
+              const ddy = player.position.y - drone.position.y;
+              const ddz = player.position.z - drone.position.z;
+              const ddist = Math.sqrt(ddx*ddx + ddy*ddy + ddz*ddz);
+              if (ddist < 4) {
+                const falloff = 1 - (ddist / 4) * 0.5;
+                player.hp = Math.max(1, (player.hp || 100) - Math.floor(drone.damage * falloff));
+                if (typeof HUD !== 'undefined' && HUD.setHealth) HUD.setHealth(player.hp, player.maxHp || 100);
+                if (typeof HUD !== 'undefined' && HUD.showDamageFlash) HUD.showDamageFlash(0xff3300, 0.4);
+              }
+            }
+          } catch (e) {}
+          // Damage friendly NPCs if too close
+          try {
+            if (typeof NPCSystem !== 'undefined' && NPCSystem.damageInRadius) {
+              NPCSystem.damageInRadius(drone.position, 4, drone.damage);
+            }
+          } catch (e) {}
+          // Terrain destruction — carve a crater
+          try {
+            if (typeof VoxelWorld !== 'undefined' && VoxelWorld.setBlock) {
+              const cx = Math.round(drone.position.x);
+              const cy = Math.round(drone.position.y);
+              const cz = Math.round(drone.position.z);
+              for (let bx = -1; bx <= 1; bx++) {
+                for (let by = -1; by <= 1; by++) {
+                  for (let bz = -1; bz <= 1; bz++) {
+                    if (Math.abs(bx) + Math.abs(by) + Math.abs(bz) <= 2) {
+                      var vy = cy + by;
+                      if (vy > 0) VoxelWorld.setBlock(cx + bx, vy, cz + bz, 0);
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {}
           createDroneExplosion(drone.position.clone());
           if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playExplosion) window.AudioSystem.playExplosion();
           destroyDrone(drone);
@@ -814,12 +854,52 @@ const DroneSystem = (function () {
   function fireAttack(droneId) {
     const drone = drones.find(d => d.id === droneId);
     if (!drone || drone.type !== DRONE_TYPE.FPV_ATTACK) return false;
-    // FPV kamikaze: damage enemies at drone position, destroy drone
+    // FPV kamikaze: damage enemies, player, NPCs, terrain at drone position, destroy drone
     if (typeof Enemies !== 'undefined') {
-      Enemies.damageInRadius(drone.position, 3, drone.damage);
+      Enemies.damageInRadius(drone.position, 4, drone.damage);
     }
+    // Player damage
+    try {
+      const player = window.GameManager && window.GameManager.getPlayer && window.GameManager.getPlayer();
+      if (player && player.position && !player.godMode) {
+        const ddx = player.position.x - drone.position.x;
+        const ddy = player.position.y - drone.position.y;
+        const ddz = player.position.z - drone.position.z;
+        const ddist = Math.sqrt(ddx*ddx + ddy*ddy + ddz*ddz);
+        if (ddist < 4) {
+          const falloff = 1 - (ddist / 4) * 0.5;
+          player.hp = Math.max(1, (player.hp || 100) - Math.floor(drone.damage * falloff));
+          if (typeof HUD !== 'undefined' && HUD.setHealth) HUD.setHealth(player.hp, player.maxHp || 100);
+          if (typeof HUD !== 'undefined' && HUD.showDamageFlash) HUD.showDamageFlash(0xff3300, 0.4);
+        }
+      }
+    } catch (e) {}
+    // NPC damage
+    try {
+      if (typeof NPCSystem !== 'undefined' && NPCSystem.damageInRadius) {
+        NPCSystem.damageInRadius(drone.position, 4, drone.damage);
+      }
+    } catch (e) {}
+    // Terrain destruction
+    try {
+      if (typeof VoxelWorld !== 'undefined' && VoxelWorld.setBlock) {
+        const cx = Math.round(drone.position.x);
+        const cy = Math.round(drone.position.y);
+        const cz = Math.round(drone.position.z);
+        for (let bx = -1; bx <= 1; bx++) {
+          for (let by = -1; by <= 1; by++) {
+            for (let bz = -1; bz <= 1; bz++) {
+              if (Math.abs(bx) + Math.abs(by) + Math.abs(bz) <= 2) {
+                var vy = cy + by;
+                if (vy > 0) VoxelWorld.setBlock(cx + bx, vy, cz + bz, 0);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
     createDroneExplosion(drone.position.clone());
-        if (typeof window.AudioSystem !== 'undefined') window.AudioSystem.playGunshot('launcher');
+    if (typeof window.AudioSystem !== 'undefined') window.AudioSystem.playGunshot('launcher');
     destroyDrone(drone);
     return true;
   }

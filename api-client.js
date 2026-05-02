@@ -92,11 +92,19 @@ const ApiClient = (function () {
     _ensureAnonId();
     // Silent health probe on init: if backend is down, trip breaker immediately
     // so the first real batch of requests doesn't all fire simultaneously.
-    if (!_healthProbe) {
+    // Skip probe when hosted on a different origin (e.g. GitHub Pages) to avoid
+    // CORS console noise — the first real request will trip the breaker anyway.
+    var isSameOrigin = false;
+    try { isSameOrigin = new URL(_baseUrl).origin === location.origin; } catch (_) {}
+    if (!_healthProbe && isSameOrigin) {
       _healthProbe = fetch(_baseUrl + '/api/health', { method: 'HEAD', mode: 'no-cors' })
         .then(function () { _backendDown = false; })
         .catch(function () { _backendDown = true; _backendCheckedAt = Date.now(); })
         .finally(function () { _healthProbe = null; });
+    } else if (!isSameOrigin) {
+      // Assume backend unreachable when cross-origin (GitHub Pages, etc.)
+      _backendDown = true;
+      _backendCheckedAt = Date.now();
     }
     return _anonId;
   }

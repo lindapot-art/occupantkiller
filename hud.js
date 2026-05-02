@@ -74,6 +74,50 @@
   // Map: npcId → {el, lastMorale}
   let _moraleIndicators = {};
 
+  // ── NPC Dialogue Bubbles ───────────────────────────────
+  let _npcDialogueEls = {};
+  function showNPCText(npc, text, duration) {
+    if (!npc || !npc.alive || !npc.mesh) return;
+    duration = duration || 2.5;
+    var ex = _npcDialogueEls[npc.id];
+    if (!ex) {
+      var el = document.createElement('div');
+      el.className = 'npc-dialogue-bubble';
+      el.style.cssText = 'position:absolute;pointer-events:none;z-index:1200;'
+        + 'background:rgba(0,0,0,0.55);color:#ffd700;border:1px solid #ffd700;'
+        + 'border-radius:6px;padding:3px 8px;font-size:13px;font-family:monospace;'
+        + 'white-space:nowrap;transition:opacity 0.3s;text-shadow:0 0 3px #000;';
+      document.body.appendChild(el);
+      _npcDialogueEls[npc.id] = { el: el, hideTimer: 0 };
+      ex = _npcDialogueEls[npc.id];
+    }
+    ex.el.textContent = text;
+    ex.el.style.opacity = '1';
+    ex.hideTimer = performance.now() / 1000 + duration;
+    // Position update will be done by updateNpcMoraleIndicators frame loop
+  }
+  function _updateNPCTextPositions(npcList, camera, renderer) {
+    if (!camera || !renderer) return;
+    var w = renderer.domElement.width, h = renderer.domElement.height;
+    var now = performance.now() / 1000;
+    for (var id in _npcDialogueEls) {
+      var ex = _npcDialogueEls[id];
+      var npc = null;
+      for (var i = 0; i < npcList.length; i++) { if (npcList[i].id == id) { npc = npcList[i]; break; } }
+      if (!npc || !npc.alive || now > ex.hideTimer) {
+        ex.el.style.opacity = '0';
+        continue;
+      }
+      var p = npc.position.clone(); p.y += 2.2;
+      p.project(camera);
+      var sx = (p.x * 0.5 + 0.5) * w;
+      var sy = (-p.y * 0.5 + 0.5) * h;
+      ex.el.style.left = Math.round(sx) + 'px';
+      ex.el.style.top = Math.round(sy) + 'px';
+      ex.el.style.transform = 'translate(-50%, -100%)';
+    }
+  }
+
   // Call this every frame with [{id, position, morale, alive}]
   function updateNpcMoraleIndicators(npcList, camera, renderer) {
     if (!moraleHudEl || !Array.isArray(npcList) || !camera || !renderer) return;
@@ -239,9 +283,10 @@ const HUD = (() => {
     el.stage.textContent = 'STAGE ' + num + ': ' + name;
     el.stage.style.opacity = '1';
     if (_stageFadeTimer) clearTimeout(_stageFadeTimer);
+    // Keep stage name faintly visible so players always know which level they're in
     _stageFadeTimer = setTimeout(function () {
       if (el.stage) el.stage.style.transition = 'opacity 2s ease-out';
-      if (el.stage) el.stage.style.opacity = '0.35';
+      if (el.stage) el.stage.style.opacity = '0.55';
     }, 6000);
   }
 
@@ -618,22 +663,29 @@ const HUD = (() => {
 
   function announceWave(number, enemyCount, totalWaves) {
     const progress = totalWaves ? ' OF ' + totalWaves : '';
-    el.waveAnn.innerHTML = '<h2>WAVE ' + escapeHTML(number) + progress + '</h2><p>' + escapeHTML(enemyCount) + ' OCCUPANTS STORMING</p>';
+    var stageName = '';
+    if (typeof GameManager !== 'undefined' && GameManager.getCurrentStage) {
+      var st = GameManager.getCurrentStage();
+      if (st && st.name) stageName = '<p style="font-size:12px;color:#aaa;margin-top:2px">' + escapeHTML(st.name) + '</p>';
+    }
+    el.waveAnn.innerHTML = '<h2>WAVE ' + escapeHTML(number) + progress + '</h2><p>' + escapeHTML(enemyCount) + ' OCCUPANTS STORMING</p>' + stageName;
     el.waveAnn.classList.remove('visible');
     void el.waveAnn.offsetWidth;
     el.waveAnn.classList.add('visible');
     setTimeout(() => el.waveAnn.classList.remove('visible'), 2200);
   }
 
-  function announceStage(stageNum, stageName, description) {
+  function announceStage(stageNum, stageName, description, objective) {
+    var objHtml = objective ? '<p style="font-size:12px;color:#ffd700;margin-top:8px;border-top:1px solid rgba(255,215,0,0.3);padding-top:6px">🎯 OBJECTIVE: ' + escapeHTML(objective) + '</p>' : '';
     el.waveAnn.innerHTML =
-      '<h2 style="color:#44ff88">STAGE ' + escapeHTML(stageNum) + '</h2>' +
-      '<p style="font-size:22px;color:#fff;margin-bottom:6px">' + escapeHTML(stageName) + '</p>' +
-      '<p style="font-size:13px;color:#aaa">' + escapeHTML(description || '') + '</p>';
+      '<h2 style="color:#44ff88;font-size:28px;margin-bottom:4px;text-shadow:0 0 12px rgba(68,255,136,0.4)">STAGE ' + escapeHTML(stageNum) + '</h2>' +
+      '<p style="font-size:24px;color:#fff;margin-bottom:6px;font-weight:bold;text-shadow:0 0 8px rgba(255,255,255,0.3)">' + escapeHTML(stageName) + '</p>' +
+      '<p style="font-size:13px;color:#aaa;max-width:320px;margin:0 auto;line-height:1.4">' + escapeHTML(description || '') + '</p>' +
+      objHtml;
     el.waveAnn.classList.remove('visible');
     void el.waveAnn.offsetWidth;
     el.waveAnn.classList.add('visible');
-    setTimeout(() => el.waveAnn.classList.remove('visible'), 3000);
+    setTimeout(() => el.waveAnn.classList.remove('visible'), 5000);
   }
 
   // ── Kill Feed ──────────────────────────────────────────────
@@ -1821,6 +1873,8 @@ const HUD = (() => {
     showWeaponUnlockCard,
     // ── NPC Morale HUD Overlay ──
     updateNpcMoraleIndicators,
+    // ── NPC Dialogue ──
+    showNPCText, _updateNPCTextPositions,
     // ── Targeting Assistant ──
     updateTargetAssist,
   };
