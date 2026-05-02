@@ -862,8 +862,9 @@
       <button class="btn" id="stealth-toggle-btn" style="border-color:#0f6;color:#0f6;margin-top:8px">👻 [S] TOGGLE STEALTH</button>
       <button class="btn" id="pause-god-mode-btn" style="font-size:12px;padding:4px 12px;border-color:#ff0;color:#ff0;display:inline-block;margin:4px 0;text-shadow:0 0 8px #ff0">⚡ [G] GOD MODE</button>
       <p style="color:#888;font-size:12px">Desktop: <kbd>R</kbd> resume · <kbd>Q</kbd> quit · <kbd>1-6</kbd> tabs · <kbd>ESC</kbd>/<kbd>TAB</kbd> close</p>
-      <button class="btn" id="resume-btn" style="border-color:#fff;color:#fff">▶ [R]ESUME</button>
-      <button class="btn" id="quit-btn" style="margin-top:12px;border-color:#888;color:#888">✕ [Q]UIT TO MENU</button>
+      <!-- Large unpause button for mobile/tablet -->
+      <button class="btn" id="resume-btn" style="border-color:#fff;color:#fff;font-size:18px;padding:14px 32px;margin:12px 0;width:100%;max-width:400px">▶ RESUME GAME</button>
+      <button class="btn" id="quit-btn" style="margin-top:8px;border-color:#888;color:#888">✕ [Q]UIT TO MENU</button>
     </div>
   </div>
 
@@ -886,7 +887,14 @@
       <button id="btn-inventory-mobile" class="mobile-btn utility-btn" title="Inventory">🎒</button>
     </div>
 
-    <!-- Action buttons (right side) -->
+    <!-- Right aim joystick -->
+    <div id="aim-joystick-zone" class="mobile-ctrl">
+      <div id="aim-joystick-base"></div>
+      <div id="aim-joystick-thumb"></div>
+      <div class="aim-joystick-label">AIM</div>
+    </div>
+
+    <!-- Action buttons (right side, above aim joystick) -->
     <div id="mobile-actions" class="mobile-ctrl">
       <button id="btn-fire" class="mobile-btn fire-btn">🔫</button>
       <button id="btn-reload" class="mobile-btn">🔄</button>
@@ -902,9 +910,9 @@
     <!-- Inventory/Pause button -->
     <button id="btn-pause" class="mobile-btn pause-btn">⏸</button>
 
-    <!-- Look zone MUST be last in DOM so it paints on top of action buttons -->
+    <!-- Look zone for tap-to-shoot (covers right half of screen) -->
     <div id="mobile-look-zone" class="mobile-ctrl">
-      <div class="mobile-look-label">LOOK</div>
+      <div class="mobile-look-label">LOOK / TAP TO SHOOT</div>
       <div class="mobile-look-reticle"></div>
     </div>
   </div>

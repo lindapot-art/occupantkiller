@@ -822,15 +822,21 @@ const GameManager = (function () {
   const touch = {
     moveX: 0, moveY: 0,
     lookX: 0, lookY: 0,
+    aimX: 0, aimY: 0,
     firing: false,
     jumping: false,
     reloading: false,
     sprinting: false,
     moveActive: false,
     lookActive: false,
+    aimActive: false,
     moveTouchId: null,
     lookTouchId: null,
+    aimTouchId: null,
     moveStartX: 0, moveStartY: 0,
+    aimStartX: 0, aimStartY: 0,
+    // Tap-to-shoot tracking
+    tapStartX: 0, tapStartY: 0, tapStartTime: 0,
     // ── Gyro aim (mobile DeviceOrientation) ──
     gyroEnabled: false,
     gyroReady: false,
@@ -839,6 +845,7 @@ const GameManager = (function () {
     gyroDX: 0,
     gyroDY: 0,
     gyroSensitivity: 4.0,
+    gyroAutoAssist: true,
   };
 
   let _rendererProfile = 'desktop';
@@ -2080,6 +2087,9 @@ const GameManager = (function () {
           touch.lookActive = true;
           touch._lookPrevX = t.clientX;
           touch._lookPrevY = t.clientY;
+          touch.tapStartX = t.clientX;
+          touch.tapStartY = t.clientY;
+          touch.tapStartTime = performance.now();
           try { lookZone.classList.add('look-active'); } catch (_e) {}
         }
       }, { passive: false });
@@ -2114,7 +2124,17 @@ const GameManager = (function () {
       }, { passive: false });
       function _releaseLookTouch(e) {
         for (let i = 0; i < e.changedTouches.length; i++) {
-          if (e.changedTouches[i].identifier === touch.lookTouchId) {
+          const t = e.changedTouches[i];
+          if (t.identifier === touch.lookTouchId) {
+            // Tap-to-shoot: if touch was brief (< 250ms) and barely moved (< 12px)
+            var tapDur = performance.now() - touch.tapStartTime;
+            var tapDx = t.clientX - touch.tapStartX;
+            var tapDy = t.clientY - touch.tapStartY;
+            if (tapDur < 250 && Math.abs(tapDx) < 12 && Math.abs(tapDy) < 12) {
+              touch.firing = true;
+              mouseNewPress = true;
+              setTimeout(function() { touch.firing = false; mouseNewPress = false; }, 120);
+            }
             touch.lookTouchId = null;
             touch.lookActive = false;
             touch.lookX = 0;
@@ -3304,6 +3324,86 @@ const GameManager = (function () {
       HUD.notifyPickup('🚀 GRAB AN NLAW OR JAVELIN — STOP THE CONVOY!', '#ffcc44');
     }
 
+    // ═══ Building Garrison — enemies occupy buildings each wave ═══
+    if (w >= 2 && typeof VoxelWorld !== 'undefined' && VoxelWorld.getBuildings) {
+      var buildings = VoxelWorld.getBuildings();
+      for (var bi = 0; bi < buildings.length; bi++) {
+        var bld = buildings[bi];
+        if (!bld || bld.kind !== 'apartment') continue;
+        // Scale garrison size with wave
+        var garrisonSize = Math.min(bld.floors, 1 + Math.floor(w / 3));
+        var garrisonTypes = ['CONSCRIPT','STORMER','SNIPER'];
+        if (w >= 5) garrisonTypes.push('ARMORED','FLAMETHROWER');
+        if (w >= 8) garrisonTypes.push('SPETSNAZ','KADYROVITE');
+        for (var gf = 0; gf < garrisonSize; gf++) {
+          var floorY = bld.baseY + gf * bld.floorH + 1;
+          // 2 enemies per floor, placed in rooms
+          for (var gr = 0; gr < 2; gr++) {
+            var gpx = bld.x + 3 + Math.floor(Math.random() * (bld.w - 6));
+            var gpz = bld.cz + (gr === 0 ? -2 : 2);
+            var gtype = garrisonTypes[Math.floor(Math.random() * garrisonTypes.length)];
+            Enemies.spawnSingle(gtype, new THREE.Vector3(gpx + 0.5, floorY, gpz + 0.5), {
+              guardPost: { x: gpx + 0.5, y: floorY, z: gpz + 0.5 },
+              guardRadius: 3,
+              garrisonRole: 'building_defender'
+            });
+          }
+        }
+      }
+    }
+
+    // ═══ Russian Federation Flag markers at enemy positions ═══
+    (function _placeRFFlags() {
+      if (!_scene) return;
+      var _rfColors = [0xffffff, 0x0033aa, 0xff0000]; // white, blue, red
+      var _flagPositions = [];
+      // Place flags near enemy spawn points (assault group centers)
+      var _egroups = Enemies.getAssaultGroups ? Enemies.getAssaultGroups() : [];
+      for (var fgi = 0; fgi < _egroups.length; fgi++) {
+        var _eg = _egroups[fgi];
+        if (_eg && _eg.center) _flagPositions.push(_eg.center);
+      }
+      // Also place flags near buildings
+      if (typeof VoxelWorld !== 'undefined' && VoxelWorld.getBuildings) {
+        var _fblds = VoxelWorld.getBuildings();
+        for (var fbi = 0; fbi < _fblds.length; fbi++) {
+          var _fb = _fblds[fbi];
+          if (_fb) _flagPositions.push(new THREE.Vector3(_fb.cx, _fb.baseY + _fb.floors * _fb.floorH, _fb.cz));
+        }
+      }
+      for (var fpi = 0; fpi < _flagPositions.length; fpi++) {
+        var fp = _flagPositions[fpi];
+        if (!fp) continue;
+        // Simple flag pole + cloth
+        var poleH = 4 + Math.random() * 2;
+        var pole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.04, 0.04, poleH, 6),
+          new THREE.MeshLambertMaterial({ color: 0x888888 })
+        );
+        pole.position.set(fp.x, poleH * 0.5, fp.z);
+        _scene.add(pole);
+        var clothW = 0.9, clothH = 0.5;
+        var clothGeo = new THREE.PlaneGeometry(clothW, clothH, 4, 2);
+        var clothMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+        var cloth = new THREE.Mesh(clothGeo, clothMat);
+        cloth.position.set(fp.x + clothW * 0.5, poleH - clothH * 0.5, fp.z);
+        _scene.add(cloth);
+        // Stripe overlays (simplified tricolor)
+        var stripeB = new THREE.Mesh(
+          new THREE.PlaneGeometry(clothW, clothH * 0.33, 2, 1),
+          new THREE.MeshBasicMaterial({ color: 0x0033aa, side: THREE.DoubleSide })
+        );
+        stripeB.position.set(fp.x + clothW * 0.5, poleH - clothH * 0.83, fp.z + 0.01);
+        _scene.add(stripeB);
+        var stripeR = new THREE.Mesh(
+          new THREE.PlaneGeometry(clothW, clothH * 0.33, 2, 1),
+          new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide })
+        );
+        stripeR.position.set(fp.x + clothW * 0.5, poleH - clothH * 0.17, fp.z + 0.01);
+        _scene.add(stripeR);
+      }
+    })();
+
     // Spawn enemy drones (from nests if alive, reduced if nests destroyed)
     if (w >= 2 && typeof DroneSystem !== 'undefined' && DroneSystem.spawnEnemyDrone) {
       var aliveNests = DroneSystem.getAliveNestCount();
@@ -3746,17 +3846,52 @@ const GameManager = (function () {
     if (DroneSystem.isPossessing() || VehicleSystem.isInVehicle()) return;
     if (CameraSystem.getMode() === CameraSystem.MODE.STRATEGIC) return;
 
-    // Apply touch look rotation
+    // Apply touch look rotation (drag on look zone)
     if (isMobile && (touch.lookX !== 0 || touch.lookY !== 0)) {
       CameraSystem.handleMouseMove(touch.lookX * 4.0, touch.lookY * 4.0);
       touch.lookX = 0;
       touch.lookY = 0;
     }
-    // Apply gyro look rotation (additive to touch)
+    // Apply aim joystick rotation (right-side digital joystick)
+    if (isMobile && touch.aimActive && (touch.aimX !== 0 || touch.aimY !== 0)) {
+      CameraSystem.handleMouseMove(touch.aimX * 5.0, touch.aimY * 5.0);
+      // Don't zero aimX/aimY — joystick holds its position like an analog stick
+    }
+    // Apply gyro look rotation (additive to touch / aim joystick)
     if (isMobile && touch.gyroEnabled && (touch.gyroDX !== 0 || touch.gyroDY !== 0)) {
       CameraSystem.handleMouseMove(touch.gyroDX, touch.gyroDY);
       touch.gyroDX = 0;
       touch.gyroDY = 0;
+    }
+    // Gyro auto-assist: when gyro is on, gently pull crosshair toward nearest enemy
+    if (isMobile && touch.gyroEnabled && touch.gyroAutoAssist && typeof Enemies !== 'undefined' && Enemies.getAll) {
+      var _gaList = Enemies.getAll();
+      if (_gaList && _gaList.length > 0) {
+        var _gy = CameraSystem.getYaw(), _gp = CameraSystem.getPitch();
+        var _gpx = _camera.position.x, _gpy = _camera.position.y, _gpz = _camera.position.z;
+        var _bestG = null, _bestGAng = 0.35, _gdx = 0, _gdy = 0, _gd = 0;
+        for (var gi = 0; gi < _gaList.length; gi++) {
+          var ge = _gaList[gi];
+          if (!ge || !ge.alive || !ge.mesh) continue;
+          var gx = ge.mesh.position.x - _gpx;
+          var gy = (ge.mesh.position.y + 1.0) - _gpy;
+          var gz = ge.mesh.position.z - _gpz;
+          var gdist2 = gx * gx + gz * gz;
+          if (gdist2 < 4 || gdist2 > 6400) continue;
+          var gdist = Math.sqrt(gdist2);
+          var gey = Math.atan2(-gx, -gz);
+          var gdy = gey - _gy; while (gdy > Math.PI) gdy -= 2 * Math.PI; while (gdy < -Math.PI) gdy += 2 * Math.PI;
+          var gep = Math.atan2(gy, gdist);
+          var gdp = gep - _gp;
+          var gang = Math.sqrt(gdy * gdy + gdp * gdp);
+          if (gang < _bestGAng) { _bestGAng = gang; _bestG = ge; _gdx = gdy; _gdy = gdp; _gd = gdist; }
+        }
+        if (_bestG) {
+          var gpull = 0.04 * Math.max(0.25, 1.0 - _gd / 80);
+          CameraSystem.setYaw(_gy + _gdx * gpull);
+          CameraSystem.setPitch(_gp + _gdy * gpull);
+        }
+      }
     }
 
     // ── Mobile aim assist: gentle magnetism toward nearest enemy in cone ──
@@ -4085,6 +4220,15 @@ const GameManager = (function () {
           targets.push(droneMeshes[dmi]);
         }
       }
+      // Add friendly NPC meshes for friendly-fire
+      var _npcMeshes = [];
+      if (typeof NPCSystem !== 'undefined' && NPCSystem.getAll) {
+        var _npcList = NPCSystem.getAll();
+        for (var ni = 0; ni < _npcList.length; ni++) {
+          var _n = _npcList[ni];
+          if (_n && _n.alive && _n.mesh) { targets.push(_n.mesh); _npcMeshes.push(_n); }
+        }
+      }
       const weaponType = Weapons.getCurrentType();
       const weaponId = Weapons.getCurrentId();
       // Map weapon type to audio sound type
@@ -4108,6 +4252,37 @@ const GameManager = (function () {
             if (typeof HUD !== 'undefined' && HUD.addCombatLog) {
               HUD.addCombatLog('Enemy drone shot down (+50)', '#44ddff');
             }
+          }
+          return;
+        }
+        // ── Friendly Fire: check if bullet hit a Ukrainian NPC ──
+        var hitNPC = null;
+        var _nWalk = hit.object;
+        var _nGuard = 0;
+        while (_nWalk && _nGuard < 8 && !hitNPC) {
+          for (var _nii = 0; _nii < _npcMeshes.length; _nii++) {
+            if (_npcMeshes[_nii].mesh === _nWalk) { hitNPC = _npcMeshes[_nii]; break; }
+          }
+          _nWalk = _nWalk.parent;
+          _nGuard++;
+        }
+        if (hitNPC) {
+          var ffDmg = Weapons.getDamage();
+          if (typeof NPCSystem !== 'undefined' && NPCSystem.damage) {
+            NPCSystem.damage(hitNPC.id, ffDmg);
+          }
+          // Penalty
+          var penalty = Math.min(50, Math.max(10, Math.floor(ffDmg * 0.5)));
+          player.score = Math.max(0, player.score - penalty);
+          if (typeof Economy !== 'undefined' && Economy.spendCurrency) {
+            Economy.spendCurrency(penalty);
+          }
+          if (typeof HUD !== 'undefined' && HUD.notifyPickup) {
+            HUD.notifyPickup('⚠ FRIENDLY FIRE! -' + penalty + ' OKC', '#ff2222');
+          }
+          // Red flash
+          if (typeof HUD !== 'undefined' && HUD.showDamageFlash) {
+            HUD.showDamageFlash(0.4);
           }
           return;
         }
@@ -6295,6 +6470,64 @@ const GameManager = (function () {
         if (e.changedTouches[i].identifier === touch.moveTouchId) resetJoystick();
       }
     }, { passive: true });
+
+    // ── Aim Joystick (right side, mirrors move joystick) ──
+    const aimZone  = document.getElementById('aim-joystick-zone');
+    const aimThumb = document.getElementById('aim-joystick-thumb');
+    if (aimZone && aimThumb) {
+      const aimBaseSize = aimZone.offsetWidth || 160;
+      const aimThumbSize = aimThumb.offsetWidth || 68;
+      const aimMaxDist = (aimBaseSize - aimThumbSize) / 2;
+
+      aimZone.addEventListener('touchstart', function (e) {
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        touch.aimTouchId = t.identifier;
+        touch.aimActive = true;
+        const rect = aimZone.getBoundingClientRect();
+        touch.aimStartX = rect.left + aimBaseSize / 2;
+        touch.aimStartY = rect.top + aimBaseSize / 2;
+      }, { passive: false });
+
+      aimZone.addEventListener('touchmove', function (e) {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const t = e.changedTouches[i];
+          if (t.identifier === touch.aimTouchId) {
+            let dx = t.clientX - touch.aimStartX;
+            let dy = t.clientY - touch.aimStartY;
+            let dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > aimMaxDist) {
+              dx = dx / dist * aimMaxDist;
+              dy = dy / dist * aimMaxDist;
+            }
+            touch.aimX = dx / aimMaxDist;
+            touch.aimY = dy / aimMaxDist;
+            aimThumb.style.left = (aimBaseSize / 2 - aimThumbSize / 2 + dx) + 'px';
+            aimThumb.style.top  = (aimBaseSize / 2 - aimThumbSize / 2 + dy) + 'px';
+          }
+        }
+      }, { passive: false });
+
+      function resetAimJoystick() {
+        touch.aimTouchId = null;
+        touch.aimActive = false;
+        touch.aimX = 0;
+        touch.aimY = 0;
+        aimThumb.style.left = (aimBaseSize / 2 - aimThumbSize / 2) + 'px';
+        aimThumb.style.top  = (aimBaseSize / 2 - aimThumbSize / 2) + 'px';
+      }
+      aimZone.addEventListener('touchend', function (e) {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === touch.aimTouchId) resetAimJoystick();
+        }
+      }, { passive: true });
+      aimZone.addEventListener('touchcancel', function (e) {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === touch.aimTouchId) resetAimJoystick();
+        }
+      }, { passive: true });
+    }
 
     // Fire button
     const btnFire = document.getElementById('btn-fire');

@@ -429,6 +429,8 @@ function buildCivilianMesh(npc) {
       members: [],       // npc ids
       morale: 85 + Math.random() * 15,
       hasMedic: false,
+      formation: FORMATION.WEDGE,
+      _formYaw: defAngle,
     };
   }
 
@@ -1113,16 +1115,12 @@ function buildCivilianMesh(npc) {
       leader.job = JOB.ASSAULT;
       leader.groupId = g;
       leader.groupRole = 'leader';
+      leader._formOff = _formOffsets[0];
       group.members.push(leader.id);
 
-      // Formation offsets (wedge formation) so squad doesn't bunch up
-      var _formOffsets = [
-        { x: 0, z: 0 },        // leader center
-        { x: -1.5, z: 1.2 },   // medic left-rear
-        { x: 1.5, z: 1.2 },    // rifleman right-rear
-        { x: -2.5, z: 2.5 },   // rifleman left-far
-        { x: 2.5, z: 2.5 },    // rifleman right-far
-      ];
+      // Use professional Ukrainian army formation with proper spacing
+      var tpl = FORMATION_TEMPLATES[FORMATION.WEDGE];
+      var _formOffsets = tpl.slice();
 
       // Medic (infantry rank, medic job)
       const mx = lx + (Math.random() - 0.5) * 3;
@@ -1136,8 +1134,8 @@ function buildCivilianMesh(npc) {
       group.members.push(medic.id);
       group.hasMedic = true;
 
-      // 2-3 infantry
-      const infantryCount = 2 + Math.floor(Math.random() * 2);
+      // 3-4 infantry (Ukrainian squad = 8-10 soldiers; we use 5-6 for performance)
+      const infantryCount = 3 + Math.floor(Math.random() * 2);
       for (let i = 0; i < infantryCount; i++) {
         const ix = lx + (Math.random() - 0.5) * 4;
         const iz = lz + (Math.random() - 0.5) * 4;
@@ -1147,7 +1145,7 @@ function buildCivilianMesh(npc) {
         inf.job = JOB.ASSAULT;
         inf.groupId = g;
         inf.groupRole = 'rifleman';
-        inf._formOff = _formOffsets[2 + i] || { x: (Math.random()-0.5)*3, z: (Math.random()-0.5)*3 };
+        inf._formOff = _formOffsets[2 + i] || { x: (Math.random()-0.5)*6, z: (Math.random()-0.5)*6 };
         group.members.push(inf.id);
       }
 
@@ -1285,16 +1283,135 @@ function buildCivilianMesh(npc) {
     }
   }
 
-  /* ── Friendly Assault Group AI ──────────────────────────────────── */
+  /* ── Ukrainian Army Squad Formations ────────────────────────────── */
+  // Based on NATO-standard infantry squad tactics used by Ukrainian forces
+  const FORMATION = Object.freeze({
+    WEDGE:   'wedge',   // arrow — advancing through open terrain
+    LINE:    'line',    // skirmish line — maximum firepower to front
+    ECHELON_L:'echelon_l', // echelon left — cover right flank
+    ECHELON_R:'echelon_r', // echelon right — cover left flank
+    DIAMOND: 'diamond', // all-around defense — leader center
+    COLUMN:  'column',  // single file — movement through narrow terrain
+  });
 
-  function _getFormedTarget(npc, basePos, out) {
+  // Formation templates: offsets relative to leader (x = lateral, z = depth/back)
+  // Units: meters. Ukrainian squads maintain 4-6m spacing in combat.
+  const FORMATION_TEMPLATES = {
+    [FORMATION.WEDGE]: [
+      { x: 0,   z: 0 },    // 0 leader — point
+      { x: -4,  z: -4 },   // 1 left-rear guard
+      { x: 4,   z: -4 },   // 2 right-rear guard
+      { x: -6,  z: -8 },   // 3 left-far
+      { x: 6,   z: -8 },   // 4 right-far
+      { x: 0,   z: -10 },  // 5 tail (medic / rear security)
+    ],
+    [FORMATION.LINE]: [
+      { x: 0,   z: 0 },    // 0 center
+      { x: -5,  z: 0 },    // 1 left
+      { x: 5,   z: 0 },    // 2 right
+      { x: -10, z: 0 },    // 3 far-left
+      { x: 10,  z: 0 },    // 4 far-right
+      { x: 0,   z: -4 },   // 5 rear support (medic)
+    ],
+    [FORMATION.ECHELON_L]: [
+      { x: 0,   z: 0 },    // 0 lead
+      { x: -4,  z: -4 },   // 1
+      { x: -8,  z: -8 },   // 2
+      { x: -12, z: -12 },  // 3
+      { x: -16, z: -16 },  // 4
+      { x: 4,   z: -4 },   // 5 cover (medic)
+    ],
+    [FORMATION.ECHELON_R]: [
+      { x: 0,   z: 0 },    // 0 lead
+      { x: 4,   z: -4 },   // 1
+      { x: 8,   z: -8 },   // 2
+      { x: 12,  z: -12 },  // 3
+      { x: 16,  z: -16 },  // 4
+      { x: -4,  z: -4 },   // 5 cover (medic)
+    ],
+    [FORMATION.DIAMOND]: [
+      { x: 0,   z: 0 },    // 0 center (leader)
+      { x: -4,  z: 0 },    // 1 left
+      { x: 4,   z: 0 },    // 2 right
+      { x: 0,   z: -5 },   // 3 front
+      { x: 0,   z: 5 },    // 4 rear (medic)
+      { x: -3,  z: -3 },   // 5 front-left
+    ],
+    [FORMATION.COLUMN]: [
+      { x: 0,   z: 0 },    // 0 lead
+      { x: 0,   z: -4 },   // 1
+      { x: 0,   z: -8 },   // 2
+      { x: 0,   z: -12 },  // 3
+      { x: 0,   z: -16 },  // 4
+      { x: 0,   z: -20 },  // 5 tail
+    ],
+  };
+
+  function _getFormationForState(state, inCombat) {
+    switch (state) {
+      case FGROUP_STATE.ADVANCING:  return FORMATION.WEDGE;
+      case FGROUP_STATE.ENGAGING:   return inCombat ? FORMATION.LINE : FORMATION.WEDGE;
+      case FGROUP_STATE.DEFENDING:  return FORMATION.DIAMOND;
+      case FGROUP_STATE.RETREATING: return FORMATION.COLUMN;
+      case FGROUP_STATE.REGROUPING: return FORMATION.DIAMOND;
+      default: return FORMATION.WEDGE;
+    }
+  }
+
+  function _rotateOffset(off, yaw) {
+    var c = Math.cos(yaw), s = Math.sin(yaw);
+    return { x: off.x * c - off.z * s, z: off.x * s + off.z * c };
+  }
+
+  function _getFormedTarget(npc, basePos, out, yaw) {
     if (!out) out = new THREE.Vector3();
     out.copy(basePos);
     if (npc && npc._formOff) {
-      out.x += npc._formOff.x;
-      out.z += npc._formOff.z;
+      var rot = yaw ? _rotateOffset(npc._formOff, yaw) : npc._formOff;
+      out.x += rot.x;
+      out.z += rot.z;
     }
     return out;
+  }
+
+  function _reassignFormation(grp, newFormation) {
+    if (grp.formation === newFormation) return;
+    grp.formation = newFormation;
+    var tpl = FORMATION_TEMPLATES[newFormation];
+    if (!tpl) return;
+    for (var mi = 0; mi < grp.members.length; mi++) {
+      var npc = _npcById[grp.members[mi]];
+      if (npc && npc.alive) {
+        npc._formOff = tpl[mi % tpl.length] ? { x: tpl[mi % tpl.length].x, z: tpl[mi % tpl.length].z } : { x: 0, z: 0 };
+      }
+    }
+  }
+
+  function _groupTargetYaw(grp) {
+    // Face toward guardPoint from rallyPoint, or toward nearest enemy if engaging
+    var tx = grp.guardPoint.x, tz = grp.guardPoint.z;
+    if (grp.state === FGROUP_STATE.ENGAGING || grp.state === FGROUP_STATE.RETREATING) {
+      // Find nearest enemy to group center
+      var cx = 0, cz = 0, cnt = 0;
+      for (var mi = 0; mi < grp.members.length; mi++) {
+        var npc = _npcById[grp.members[mi]];
+        if (npc && npc.alive) { cx += npc.position.x; cz += npc.position.z; cnt++; }
+      }
+      if (cnt > 0) { cx /= cnt; cz /= cnt; }
+      var nearest = null, nearD = Infinity;
+      if (typeof Enemies !== 'undefined' && Enemies.getAll) {
+        var elist = Enemies.getAll();
+        for (var ei = 0; ei < elist.length; ei++) {
+          var e = elist[ei];
+          if (!e || !e.alive || !e.mesh) continue;
+          var d = (e.mesh.position.x - cx) * (e.mesh.position.x - cx) + (e.mesh.position.z - cz) * (e.mesh.position.z - cz);
+          if (d < nearD) { nearD = d; nearest = e; }
+        }
+      }
+      if (nearest) { tx = nearest.mesh.position.x; tz = nearest.mesh.position.z; }
+    }
+    var dx = tx - grp.rallyPoint.x, dz = tz - grp.rallyPoint.z;
+    return Math.atan2(dx, dz);
   }
 
   function updateFriendlyGroups(delta) {
@@ -1315,16 +1432,25 @@ function buildCivilianMesh(npc) {
       // Check if any member is in combat
       const inCombat = aliveMembers.some(n => n.combatTarget);
 
+      // Dynamic formation based on tactical state
+      var desiredForm = _getFormationForState(grp.state, inCombat);
+      if (grp.formation !== desiredForm) {
+        _reassignFormation(grp, desiredForm);
+      }
+      // Update facing direction
+      grp._formYaw = _groupTargetYaw(grp);
+
       switch (grp.state) {
         case FGROUP_STATE.STAGING:
           if (grp.stateTimer <= 0) {
             grp.state = FGROUP_STATE.ADVANCING;
             grp.stateTimer = 5 + Math.random() * 8;
-            // Set guard point as target for all members
+            _reassignFormation(grp, FORMATION.WEDGE);
+            grp._formYaw = _groupTargetYaw(grp);
             for (const npc of aliveMembers) {
               if (npc.job === JOB.ASSAULT || npc.job === JOB.IDLE) {
                 npc.job = JOB.ASSAULT;
-                _getFormedTarget(npc, grp.guardPoint, npc.target || (npc.target = new THREE.Vector3()));
+                _getFormedTarget(npc, grp.guardPoint, npc.target || (npc.target = new THREE.Vector3()), grp._formYaw);
               }
             }
           }
@@ -1334,14 +1460,16 @@ function buildCivilianMesh(npc) {
           if (inCombat) {
             grp.state = FGROUP_STATE.ENGAGING;
             grp.stateTimer = 15 + Math.random() * 15;
+            _reassignFormation(grp, FORMATION.LINE);
+            grp._formYaw = _groupTargetYaw(grp);
           } else if (grp.stateTimer <= 0) {
             grp.state = FGROUP_STATE.DEFENDING;
             grp.stateTimer = 15 + Math.random() * 15;
+            _reassignFormation(grp, FORMATION.DIAMOND);
             for (const npc of aliveMembers) {
               if (npc.job === JOB.ASSAULT) {
                 npc.job = JOB.GUARD;
-                if (npc.guardPos) npc.guardPos.copy(grp.guardPoint);
-                else npc.guardPos = grp.guardPoint.clone();
+                _getFormedTarget(npc, grp.guardPoint, npc.guardPos || (npc.guardPos = new THREE.Vector3()), grp._formYaw);
               }
             }
           }
@@ -1351,25 +1479,28 @@ function buildCivilianMesh(npc) {
           if (grp.morale < 35) {
             grp.state = FGROUP_STATE.RETREATING;
             grp.stateTimer = 8 + Math.random() * 10;
+            _reassignFormation(grp, FORMATION.COLUMN);
             for (const npc of aliveMembers) showNPCDialogue(npc, 'retreat', 2);
           } else if (grp.stateTimer <= 0 && !inCombat) {
             grp.state = FGROUP_STATE.DEFENDING;
             grp.stateTimer = 20 + Math.random() * 20;
+            _reassignFormation(grp, FORMATION.DIAMOND);
           }
           break;
 
         case FGROUP_STATE.DEFENDING:
           if (grp.stateTimer <= 0) {
-            // Re-advance to new position
             const angle = Math.random() * Math.PI * 2;
             const dist = 6 + Math.random() * 10;
             grp.guardPoint.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
             grp.state = FGROUP_STATE.ADVANCING;
             grp.stateTimer = 12 + Math.random() * 15;
+            _reassignFormation(grp, FORMATION.WEDGE);
+            grp._formYaw = _groupTargetYaw(grp);
             for (const npc of aliveMembers) {
               if (npc.job === JOB.GUARD) {
                 npc.job = JOB.ASSAULT;
-                _getFormedTarget(npc, grp.guardPoint, npc.target || (npc.target = new THREE.Vector3()));
+                _getFormedTarget(npc, grp.guardPoint, npc.target || (npc.target = new THREE.Vector3()), grp._formYaw);
               }
             }
           }
@@ -1377,12 +1508,13 @@ function buildCivilianMesh(npc) {
 
         case FGROUP_STATE.RETREATING:
           for (const npc of aliveMembers) {
-            _getFormedTarget(npc, grp.rallyPoint, npc.target || (npc.target = new THREE.Vector3()));
+            _getFormedTarget(npc, grp.rallyPoint, npc.target || (npc.target = new THREE.Vector3()), grp._formYaw);
           }
           if (grp.stateTimer <= 0) {
             grp.state = FGROUP_STATE.REGROUPING;
             grp.stateTimer = 10 + Math.random() * 10;
             grp.morale = Math.min(100, grp.morale + 20);
+            _reassignFormation(grp, FORMATION.DIAMOND);
             for (const npc of aliveMembers) showNPCDialogue(npc, 'rally', 2);
           }
           break;
@@ -2077,51 +2209,53 @@ function buildCivilianMesh(npc) {
       case 'attack':
         grp.state = FGROUP_STATE.ADVANCING;
         grp.stateTimer = 20;
+        _reassignFormation(grp, FORMATION.WEDGE);
+        grp._formYaw = _groupTargetYaw(grp);
         for (const npc of aliveMembers) {
           npc.job = JOB.ASSAULT;
-          _getFormedTarget(npc, grp.guardPoint, npc.target || (npc.target = new THREE.Vector3()));
+          _getFormedTarget(npc, grp.guardPoint, npc.target || (npc.target = new THREE.Vector3()), grp._formYaw);
         }
         break;
       case 'defend':
         grp.state = FGROUP_STATE.DEFENDING;
         grp.stateTimer = 30;
+        _reassignFormation(grp, FORMATION.DIAMOND);
         for (const npc of aliveMembers) {
           npc.job = JOB.GUARD;
-          _getFormedTarget(npc, grp.guardPoint, npc.guardPos || (npc.guardPos = new THREE.Vector3()));
+          _getFormedTarget(npc, grp.guardPoint, npc.guardPos || (npc.guardPos = new THREE.Vector3()), grp._formYaw);
         }
         break;
       case 'regroup':
         grp.state = FGROUP_STATE.REGROUPING;
         grp.stateTimer = 10;
+        _reassignFormation(grp, FORMATION.DIAMOND);
         for (const npc of aliveMembers) {
-          _getFormedTarget(npc, grp.rallyPoint, npc.target || (npc.target = new THREE.Vector3()));
+          _getFormedTarget(npc, grp.rallyPoint, npc.target || (npc.target = new THREE.Vector3()), grp._formYaw);
         }
         break;
       case 'flank_left': {
         grp.state = FGROUP_STATE.ADVANCING;
         grp.stateTimer = 15;
+        _reassignFormation(grp, FORMATION.ECHELON_L);
+        grp._formYaw = _groupTargetYaw(grp);
         const flankL = grp.guardPoint.clone();
         flankL.x -= 12;
         for (const npc of aliveMembers) {
           npc.job = JOB.ASSAULT;
-          const ft = flankL.clone();
-          if (npc._formOff) { ft.x += npc._formOff.x; ft.z += npc._formOff.z; }
-          else { ft.x += (Math.random() - 0.5) * 3; ft.z += (Math.random() - 0.5) * 3; }
-          if (npc.target) npc.target.copy(ft); else npc.target = ft;
+          _getFormedTarget(npc, flankL, npc.target || (npc.target = new THREE.Vector3()), grp._formYaw);
         }
         break;
       }
       case 'flank_right': {
         grp.state = FGROUP_STATE.ADVANCING;
         grp.stateTimer = 15;
+        _reassignFormation(grp, FORMATION.ECHELON_R);
+        grp._formYaw = _groupTargetYaw(grp);
         const flankR = grp.guardPoint.clone();
         flankR.x += 12;
         for (const npc of aliveMembers) {
           npc.job = JOB.ASSAULT;
-          const ft = flankR.clone();
-          if (npc._formOff) { ft.x += npc._formOff.x; ft.z += npc._formOff.z; }
-          else { ft.x += (Math.random() - 0.5) * 3; ft.z += (Math.random() - 0.5) * 3; }
-          if (npc.target) npc.target.copy(ft); else npc.target = ft;
+          _getFormedTarget(npc, flankR, npc.target || (npc.target = new THREE.Vector3()), grp._formYaw);
         }
         break;
       }

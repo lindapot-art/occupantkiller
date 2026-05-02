@@ -710,8 +710,10 @@ const Enemies = (() => {
         objectiveAngle = Math.atan2(objZ - spawnCenter.z, objX - spawnCenter.x);
       }
     }
-    // Pick formation type based on group id
+    // Pick formation type based on group id — larger spread for professional look
     var formations = ['wedge', 'line', 'column', 'staggered'];
+    // Face toward center (player area) for defensive posture
+    var faceAngle = Math.atan2(-spawnCenter.z, -spawnCenter.x);
     return {
       id: id,
       state: GROUP_STATE.FORMING,
@@ -724,16 +726,16 @@ const Enemies = (() => {
       hasOfficer: false,
       hasMedic: false,
       huntsNPCs: huntsNPCs, // if true, this squad prioritises NPCs over player
-      formationSpread: 2 + Math.random() * 2,
+      formationSpread: 4 + Math.random() * 3, // 4-7m spacing (was 2-4m)
       formation: formations[id % formations.length],
-      formationHeading: objectiveAngle, // direction the formation faces
+      formationHeading: faceAngle, // face toward player/center
     };
   }
 
   // ── Tactical Formation Offsets ──────────────────────────────
   // Returns a {x, z} offset for member index within a formation
   function getFormationOffset(formation, memberIndex, totalMembers, spread) {
-    var s = spread || 2.5;
+    var s = spread || 4.0;
     var i = memberIndex;
     switch (formation) {
       case 'wedge': {
@@ -741,21 +743,21 @@ const Enemies = (() => {
         if (i === 0) return { x: 0, z: 0 }; // pointman at tip
         var side = (i % 2 === 0) ? 1 : -1;
         var row = Math.ceil(i / 2);
-        return { x: side * row * s * 0.8, z: -row * s };
+        return { x: side * row * s * 0.9, z: -row * s };
       }
       case 'line': {
-        // Abreast line perpendicular to heading
+        // Abreast line perpendicular to heading — wider spacing
         var half = (totalMembers - 1) / 2;
-        return { x: (i - half) * s, z: 0 };
+        return { x: (i - half) * s * 1.1, z: 0 };
       }
       case 'column': {
-        // Single file, leader at front
-        return { x: (i % 2 === 0 ? 0.3 : -0.3) * s, z: -i * s * 0.7 };
+        // Single file, leader at front — deeper spacing
+        return { x: (i % 2 === 0 ? 0.4 : -0.4) * s, z: -i * s };
       }
       case 'staggered': {
         // Alternating left-right echelon
         var side2 = (i % 2 === 0) ? 1 : -1;
-        return { x: side2 * s * 0.5 * ((i % 4 < 2) ? 1 : 1.5), z: -Math.floor(i / 2) * s * 0.6 };
+        return { x: side2 * s * 0.7 * ((i % 4 < 2) ? 1 : 1.6), z: -Math.floor(i / 2) * s * 0.8 };
       }
       default:
         return { x: (Math.random() - 0.5) * s * 2, z: (Math.random() - 0.5) * s * 2 };
@@ -1780,48 +1782,43 @@ const Enemies = (() => {
     // Each stage flavors the group with its signature units
     var stageNum = (typeof _stageId === 'number') ? _stageId : 1;
 
-    // Core: officer + medic always present
-    var officerIdx = spawnOne('OFFICER', groupId, center);
-    group.members.push(officerIdx);
-    group.hasOfficer = true;
+    // Spawn members in formation positions (not all clustered at center)
+    var _formOrder = [
+      { type: 'OFFICER',  role: SQUAD_ROLE.OFFICER },
+      { type: 'MEDIC',    role: SQUAD_ROLE.RIFLEMAN },
+      { type: 'STORMER',  role: SQUAD_ROLE.POINTMAN },
+    ];
+    // Stage-specific pointman type
+    if (stageNum === 3)       _formOrder[2].type = 'WAGNER';
+    else if (stageNum === 8)  _formOrder[2].type = 'SPETSNAZ';
+    else if (stageNum === 10) _formOrder[2].type = 'KADYROVITE';
+    else if (stageNum === 12) _formOrder[2].type = 'SPETSNAZ';
 
-    var medicIdx = spawnOne('MEDIC', groupId, center);
-    group.members.push(medicIdx);
-    group.hasMedic = true;
-
-    // Pointman — use stage-specific pointman type
-    var pointType = 'STORMER';
-    if (stageNum === 3)       pointType = 'WAGNER';       // Bakhmut: Wagner spearheads
-    else if (stageNum === 8)  pointType = 'SPETSNAZ';     // Moscow: Spetsnaz vanguard
-    else if (stageNum === 10) pointType = 'KADYROVITE';   // Donbas: Kadyrovite assault
-    else if (stageNum === 12) pointType = 'SPETSNAZ';     // Kremlin: elite assault
-    var pointIdx = spawnOne(pointType, groupId, center);
-    enemies[pointIdx].squadRole = SQUAD_ROLE.POINTMAN;
-    group.members.push(pointIdx);
-
-    // Riflemen count scales with stage (bigger squads late-game)
-    var rifleCt = 2 + Math.floor(Math.random() * 3) + Math.floor(stageNum / 4);
-
-    // Stage-specific group fillers from roster
     var roster = STAGE_ROSTER[stageNum];
-    for (var i = 0; i < rifleCt; i++) {
-      var typ;
+    var rifleCt = 2 + Math.floor(Math.random() * 3) + Math.floor(stageNum / 4);
+    for (var ri = 0; ri < rifleCt; ri++) {
+      var rtyp;
       if (roster && Math.random() < 0.5) {
-        // Pull from stage signature pool
-        typ = roster.pool[Math.floor(Math.random() * roster.pool.length)];
+        rtyp = roster.pool[Math.floor(Math.random() * roster.pool.length)];
       } else {
-        typ = Math.random() < 0.3 ? 'ARMORED' : 'CONSCRIPT';
+        rtyp = Math.random() < 0.3 ? 'ARMORED' : 'CONSCRIPT';
       }
-      var idx = spawnOne(typ, groupId, center);
-      group.members.push(idx);
+      _formOrder.push({ type: rtyp, role: SQUAD_ROLE.RIFLEMAN });
+    }
+    if (stageNum >= 5 && Math.random() < 0.4) {
+      var specType = roster ? roster.pool[Math.floor(Math.random() * roster.pool.length)] : 'ARMORED';
+      _formOrder.push({ type: specType, role: SQUAD_ROLE.RIFLEMAN });
     }
 
-    // Stage-specific specialist additions
-    if (stageNum >= 5 && Math.random() < 0.4) {
-      // Late stages get an extra specialist
-      var specType = roster ? roster.pool[Math.floor(Math.random() * roster.pool.length)] : 'ARMORED';
-      var specIdx = spawnOne(specType, groupId, center);
-      group.members.push(specIdx);
+    // Spawn each member at their formation offset
+    for (var fi = 0; fi < _formOrder.length; fi++) {
+      var foff = getFormationWorldPos(group, fi, _formOrder.length);
+      var fpos = new THREE.Vector3(center.x + foff.x, center.y, center.z + foff.z);
+      var fidx = spawnOne(_formOrder[fi].type, groupId, fpos);
+      enemies[fidx].squadRole = _formOrder[fi].role;
+      group.members.push(fidx);
+      if (_formOrder[fi].type === 'OFFICER') group.hasOfficer = true;
+      if (_formOrder[fi].type === 'MEDIC') group.hasMedic = true;
     }
 
     assaultGroups.push(group);

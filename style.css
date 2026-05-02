@@ -1018,23 +1018,55 @@ canvas {
   position: absolute;
   bottom: 20px;
   left: 20px;
-  width: 140px;
-  height: 140px;
+  width: 160px;
+  height: 160px;
 }
 #joystick-base {
   position: absolute;
-  width: 140px; height: 140px;
+  width: 160px; height: 160px;
   border-radius: 50%;
   background: rgba(255,255,255,0.15);
   border: 2px solid rgba(255,255,255,0.3);
 }
 #joystick-thumb {
   position: absolute;
-  width: 60px; height: 60px;
+  width: 68px; height: 68px;
   border-radius: 50%;
   background: rgba(255,255,255,0.4);
-  left: 40px; top: 40px;
+  left: 46px; top: 46px;
   transition: none;
+}
+
+/* ── Aim Joystick (right side) ── */
+#aim-joystick-zone {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 160px;
+  height: 160px;
+}
+#aim-joystick-base {
+  position: absolute;
+  width: 160px; height: 160px;
+  border-radius: 50%;
+  background: rgba(255,80,80,0.12);
+  border: 2px solid rgba(255,120,120,0.3);
+}
+#aim-joystick-thumb {
+  position: absolute;
+  width: 68px; height: 68px;
+  border-radius: 50%;
+  background: rgba(255,120,120,0.4);
+  left: 46px; top: 46px;
+  transition: none;
+}
+.aim-joystick-label {
+  position: absolute;
+  bottom: 4px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: rgba(255,120,120,0.5);
+  pointer-events: none;
 }
 
 #mobile-actions {
@@ -1052,8 +1084,8 @@ canvas {
 #mobile-actions #btn-fire {
   grid-column: span 3;
   margin-bottom: 4px;
-  width: 88px; height: 88px;
-  font-size: 30px;
+  width: 100px; height: 100px;
+  font-size: 34px;
   background: rgba(255, 80, 80, 0.28);
   border-color: rgba(255, 120, 120, 0.55);
 }
@@ -1061,10 +1093,10 @@ canvas {
 #mobile-utility {
   position: absolute;
   right: max(18px, env(safe-area-inset-right));
-  bottom: 350px;
+  bottom: 380px;
   display: grid;
-  grid-template-columns: repeat(4, 52px);
-  gap: 8px;
+  grid-template-columns: repeat(4, 58px);
+  gap: 10px;
   justify-items: center;
 }
 
