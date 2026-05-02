@@ -907,6 +907,16 @@
       <button id="btn-weapon-next" class="mobile-btn sm">▶</button>
     </div>
 
+    <!-- Mobile Jukebox Bar (compact) -->
+    <div id="mobile-jukebox-bar" class="mobile-ctrl" style="position:absolute;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;gap:6px;align-items:center;background:rgba(0,0,0,0.5);border:1px solid rgba(255,213,0,0.3);border-radius:20px;padding:4px 10px;z-index:235">
+      <button id="mb-jbx-mute" class="mobile-btn" style="width:32px;height:32px;font-size:14px;background:none;border:none">🔊</button>
+      <input id="mb-jbx-vol" type="range" min="0" max="100" value="25" style="width:80px;accent-color:#ffd500">
+      <button id="mb-jbx-prev" class="mobile-btn" style="width:32px;height:32px;font-size:14px;background:none;border:none">⏮</button>
+      <button id="mb-jbx-play" class="mobile-btn" style="width:32px;height:32px;font-size:14px;background:none;border:none">▶</button>
+      <button id="mb-jbx-next" class="mobile-btn" style="width:32px;height:32px;font-size:14px;background:none;border:none">⏭</button>
+      <span id="mb-jbx-now" style="font-size:9px;color:#ffd500;max-width:80px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-family:monospace">—</span>
+    </div>
+
     <!-- Inventory/Pause button -->
     <button id="btn-pause" class="mobile-btn pause-btn">⏸</button>
 
@@ -1536,6 +1546,36 @@ document.addEventListener('DOMContentLoaded', function () {
     if (invAutoBtn) invAutoBtn.addEventListener('click', function () {
       Jukebox.setAutoplay(!Jukebox.getAutoplay());
     });
+
+    // Mobile jukebox bar controls
+    var mbMute = document.getElementById('mb-jbx-mute');
+    var mbVol  = document.getElementById('mb-jbx-vol');
+    var mbPrev = document.getElementById('mb-jbx-prev');
+    var mbPlay = document.getElementById('mb-jbx-play');
+    var mbNext = document.getElementById('mb-jbx-next');
+    var mbNow  = document.getElementById('mb-jbx-now');
+    var _mbMuted = false;
+    if (mbMute) {
+      mbMute.addEventListener('click', function () {
+        _mbMuted = !_mbMuted;
+        Jukebox.mute(_mbMuted);
+        mbMute.textContent = _mbMuted ? '🔇' : '🔊';
+      });
+    }
+    if (mbVol) mbVol.addEventListener('input', function () { Jukebox.setVolume(parseInt(mbVol.value, 10) / 100); _mbMuted = false; mbMute.textContent = '🔊'; });
+    if (mbPrev) mbPrev.addEventListener('click', function () { Jukebox.prev(); });
+    if (mbPlay) mbPlay.addEventListener('click', function () { Jukebox.toggle(); });
+    if (mbNext) mbNext.addEventListener('click', function () { Jukebox.next(); });
+    // Also update mobile bar in refreshAll
+    var _origRefresh = refreshAll;
+    refreshAll = function () {
+      _origRefresh();
+      var cur2 = Jukebox.getCurrent();
+      var isPlaying2 = Jukebox.isPlaying();
+      if (mbNow) mbNow.textContent = cur2 ? cur2.title : '—';
+      if (mbPlay) mbPlay.textContent = isPlaying2 ? '⏸' : '▶';
+      if (mbMute) mbMute.textContent = Jukebox.getVolume && Jukebox.getVolume() > 0 ? '🔊' : '🔇';
+    };
 
     // J key shortcut
     document.addEventListener('keydown', function (ev) {

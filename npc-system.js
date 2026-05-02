@@ -572,6 +572,15 @@ function buildCivilianMesh(npc) {
 
     npc.mesh = (rank === NPC_RANK.CIVILIAN) ? buildCivilianMesh(npc) : buildNPCMesh(npc);
     npc.mesh.position.copy(npc.position);
+    // Tactical flashlight for armed NPCs (~40% chance)
+    if (weaponDef && Math.random() < 0.4) {
+      var npcLight = new THREE.SpotLight(0xffffee, 1.2, 18, Math.PI / 4, 0.5, 1.2);
+      npcLight.position.set(0, 1.6, 0.3);
+      npcLight.target.position.set(0, 1.6, 5);
+      npc.mesh.add(npcLight);
+      npc.mesh.add(npcLight.target);
+      npc._flashlight = npcLight;
+    }
     return npc;
   }
 
@@ -1249,6 +1258,11 @@ function buildCivilianMesh(npc) {
         updateBehavior(npc, delta, timeInfo);
         updateMovement(npc, delta);
         updateAnimation(npc, delta);
+        // Update flashlight direction to match NPC facing
+        if (npc._flashlight && npc.mesh) {
+          var fwd = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), npc.mesh.rotation.y);
+          npc._flashlight.target.position.set(fwd.x * 5, 1.6, fwd.z * 5);
+        }
         // Sitting mat: toggle rolled vs flat plane based on idle time
         var ud = npc.mesh && npc.mesh.userData;
         if (ud && ud.sittingMatRolled && ud.sittingMatFlat) {

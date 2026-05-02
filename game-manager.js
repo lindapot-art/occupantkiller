@@ -1426,6 +1426,11 @@ const GameManager = (function () {
           }
         }
 
+        // L key — toggle weapon flashlight
+        if (e.code === 'KeyL') {
+          if (typeof Weapons !== 'undefined' && Weapons.toggleFlashlight) Weapons.toggleFlashlight();
+        }
+
         // F key priority chain: 1) drone release  2) mission interact  3) drone possess  4) quick melee
         if (e.code === 'KeyF') {
           var fHandled = false;
@@ -3426,6 +3431,15 @@ const GameManager = (function () {
         DroneSystem.spawnEnemyDrone(fp.x, droneSpawnH, fp.z, 'enemy_fpv');
       }
 
+      // Ukrainian incendiary drone (friendly fire-support) — wave 3+
+      if (w >= 3 && typeof DroneSystem !== 'undefined' && DroneSystem.spawn) {
+        var incPos = _nestSpawnPos(99);
+        var incDrone = DroneSystem.spawn(incPos.x, droneSpawnH + 5, incPos.z, 'incendiary');
+        if (incDrone && typeof HUD !== 'undefined' && HUD.notifyPickup) {
+          HUD.notifyPickup('🔥 UKRAINIAN INCENDIARY DRONE DEPLOYED — [F] when possessing to drop fire', '#ff6600');
+        }
+      }
+
       if (w >= 4 && Math.random() < nestMult) {
         var bp = _nestSpawnPos(1);
         DroneSystem.spawnEnemyDrone(bp.x, droneSpawnH + 5, bp.z, 'enemy_bomber');
@@ -4184,6 +4198,8 @@ const GameManager = (function () {
             DroneSystem.fireAttack(drone.id);
           } else if (drone.type === 'bomb' && drone.hasPayload) {
             DroneSystem.dropPayload(drone.id);
+          } else if (drone.type === 'incendiary' && drone.hasPayload) {
+            DroneSystem.dropFire(drone.id);
           }
         }
         mouseNewPress = false;

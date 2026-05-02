@@ -85,27 +85,32 @@ const Tracers = (() => {
 
   function spawnMuzzleFlash(pos, dir) {
     if (!_scene) return;
-    // 20% of previous size — was 0.5..0.7, now 0.10..0.14 to stop blocking the player view
-    var flashSize = 0.10 + Math.random() * 0.04;
+    // Visible flash size — big enough to see, small enough to not block view
+    var flashSize = 0.22 + Math.random() * 0.10;
     var flashColor = Math.random() < 0.5 ? 0xffdd44 : 0xffaa22;
     var flashMat = new THREE.MeshBasicMaterial({
-      color: flashColor, transparent: true, opacity: 0.9,
+      color: flashColor, transparent: true, opacity: 0.95,
       blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     });
     var flash = new THREE.Mesh(_planeGeoFlash, flashMat);
     flash.scale.setScalar(flashSize);
-    // Move flash slightly further from origin so the small puff still reads at distance
     flash.position.copy(pos).addScaledVector(dir, 0.35);
     _tTmp.copy(pos).add(dir);
     flash.lookAt(_tTmp);
     flash.rotation.z = Math.random() * Math.PI;
     _scene.add(flash);
-    // Single billboard now (cross-billboard removed; doubled the visual mass with no readability gain)
-    // Dim point light for illumination — was intensity 3, range 8
-    var light = new THREE.PointLight(0xffaa22, 1.2, 4);
+    // Second cross-plane for 3D volume
+    var flash2 = new THREE.Mesh(_planeGeoFlash, flashMat.clone());
+    flash2.scale.setScalar(flashSize * 0.8);
+    flash2.position.copy(flash.position);
+    flash2.lookAt(_tTmp);
+    flash2.rotation.z = flash.rotation.z + Math.PI / 2;
+    _scene.add(flash2);
+    // Bright point light for illumination
+    var light = new THREE.PointLight(0xffaa22, 2.5, 6);
     light.position.copy(flash.position);
     _scene.add(light);
-    flashes.push({ mesh: flash, light: light, life: 0.14 });
+    flashes.push({ mesh: flash, light: light, life: 0.14, mesh2: flash2 });
   }
 
   /* ── Explosion Particles ────────────────────────────────────── */
@@ -280,11 +285,14 @@ const Tracers = (() => {
       f.life -= delta;
       if (f.life <= 0) {
         if (f.mesh) { _scene.remove(f.mesh); f.mesh.material.dispose(); }
+        if (f.mesh2) { _scene.remove(f.mesh2); f.mesh2.material.dispose(); }
         if (f.light) { _scene.remove(f.light); f.light.dispose(); }
         flashes.splice(i, 1);
       } else {
-        if (f.mesh) f.mesh.material.opacity = f.life / 0.06;
-        if (f.light) f.light.intensity = f.life / 0.06 * 2;
+        var op = Math.min(1, f.life / 0.08);
+        if (f.mesh) f.mesh.material.opacity = op;
+        if (f.mesh2) f.mesh2.material.opacity = op * 0.8;
+        if (f.light) f.light.intensity = op * 2.5;
       }
     }
     // Update explosion particles

@@ -2488,6 +2488,8 @@ const Weapons = (() => {
   let muzzleFlash = null;
   let muzzleTimer = 0;
   let _muzzleLight = null;
+  let _weaponFlashlight = null;
+  let _flashlightOn = false;
   // Lingering muzzle smoke puff (plane that fades + drifts up)
   let _muzzleSmoke = null;
   let _muzzleSmokeTimer = 0;
@@ -2517,6 +2519,14 @@ const Weapons = (() => {
     _muzzleLight = new THREE.PointLight(0xff8833, 0, 8);
     _muzzleLight.position.set(0, -0.05, -0.7);
     camera.add(_muzzleLight);
+
+    // Weapon tactical flashlight (spotlight attached to camera)
+    _weaponFlashlight = new THREE.SpotLight(0xffffee, 0, 35, Math.PI / 5, 0.6, 1.5);
+    _weaponFlashlight.position.set(0, -0.08, -0.3);
+    _weaponFlashlight.target.position.set(0, -0.08, -10);
+    camera.add(_weaponFlashlight);
+    camera.add(_weaponFlashlight.target);
+    _flashlightOn = true;
 
     // Lingering smoke puff plane (additive grey, faces camera)
     var smokeGeo = new THREE.PlaneGeometry(0.18, 0.18);
@@ -2729,6 +2739,13 @@ const Weapons = (() => {
     if (!_camera) return;
     zoomed = false;
     _adsTarget = 0;
+  }
+
+  function toggleFlashlight() {
+    _flashlightOn = !_flashlightOn;
+    if (typeof HUD !== 'undefined' && HUD.notifyPickup) {
+      HUD.notifyPickup(_flashlightOn ? '🔦 Flashlight ON' : '🔦 Flashlight OFF', _flashlightOn ? '#ffffaa' : '#888888');
+    }
   }
 
   function handleRightDown() {
@@ -3533,6 +3550,13 @@ const Weapons = (() => {
       if (muzzleFlash) muzzleFlash.material.opacity = Math.max(0, muzzleTimer / 0.06);
       if (_muzzleLight) _muzzleLight.intensity = Math.max(0, (muzzleTimer / 0.06) * 2.5);
     }
+    // Weapon flashlight: on for suitable weapons, off for melee/launchers/smoke/etc
+    if (_weaponFlashlight) {
+      var cw = cur();
+      var hasLight = cw && ['MELEE','MINE','SMOKE','FLASHBANG','EXPLOSIVE'].indexOf(cw.type) < 0;
+      var targetInt = (_flashlightOn && hasLight) ? 2.5 : 0;
+      _weaponFlashlight.intensity += (targetInt - _weaponFlashlight.intensity) * Math.min(1, delta * 8);
+    }
     // Lingering muzzle smoke puff: drift up & fade
     if (_muzzleSmokeTimer > 0 && _muzzleSmoke) {
       _muzzleSmokeTimer -= delta;
@@ -4253,6 +4277,7 @@ const Weapons = (() => {
     handleRightUp,
     exitZoom,
     isZoomed,
+    toggleFlashlight,
     setPlayerSpeed: function(s) { _playerSpeed = s; },
     setHoldBreath,
     getRecoilAccum: function() { return _recoilPitchAccum; },

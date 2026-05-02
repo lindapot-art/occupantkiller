@@ -16,6 +16,7 @@ const DroneSystem = (function () {
     BOMB:         'bomb',
     SURVEILLANCE: 'surveillance',
     KAMIKAZE:     'kamikaze',
+    INCENDIARY:   'incendiary',
     ENEMY_BOMBER: 'enemy_bomber',
     ENEMY_FPV:    'enemy_fpv',
     ENEMY_OBSERVER: 'enemy_observer',
@@ -27,6 +28,7 @@ const DroneSystem = (function () {
     bomb:           { speed: 8,  health: 40,  battery: 90,  damage: 200, range: 60 },
     surveillance:   { speed: 6,  health: 50,  battery: 300, damage: 0,   range: 100 },
     kamikaze:       { speed: 25, health: 8,   battery: 20,  damage: 120, range: 35 },
+    incendiary:     { speed: 10, health: 25,  battery: 60,  damage: 60,  range: 70 },
     enemy_bomber:   { speed: 7,  health: 35,  battery: 80,  damage: 150, range: 50 },
     enemy_fpv:      { speed: 22, health: 10,  battery: 30,  damage: 100, range: 40 },
     enemy_observer: { speed: 5,  health: 45,  battery: 200, damage: 0,   range: 120 },
@@ -235,6 +237,20 @@ const DroneSystem = (function () {
       group.add(payload);
     }
 
+    // Incendiary drone: red payload + flame glow
+    if (type === DRONE_TYPE.INCENDIARY) {
+      const payload = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.09, 0.07, 0.22, 8),
+        new THREE.MeshLambertMaterial({ color: 0xcc3300 })
+      );
+      payload.position.set(0, -0.15, 0);
+      payload.userData.isPayload = true;
+      group.add(payload);
+      const glow = new THREE.PointLight(0xff4400, 1.5, 4);
+      glow.position.set(0, -0.15, 0);
+      group.add(glow);
+    }
+
     group.castShadow = true;
     return group;
   }
@@ -283,7 +299,7 @@ const DroneSystem = (function () {
       mesh:     null,
       alive:    true,
       active:   true,  // powered on
-      hasPayload: type === DRONE_TYPE.BOMB || type === DRONE_TYPE.ENEMY_BOMBER,
+      hasPayload: type === DRONE_TYPE.BOMB || type === DRONE_TYPE.ENEMY_BOMBER || type === DRONE_TYPE.INCENDIARY,
 
       // AI patrol (for surveillance drones)
       patrolPoints: [],
@@ -848,6 +864,48 @@ const DroneSystem = (function () {
     }
     createDroneExplosion(dropPos);
         if (typeof window.AudioSystem !== 'undefined') window.AudioSystem.playGunshot('launcher');
+    return { position: dropPos, damage: drone.damage };
+  }
+
+  function dropFire(droneId) {
+    const drone = drones.find(d => d.id === droneId);
+    if (!drone || drone.type !== DRONE_TYPE.INCENDIARY || !drone.hasPayload) return false;
+    drone.hasPayload = false;
+    drone.mesh.children.forEach(function(ch) { if (ch.userData.isPayload) ch.visible = false; });
+    const dropPos = drone.position.clone();
+    dropPos.y -= 1;
+    // Fire damage to enemies
+    if (typeof Enemies !== 'undefined' && Enemies.damageInRadius) {
+      Enemies.damageInRadius(dropPos, 6, drone.damage);
+    }
+    // Spawn fire VFX
+    if (typeof Tracers !== 'undefined') {
+      if (Tracers.spawnFire) Tracers.spawnFire(dropPos, 6);
+      if (Tracers.spawnExplosion) Tracers.spawnExplosion(dropPos, 3);
+    }
+    // Terrain fire: set blocks to fire type temporarily
+    try {
+      if (typeof VoxelWorld !== 'undefined' && VoxelWorld.setBlock) {
+        var cx = Math.round(dropPos.x), cy = Math.round(dropPos.y), cz = Math.round(dropPos.z);
+        for (var bx = -2; bx <= 2; bx++) {
+          for (var bz = -2; bz <= 2; bz++) {
+            if (bx * bx + bz * bz <= 5) {
+              var by = cy;
+              while (by > 0 && VoxelWorld.getBlock(cx + bx, by, cz + bz) === 0) by--;
+              if (by >= 0 && VoxelWorld.getBlock(cx + bx, by, cz + bz) !== 0) {
+                VoxelWorld.setBlock(cx + bx, by + 1, cz + bz, 13); // fire block
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+    if (typeof window.AudioSystem !== 'undefined' && window.AudioSystem.playGunshot) {
+      window.AudioSystem.playGunshot('launcher');
+    }
+    if (typeof HUD !== 'undefined' && HUD.notifyPickup) {
+      HUD.notifyPickup('🔥 INCENDIARY DROPPED!', '#ff4400');
+    }
     return { position: dropPos, damage: drone.damage };
   }
 

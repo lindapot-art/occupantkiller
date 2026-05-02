@@ -1147,7 +1147,7 @@ canvas {
 #btn-pause {
   position: absolute;
   top: max(10px, env(safe-area-inset-top));
-  right: max(10px, env(safe-area-inset-right));
+  left: max(180px, env(safe-area-inset-left));
   width: 48px; height: 48px;
   font-size: 22px;
   pointer-events: auto;
@@ -1165,6 +1165,17 @@ canvas {
   background: rgba(0,0,0,0.6);
   z-index: 20;
   pointer-events: none;
+}
+/* Mobile minimap: small square top-left, responsive */
+html.is-mobile #minimap-canvas {
+  display: block !important;
+  bottom: auto;
+  top: max(52px, env(safe-area-inset-top) + 48px);
+  right: auto;
+  left: max(8px, env(safe-area-inset-left));
+  width: min(22vw, 130px);
+  height: min(22vw, 130px);
+  border-radius: 8px;
 }
 
 /* ── Kill Feed ────────────────────────────────────────────── */
@@ -1350,9 +1361,18 @@ html.is-mobile #tank-hud {
   html.is-mobile #joystick-zone {
     width: 110px !important; height: 110px !important;
   }
-  /* Mobile: hide minimap to free screen real estate for touch controls */
+  /* Mobile minimap shown as small square top-left */
   html.is-mobile #minimap-container,
-  html.is-mobile #minimap-canvas { display: none !important; }
+  html.is-mobile #minimap-canvas {
+    display: block !important;
+    bottom: auto;
+    top: calc(var(--mobile-safe-top) + 50px);
+    right: auto;
+    left: max(6px, env(safe-area-inset-left));
+    width: min(20vw, 120px);
+    height: min(20vw, 120px);
+    border-radius: 6px;
+  }
   /* Mobile: compact bottom HUD bar */
   html.is-mobile #bottom-bar { transform: translateX(-50%) scale(0.85); transform-origin: bottom center; }
   html.is-mobile #hud-resources { font-size: 9px !important; }
@@ -1379,6 +1399,15 @@ html.is-mobile #tank-hud {
   html.is-mobile #top-bar { font-size: 10px; gap: 10px; top: 32px; }
   html.is-mobile #extended-top-bar { font-size: 9px; padding: 3px 8px; }
   html.is-mobile #resource-bar { font-size: 9px; top: 52px; }
+  /* Hide desktop top-bar buttons on mobile */
+  html.is-mobile #jukebox-btn,
+  html.is-mobile #lottery-btn,
+  html.is-mobile #premium-btn,
+  html.is-mobile #gyro-btn,
+  html.is-mobile #mortar-btn,
+  html.is-mobile #bradley-btn,
+  html.is-mobile #hud-god-mode-btn { display: none !important; }
+  html.is-mobile #inventory-btn { right: max(10px, env(safe-area-inset-right)); top: max(8px, env(safe-area-inset-top)); }
   html.is-mobile #tactical-compass { top: 8px; width: 240px; }
   html.is-mobile #hud-okc-bar { top: 82px; font-size: 10px; }
   html.is-mobile #weather-indicator { top: 44px; font-size: 9px; }
