@@ -20,7 +20,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#000000" />
   <title>OccupantKiller — Hybrid Voxel Warfare</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20260429" />
 </head>
   <body>
     <!-- ── Boot Preloader (gates GameManager.init until everything is ready) ── -->
@@ -41,7 +41,7 @@
     <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     <div id="error-overlay" style="display:none;position:fixed;z-index:99999;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);color:#fff;font-family:monospace;font-size:18px;padding:40px 20px 20px 20px;overflow:auto;"></div>
     <div id="conn-status" style="position:fixed;top:4px;right:8px;z-index:9999;font-family:monospace;font-size:11px;padding:2px 8px;border-radius:6px;background:rgba(34,34,34,0.7);color:#fff;border:1px solid rgba(68,68,68,0.5);">Srv <span id="conn-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#aaa;vertical-align:middle;"></span></div>
-    <script src="page-prelude.js"></script>
+    <script src="page-prelude.js?v=20260429"></script>
   <!-- Skill/Perk Progression HUD -->
   <div id="skill-hud-overlay" style="display:none;position:fixed;top:10%;left:50%;transform:translateX(-50%);z-index:300;"></div>
   <button id="skill-hud-btn" style="position:fixed;top:4px;left:8px;background:rgba(0,0,0,0.5);border:1px solid rgba(68,170,255,0.5);color:#aaccff;padding:2px 10px;border-radius:4px;font-size:11px;font-family:monospace;z-index:210;cursor:pointer">🧠 SKILLS</button>
@@ -937,7 +937,7 @@
 </div>
 
 <!-- Three.js r137 (local copy, patched for CVE XSS < 0.137.0) -->
-<script src="three.min.js"></script>
+<script src="three.min.js?v=20260429"></script>
 
 <!-- ethers v6 (CDN — used by blockchain.js for contract calls).
      async + onerror so a slow/blocked CDN can't stall game boot.
@@ -947,54 +947,54 @@
         onerror="console.warn('[BOOT] ethers CDN failed; web3 features disabled');"></script>
 
 <!-- Core modules (order matters: dependencies first) -->
-<script src="voxel-world.js"></script>
-<script src="camera-system.js"></script>
-<script src="time-system.js"></script>
-<script src="economy.js"></script>
-<script src="api-client.js"></script>
-<script src="blockchain.js"></script>
-<script src="marketplace.js"></script>
-<script src="skills.js"></script>
-<script src="ranks.js"></script>
-<script src="building.js"></script>
-<script src="npc-system.js"></script>
-<script src="drone-system.js"></script>
-<script src="vehicles.js"></script>
-<script src="automation.js"></script>
-<script src="missions.js"></script>
-<script src="pickups.js"></script>
-<script src="hud.js"></script>
-<script src="weapon-details.js"></script>
-<script src="weapons.js"></script>
-<script src="enemies.js"></script>
-<script src="audio-system.js"></script>
-<script src="jukebox.js"></script>
-<script src="birds.js"></script>
-<script src="premium.js"></script>
-<script src="lottery.js"></script>
-<script src="mortar.js"></script>
-<script src="bradley.js"></script>
-<script src="gyro.js"></script>
-<script src="weather-system.js"></script>
-<script src="ml-system.js"></script>
-<script src="npc-ml.js"></script>
-<script src="tokenomics.js"></script>
-<script src="tracers.js"></script>
-<script src="stage-vfx.js"></script>
-<script src="flags.js"></script>
-<script src="environment.js"></script>
+<script src="voxel-world.js?v=20260429"></script>
+<script src="camera-system.js?v=20260429"></script>
+<script src="time-system.js?v=20260429"></script>
+<script src="economy.js?v=20260429"></script>
+<script src="api-client.js?v=20260429"></script>
+<script src="blockchain.js?v=20260429"></script>
+<script src="marketplace.js?v=20260429"></script>
+<script src="skills.js?v=20260429"></script>
+<script src="ranks.js?v=20260429"></script>
+<script src="building.js?v=20260429"></script>
+<script src="npc-system.js?v=20260429"></script>
+<script src="drone-system.js?v=20260429"></script>
+<script src="vehicles.js?v=20260429"></script>
+<script src="automation.js?v=20260429"></script>
+<script src="missions.js?v=20260429"></script>
+<script src="pickups.js?v=20260429"></script>
+<script src="hud.js?v=20260429"></script>
+<script src="weapon-details.js?v=20260429"></script>
+<script src="weapons.js?v=20260429"></script>
+<script src="enemies.js?v=20260429"></script>
+<script src="audio-system.js?v=20260429"></script>
+<script src="jukebox.js?v=20260429"></script>
+<script src="birds.js?v=20260429"></script>
+<script src="premium.js?v=20260429"></script>
+<script src="lottery.js?v=20260429"></script>
+<script src="mortar.js?v=20260429"></script>
+<script src="bradley.js?v=20260429"></script>
+<script src="gyro.js?v=20260429"></script>
+<script src="weather-system.js?v=20260429"></script>
+<script src="ml-system.js?v=20260429"></script>
+<script src="npc-ml.js?v=20260429"></script>
+<script src="tokenomics.js?v=20260429"></script>
+<script src="tracers.js?v=20260429"></script>
+<script src="stage-vfx.js?v=20260429"></script>
+<script src="flags.js?v=20260429"></script>
+<script src="environment.js?v=20260429"></script>
 
 <!-- New feature modules (59 features) -->
-<script src="combat-extras.js"></script>
-<script src="traversal.js"></script>
-<script src="enemy-types.js"></script>
-<script src="world-features.js"></script>
-<script src="perks.js"></script>
-<script src="mission-types.js"></script>
-<script src="feedback.js"></script>
-<script src="progression.js"></script>
-<script src="refinery-strike.js"></script>
-<script src="enemy-artillery.js"></script>
+<script src="combat-extras.js?v=20260429"></script>
+<script src="traversal.js?v=20260429"></script>
+<script src="enemy-types.js?v=20260429"></script>
+<script src="world-features.js?v=20260429"></script>
+<script src="perks.js?v=20260429"></script>
+<script src="mission-types.js?v=20260429"></script>
+<script src="feedback.js?v=20260429"></script>
+<script src="progression.js?v=20260429"></script>
+<script src="refinery-strike.js?v=20260429"></script>
+<script src="enemy-artillery.js?v=20260429"></script>
 
 
 <script src="game-manager.js?v=20260429-static"></script>
