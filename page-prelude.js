@@ -22,6 +22,13 @@
       if (ctrl) ctrl.abort();
     }, 2500);
 
+    // Skip health check on static hosts (GitHub Pages, etc.) — no server endpoint exists
+    var isStaticHost = location.hostname.indexOf('github.io') >= 0 || location.protocol === 'file:';
+    if (isStaticHost) {
+      if (dot) { dot.style.background = '#3f3'; dot.title = 'Static host (no server)'; }
+      scheduleConnCheck(_connDelayMax);
+      return;
+    }
     fetch('/healthz', {
       cache: 'no-store',
       signal: ctrl ? ctrl.signal : undefined,

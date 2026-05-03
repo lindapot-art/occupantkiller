@@ -16,10 +16,11 @@ window.Jukebox = (function () {
   let _mode = 'mp3'; // 'mp3' | 'procedural'
   let _autoplay = true;
 
-  // Fetch music manifest from server
+  // Fetch music manifest — tries static JSON first (works on GitHub Pages), then server endpoint
   function _loadMp3Manifest() {
     if (typeof fetch === 'undefined') return;
-    fetch('/api/music')
+    // Static manifest works on both local server and static hosts (GitHub Pages)
+    fetch('gamemusic/manifest.json')
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (Array.isArray(data) && data.length) {
@@ -28,7 +29,7 @@ window.Jukebox = (function () {
         }
       })
       .catch(function () {
-        // Fallback: known tracks if server endpoint missing
+        // Fallback: hardcoded known tracks (server-less / static hosting)
         _mp3Tracks = [
           { filename: 'Glory to Ukraine.mp3', title: 'Glory to Ukraine', artist: 'OccupantKiller OST', src: 'gamemusic/Glory%20to%20Ukraine.mp3' },
           { filename: 'No Occupants.mp3', title: 'No Occupants', artist: 'OccupantKiller OST', src: 'gamemusic/No%20Occupants.mp3' },

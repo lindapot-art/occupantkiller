@@ -1161,64 +1161,80 @@ const GameManager = (function () {
     // frozen on desktop (and worse on mobile / slow GPUs).
     var _initStep = 0;
     var _initSteps = 14;
+    var _bootErrors = [];
+    function _safeInit(label, fn) {
+      try {
+        fn();
+      } catch (e) {
+        console.warn('[BOOT] ' + label + ' failed:', e);
+        _bootErrors.push(label + ': ' + (e && e.message ? e.message : e));
+      }
+    }
     function _bootStep(label) {
       _initStep++;
       if (typeof window.__bootProgress === 'function') {
         var pct = 30 + Math.round((_initStep / _initSteps) * 65); // 30→95
-        try { window.__bootProgress(pct, label, ''); } catch (e) {}
+        var detail = _bootErrors.length ? 'warnings: ' + _bootErrors.slice(-2).join('; ') : '';
+        try { window.__bootProgress(pct, label, detail); } catch (e) {}
       }
     }
 
-    if (CameraSystem && typeof CameraSystem.init === 'function') CameraSystem.init(_camera);
+    _safeInit('camera', function () { if (CameraSystem && typeof CameraSystem.init === 'function') CameraSystem.init(_camera); });
     _bootStep('camera');
-    if (window.VoxelWorld && typeof window.VoxelWorld.init === 'function') window.VoxelWorld.init(_scene);
+    _safeInit('voxel world', function () { if (window.VoxelWorld && typeof window.VoxelWorld.init === 'function') window.VoxelWorld.init(_scene); });
     _bootStep('voxel world');
 
-    if (TimeSystem && typeof TimeSystem.init === 'function') TimeSystem.init(_scene, sunLight, ambLight, hemiLight);
+    _safeInit('time', function () { if (TimeSystem && typeof TimeSystem.init === 'function') TimeSystem.init(_scene, sunLight, ambLight, hemiLight); });
     _bootStep('time');
-    if (Building && typeof Building.init === 'function') Building.init(_scene);
+    _safeInit('building', function () { if (Building && typeof Building.init === 'function') Building.init(_scene); });
     _bootStep('building');
-    if (NPCSystem && typeof NPCSystem.init === 'function') NPCSystem.init(_scene);
+    _safeInit('npc system', function () { if (NPCSystem && typeof NPCSystem.init === 'function') NPCSystem.init(_scene); });
     _bootStep('npc system');
-    if (DroneSystem && typeof DroneSystem.init === 'function') DroneSystem.init(_scene, _camera);
-    if (typeof EnemyArtillery !== 'undefined' && EnemyArtillery.init) EnemyArtillery.init(_scene);
+    _safeInit('drones', function () {
+      if (DroneSystem && typeof DroneSystem.init === 'function') DroneSystem.init(_scene, _camera);
+      if (typeof EnemyArtillery !== 'undefined' && EnemyArtillery.init) EnemyArtillery.init(_scene);
+    });
     _bootStep('drones');
-    if (typeof RefineryStrike !== 'undefined' && RefineryStrike.init) RefineryStrike.init(_scene);
-    if (VehicleSystem && typeof VehicleSystem.init === 'function') VehicleSystem.init(_scene);
+    _safeInit('refinery', function () { if (typeof RefineryStrike !== 'undefined' && RefineryStrike.init) RefineryStrike.init(_scene); });
+    _safeInit('vehicles', function () { if (VehicleSystem && typeof VehicleSystem.init === 'function') VehicleSystem.init(_scene); });
     _bootStep('vehicles');
-    if (Economy && typeof Economy.init === 'function') Economy.init();
-    if (SkillSystem && typeof SkillSystem.init === 'function') SkillSystem.init();
-    if (RankSystem && typeof RankSystem.init === 'function') RankSystem.init();
+    _safeInit('economy', function () { if (Economy && typeof Economy.init === 'function') Economy.init(); });
+    _safeInit('skills', function () { if (SkillSystem && typeof SkillSystem.init === 'function') SkillSystem.init(); });
+    _safeInit('ranks', function () { if (RankSystem && typeof RankSystem.init === 'function') RankSystem.init(); });
     _bootStep('progression');
-    if (MissionSystem && typeof MissionSystem.init === 'function') MissionSystem.init();
-    if (Automation && typeof Automation.init === 'function') Automation.init();
-    if (Pickups && typeof Pickups.init === 'function') Pickups.init(_scene);
+    _safeInit('missions', function () {
+      if (MissionSystem && typeof MissionSystem.init === 'function') MissionSystem.init();
+      if (Automation && typeof Automation.init === 'function') Automation.init();
+      if (Pickups && typeof Pickups.init === 'function') Pickups.init(_scene);
+    });
     _bootStep('missions');
 
     // Tracers system
-    if (typeof Tracers !== 'undefined' && Tracers && typeof Tracers.init === 'function') Tracers.init(_scene);
+    _safeInit('tracers', function () { if (typeof Tracers !== 'undefined' && Tracers && typeof Tracers.init === 'function') Tracers.init(_scene); });
     _bootStep('tracers');
 
     // Audio, Weather & ML systems
-    if (window.AudioSystem && typeof window.AudioSystem.init === 'function') window.AudioSystem.init();
-    if (WeatherSystem && typeof WeatherSystem.init === 'function') WeatherSystem.init(_scene, _camera);
-    if (MLSystem && typeof MLSystem.init === 'function') MLSystem.init();
-    if (typeof StageVFX !== 'undefined' && StageVFX && typeof StageVFX.init === 'function') StageVFX.init(_scene);
-    if (typeof Flags !== 'undefined' && Flags && typeof Flags.init === 'function') {
-      Flags.init(_scene);
-      // Plant a Ukrainian flagpole near the player spawn (and a captured Russian one further out for atmosphere)
-      try {
-        var spawnX = (_player && _player.position) ? _player.position.x : 0;
-        var spawnZ = (_player && _player.position) ? _player.position.z : 0;
-        var groundY = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
-          ? VoxelWorld.getTerrainHeight(spawnX + 6, spawnZ + 6) + 1 : 1;
-        Flags.spawnFlagpole(spawnX + 6, groundY, spawnZ + 6, 'ukrainian', 4.5);
-        var ry = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
-          ? VoxelWorld.getTerrainHeight(spawnX + 28, spawnZ - 28) + 1 : 1;
-        Flags.spawnFlagpole(spawnX + 28, ry, spawnZ - 28, 'russian', 4.0);
-      } catch (e) {}
-    }
-    if (typeof Environment !== 'undefined' && Environment.init) Environment.init(_scene, _camera);
+    _safeInit('audio', function () { if (window.AudioSystem && typeof window.AudioSystem.init === 'function') window.AudioSystem.init(); });
+    _safeInit('weather', function () { if (WeatherSystem && typeof WeatherSystem.init === 'function') WeatherSystem.init(_scene, _camera); });
+    _safeInit('ml', function () { if (MLSystem && typeof MLSystem.init === 'function') MLSystem.init(); });
+    _safeInit('stagevfx', function () { if (typeof StageVFX !== 'undefined' && StageVFX && typeof StageVFX.init === 'function') StageVFX.init(_scene); });
+    _safeInit('flags', function () {
+      if (typeof Flags !== 'undefined' && Flags && typeof Flags.init === 'function') {
+        Flags.init(_scene);
+        // Plant a Ukrainian flagpole near the player spawn (and a captured Russian one further out for atmosphere)
+        try {
+          var spawnX = (typeof player !== 'undefined' && player.position) ? player.position.x : 0;
+          var spawnZ = (typeof player !== 'undefined' && player.position) ? player.position.z : 0;
+          var groundY = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
+            ? VoxelWorld.getTerrainHeight(spawnX + 6, spawnZ + 6) + 1 : 1;
+          Flags.spawnFlagpole(spawnX + 6, groundY, spawnZ + 6, 'ukrainian', 4.5);
+          var ry = (typeof VoxelWorld !== 'undefined' && VoxelWorld.getTerrainHeight)
+            ? VoxelWorld.getTerrainHeight(spawnX + 28, spawnZ - 28) + 1 : 1;
+          Flags.spawnFlagpole(spawnX + 28, ry, spawnZ - 28, 'russian', 4.0);
+        } catch (e) {}
+      }
+    });
+    _safeInit('environment', function () { if (typeof Environment !== 'undefined' && Environment.init) Environment.init(_scene, _camera); });
 
     // ── New feature systems init ──────────────────────────
     if (typeof CombatExtras !== 'undefined' && CombatExtras && typeof CombatExtras.reset === 'function') CombatExtras.reset();

@@ -997,7 +997,7 @@
 <script src="enemy-artillery.js"></script>
 
 
-<script src="game-manager.js?v=20260426-refinery"></script>
+<script src="game-manager.js?v=20260429-static"></script>
 
 
 <!-- Defensive global export for VoxelWorld and AudioSystem -->
@@ -1075,9 +1075,16 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(hideBootPreloader, 220);
       } catch (e) {
         var ov = document.getElementById('error-overlay');
+        var errMsg = (e && e.message ? e.message : String(e));
+        var errStack = (e && e.stack ? e.stack : '');
         if (ov) {
           ov.style.display = 'block';
-          ov.innerText = 'BOOT ERROR:\n' + (e && e.message ? e.message : e) + '\n\nTry reloading the page.';
+          ov.innerHTML = '<div style="font-family:monospace;font-size:13px;line-height:1.4">' +
+            '<div style="color:#ff6464;font-weight:bold;font-size:16px;margin-bottom:8px">BOOT ERROR</div>' +
+            '<div style="color:#ffaa44;margin-bottom:8px">' + errMsg.replace(/</g, '&lt;') + '</div>' +
+            '<pre style="color:#aaa;font-size:11px;white-space:pre-wrap;word-break:break-all;max-height:40vh;overflow:auto">' + errStack.replace(/</g, '&lt;') + '</pre>' +
+            '<div style="margin-top:12px;color:#888">Try reloading the page (Ctrl+Shift+R).</div>' +
+            '</div>';
         }
         console.error('[BOOT]', e);
       }
