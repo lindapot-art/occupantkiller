@@ -1119,6 +1119,10 @@ function buildCivilianMesh(npc) {
       const lz = Math.sin(leaderAngle) * leaderDist;
       const lh = (typeof VoxelWorld !== 'undefined') ? (VoxelWorld.getTopSolidY ? VoxelWorld.getTopSolidY(lx, lz) : VoxelWorld.getTerrainHeight(lx, lz) + 1) : 0;
 
+      // Use professional Ukrainian army formation with proper spacing
+      var tpl = FORMATION_TEMPLATES[FORMATION.WEDGE];
+      var _formOffsets = tpl ? tpl.slice() : [[0, 0], [1, 0], [-1, 1], [1, 1], [-1, -1], [1, -1]];
+
       // Leader (specialist)
       const leader = spawn(lx, lh, lz, NPC_RANK.SPECIALIST);
       leader.job = JOB.ASSAULT;
@@ -1126,10 +1130,6 @@ function buildCivilianMesh(npc) {
       leader.groupRole = 'leader';
       leader._formOff = _formOffsets[0];
       group.members.push(leader.id);
-
-      // Use professional Ukrainian army formation with proper spacing
-      var tpl = FORMATION_TEMPLATES[FORMATION.WEDGE];
-      var _formOffsets = tpl.slice();
 
       // Medic (infantry rank, medic job)
       const mx = lx + (Math.random() - 0.5) * 3;
